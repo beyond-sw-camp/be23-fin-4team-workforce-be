@@ -1,8 +1,6 @@
 # WORKFORCE - 기록하는 HR에서 예측하는 HR로, 스마트 HR 통합 플랫폼
 
-<div align="center">
-  <img width="492" height="200" alt="image" src="https://github.com/user-attachments/assets/a5a984c1-b005-43a8-bec6-f07fafe8d7e9" />
-</div>
+
 
 <hr>
 
