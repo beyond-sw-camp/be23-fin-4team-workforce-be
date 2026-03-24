@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.38/57f8f5e02e92a30fd21b80cbd426a4172b5f8e29/lombok-1.18.38.jar" />
+        </processorPath>
+        <module name="workforce.common.main" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel target="17" />
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="workforce.approval-service" options="-parameters" />
+      <module name="workforce.approval-service.main" options="-parameters" />
+      <module name="workforce.approval-service.test" options="-parameters" />
+      <module name="workforce.attendance-service" options="-parameters" />
+      <module name="workforce.attendance-service.main" options="-parameters" />
+      <module name="workforce.attendance-service.test" options="-parameters" />
+      <module name="workforce.eureka" options="-parameters" />
+      <module name="workforce.eureka.main" options="-parameters" />
+      <module name="workforce.eureka.test" options="-parameters" />
+      <module name="workforce.gateway" options="-parameters" />
+      <module name="workforce.gateway.main" options="-parameters" />
+      <module name="workforce.gateway.test" options="-parameters" />
+      <module name="workforce.goal-service" options="-parameters" />
+      <module name="workforce.goal-service.main" options="-parameters" />
+      <module name="workforce.goal-service.test" options="-parameters" />
+      <module name="workforce.insight-service" options="-parameters" />
+      <module name="workforce.insight-service.main" options="-parameters" />
+      <module name="workforce.insight-service.test" options="-parameters" />
+      <module name="workforce.member-service" options="-parameters" />
+      <module name="workforce.member-service.main" options="-parameters" />
+      <module name="workforce.member-service.test" options="-parameters" />
+      <module name="workforce.salary-service" options="-parameters" />
+      <module name="workforce.salary-service.main" options="-parameters" />
+      <module name="workforce.salary-service.test" options="-parameters" />
+    </option>
+  </component>
+</project>

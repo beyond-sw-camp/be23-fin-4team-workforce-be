@@ -1,0 +1,11 @@
+rootProject.name = 'workforce'
+
+include 'common'
+include 'gateway'
+include 'eureka'
+include 'member-service'
+include 'attendance-service'
+include 'approval-service'
+include 'salary-service'
+include 'goal-service'
+include 'insight-service'
