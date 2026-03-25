@@ -107,8 +107,11 @@ Phase4: 대시보드
 </div>
 <hr>
 
-## 기획서 (Business Requirements)
-[![기획서 PDF](./docs/WORKFORCE_프로젝트_기획서.pdf)](./docs/WORKFORCE_프로젝트_기획서.pdf)
+## 기획서 (Business Requirements Document)
+
+- [Figma 기획서 보기](https://www.figma.com/design/6suak3PIQpHGzS3UBatOF1/%ED%95%9C%ED%99%94-BEYOND-SW-CAMP-23%EA%B8%B0?node-id=618-102&t=ycUT8ACYjClBTb1a-1)
+- [기획서 PDF 다운로드](./docs/WORKFORCE_프로젝트_기획서.pdf)
+
 
 <br>
 <div align="right">
