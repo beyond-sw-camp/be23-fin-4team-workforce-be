@@ -4,43 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a9caf5bd-9573-4e16-8832-8818529830dc" name="변경" comment="add readme">
-      <change afterPath="$PROJECT_DIR$/.idea/modules/member-service/workforce.member-service.main.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/company/domain/Company.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/company/domain/enums/CompanyStatus.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/auth/JwtTokenProvider.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/controller/MemberController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/domain/JobGradeHistory.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/domain/Member.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/domain/MemberPosition.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/domain/enums/AccountStatus.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/domain/enums/EmploymentType.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/domain/enums/MemberStatus.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/repository/MemberRepository.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/member/service/MemberService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/JobGrade.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/JobTitle.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/Organization.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/Permission.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/Role.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/RolePermission.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/enums/Action.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/organization/domain/enums/PermissionRange.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.14/executionHistory/executionHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/executionHistory/executionHistory.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.14/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/executionHistory/executionHistory.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.14/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/fileHashes/fileHashes.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.14/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/fileHashes/fileHashes.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.14/fileHashes/resourceHashesCache.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/fileHashes/resourceHashesCache.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/file-system.probe" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/file-system.probe" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build/reports/problems/problems-report.html" beforeDir="false" afterPath="$PROJECT_DIR$/build/reports/problems/problems-report.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gateway/src/main/java/com/_team/_team/JwtAuthFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/gateway/src/main/java/com/_team/_team/JwtAuthFilter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/member-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/member-service/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/Application.java" afterDir="false" />
-    </list>
+    <list default="true" id="a9caf5bd-9573-4e16-8832-8818529830dc" name="변경" comment="add readme" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
