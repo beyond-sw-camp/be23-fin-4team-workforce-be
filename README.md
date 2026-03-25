@@ -11,8 +11,8 @@
 #### [기획서](#기획서-business-requirements)
 #### [기술 스택](#기술-스택)
 #### [시스템 아키텍처](#시스템-아키텍처)
-#### [WBS](#wbs)
 #### [요구사항 명세서](#요구사항-명세서)
+#### [WBS](#wbs)
 #### [DDD](#ddd)
 #### [ERD](#erd)
 #### [와이어 프레임](#와이어-프레임)
@@ -179,7 +179,20 @@ Phase4: 대시보드
 
 
 ## 요구사항 명세서
-<img width="845" height="630" alt="" src="" />
+- [요구사항 명세서 보기](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=63147339#gid=63147339)
+
+<img width="845" alt="WORKFORCE 요구사항 명세서" src="./docs/WORKFORCE_요구사항명세서.png" />
+
+<br>
+<div align="right">
+  <a href="#목차">🔝 맨 위로</a>
+</div>
+<hr>
+
+## WBS
+- [WBS 보기](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=395838842#gid=395838842)
+
+<img width="845" alt="WORKFORCE WBS" src="./docs/WORKFORCE_WBS.png" />
 
 <br>
 <div align="right">
@@ -196,7 +209,11 @@ Phase4: 대시보드
 <hr>
 
 ## ERD
-<img width="1302" height="743" alt="" src="" />
+
+- [ERD 전체 보기](https://www.erdcloud.com/d/Er4amBY2KpweBcKTk)
+
+<img width="1302" alt="WORKFORCE ERD" src="./docs/WORKFORCE_ERD.png" />
+
 <br>
 <div align="right">
   <a href="#목차">🔝 맨 위로</a>
