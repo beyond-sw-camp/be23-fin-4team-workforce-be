@@ -9,6 +9,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -25,6 +26,8 @@ public class JwtAuthFilter implements GlobalFilter {
 
     private Key key;
 
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
     @PostConstruct
     public void init() {
         byte[] bytes = Base64.getDecoder().decode(secretKey);
@@ -39,9 +42,10 @@ public class JwtAuthFilter implements GlobalFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String urlPath = exchange.getRequest().getURI().getRawPath();
-
+        boolean isAllowed = ALLOWED_PATH.stream()
+                .anyMatch(path -> pathMatcher.match(path, urlPath));
         // 허용 경로는 토큰 검증 없이 통과
-        if (ALLOWED_PATH.contains(urlPath)) {
+        if (isAllowed) {
             return chain.filter(exchange);
         }
 

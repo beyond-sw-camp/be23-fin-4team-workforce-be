@@ -1,15 +1,14 @@
-package com._team._team.approval.exception;
+package com._team._team.dto;
 
-import com._team._team.dto.CommonErrorDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
-
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import jakarta.servlet.http.HttpServletRequest;
+
 import java.util.NoSuchElementException;
 
 @RestControllerAdvice
