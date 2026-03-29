@@ -36,7 +36,12 @@ public class JwtAuthFilter implements GlobalFilter {
 
     // 토큰 없이 접근 가능한 경로
     private static final List<String> ALLOWED_PATH = List.of(
-            "/member/health"
+            "/member/health",
+            "/member/login",
+            "/company/check-business-number",
+            "/company/send-verification-code",
+            "/company/verify-code",
+            "/company/onboarding"
     );
 
     @Override
@@ -69,6 +74,7 @@ public class JwtAuthFilter implements GlobalFilter {
             String memberPositionId = claims.get("memberPositionId", String.class);
             String companyId = claims.get("companyId", String.class);
             String name = claims.get("name", String.class);
+            String isSystemAdmin = claims.get("isSystemAdmin", String.class);
 
             // 각 서비스로 헤더에 담아 전달
             ServerWebExchange serverWebExchange = exchange.mutate()
@@ -76,7 +82,8 @@ public class JwtAuthFilter implements GlobalFilter {
                             .header("X-User-UUID", memberId)
                             .header("X-User-MemberPositionId", memberPositionId)
                             .header("X-User-CompanyId", companyId)
-                            .header("X-User-Name", name))
+                            .header("X-User-Name", name)
+                            .header("X-User-IsSystemAdmin", isSystemAdmin))
                     .build();
 
             return chain.filter(serverWebExchange);

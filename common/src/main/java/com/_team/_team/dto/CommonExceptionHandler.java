@@ -13,6 +13,13 @@ import java.util.NoSuchElementException;
 
 @RestControllerAdvice
 public class CommonExceptionHandler {
+    // BusinessException 처리
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<?> handleBusinessException(BusinessException e) {
+        return ResponseEntity
+                .status(e.getStatus())
+                .body(ApiResponse.fail(e.getMessage()));
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<?> illegal(IllegalArgumentException e){

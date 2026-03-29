@@ -11,8 +11,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -24,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 public class JwtTokenProvider {
-    private final StringRedisTemplate redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Value("${jwt.expirationAt}")
     private int expirationAt;
@@ -42,7 +43,8 @@ public class JwtTokenProvider {
     private Key rtKey;
 
     @Autowired
-    public JwtTokenProvider(StringRedisTemplate redisTemplate) {
+    public JwtTokenProvider(
+            @Qualifier("rtInventory") RedisTemplate<String, String> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 
@@ -61,6 +63,7 @@ public class JwtTokenProvider {
         claims.put("organizationId", memberPosition.getOrganization().getOrganizationId().toString());
         claims.put("companyId", member.getCompany().getCompanyId().toString());
         claims.put("name", member.getName());
+        claims.put("isSystemAdmin", memberPosition.getIsSystemAdminYn());
 
         Date now = new Date();
 
