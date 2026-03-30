@@ -1,6 +1,10 @@
 package com._team._team.member.controller;
 
+import com._team._team.annotation.Action;
+import com._team._team.annotation.CheckPermission;
+import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
+import com._team._team.member.dto.reqdto.ChangePasswordReqDto;
 import com._team._team.member.dto.reqdto.LoginReqDto;
 import com._team._team.member.dto.reqdto.MemberCreateReqDto;
 import com._team._team.member.dto.resdto.LoginResDto;
@@ -38,6 +42,17 @@ public class MemberController {
                 HttpStatus.OK
         );
     }
+    // 최초 로그인 비밀번호 변경
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @Valid @RequestBody ChangePasswordReqDto reqDto) {
+        memberService.changePassword(memberId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "비밀번호 변경 성공"),
+                HttpStatus.OK
+        );
+    }
 
     // 로그아웃
     @PostMapping("/logout")
@@ -64,6 +79,7 @@ public class MemberController {
     }
 
     // 직원 계정 생성
+    @CheckPermission(resource = Resource.MEMBER, action = Action.CREATE)
     @PostMapping("/create")
     public ResponseEntity<?> createMember(
             @RequestHeader("X-User-UUID") UUID memberId,
@@ -77,6 +93,7 @@ public class MemberController {
     }
 
     // 직원 목록 조회
+    @CheckPermission(resource = Resource.MEMBER, action = Action.READ)
     @GetMapping("/list")
     public ResponseEntity<?> getMemberList(
             @RequestHeader("X-User-UUID") UUID memberId,
@@ -88,6 +105,7 @@ public class MemberController {
     }
 
     // 직원 상세 조회
+    @CheckPermission(resource = Resource.MEMBER, action = Action.READ)
     @GetMapping("/{targetMemberId}")
     public ResponseEntity<?> getMemberDetail(
             @RequestHeader("X-User-UUID") UUID memberId,
@@ -98,4 +116,5 @@ public class MemberController {
                 HttpStatus.OK
         );
     }
+
 }

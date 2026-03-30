@@ -23,6 +23,9 @@ public class Company extends BaseTimeEntity {
     private String companyName;
 
     @Column(nullable = false)
+    private String companyDomain;
+
+    @Column(nullable = false)
     private String ceoName;
 
     @Column(nullable = false, unique = true)

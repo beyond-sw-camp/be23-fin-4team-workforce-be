@@ -150,6 +150,7 @@ public class CompanyService {
     private Company createCompany(CompanyOnboardingReqDto reqDto) {
         Company company = Company.builder()
                 .companyName(reqDto.getCompanyName())
+                .companyDomain(reqDto.getCompanyDomain())
                 .ceoName(reqDto.getCeoName())
                 .businessNumber(reqDto.getBusinessNumber())
                 .address(reqDto.getAddress())

@@ -2,8 +2,8 @@ package com._team._team.member.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 
-import com._team._team.member.constant.Action;
-import com._team._team.member.constant.Resource;
+import com._team._team.annotation.Action;
+import com._team._team.annotation.Resource;
 import jakarta.persistence.*;
 import lombok.*;
 
