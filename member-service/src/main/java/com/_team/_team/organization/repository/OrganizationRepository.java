@@ -1,5 +1,6 @@
 package com._team._team.organization.repository;
 
+import com._team._team.company.domain.Company;
 import com._team._team.organization.domain.Organization;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -11,4 +12,5 @@ import java.util.UUID;
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
     List<Organization> findByCompany_CompanyIdAndDelYn(UUID companyId, String delYn);
 
+    List<Organization> findByCompanyAndDelYnOrderByDisplayOrder(Company company, String delYn);
 }

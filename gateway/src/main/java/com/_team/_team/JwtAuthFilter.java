@@ -36,7 +36,7 @@ public class JwtAuthFilter implements GlobalFilter {
 
     // 토큰 없이 접근 가능한 경로
     private static final List<String> ALLOWED_PATH = List.of(
-            "/member/health",
+            "member/change-password",
             "/member/login",
             "/company/check-business-number",
             "/company/send-verification-code",

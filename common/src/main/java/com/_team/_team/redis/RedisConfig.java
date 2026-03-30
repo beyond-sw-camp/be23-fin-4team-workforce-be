@@ -61,4 +61,25 @@ public class RedisConfig {
         redisTemplate.setConnectionFactory(emailConnectionFactory);
         return redisTemplate;
     }
+    // DB 2 - 권한 캐시
+    @Bean
+    @Qualifier("permissionInventory")
+    public RedisConnectionFactory permissionConnectionFactory() {
+        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
+        configuration.setHostName(host);
+        configuration.setPort(port);
+        configuration.setDatabase(2);
+        return new LettuceConnectionFactory(configuration);
+    }
+
+    @Bean
+    @Qualifier("permissionInventory")
+    public RedisTemplate<String, String> permissionRedisTemplate(
+            @Qualifier("permissionInventory") RedisConnectionFactory permissionConnectionFactory) {
+        RedisTemplate<String, String> redisTemplate = new RedisTemplate<>();
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        redisTemplate.setValueSerializer(new StringRedisSerializer());
+        redisTemplate.setConnectionFactory(permissionConnectionFactory);
+        return redisTemplate;
+    }
 }

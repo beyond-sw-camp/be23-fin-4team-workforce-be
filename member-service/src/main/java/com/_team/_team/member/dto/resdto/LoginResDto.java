@@ -16,4 +16,6 @@ public class LoginResDto {
     private String name;
     private UUID memberId;
     private UUID memberPositionId;
+    private String isFirstLoginYn;
+    private String isEmailVerifiedYn;
 }

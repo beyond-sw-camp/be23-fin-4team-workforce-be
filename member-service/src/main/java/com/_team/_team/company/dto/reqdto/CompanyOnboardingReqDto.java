@@ -20,6 +20,9 @@ public class CompanyOnboardingReqDto {
     @NotBlank(message = "대표자명은 필수입니다.")
     private String ceoName;
 
+    @NotBlank(message = "회사도메인은 필수입니다.")
+    private String companyDomain;
+
     @NotBlank(message = "사업자번호는 필수입니다.")
     @Pattern(regexp = "\\d{10}", message = "사업자번호는 10자리 숫자입니다.")
     private String businessNumber;

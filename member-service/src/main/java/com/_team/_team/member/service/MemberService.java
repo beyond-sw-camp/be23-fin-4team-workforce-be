@@ -5,13 +5,14 @@ import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.service.MailService;
 import com._team._team.dto.BusinessException;
 import com._team._team.member.auth.JwtTokenProvider;
-import com._team._team.member.constant.Action;
+import com._team._team.annotation.Action;
 import com._team._team.member.constant.PermissionRange;
-import com._team._team.member.constant.Resource;
+import com._team._team.annotation.Resource;
 import com._team._team.member.domain.*;
 import com._team._team.member.domain.enums.AccountStatus;
 import com._team._team.member.domain.enums.EmploymentType;
 import com._team._team.member.domain.enums.MemberStatus;
+import com._team._team.member.dto.reqdto.ChangePasswordReqDto;
 import com._team._team.member.dto.reqdto.LoginReqDto;
 import com._team._team.member.dto.reqdto.MemberCreateReqDto;
 import com._team._team.member.dto.resdto.LoginResDto;
@@ -23,9 +24,12 @@ import com._team._team.organization.domain.Organization;
 import com._team._team.organization.repository.JobGradeRepository;
 import com._team._team.organization.repository.JobTitleRepository;
 import com._team._team.organization.repository.OrganizationRepository;
+import com._team._team.util.PermissionUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -54,9 +59,11 @@ public class MemberService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final MailService mailService;
+    private final RedisTemplate<String, String> permissoinRedisTemplate;
+    private final PermissionUtils permissionUtils;
 
     @Autowired
-    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService) {
+    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils) {
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.roleRepository = roleRepository;
@@ -68,6 +75,8 @@ public class MemberService {
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.mailService = mailService;
+        this.permissoinRedisTemplate = permissoinRedisTemplate;
+        this.permissionUtils = permissionUtils;
     }
 
     // 온보딩 시 기본 역할 4개 + 권한 생성
@@ -245,10 +254,40 @@ public class MemberService {
         }
         return result;
     }
+    //이메일 검증
     @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
         return memberRepository.existsByEmail(email);
     }
+    // 권한 캐싱 메서드 추가
+    private void cachePermissions(MemberPosition memberPosition) {
+
+        if ("YES".equals(memberPosition.getIsSystemAdminYn())) return;
+
+        List<String> permissions = memberPosition.getRole()
+                .getRolePermissionList()
+                .stream()
+                .map(rp -> rp.getPermission().getResource().name()
+                        + ":" + rp.getPermission().getAction().name()
+                        + ":" + rp.getPermissionRange().name())
+                .collect(Collectors.toList());
+
+        if (permissions.isEmpty()) {
+            log.warn("권한 목록이 비어있음: {}", memberPosition.getMemberPositionId());
+            return;
+        }
+
+        // Redis에 저장 (30분)
+        // key: "PERMISSION:{memberPositionId}"
+        // value: "MEMBER:READ:COMPANY,MEMBER:CREATE:COMPANY,..."
+        permissoinRedisTemplate.opsForValue().set(
+                "PERMISSION:" + memberPosition.getMemberPositionId(),
+                String.join(",", permissions),
+                30,
+                TimeUnit.MINUTES
+        );
+    }
+
     // 로그인
     public LoginResDto login(LoginReqDto reqDto, HttpServletResponse response) {
 
@@ -280,7 +319,7 @@ public class MemberService {
 
         // 5. defaultPosition 조회
         MemberPosition memberPosition = memberPositionRepository
-                .findById(member.getDefaultPositionId())
+                .findByIdWithRoleAndPermissions(member.getDefaultPositionId())
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
                 ));
@@ -292,12 +331,51 @@ public class MemberService {
         String refreshToken = jwtTokenProvider.createRtToken(member);
         jwtTokenProvider.setRtCookie(response, refreshToken);
 
+    cachePermissions(memberPosition);
+
         return LoginResDto.builder()
                 .accessToken(accessToken)
                 .name(member.getName())
                 .memberId(member.getMemberId())
                 .memberPositionId(memberPosition.getMemberPositionId())
+                .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
+                .isFirstLoginYn(member.getIsFirstLoginYn())
                 .build();
+    }
+
+    public void changePassword(UUID memberId, ChangePasswordReqDto reqDto) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 1. 현재 비밀번호 확인
+        if (!passwordEncoder.matches(reqDto.getCurrentPassword(), member.getPassword())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."
+            );
+        }
+
+        // 2. 새 비밀번호 확인
+        if (!reqDto.getNewPassword().equals(reqDto.getNewPasswordCheck())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "새 비밀번호가 일치하지 않습니다."
+            );
+        }
+
+        // 3. 현재 비밀번호와 새 비밀번호 같은지 확인
+        if (passwordEncoder.matches(reqDto.getNewPassword(), member.getPassword())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "현재 비밀번호와 다른 비밀번호를 입력해주세요."
+            );
+        }
+
+        // 4. 비밀번호 변경
+        member.updatePassword(passwordEncoder.encode(reqDto.getNewPassword()));
+
+        // 5. 최초 로그인 완료 처리
+        member.completeFirstLogin();
     }
 
     // 로그아웃
@@ -340,9 +418,7 @@ public class MemberService {
         Company company = requester.getCompany();
 
         // 2. 회사 이메일 자동 생성
-        String companyDomain = company.getCompanyName()
-                .toLowerCase()
-                .replaceAll("[^a-z0-9]", "");
+        String companyDomain = company.getCompanyDomain();
 
         String companyEmail = reqDto.getSabun().toLowerCase()
                 + "." + reqDto.getEnglishInitial().toUpperCase()
@@ -366,24 +442,43 @@ public class MemberService {
         Member member = reqDto.toEntity(companyEmail, passwordEncoder.encode(tempPassword), company);
         Member savedMember = memberRepository.save(member);
 
-        // 6. 조직/직급/직책/역할 조회
+        // 6. 조직 조회 + 같은 회사 검증
         Organization organization = organizationRepository
                 .findById(reqDto.getOrganizationId())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 조직입니다."));
 
+        if (!organization.getCompany().getCompanyId().equals(company.getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 조직에 직원을 추가할 수 없습니다.");
+        }
+
+        // 7. 직급 조회 + 같은 회사 검증
         JobGrade jobGrade = jobGradeRepository
                 .findById(reqDto.getJobGradeId())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 직급입니다."));
 
+        if (!jobGrade.getCompany().getCompanyId().equals(company.getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직급을 지정할 수 없습니다.");
+        }
+
+        // 8. 직책 조회 + 같은 회사 검증
         JobTitle jobTitle = jobTitleRepository
                 .findById(reqDto.getJobTitleId())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 직책입니다."));
 
+        if (!jobTitle.getCompany().getCompanyId().equals(company.getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직책을 지정할 수 없습니다.");
+        }
+
+        // 9. 역할 조회 + 같은 회사 검증
         Role role = roleRepository
                 .findById(reqDto.getRoleId())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."));
 
-        // 7. MemberPosition 생성
+        if (!role.getCompany().getCompanyId().equals(company.getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 역할을 지정할 수 없습니다.");
+        }
+
+        // 10. MemberPosition 생성
         MemberPosition position = MemberPosition.builder()
                 .member(savedMember)
                 .organization(organization)
@@ -396,25 +491,49 @@ public class MemberService {
 
         MemberPosition savedPosition = memberPositionRepository.save(position);
 
-        // 8. defaultPositionId 업데이트
+        // 11. defaultPositionId 업데이트
         savedMember.updateDefaultPosition(savedPosition.getMemberPositionId());
 
-        // 9. 임시 비밀번호 개인 이메일로 발송
+        // 12. 임시 비밀번호 개인 이메일로 발송
         mailService.sendTempPassword(reqDto.getPersonalEmail(), companyEmail, tempPassword);
     }
 
     // 직원 목록 조회
     @Transactional(readOnly = true)
     public List<MemberResDto> getMemberList(UUID memberId, UUID memberPositionId) {
+
         Member requester = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
                 ));
-        return memberRepository
-                .findByCompanyAndDelYn(requester.getCompany(), "NO")
-                .stream()
-                .map(MemberResDto::fromEntity)
-                .collect(Collectors.toList());
+
+        Organization organization = memberPositionRepository
+                .findById(memberPositionId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 포지션입니다."
+                ))
+                .getOrganization();
+
+        return permissionUtils.getDataByRange(
+                memberPositionId.toString(),
+                Resource.MEMBER,
+                Action.READ,
+
+                // COMPANY → 전사 조회
+                () -> memberRepository
+                        .findByCompanyAndDelYn(requester.getCompany(), "NO")
+                        .stream().map(MemberResDto::fromEntity).toList(),
+
+                // TEAM/DEPARTMENT → 같은 조직 조회
+                () -> memberPositionRepository
+                        .findByOrganizationAndDelYn(organization, "NO")
+                        .stream()
+                        .map(mp -> MemberResDto.fromEntity(mp.getMember()))
+                        .toList(),
+
+                // SELF → 본인만
+                () -> List.of(MemberResDto.fromEntity(requester))
+        );
     }
 
     // 직원 상세 조회

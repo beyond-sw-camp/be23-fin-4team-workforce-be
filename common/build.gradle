@@ -12,6 +12,7 @@ dependencies {
     api 'org.springframework.kafka:spring-kafka'
     api 'org.springframework.boot:spring-boot-starter'
     api 'org.projectlombok:lombok'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
