@@ -5,6 +5,8 @@ import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -24,8 +26,14 @@ public class Organization extends BaseTimeEntity {
             nullable = false)
     private Company company;
 
-    @Column(columnDefinition = "BINARY(16)")
-    private UUID parentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private Organization parent;
+
+    @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Organization> children = new ArrayList<>();
 
     @Column(nullable = false)
     private String name;
@@ -37,7 +45,6 @@ public class Organization extends BaseTimeEntity {
     @Builder.Default
     private String delYn = "NO";
 
-    // 비즈니스 메서드
     public void updateName(String name) {
         this.name = name;
     }
@@ -46,8 +53,8 @@ public class Organization extends BaseTimeEntity {
         this.displayOrder = displayOrder;
     }
 
-    public void updateParent(UUID parentId) {
-        this.parentId = parentId;
+    public void updateParent(Organization parent) {
+        this.parent = parent;
     }
 
     public void delete() {

@@ -1,7 +1,7 @@
 package com._team._team.member.repository;
 
-import com._team._team.member.constant.Action;
-import com._team._team.member.constant.Resource;
+import com._team._team.annotation.Action;
+import com._team._team.annotation.Resource;
 import com._team._team.member.domain.Permission;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

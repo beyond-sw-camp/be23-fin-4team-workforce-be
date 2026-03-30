@@ -1,4 +1,4 @@
-package com._team._team.member.constant;
+package com._team._team.annotation;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
