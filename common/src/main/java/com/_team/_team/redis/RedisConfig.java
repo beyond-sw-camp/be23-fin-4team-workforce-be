@@ -23,7 +23,7 @@ public class RedisConfig {
 
     @Bean
     @Qualifier("rtInventory")
-    public RedisConnectionFactory rtConnectionFactory() {
+    public RedisConnectionFactory connectionFactory() {
         RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
         configuration.setHostName(host);
         configuration.setPort(port);
@@ -33,11 +33,32 @@ public class RedisConfig {
 
     @Bean
     @Qualifier("rtInventory")
-    public RedisTemplate<String, String> rtRedisTemplate(@Qualifier("rtInventory") RedisConnectionFactory redisConnectionFactory) {
+    public RedisTemplate<String, String> redisTemplate(@Qualifier("rtInventory") RedisConnectionFactory redisConnectionFactory) {
         RedisTemplate<String, String> redisTemplate = new RedisTemplate<>();
         redisTemplate.setKeySerializer(new StringRedisSerializer());
         redisTemplate.setValueSerializer(new StringRedisSerializer());
         redisTemplate.setConnectionFactory(redisConnectionFactory);
+        return redisTemplate;
+    }
+
+    @Bean
+    @Qualifier("emailInventory")
+    public RedisConnectionFactory emailConnectionFactory() {
+        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
+        configuration.setHostName(host);
+        configuration.setPort(port);
+        configuration.setDatabase(1);
+        return new LettuceConnectionFactory(configuration);
+    }
+
+    @Bean
+    @Qualifier("emailInventory")
+    public RedisTemplate<String, String> emailRedisTemplate(
+            @Qualifier("emailInventory") RedisConnectionFactory emailConnectionFactory) {
+        RedisTemplate<String, String> redisTemplate = new RedisTemplate<>();
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        redisTemplate.setValueSerializer(new StringRedisSerializer());
+        redisTemplate.setConnectionFactory(emailConnectionFactory);
         return redisTemplate;
     }
 }

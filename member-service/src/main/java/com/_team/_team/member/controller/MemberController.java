@@ -1,13 +1,19 @@
 package com._team._team.member.controller;
 
+import com._team._team.dto.ApiResponse;
+import com._team._team.member.dto.reqdto.LoginReqDto;
+import com._team._team.member.dto.reqdto.MemberCreateReqDto;
+import com._team._team.member.dto.resdto.LoginResDto;
 import com._team._team.member.service.MemberService;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/member")
@@ -20,12 +26,76 @@ public class MemberController {
         this.memberService = memberService;
     }
 
-    @GetMapping("/health")
-    public String healthCheck(){
-        return "OK2";
+
+    // 로그인
+    @PostMapping("/login")
+    public ResponseEntity<?> login(
+            @Valid @RequestBody LoginReqDto reqDto,
+            HttpServletResponse response) {
+        LoginResDto resDto = memberService.login(reqDto, response);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "로그인 성공"),
+                HttpStatus.OK
+        );
     }
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getMember(@PathVariable Long id) {
-        return ResponseEntity.ok(memberService.getMember(id));
+
+    // 로그아웃
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            HttpServletResponse response) {
+        memberService.logout(memberId, response);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "로그아웃 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // AT 재발급
+    @PostMapping("/generate-at")
+    public ResponseEntity<?> generateAt(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
+        LoginResDto resDto = memberService.generateAt(memberId, memberPositionId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "AT 재발급 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 직원 계정 생성
+    @PostMapping("/create")
+    public ResponseEntity<?> createMember(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
+            @Valid @RequestBody MemberCreateReqDto reqDto) {
+        memberService.createMember(memberId, memberPositionId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "직원 계정 생성 성공"),
+                HttpStatus.CREATED
+        );
+    }
+
+    // 직원 목록 조회
+    @GetMapping("/list")
+    public ResponseEntity<?> getMemberList(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(memberService.getMemberList(memberId, memberPositionId), "직원 목록 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 직원 상세 조회
+    @GetMapping("/{targetMemberId}")
+    public ResponseEntity<?> getMemberDetail(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
+            @PathVariable UUID targetMemberId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(memberService.getMemberDetail(memberId, memberPositionId, targetMemberId), "직원 상세 조회 성공"),
+                HttpStatus.OK
+        );
     }
 }
