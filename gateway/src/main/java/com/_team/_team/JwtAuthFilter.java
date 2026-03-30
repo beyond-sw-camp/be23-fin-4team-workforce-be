@@ -2,15 +2,20 @@ package com._team._team;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.http.HttpHeaders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import jakarta.annotation.PostConstruct;
+import java.security.Key;
+import java.util.Base64;
 import java.util.List;
 
 @Component
@@ -19,45 +24,71 @@ public class JwtAuthFilter implements GlobalFilter {
     @Value("${jwt.secretKey}")
     private String secretKey;
 
-    private static final List<String> ALLOWED_PATH=List.of(
-    );
+    private Key key;
 
-    private static final List<String> ADMIN_ONLY_PATH= List.of(
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
+    @PostConstruct
+    public void init() {
+        byte[] bytes = Base64.getDecoder().decode(secretKey);
+        this.key = Keys.hmacShaKeyFor(bytes);
+    }
+
+    // 토큰 없이 접근 가능한 경로
+    private static final List<String> ALLOWED_PATH = List.of(
+            "/member/health",
+            "/member/login",
+            "/company/check-business-number",
+            "/company/send-verification-code",
+            "/company/verify-code",
+            "/company/onboarding"
     );
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String bearerToken = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         String urlPath = exchange.getRequest().getURI().getRawPath();
-
-        if(ALLOWED_PATH.contains(urlPath)){
+        boolean isAllowed = ALLOWED_PATH.stream()
+                .anyMatch(path -> pathMatcher.match(path, urlPath));
+        // 허용 경로는 토큰 검증 없이 통과
+        if (isAllowed) {
             return chain.filter(exchange);
         }
+
+        String bearerToken = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+
         try {
-            if(bearerToken==null || !bearerToken.startsWith("Bearer ")){
+            if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
                 throw new IllegalArgumentException("token이 없거나, 형식이 잘못되었습니다.");
             }
 
             String token = bearerToken.substring(7);
-            Claims claims = Jwts.parserBuilder().setSigningKey(secretKey)
+
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(key)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-            String email = claims.getSubject();
-            String role = claims.get("role", String.class);
 
-            if(ADMIN_ONLY_PATH.contains(urlPath) && !role.equals("ADMIN")){
-                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-                return exchange.getResponse().setComplete();
-            }
+            // AT에 담긴 값 꺼내기
+            String memberId = claims.getSubject();
+            String memberPositionId = claims.get("memberPositionId", String.class);
+            String companyId = claims.get("companyId", String.class);
+            String name = claims.get("name", String.class);
+            String isSystemAdmin = claims.get("isSystemAdmin", String.class);
 
+            // 각 서비스로 헤더에 담아 전달
             ServerWebExchange serverWebExchange = exchange.mutate()
-                    .request(r -> r.header("X-User-Email", email)
-                            .header("X-User-Role", role))
+                    .request(r -> r
+                            .header("X-User-UUID", memberId)
+                            .header("X-User-MemberPositionId", memberPositionId)
+                            .header("X-User-CompanyId", companyId)
+                            .header("X-User-Name", name)
+                            .header("X-User-IsSystemAdmin", isSystemAdmin))
                     .build();
+
             return chain.filter(serverWebExchange);
 
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();

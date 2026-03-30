@@ -6,6 +6,24 @@ plugins {
 
 dependencies {
     implementation project(':common')
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    // WebClient (국세청 API, 카카오 API 호출용)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Redis (캐싱, 이메일 인증 코드 저장)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Mail (임시 비밀번호 발송)
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    // 비밀번호 암호화
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // jwt
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
