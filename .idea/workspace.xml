@@ -5,29 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a9caf5bd-9573-4e16-8832-8818529830dc" name="변경" comment="add readme">
-      <change afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules/common/workforce.common.main.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gradle/8.14/checksums/checksums.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/checksums/checksums.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gradle/8.14/checksums/md5-checksums.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/checksums/md5-checksums.bin" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gradle/8.14/checksums/sha1-checksums.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.14/checksums/sha1-checksums.bin" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/approval-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/approval-service/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/approval-service/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/approval-service/src/main/java/com/_team/_team/Application.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/attendance-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/attendance-service/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/attendance-service/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/attendance-service/src/main/java/com/_team/_team/Application.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/java/com/_team/_team/Application.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/eureka/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/eureka/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gateway/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/gateway/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gateway/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/gateway/src/main/resources/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/goal-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/goal-service/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/goal-service/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/goal-service/src/main/java/com/_team/_team/Application.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/insight-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/insight-service/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/insight-service/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/insight-service/src/main/java/com/_team/_team/Application.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/member-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/member-service/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/member-service/src/main/java/com/_team/_team/Application.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/salary-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/salary-service/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/salary-service/src/main/java/com/_team/_team/Application.java" beforeDir="false" afterPath="$PROJECT_DIR$/salary-service/src/main/java/com/_team/_team/Application.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -59,6 +41,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;leeda973&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/beyond-sw-camp/be23-fin-workforce-be.git&quot;,
+    &quot;accountId&quot;: &quot;3960bdf2-2ab8-4522-b5df-cc17a4e242ad&quot;
+  }
+}</component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 3
@@ -78,12 +72,12 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "feature/approval",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/Users/parksemin/Desktop/workforce"
   }
 }]]></component>
-  <component name="RunManager" selected="애플리케이션.member">
+  <component name="RunManager" selected="Application.approval">
     <configuration name="approval" type="Application" factoryName="Application">
       <option name="MAIN_CLASS_NAME" value="com._team._team.Application" />
       <module name="workforce.approval-service.main" />
@@ -141,14 +135,14 @@
       </method>
     </configuration>
     <list>
-      <item itemvalue="애플리케이션.approval" />
-      <item itemvalue="애플리케이션.attendance" />
-      <item itemvalue="애플리케이션.eureka" />
-      <item itemvalue="애플리케이션.gateway" />
-      <item itemvalue="애플리케이션.goal" />
-      <item itemvalue="애플리케이션.insight" />
-      <item itemvalue="애플리케이션.member" />
-      <item itemvalue="애플리케이션.salary" />
+      <item itemvalue="Application.approval" />
+      <item itemvalue="Application.attendance" />
+      <item itemvalue="Application.eureka" />
+      <item itemvalue="Application.gateway" />
+      <item itemvalue="Application.goal" />
+      <item itemvalue="Application.insight" />
+      <item itemvalue="Application.member" />
+      <item itemvalue="Application.salary" />
     </list>
   </component>
   <component name="TaskManager">
