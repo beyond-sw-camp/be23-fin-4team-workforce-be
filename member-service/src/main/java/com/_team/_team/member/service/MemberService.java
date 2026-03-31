@@ -9,14 +9,14 @@ import com._team._team.annotation.Action;
 import com._team._team.member.constant.PermissionRange;
 import com._team._team.annotation.Resource;
 import com._team._team.member.domain.*;
-import com._team._team.member.domain.enums.AccountStatus;
+        import com._team._team.member.domain.enums.AccountStatus;
 import com._team._team.member.domain.enums.ChangeType;
 import com._team._team.member.domain.enums.EmploymentType;
 import com._team._team.member.domain.enums.MemberStatus;
 import com._team._team.member.dto.reqdto.*;
-import com._team._team.member.dto.resdto.*;
-import com._team._team.member.repository.*;
-import com._team._team.organization.domain.JobGrade;
+        import com._team._team.member.dto.resdto.*;
+        import com._team._team.member.repository.*;
+        import com._team._team.organization.domain.JobGrade;
 import com._team._team.organization.domain.JobTitle;
 import com._team._team.organization.domain.Organization;
 import com._team._team.organization.repository.JobGradeRepository;
@@ -357,7 +357,7 @@ public class MemberService {
         String refreshToken = jwtTokenProvider.createRtToken(member);
         jwtTokenProvider.setRtCookie(response, refreshToken);
 
-    cachePermissions(memberPosition);
+        cachePermissions(memberPosition);
 
         return LoginResDto.builder()
                 .accessToken(accessToken)
@@ -584,20 +584,29 @@ public class MemberService {
                 Resource.MEMBER,
                 Action.READ,
 
-                // COMPANY → 전사 조회
+                // COMPANY → 전사 조회 (fetch join으로 N+1 방지)
                 () -> memberRepository
-                        .findByCompanyAndDelYn(requester.getCompany(), "NO")
-                        .stream().map(MemberResDto::fromEntity).toList(),
+                        .findByCompanyAndDelYnWithPosition(requester.getCompany(), "NO")
+                        .stream()
+                        .map(m -> memberPositionRepository
+                                .findByIdWithDetails(m.getDefaultPositionId())
+                                .map(pos -> MemberResDto.fromEntity(m, pos))
+                                .orElse(MemberResDto.fromEntity(m)))
+                        .toList(),
+
 
                 // TEAM/DEPARTMENT → 같은 조직 조회
                 () -> memberPositionRepository
                         .findByOrganizationAndDelYn(organization, "NO")
                         .stream()
-                        .map(mp -> MemberResDto.fromEntity(mp.getMember()))
+                        .map(mp -> MemberResDto.fromEntity(mp.getMember(), mp))
                         .toList(),
 
                 // SELF → 본인만
-                () -> List.of(MemberResDto.fromEntity(requester))
+                () -> memberPositionRepository
+                        .findByIdWithDetails(requester.getDefaultPositionId())
+                        .map(pos -> List.of(MemberResDto.fromEntity(requester, pos)))
+                        .orElse(List.of(MemberResDto.fromEntity(requester)))
         );
     }
 
@@ -877,6 +886,12 @@ public class MemberService {
         // 고용형태 변경
         if (!current.getEmploymentType().equals(reqDto.getEmploymentType())) {
             return ChangeType.EMPLOYMENT_CHANGE;
+        }
+
+        // 직책 변경
+        if (!current.getDefaultPosition().getJobTitle().getJobTitleId()
+                .equals(reqDto.getJobTitleId())) {
+            return ChangeType.TITLE_CHANGE;
         }
 
         // 변경 없음
@@ -1333,6 +1348,140 @@ public class MemberService {
 
         // profileUrl null로 업데이트
         member.updateProfileUrl(null);
+    }
+    // 휴직 처리
+    public void dormantMember(UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원입니다."
+            );
+        }
+
+        // 4. 이미 휴직 중인지 확인
+        if (target.getMemberStatus() == MemberStatus.DORMANT) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이미 휴직 중인 직원입니다."
+            );
+        }
+
+        // 5. 퇴직한 직원인지 확인
+        if ("YES".equals(target.getDelYn())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "퇴직한 직원입니다."
+            );
+        }
+
+        // 6. 휴직 처리
+        target.updateMemberStatus(MemberStatus.DORMANT);
+
+        // 7. 이력 저장
+        EmploymentJobHistory currentHistory = employmentJobHistoryRepository
+                .findCurrentHistory(target)
+                .orElse(null);
+
+        if (currentHistory != null) {
+            currentHistory.closeHistory(LocalDate.now());
+        }
+
+        MemberPosition position = memberPositionRepository
+                .findById(target.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                ));
+
+        EmploymentJobHistory history = EmploymentJobHistory.builder()
+                .member(target)
+                .jobGrade(position.getJobGrade())
+                .organization(position.getOrganization())
+                .defaultPosition(position)
+                .employmentType(target.getEmploymentType())
+                .changedAt(LocalDateTime.now())
+                .changedId(memberId)
+                .effectiveFrom(LocalDate.now())
+                .effectiveTo(null)
+                .changeType(ChangeType.DORMANT)
+                .build();
+
+        employmentJobHistoryRepository.save(history);
+    }
+
+    // 복직 처리
+    public void returnMember(UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원입니다."
+            );
+        }
+
+        // 4. 휴직 중인지 확인
+        if (target.getMemberStatus() != MemberStatus.DORMANT) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "휴직 중인 직원이 아닙니다."
+            );
+        }
+
+        // 5. 복직 처리
+        target.updateMemberStatus(MemberStatus.ACTIVE);
+
+        // 6. 이력 저장
+        EmploymentJobHistory currentHistory = employmentJobHistoryRepository
+                .findCurrentHistory(target)
+                .orElse(null);
+
+        if (currentHistory != null) {
+            currentHistory.closeHistory(LocalDate.now());
+        }
+
+        MemberPosition position = memberPositionRepository
+                .findById(target.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                ));
+
+        EmploymentJobHistory history = EmploymentJobHistory.builder()
+                .member(target)
+                .jobGrade(position.getJobGrade())
+                .organization(position.getOrganization())
+                .defaultPosition(position)
+                .employmentType(target.getEmploymentType())
+                .changedAt(LocalDateTime.now())
+                .changedId(memberId)
+                .effectiveFrom(LocalDate.now())
+                .effectiveTo(null)
+                .changeType(ChangeType.RETURN)
+                .build();
+
+        employmentJobHistoryRepository.save(history);
     }
 }
 

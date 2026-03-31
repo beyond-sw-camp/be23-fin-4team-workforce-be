@@ -128,7 +128,7 @@ public class OrganizationService {
                 ));
 
         return organizationRepository
-                .findByCompanyAndDelYnOrderByDisplayOrder(member.getCompany(), "NO")
+                .findByCompanyWithChildren(member.getCompany(), "NO")
                 .stream()
                 .filter(o -> o.getParent() == null)
                 .map(OrganizationResDto::fromEntity)

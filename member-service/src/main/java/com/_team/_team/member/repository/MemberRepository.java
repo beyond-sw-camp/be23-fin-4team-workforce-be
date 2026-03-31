@@ -2,7 +2,9 @@ package com._team._team.member.repository;
 
 import com._team._team.company.domain.Company;
 import com._team._team.member.domain.Member;
+import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -27,4 +29,12 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     List<Member> findByCompanyAndDelYn(Company company, String delYn);
 
     Optional<Member> findByPersonalEmail(String personalEmail);
+
+    @Query("SELECT DISTINCT m FROM Member m " +
+            "JOIN FETCH m.company " +
+            "WHERE m.company = :company " +
+            "AND m.delYn = :delYn")
+    List<Member> findByCompanyAndDelYnWithPosition(
+            @Param("company") Company company,
+            @Param("delYn") String delYn);
 }

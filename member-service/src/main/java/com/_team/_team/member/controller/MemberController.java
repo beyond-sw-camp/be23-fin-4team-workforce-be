@@ -333,4 +333,29 @@ public class MemberController {
                 HttpStatus.OK
         );
     }
+    // 휴직 처리
+    @CheckPermission(resource = Resource.MEMBER, action = Action.UPDATE)
+    @PatchMapping("/{targetMemberId}/dormant")
+    public ResponseEntity<?> dormantMember(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID targetMemberId) {
+        memberService.dormantMember(memberId, targetMemberId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "휴직 처리 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 복직 처리
+    @CheckPermission(resource = Resource.MEMBER, action = Action.UPDATE)
+    @PatchMapping("/{targetMemberId}/return")
+    public ResponseEntity<?> returnMember(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID targetMemberId) {
+        memberService.returnMember(memberId, targetMemberId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "복직 처리 성공"),
+                HttpStatus.OK
+        );
+    }
 }
