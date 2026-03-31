@@ -1,0 +1,67 @@
+server:
+  port: 0
+spring:
+  application:
+    name: member-service
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    kafka-server: localhost:9092
+  datasource:
+    driver-class-name: org.mariadb.jdbc.Driver
+    url: jdbc:mariadb://localhost:3306/workforce
+    username: root
+    password: test1234
+  jpa:
+    database: mysql
+    database-platform: org.hibernate.dialect.MariaDBDialect
+    generate-ddl: true
+    hibernate:
+      ddl-auto: create
+    show_sql: true
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: tpalsdl87@gmail.com
+    password: fdzw phnp tatj adas
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+jwt:
+  expirationAt: 30
+  secretKeyAt: YmV5b25kYWNjZXNzdG9rZW5zZWNyZXRrZXliZXlvbmRhY2Nlc3N0b2tlbnNlY3JldGtleWJleW9uZGFjY2Vzc3Rva2Vuc2VjcmV0a2V5
+  expirationRt: 1440
+  secretKeyRt: YmV5b25kYWNjZXNzdG9rZW5zZWNyZXRrZXliZXlvbmRhY2Nlc3N0b2tlbnNlY3JldGtleWJleW9uZGFjY2Vzc3Rva2Vuc2VjcmV0a2V5
+aws:
+  region: ap-northeast-2
+  s3:
+    bucket: workforce-profiles
+  credentials:
+    access-key: AKIA6MFCJQ63CPTHBV6D
+    secret-key: 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
+nts:
+  api:
+    url: https://api.odcloud.kr/api/nts-businessman/v1
+    key: 0f5990231be4778ccc33061e742a130a65bc53f234fc0a50687b3636cad5547f
+kakao:
+  api:
+    url: https://dapi.kakao.com/v2/local
+    key: b3af2cfd3c54123a6c3f7408f6243f7e
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
