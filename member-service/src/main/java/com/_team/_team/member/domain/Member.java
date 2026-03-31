@@ -142,4 +142,40 @@ public class Member extends BaseTimeEntity {
     public void delete() {
         this.delYn = "YES";
     }
+
+    // restore 없으면 추가
+    public void restore() {
+        this.delYn = "NO";
+    }
+    public void updateProfileUrl(String profileUrl) {
+        this.profileUrl = profileUrl;
+    }
+    // 기본 정보 수정 (인사팀)
+    public void updateBasicInfo(String name, String sabun, LocalDate joinDate,
+                                EmploymentType employmentType, MemberStatus memberStatus) {
+        this.name = name;
+        this.sabun = sabun;
+        this.joinDate = joinDate;
+        this.employmentType = employmentType;
+        this.memberStatus = memberStatus;
+    }
+
+    // 마이페이지 수정 (본인)
+    public void updateMyInfo(String phoneNumber, String phonePublicYn,
+                             String emergencyContact, String address,
+                             String detailAddress, String addressPublicYn,
+                             String bank, String bankAccount,
+                             String extensionNumber,
+                             String telNumber) {
+        if (phoneNumber != null) this.phoneNumber = phoneNumber;
+        if (phonePublicYn != null) this.phonePublicYn = phonePublicYn;
+        if (emergencyContact != null) this.emergencyContact = emergencyContact;
+        if (address != null) this.address = address;
+        if (detailAddress != null) this.detailAddress = detailAddress;
+        if (addressPublicYn != null) this.addressPublicYn = addressPublicYn;
+        if (bank != null) this.bank = bank;
+        if (bankAccount != null) this.bankAccount = bankAccount;
+        if (extensionNumber != null) this.extensionNumber = extensionNumber;
+        if (telNumber != null) this.telNumber = telNumber;
+    }
 }

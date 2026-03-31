@@ -9,22 +9,22 @@ import com._team._team.annotation.Action;
 import com._team._team.member.constant.PermissionRange;
 import com._team._team.annotation.Resource;
 import com._team._team.member.domain.*;
-import com._team._team.member.domain.enums.AccountStatus;
+        import com._team._team.member.domain.enums.AccountStatus;
+import com._team._team.member.domain.enums.ChangeType;
 import com._team._team.member.domain.enums.EmploymentType;
 import com._team._team.member.domain.enums.MemberStatus;
-import com._team._team.member.dto.reqdto.ChangePasswordReqDto;
-import com._team._team.member.dto.reqdto.LoginReqDto;
-import com._team._team.member.dto.reqdto.MemberCreateReqDto;
-import com._team._team.member.dto.resdto.LoginResDto;
-import com._team._team.member.dto.resdto.MemberResDto;
-import com._team._team.member.repository.*;
-import com._team._team.organization.domain.JobGrade;
+import com._team._team.member.dto.reqdto.*;
+        import com._team._team.member.dto.resdto.*;
+        import com._team._team.member.repository.*;
+        import com._team._team.organization.domain.JobGrade;
 import com._team._team.organization.domain.JobTitle;
 import com._team._team.organization.domain.Organization;
 import com._team._team.organization.repository.JobGradeRepository;
 import com._team._team.organization.repository.JobTitleRepository;
 import com._team._team.organization.repository.OrganizationRepository;
+import com._team._team.s3.S3Uploader;
 import com._team._team.util.PermissionUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,9 +34,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -61,9 +63,12 @@ public class MemberService {
     private final MailService mailService;
     private final RedisTemplate<String, String> permissoinRedisTemplate;
     private final PermissionUtils permissionUtils;
+    private final RedisTemplate<String, String> emailRedisTemplate;
+    private final EmploymentJobHistoryRepository employmentJobHistoryRepository;
+    private final S3Uploader s3Uploader;
 
     @Autowired
-    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils) {
+    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader) {
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.roleRepository = roleRepository;
@@ -77,6 +82,9 @@ public class MemberService {
         this.mailService = mailService;
         this.permissoinRedisTemplate = permissoinRedisTemplate;
         this.permissionUtils = permissionUtils;
+        this.emailRedisTemplate = emailRedisTemplate;
+        this.employmentJobHistoryRepository = employmentJobHistoryRepository;
+        this.s3Uploader = s3Uploader;
     }
 
     // 온보딩 시 기본 역할 4개 + 권한 생성
@@ -289,6 +297,7 @@ public class MemberService {
     }
 
     // 로그인
+    @Transactional(noRollbackFor = BusinessException.class)
     public LoginResDto login(LoginReqDto reqDto, HttpServletResponse response) {
 
         // 1. 이메일 확인
@@ -297,41 +306,58 @@ public class MemberService {
                         HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 일치하지 않습니다."
                 ));
 
-        // 2. 계정 잠금 확인
+        // 2. 삭제된 계정 확인 ← 추가
+        if ("YES".equals(member.getDelYn())) {
+            throw new BusinessException(
+                    HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다."
+            );
+        }
+
+        // 3. 계정 잠금 확인
         if (member.getAccountStatus() == AccountStatus.BLOCKED) {
             throw new BusinessException(
                     HttpStatus.FORBIDDEN, "계정이 잠금 상태입니다. 관리자에게 문의하세요."
             );
         }
 
-        // 3. 비밀번호 확인
+        // 4. 비밀번호 확인
         if (!passwordEncoder.matches(reqDto.getPassword(), member.getPassword())) {
             member.increaseLoginFailCount();
             memberRepository.save(member);
+
+            // 5회 오류 시 잠금 메시지 반환
+            if (member.getAccountStatus() == AccountStatus.BLOCKED) {
+                throw new BusinessException(
+                        HttpStatus.FORBIDDEN, "비밀번호 5회 오류로 계정이 잠금됐습니다. 관리자에게 문의하세요."
+                );
+            }
+
             throw new BusinessException(
-                    HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 일치하지 않습니다."
+                    HttpStatus.UNAUTHORIZED,
+                    "이메일 또는 비밀번호가 일치하지 않습니다. ("
+                            + member.getLoginFailCount() + "/5)"
             );
         }
 
-        // 4. 로그인 실패 횟수 초기화
+        // 5. 로그인 실패 횟수 초기화
         member.resetLoginFailCount();
         memberRepository.save(member);
 
-        // 5. defaultPosition 조회
+        // 6. defaultPosition 조회
         MemberPosition memberPosition = memberPositionRepository
                 .findByIdWithRoleAndPermissions(member.getDefaultPositionId())
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
                 ));
 
-        // 6. AT 발급
+        // 7. AT 발급
         String accessToken = jwtTokenProvider.createAtToken(member, memberPosition);
 
-        // 7. RT 발급 + 쿠키 저장
+        // 8. RT 발급 + 쿠키 저장
         String refreshToken = jwtTokenProvider.createRtToken(member);
         jwtTokenProvider.setRtCookie(response, refreshToken);
 
-    cachePermissions(memberPosition);
+        cachePermissions(memberPosition);
 
         return LoginResDto.builder()
                 .accessToken(accessToken)
@@ -387,18 +413,43 @@ public class MemberService {
     }
 
     // AT 재발급
-    public LoginResDto generateAt(UUID memberId, UUID memberPositionId) {
+    public LoginResDto generateAt(UUID memberId,
+                                  UUID memberPositionId,
+                                  HttpServletRequest request) {
+
+        // 1. RT 검증
+        jwtTokenProvider.validateAndGetRtClaims(
+                request, memberId.toString()
+        );
+
+        // 2. 회원 조회
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
                 ));
 
+        // 3. 삭제된 계정 확인
+        if ("YES".equals(member.getDelYn())) {
+            throw new BusinessException(
+                    HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다."
+            );
+        }
+
+        // 4. 계정 잠금 확인
+        if (member.getAccountStatus() == AccountStatus.BLOCKED) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "계정이 잠금 상태입니다."
+            );
+        }
+
+        // 5. MemberPosition 조회
         MemberPosition memberPosition = memberPositionRepository
                 .findById(memberPositionId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 포지션입니다."
                 ));
 
+        // 6. AT 재발급
         String accessToken = jwtTokenProvider.createAtToken(member, memberPosition);
 
         return LoginResDto.builder()
@@ -493,8 +544,22 @@ public class MemberService {
 
         // 11. defaultPositionId 업데이트
         savedMember.updateDefaultPosition(savedPosition.getMemberPositionId());
+        // 12. 최초 등록 이력 저장
+        EmploymentJobHistory history = EmploymentJobHistory.builder()
+                .member(savedMember)
+                .jobGrade(jobGrade)
+                .organization(organization)
+                .defaultPosition(savedPosition)
+                .employmentType(reqDto.getEmploymentType())
+                .changedAt(LocalDateTime.now())
+                .changedId(memberId)          // 생성한 인사팀 ID
+                .effectiveFrom(reqDto.getJoinDate())
+                .effectiveTo(null)            // 현재 적용 중
+                .changeType(ChangeType.INITIAL)
+                .build();
 
-        // 12. 임시 비밀번호 개인 이메일로 발송
+        employmentJobHistoryRepository.save(history);
+        // 13. 임시 비밀번호 개인 이메일로 발송
         mailService.sendTempPassword(reqDto.getPersonalEmail(), companyEmail, tempPassword);
     }
 
@@ -519,31 +584,66 @@ public class MemberService {
                 Resource.MEMBER,
                 Action.READ,
 
-                // COMPANY → 전사 조회
+                // COMPANY → 전사 조회 (fetch join으로 N+1 방지)
                 () -> memberRepository
-                        .findByCompanyAndDelYn(requester.getCompany(), "NO")
-                        .stream().map(MemberResDto::fromEntity).toList(),
+                        .findByCompanyAndDelYnWithPosition(requester.getCompany(), "NO")
+                        .stream()
+                        .map(m -> memberPositionRepository
+                                .findByIdWithDetails(m.getDefaultPositionId())
+                                .map(pos -> MemberResDto.fromEntity(m, pos))
+                                .orElse(MemberResDto.fromEntity(m)))
+                        .toList(),
+
 
                 // TEAM/DEPARTMENT → 같은 조직 조회
                 () -> memberPositionRepository
                         .findByOrganizationAndDelYn(organization, "NO")
                         .stream()
-                        .map(mp -> MemberResDto.fromEntity(mp.getMember()))
+                        .map(mp -> MemberResDto.fromEntity(mp.getMember(), mp))
                         .toList(),
 
                 // SELF → 본인만
-                () -> List.of(MemberResDto.fromEntity(requester))
+                () -> memberPositionRepository
+                        .findByIdWithDetails(requester.getDefaultPositionId())
+                        .map(pos -> List.of(MemberResDto.fromEntity(requester, pos)))
+                        .orElse(List.of(MemberResDto.fromEntity(requester)))
         );
     }
 
     // 직원 상세 조회
     @Transactional(readOnly = true)
-    public MemberResDto getMemberDetail(UUID memberId, UUID memberPositionId, UUID targetMemberId) {
-        Member member = memberRepository.findById(targetMemberId)
+    public MemberDetailResDto getMemberDetail(UUID memberId,
+                                              UUID memberPositionId,
+                                              UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
                 ));
-        return MemberResDto.fromEntity(member);
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원을 조회할 수 없습니다."
+            );
+        }
+
+        // 4. MemberPosition 조회 (N+1 방지)
+        MemberPosition position = memberPositionRepository
+                .findByIdWithDetails(target.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                ));
+
+        return MemberDetailResDto.fromEntity(target, position);
     }
 
     // 임시 비밀번호 생성
@@ -555,6 +655,833 @@ public class MemberService {
             sb.append(chars.charAt(random.nextInt(chars.length())));
         }
         return sb.toString();
+    }
+
+    // 비밀번호 재설정 인증 코드 발송
+    public void sendResetPasswordCode(String personalEmail) {
+
+        // 1. 개인 이메일로 회원 조회
+        Member member = memberRepository.findByPersonalEmail(personalEmail)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 이메일입니다."
+                ));
+
+        // 2. 계정 상태 확인
+        if (member.getAccountStatus() == AccountStatus.BLOCKED) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "계정이 잠금 상태입니다. 관리자에게 문의하세요."
+            );
+        }
+
+        // 3. 인증 코드 생성
+        String code = generateVerificationCode();
+
+        // 4. Redis DB1에 저장 (5분)
+        emailRedisTemplate.opsForValue().set(
+                "RESET_PASSWORD:" + personalEmail,
+                code,
+                5,
+                TimeUnit.MINUTES
+        );
+
+        // 5. 메일 발송
+        mailService.sendVerificationCode(personalEmail, code);
+    }
+
+    // 비밀번호 재설정 인증 코드 확인
+    public void verifyResetPasswordCode(String personalEmail, String code) {
+
+        String savedCode = emailRedisTemplate.opsForValue()
+                .get("RESET_PASSWORD:" + personalEmail);
+
+        if (savedCode == null) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "인증 코드가 만료됐습니다."
+            );
+        }
+
+        if (!savedCode.equals(code)) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "인증 코드가 일치하지 않습니다."
+            );
+        }
+
+        // 인증 완료 표시 (30분)
+        emailRedisTemplate.opsForValue().set(
+                "RESET_PASSWORD_VERIFIED:" + personalEmail,
+                "YES",
+                30,
+                TimeUnit.MINUTES
+        );
+
+        // 인증 코드 삭제
+        emailRedisTemplate.delete("RESET_PASSWORD:" + personalEmail);
+    }
+
+    // 비밀번호 재설정
+    public void resetPassword(ResetPasswordReqDto reqDto) {
+
+        // 1. 이메일 인증 여부 확인
+        String verified = emailRedisTemplate.opsForValue()
+                .get("RESET_PASSWORD_VERIFIED:" + reqDto.getPersonalEmail());
+
+        if (!"YES".equals(verified)) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이메일 인증이 필요합니다."
+            );
+        }
+
+        // 2. 새 비밀번호 확인
+        if (!reqDto.getNewPassword().equals(reqDto.getNewPasswordCheck())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "새 비밀번호가 일치하지 않습니다."
+            );
+        }
+
+        // 3. 회원 조회
+        Member member = memberRepository.findByPersonalEmail(reqDto.getPersonalEmail())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 이메일입니다."
+                ));
+
+        // 4. 현재 비밀번호와 같은지 확인
+        if (passwordEncoder.matches(reqDto.getNewPassword(), member.getPassword())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "현재 비밀번호와 다른 비밀번호를 입력해주세요."
+            );
+        }
+
+        // 5. 비밀번호 변경
+        member.updatePassword(passwordEncoder.encode(reqDto.getNewPassword()));
+
+        // 6. 인증 정보 삭제
+        emailRedisTemplate.delete("RESET_PASSWORD_VERIFIED:" + reqDto.getPersonalEmail());
+    }
+
+    // 인증 코드 생성
+    private String generateVerificationCode() {
+        SecureRandom random = new SecureRandom();
+        int code = random.nextInt(900000) + 100000;
+        return String.valueOf(code);
+    }
+    // 직원 수정 (인사팀)
+    public void updateMember(UUID memberId, UUID memberPositionId,
+                             UUID targetMemberId, MemberUpdateReqDto reqDto) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+        Company company = requester.getCompany();
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사 직원인지 확인
+        if (!target.getCompany().getCompanyId().equals(company.getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원을 수정할 수 없습니다."
+            );
+        }
+
+        // 4. 조직/직급/직책/역할 조회 + 같은 회사 검증
+        Organization organization = organizationRepository
+                .findById(reqDto.getOrganizationId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 조직입니다."
+                ));
+
+        JobGrade jobGrade = jobGradeRepository
+                .findById(reqDto.getJobGradeId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직급입니다."
+                ));
+
+        JobTitle jobTitle = jobTitleRepository
+                .findById(reqDto.getJobTitleId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직책입니다."
+                ));
+
+        Role role = roleRepository
+                .findById(reqDto.getRoleId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."
+                ));
+
+        // 5. 현재 이력 조회
+        EmploymentJobHistory currentHistory = employmentJobHistoryRepository
+                .findCurrentHistory(target)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "이력 정보를 찾을 수 없습니다."
+                ));
+
+        // 6. 변경 유형 판별
+        ChangeType changeType = determineChangeType(
+                currentHistory, reqDto, Boolean.TRUE.equals(reqDto.getIsPromotion())
+        );
+
+        // 7. 기본 정보 수정
+        target.updateBasicInfo(
+                reqDto.getName(),
+                reqDto.getSabun(),
+                reqDto.getJoinDate(),
+                reqDto.getEmploymentType(),
+                reqDto.getMemberStatus()
+        );
+
+        // 8. MemberPosition 수정
+        MemberPosition position = memberPositionRepository
+                .findById(target.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                ));
+
+        position.update(organization, jobGrade, jobTitle, role);
+
+        // 9. 변경 이력 저장
+        if (changeType != null) {
+            // 기존 이력 종료
+            currentHistory.closeHistory(LocalDate.now());
+
+            // 새 이력 생성
+            EmploymentJobHistory newHistory = EmploymentJobHistory.builder()
+                    .member(target)
+                    .jobGrade(jobGrade)
+                    .organization(organization)
+                    .defaultPosition(position)
+                    .employmentType(reqDto.getEmploymentType())
+                    .changedAt(LocalDateTime.now())
+                    .changedId(memberId)
+                    .changeReason(reqDto.getChangeReason())
+                    .effectiveFrom(LocalDate.now())
+                    .effectiveTo(null)
+                    .changeType(changeType)
+                    .build();
+
+            employmentJobHistoryRepository.save(newHistory);
+        }
+    }
+
+    // 변경 유형 판별
+    private ChangeType determineChangeType(
+            EmploymentJobHistory current,
+            MemberUpdateReqDto reqDto,
+            boolean isPromotion) {
+
+        // 직급 변경
+        if (!current.getJobGrade().getJobGradeId().equals(reqDto.getJobGradeId())) {
+            return isPromotion ? ChangeType.PROMOTION : ChangeType.GRADE_CHANGE;
+        }
+
+        // 조직 변경
+        if (!current.getOrganization().getOrganizationId().equals(reqDto.getOrganizationId())) {
+            return ChangeType.ORG_CHANGE;
+        }
+
+        // 고용형태 변경
+        if (!current.getEmploymentType().equals(reqDto.getEmploymentType())) {
+            return ChangeType.EMPLOYMENT_CHANGE;
+        }
+
+        // 직책 변경
+        if (!current.getDefaultPosition().getJobTitle().getJobTitleId()
+                .equals(reqDto.getJobTitleId())) {
+            return ChangeType.TITLE_CHANGE;
+        }
+
+        // 변경 없음
+        return null;
+    }
+
+    // 마이페이지 수정 (본인)
+    public void updateMyInfo(UUID memberId, MyInfoUpdateReqDto reqDto) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        member.updateMyInfo(
+                reqDto.getPhoneNumber(),
+                reqDto.getPhonePublicYn(),
+                reqDto.getEmergencyContact(),
+                reqDto.getAddress(),
+                reqDto.getDetailAddress(),
+                reqDto.getAddressPublicYn(),
+                reqDto.getBank(),
+                reqDto.getBankAccount(),
+                reqDto.getExtensionNumber(),
+                reqDto.getTelNumber()
+        );
+    }
+    // 직원 삭제
+    public void deleteMember(UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원을 삭제할 수 없습니다."
+            );
+        }
+
+        // 4. 이미 삭제된 직원인지 확인
+        if ("YES".equals(target.getDelYn())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이미 삭제된 직원입니다."
+            );
+        }
+
+        // 5. 본인 삭제 방지
+        if (memberId.equals(targetMemberId)) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "본인 계정은 삭제할 수 없습니다."
+            );
+        }
+
+        // 6. 소프트 삭제
+        target.delete();
+
+        // 7. 계정 상태 변경
+        target.updateMemberStatus(MemberStatus.LEAVE);
+
+        // 8. Redis 권한 캐시 삭제
+        MemberPosition position = memberPositionRepository
+                .findById(target.getDefaultPositionId())
+                .orElse(null);
+
+        if (position != null) {
+            permissoinRedisTemplate.delete(
+                    "PERMISSION:" + position.getMemberPositionId()
+            );
+        }
+    }
+
+    // 직원 복원
+    public void restoreMember(UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원을 복원할 수 없습니다."
+            );
+        }
+
+        // 4. 삭제된 직원인지 확인
+        if ("NO".equals(target.getDelYn())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "삭제되지 않은 직원입니다."
+            );
+        }
+
+        // 5. 복원
+        target.restore();
+
+        // 6. 계정 상태 변경
+        target.updateMemberStatus(MemberStatus.ACTIVE);
+    }
+    public void updateMemberRole(UUID memberId, UUID targetMemberId,
+                                 UpdateMemberRoleReqDto reqDto) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 MemberPosition 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원입니다."
+            );
+        }
+
+        // 4. 역할 조회
+        Role role = roleRepository.findById(reqDto.getRoleId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."
+                ));
+
+        // 5. 같은 회사 역할인지 확인
+        if (!role.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 역할입니다."
+            );
+        }
+
+        // 6. MemberPosition 역할 변경
+        MemberPosition position = memberPositionRepository
+                .findById(target.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                ));
+
+        position.updateRole(role);
+
+        // 7. Redis 권한 캐시 삭제 (다음 로그인 시 재캐싱)
+        permissoinRedisTemplate.delete(
+                "PERMISSION:" + position.getMemberPositionId()
+        );
+    }
+
+    // 직원 이력 조회
+    @Transactional(readOnly = true)
+    public List<EmploymentJobHistoryResDto> getMemberHistory(
+            UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원 이력을 조회할 수 없습니다."
+            );
+        }
+
+        // 4. 이력 조회 (최신순)
+        return employmentJobHistoryRepository
+                .findByMemberOrderByEffectiveFromDesc(target)
+                .stream()
+                .map(history -> {
+                    // 변경자 이름 조회
+                    String changerName = memberRepository
+                            .findById(history.getChangedId())
+                            .map(Member::getName)
+                            .orElse("알 수 없음");
+                    return EmploymentJobHistoryResDto.fromEntity(history, changerName);
+                })
+                .collect(Collectors.toList());
+    }
+
+    // 역할 생성
+    public UUID createRole(UUID memberId, RoleReqDto reqDto) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+        Company company = member.getCompany();
+
+        int displayOrder = roleRepository
+                .findByCompany_CompanyIdAndDelYnOrderByDisplayOrder(
+                        company.getCompanyId(), "NO").size();
+
+        Role role = Role.builder()
+                .company(company)
+                .name(reqDto.getName())
+                .description(reqDto.getDescription())
+                .displayOrder(displayOrder)
+                .build();
+
+        Role savedRole = roleRepository.save(role);
+
+        // 권한 세팅
+        if (reqDto.getPermissions() != null && !reqDto.getPermissions().isEmpty()) {
+            List<RolePermission> rolePermissions = reqDto.getPermissions().stream()
+                    .map(p -> {
+                        Permission permission = permissionRepository
+                                .findByResourceAndAction(p.getResource(), p.getAction())
+                                .orElseGet(() -> permissionRepository.save(
+                                        Permission.builder()
+                                                .resource(p.getResource())
+                                                .action(p.getAction())
+                                                .build()
+                                ));
+                        return RolePermission.builder()
+                                .role(savedRole)
+                                .permission(permission)
+                                .permissionRange(p.getPermissionRange())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+
+            rolePermissionRepository.saveAll(rolePermissions);
+        }
+
+        return savedRole.getRoleId();
+    }
+
+    // 역할 목록 조회
+    @Transactional(readOnly = true)
+    public List<RoleResDto> getRoleList(UUID memberId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        return roleRepository
+                .findByCompany_CompanyIdAndDelYnOrderByDisplayOrder(
+                        member.getCompany().getCompanyId(), "NO")
+                .stream()
+                .map(RoleResDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    // 역할 상세 조회
+    @Transactional(readOnly = true)
+    public RoleResDto getRoleDetail(UUID memberId, UUID roleId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."
+                ));
+
+        if (!role.getCompany().getCompanyId()
+                .equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 역할입니다."
+            );
+        }
+
+        return RoleResDto.fromEntity(role);
+    }
+
+    // 역할 수정
+    public void updateRole(UUID memberId, UUID roleId, RoleReqDto reqDto) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."
+                ));
+
+        if (!role.getCompany().getCompanyId()
+                .equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 역할입니다."
+            );
+        }
+
+        // 역할 기본 정보 수정
+        role.updateName(reqDto.getName());
+        role.updateDescription(reqDto.getDescription());
+
+        // 기존 권한 삭제 후 새로 저장
+        rolePermissionRepository.deleteByRole(role);
+
+        if (reqDto.getPermissions() != null && !reqDto.getPermissions().isEmpty()) {
+            List<RolePermission> rolePermissions = reqDto.getPermissions().stream()
+                    .map(p -> {
+                        Permission permission = permissionRepository
+                                .findByResourceAndAction(p.getResource(), p.getAction())
+                                .orElseGet(() -> permissionRepository.save(
+                                        Permission.builder()
+                                                .resource(p.getResource())
+                                                .action(p.getAction())
+                                                .build()
+                                ));
+                        return RolePermission.builder()
+                                .role(role)
+                                .permission(permission)
+                                .permissionRange(p.getPermissionRange())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+
+            rolePermissionRepository.saveAll(rolePermissions);
+        }
+
+        // Redis 권한 캐시 삭제 (해당 역할 사용 직원 전체)
+        memberPositionRepository.findByRole(role)
+                .forEach(mp -> permissoinRedisTemplate.delete(
+                        "PERMISSION:" + mp.getMemberPositionId()
+                ));
+    }
+
+    // 역할 삭제
+    public void deleteRole(UUID memberId, UUID roleId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 역할입니다."
+                ));
+
+        if (!role.getCompany().getCompanyId()
+                .equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 역할입니다."
+            );
+        }
+
+        // 사용 중인 직원 확인
+        if (memberPositionRepository.existsByRoleAndDelYn(role, "NO")) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "사용 중인 직원이 있어 삭제할 수 없습니다."
+            );
+        }
+
+        role.delete();
+    }
+    // 계정 잠금 해제
+    public void unblockMember(UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원입니다."
+            );
+        }
+
+        // 4. 잠금 상태인지 확인
+        if (target.getAccountStatus() != AccountStatus.BLOCKED) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "잠금 상태가 아닌 계정입니다."
+            );
+        }
+
+        // 5. 잠금 해제
+        target.unblock();
+    }
+    // 프로필 이미지 업로드
+    public void updateProfileImage(UUID memberId, MultipartFile profileImage) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 기존 이미지 있으면 삭제
+        if (member.getProfileUrl() != null) {
+            s3Uploader.delete(member.getProfileUrl());
+        }
+
+        // 새 이미지 업로드
+        String profileUrl = s3Uploader.upload(profileImage, "profile");
+
+        // profileUrl 업데이트
+        member.updateProfileUrl(profileUrl);
+    }
+
+    // 프로필 이미지 삭제
+    public void deleteProfileImage(UUID memberId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        if (member.getProfileUrl() == null) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "프로필 이미지가 없습니다."
+            );
+        }
+
+        // S3 파일 삭제
+        s3Uploader.delete(member.getProfileUrl());
+
+        // profileUrl null로 업데이트
+        member.updateProfileUrl(null);
+    }
+    // 휴직 처리
+    public void dormantMember(UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원입니다."
+            );
+        }
+
+        // 4. 이미 휴직 중인지 확인
+        if (target.getMemberStatus() == MemberStatus.DORMANT) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이미 휴직 중인 직원입니다."
+            );
+        }
+
+        // 5. 퇴직한 직원인지 확인
+        if ("YES".equals(target.getDelYn())) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "퇴직한 직원입니다."
+            );
+        }
+
+        // 6. 휴직 처리
+        target.updateMemberStatus(MemberStatus.DORMANT);
+
+        // 7. 이력 저장
+        EmploymentJobHistory currentHistory = employmentJobHistoryRepository
+                .findCurrentHistory(target)
+                .orElse(null);
+
+        if (currentHistory != null) {
+            currentHistory.closeHistory(LocalDate.now());
+        }
+
+        MemberPosition position = memberPositionRepository
+                .findById(target.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                ));
+
+        EmploymentJobHistory history = EmploymentJobHistory.builder()
+                .member(target)
+                .jobGrade(position.getJobGrade())
+                .organization(position.getOrganization())
+                .defaultPosition(position)
+                .employmentType(target.getEmploymentType())
+                .changedAt(LocalDateTime.now())
+                .changedId(memberId)
+                .effectiveFrom(LocalDate.now())
+                .effectiveTo(null)
+                .changeType(ChangeType.DORMANT)
+                .build();
+
+        employmentJobHistoryRepository.save(history);
+    }
+
+    // 복직 처리
+    public void returnMember(UUID memberId, UUID targetMemberId) {
+
+        // 1. 요청자 조회
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 대상 직원 조회
+        Member target = memberRepository.findById(targetMemberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        // 3. 같은 회사인지 확인
+        if (!target.getCompany().getCompanyId()
+                .equals(requester.getCompany().getCompanyId())) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원입니다."
+            );
+        }
+
+        // 4. 휴직 중인지 확인
+        if (target.getMemberStatus() != MemberStatus.DORMANT) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "휴직 중인 직원이 아닙니다."
+            );
+        }
+
+        // 5. 복직 처리
+        target.updateMemberStatus(MemberStatus.ACTIVE);
+
+        // 6. 이력 저장
+        EmploymentJobHistory currentHistory = employmentJobHistoryRepository
+                .findCurrentHistory(target)
+                .orElse(null);
+
+        if (currentHistory != null) {
+            currentHistory.closeHistory(LocalDate.now());
+        }
+
+        MemberPosition position = memberPositionRepository
+                .findById(target.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                ));
+
+        EmploymentJobHistory history = EmploymentJobHistory.builder()
+                .member(target)
+                .jobGrade(position.getJobGrade())
+                .organization(position.getOrganization())
+                .defaultPosition(position)
+                .employmentType(target.getEmploymentType())
+                .changedAt(LocalDateTime.now())
+                .changedId(memberId)
+                .effectiveFrom(LocalDate.now())
+                .effectiveTo(null)
+                .changeType(ChangeType.RETURN)
+                .build();
+
+        employmentJobHistoryRepository.save(history);
     }
 }
 

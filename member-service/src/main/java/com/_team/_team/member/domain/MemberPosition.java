@@ -94,5 +94,14 @@ public class MemberPosition extends BaseTimeEntity {
     public void updateRole(Role role) {
         this.role = role;
     }
+    public void update(Organization organization, JobGrade jobGrade,
+                       JobTitle jobTitle, Role role) {
+        this.organization = organization;
+        this.jobGrade = jobGrade;
+        this.jobTitle = jobTitle;
+        this.role = role;
+    }
+
+
 }
 
