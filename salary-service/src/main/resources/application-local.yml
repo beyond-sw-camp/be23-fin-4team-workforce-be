@@ -1,0 +1,48 @@
+server:
+  port: 0
+spring:
+  application:
+    name: salary-service
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    kafka-server: localhost:9092
+  datasource:
+    driver-class-name: org.mariadb.jdbc.Driver
+    url: jdbc:mariadb://localhost:3306/workforce
+    username: root
+    password: test1234
+  jpa:
+    database: mysql
+    database-platform: org.hibernate.dialect.MariaDBDialect
+    generate-ddl: true
+    hibernate:
+      ddl-auto: update
+    show_sql: true
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+jwt:
+  expirationAt: 30
+  secretKeyAt: YmV5b25kYWNjZXNzdG9rZW5zZWNyZXRrZXliZXlvbmRhY2Nlc3N0b2tlbnNlY3JldGtleWJleW9uZGFjY2Vzc3Rva2Vuc2VjcmV0a2V5
+  expirationRt: 1440
+  secretKeyRt: YmV5b25kYWNjZXNzdG9rZW5zZWNyZXRrZXliZXlvbmRhY2Nlc3N0b2tlbnNlY3JldGtleWJleW9uZGFjY2Vzc3Rva2Vuc2VjcmV0a2V5
+aws:
+  region: ap-northeast-2
+  s3:
+    bucket: workforce-profiles
+  credentials:
+    access-key: AKIA6MFCJQ63CPTHBV6D
+    secret-key: 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
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
