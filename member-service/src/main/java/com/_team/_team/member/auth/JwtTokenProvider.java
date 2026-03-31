@@ -1,5 +1,6 @@
 package com._team._team.member.auth;
 
+import com._team._team.dto.BusinessException;
 import com._team._team.member.domain.Member;
 import com._team._team.member.domain.MemberPosition;
 import io.jsonwebtoken.Claims;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -153,7 +155,38 @@ public class JwtTokenProvider {
             return e.getClaims();
         }
     }
+    // RT 쿠키 검증 후 Claims 반환
+    public Claims validateAndGetRtClaims(
+            HttpServletRequest request, String memberId) {
 
+        // 1. 쿠키에서 RT 꺼내기
+        String refreshToken = getRtFromCookie(request);
+
+        if (refreshToken == null) {
+            throw new BusinessException(
+                    HttpStatus.UNAUTHORIZED, "Refresh Token이 없습니다."
+            );
+        }
+
+        // 2. RT 서명 검증
+        Claims claims = validateRtToken(refreshToken);
+
+        // 3. RT 만료 확인
+        if (claims.getExpiration().before(new Date())) {
+            throw new BusinessException(
+                    HttpStatus.UNAUTHORIZED, "Refresh Token이 만료됐습니다."
+            );
+        }
+
+        // 4. Redis에서 RT 유효성 확인
+        if (!isRtValid(memberId, refreshToken)) {
+            throw new BusinessException(
+                    HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."
+            );
+        }
+
+        return claims;
+    }
     // Redis에서 RT 유효성 확인
     public boolean isRtValid(String memberId, String refreshToken) {
         String redisRt = redisTemplate.opsForValue().get("RT:" + memberId);

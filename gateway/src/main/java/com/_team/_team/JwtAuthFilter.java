@@ -41,7 +41,10 @@ public class JwtAuthFilter implements GlobalFilter {
             "/company/check-business-number",
             "/company/send-verification-code",
             "/company/verify-code",
-            "/company/onboarding"
+            "/company/onboarding",
+            "/member/reset-password/send-code",
+            "/member/reset-password/verify-code",
+            "/member/reset-password"
     );
 
     @Override

@@ -25,4 +25,6 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     // 회사별 직원 목록
     List<Member> findByCompanyAndDelYn(Company company, String delYn);
+
+    Optional<Member> findByPersonalEmail(String personalEmail);
 }

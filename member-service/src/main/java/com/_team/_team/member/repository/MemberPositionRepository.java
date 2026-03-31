@@ -1,6 +1,9 @@
 package com._team._team.member.repository;
 
 import com._team._team.member.domain.MemberPosition;
+import com._team._team.member.domain.Role;
+import com._team._team.organization.domain.JobGrade;
+import com._team._team.organization.domain.JobTitle;
 import com._team._team.organization.domain.Organization;
 import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,16 +16,8 @@ import java.util.UUID;
 
 @Repository
 public interface MemberPositionRepository extends JpaRepository<MemberPosition, UUID> {
-    // 특정 멤버의 활성 포지션 조회
-    Optional<MemberPosition> findByMember_MemberIdAndIsActiveYnAndDelYn(
-            UUID memberId, String isActiveYn, String delYn);
-
-    // 특정 멤버의 전체 포지션 조회
-    List<MemberPosition> findByMember_MemberIdAndDelYn(UUID memberId, String delYn);
-
-    // 시스템 관리자 조회 (회사별)
-    List<MemberPosition> findByMember_Company_CompanyIdAndIsSystemAdminYn(
-            UUID companyId, String isSystemAdminYn);
+    boolean existsByRoleAndDelYn(Role role, String delYn);
+    List<MemberPosition> findByRole(Role role);
 
     // 조직별 MemberPosition 조회
     List<MemberPosition> findByOrganizationAndDelYn(Organization organization, String delYn);
@@ -33,5 +28,20 @@ public interface MemberPositionRepository extends JpaRepository<MemberPosition, 
             "LEFT JOIN FETCH rp.permission " +
             "WHERE mp.memberPositionId = :memberPositionId")
     Optional<MemberPosition> findByIdWithRoleAndPermissions(
+            @Param("memberPositionId") UUID memberPositionId);
+
+    boolean existsByJobGradeAndDelYn(JobGrade jobGrade, String delYn);
+
+    boolean existsByJobTitleAndDelYn(JobTitle jobTitle, String delYn);
+
+    boolean existsByOrganizationAndDelYn(Organization organization, String delYn);
+
+    @Query("SELECT mp FROM MemberPosition mp " +
+            "JOIN FETCH mp.organization " +
+            "JOIN FETCH mp.jobGrade " +
+            "JOIN FETCH mp.jobTitle " +
+            "JOIN FETCH mp.role " +
+            "WHERE mp.memberPositionId = :memberPositionId")
+    Optional<MemberPosition> findByIdWithDetails(
             @Param("memberPositionId") UUID memberPositionId);
 }

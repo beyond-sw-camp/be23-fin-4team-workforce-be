@@ -2,9 +2,14 @@ package com._team._team.organization.service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.member.domain.Member;
+import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
 import com._team._team.member.service.MemberService;
+import com._team._team.organization.dto.reqdto.JobGradeReqDto;
+import com._team._team.organization.dto.reqdto.JobTitleReqDto;
 import com._team._team.organization.dto.reqdto.OrganizationReqDto;
+import com._team._team.organization.dto.resdto.JobGradeResDto;
+import com._team._team.organization.dto.resdto.JobTitleResDto;
 import com._team._team.organization.dto.resdto.OrganizationResDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -22,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,13 +40,15 @@ public class OrganizationService {
     private final JobGradeRepository jobGradeRepository;
     private final JobTitleRepository jobTitleRepository;
     private final MemberRepository memberRepository;
+    private final MemberPositionRepository memberPositionRepository;
 
     @Autowired
-    public OrganizationService(OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, MemberRepository memberRepository) {
+    public OrganizationService(OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository) {
         this.organizationRepository = organizationRepository;
         this.jobGradeRepository = jobGradeRepository;
         this.jobTitleRepository = jobTitleRepository;
         this.memberRepository = memberRepository;
+        this.memberPositionRepository = memberPositionRepository;
     }
 
     // 온보딩 시 기본 조직 생성
@@ -57,7 +65,7 @@ public class OrganizationService {
     public JobGrade createDefaultJobGrade(Company company) {
         JobGrade jobGrade = JobGrade.builder()
                 .company(company)
-                .name("미지정")
+                .name("관리자")
                 .displayOrder(0)
                 .build();
         return jobGradeRepository.save(jobGrade);
@@ -67,7 +75,7 @@ public class OrganizationService {
     public JobTitle createDefaultJobTitle(Company company) {
         JobTitle jobTitle = JobTitle.builder()
                 .company(company)
-                .name("미지정")
+                .name("관리자")
                 .displayOrder(0)
                 .build();
         return jobTitleRepository.save(jobTitle);
@@ -95,8 +103,9 @@ public class OrganizationService {
             }
         }
 
+        // 동시성 해결 - 비관적 락
         int displayOrder = organizationRepository
-                .findByCompanyAndDelYnOrderByDisplayOrder(company, "NO").size();
+                .findByCompanyAndDelYnOrderByDisplayOrderWithLock(company, "NO").size();
 
         Organization organization = Organization.builder()
                 .company(company)
@@ -107,6 +116,7 @@ public class OrganizationService {
 
         return organizationRepository.save(organization).getOrganizationId();
     }
+
 
     // 조직 목록 조회 (트리 구조)
     @Transactional(readOnly = true)
@@ -170,8 +180,229 @@ public class OrganizationService {
                     HttpStatus.BAD_REQUEST, "하위 조직이 있어 삭제할 수 없습니다."
             );
         }
+        if (memberPositionRepository.existsByOrganizationAndDelYn(organization, "NO")) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "해당 조직에 속한 직원이 있어 삭제할 수 없습니다."
+            );
+        }
 
         organization.delete();
     }
+    // 직급 생성
+    public UUID createJobGrade(UUID memberId, JobGradeReqDto reqDto) {
 
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+        Company company = member.getCompany();
+
+        // 동시성 해결 - 비관적 락
+        int displayOrder = jobGradeRepository
+                .findByCompanyIdAndDelYnWithLock(
+                        company.getCompanyId(), "NO").size();
+
+        JobGrade jobGrade = JobGrade.builder()
+                .company(company)
+                .name(reqDto.getName())
+                .displayOrder(displayOrder)
+                .build();
+
+        return jobGradeRepository.save(jobGrade).getJobGradeId();
+    }
+
+    // 직급 목록 조회
+    @Transactional(readOnly = true)
+    public List<JobGradeResDto> getJobGradeList(UUID memberId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        return jobGradeRepository
+                .findByCompany_CompanyIdAndDelYnOrderByDisplayOrder(
+                        member.getCompany().getCompanyId(), "NO")
+                .stream()
+                .map(JobGradeResDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    // 직급 수정
+    public void updateJobGrade(UUID memberId, UUID jobGradeId, JobGradeReqDto reqDto) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        JobGrade jobGrade = jobGradeRepository.findById(jobGradeId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직급입니다."
+                ));
+
+        if (!jobGrade.getCompany().getCompanyId()
+                .equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직급입니다.");
+        }
+
+        jobGrade.updateName(reqDto.getName());
+    }
+
+    // 직급 삭제
+    public void deleteJobGrade(UUID memberId, UUID jobGradeId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        JobGrade jobGrade = jobGradeRepository.findById(jobGradeId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직급입니다."
+                ));
+
+        if (!jobGrade.getCompany().getCompanyId()
+                .equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직급입니다.");
+        }
+
+        // 사용 중인 직원 있는지 확인
+        if (memberPositionRepository.existsByJobGradeAndDelYn(jobGrade, "NO")) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "사용 중인 직원이 있어 삭제할 수 없습니다."
+            );
+        }
+
+        jobGrade.delete();
+    }
+
+    // 직책 생성
+    public UUID createJobTitle(UUID memberId, JobTitleReqDto reqDto) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+        Company company = member.getCompany();
+
+        // 동시성 해결 - 비관적 락
+        int displayOrder = jobTitleRepository
+                .findByCompanyIdAndDelYnWithLock(
+                        company.getCompanyId(), "NO").size();
+
+        JobTitle jobTitle = JobTitle.builder()
+                .company(company)
+                .name(reqDto.getName())
+                .displayOrder(displayOrder)
+                .build();
+
+        return jobTitleRepository.save(jobTitle).getJobTitleId();
+    }
+
+    // 직책 목록 조회
+    @Transactional(readOnly = true)
+    public List<JobTitleResDto> getJobTitleList(UUID memberId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        return jobTitleRepository
+                .findByCompany_CompanyIdAndDelYnOrderByDisplayOrder(
+                        member.getCompany().getCompanyId(), "NO")
+                .stream()
+                .map(JobTitleResDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    // 직책 수정
+    public void updateJobTitle(UUID memberId, UUID jobTitleId, JobTitleReqDto reqDto) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        JobTitle jobTitle = jobTitleRepository.findById(jobTitleId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직책입니다."
+                ));
+
+        if (!jobTitle.getCompany().getCompanyId()
+                .equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직책입니다.");
+        }
+
+        jobTitle.updateName(reqDto.getName());
+    }
+
+    // 직책 삭제
+    public void deleteJobTitle(UUID memberId, UUID jobTitleId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        JobTitle jobTitle = jobTitleRepository.findById(jobTitleId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직책입니다."
+                ));
+
+        if (!jobTitle.getCompany().getCompanyId()
+                .equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직책입니다.");
+        }
+
+        // 사용 중인 직원 있는지 확인
+        if (memberPositionRepository.existsByJobTitleAndDelYn(jobTitle, "NO")) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "사용 중인 직원이 있어 삭제할 수 없습니다."
+            );
+        }
+
+        jobTitle.delete();
+    }
+    public void reorderOrganization(List<UUID> organizationIdList) {
+
+        if (organizationIdList == null || organizationIdList.isEmpty()) return;
+
+        List<Organization> organizations = organizationRepository
+                .findAllById(organizationIdList);
+
+        if (organizations.size() != organizationIdList.size()) {
+            throw new BusinessException(
+                    HttpStatus.NOT_FOUND, "일부 조직을 찾을 수 없습니다."
+            );
+        }
+
+        // 모든 조직이 같은 부모인지 확인
+        UUID firstParentId = organizations.get(0).getParent() != null ?
+                organizations.get(0).getParent().getOrganizationId() : null;
+
+        for (Organization org : organizations) {
+            UUID currentParentId = org.getParent() != null ?
+                    org.getParent().getOrganizationId() : null;
+            if (!Objects.equals(firstParentId, currentParentId)) {
+                throw new BusinessException(
+                        HttpStatus.BAD_REQUEST, "다른 레벨의 조직을 함께 변경할 수 없습니다."
+                );
+            }
+        }
+
+        // displayOrder 업데이트
+        for (int i = 0; i < organizationIdList.size(); i++) {
+            UUID id = organizationIdList.get(i);
+            int order = i;
+            organizations.stream()
+                    .filter(o -> o.getOrganizationId().equals(id))
+                    .findFirst()
+                    .ifPresent(o -> o.updateDisplayOrder(order));
+        }
+
+        organizationRepository.saveAll(organizations);
+    }
 }
