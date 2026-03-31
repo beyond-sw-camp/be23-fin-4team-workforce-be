@@ -1,5 +1,6 @@
 package com._team._team.domain;
 
+import com._team._team.domain.enums.LineStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -36,22 +37,22 @@ public class ApprovalLine extends BaseTimeEntity {
     @Column(nullable = false)
     private LineStatus lineStatus;
 
-    private LocalDateTime actedAt;
-
     @Column(columnDefinition = "TEXT")
     private String comment; // 반려 사유 등
 
     @Column(columnDefinition = "TEXT")
-    private String signatureImageUrl;
+    private String signatureImageUrl; // 전자서명
+
+    /// //
 
     @Column(length = 64)
     private String documentHash;
 
     @Builder.Default
     @Column(nullable = false)
-    private String isSignedYn = "N";
+    private String isSignedYn = "N"; // 서명 완료 여부
 
-    private LocalDateTime signedAt;
+    private LocalDateTime signedAt; // 서명일시
 
     @Column(length = 45)
     private String ipAddress; // 감사 로그용

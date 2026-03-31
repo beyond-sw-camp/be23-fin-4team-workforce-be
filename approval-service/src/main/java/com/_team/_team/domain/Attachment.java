@@ -14,7 +14,7 @@ import java.util.UUID;
 @Getter
 @Builder
 @Entity
-public class Attachment {
+public class Attachment extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false)

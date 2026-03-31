@@ -1,9 +1,8 @@
 package com._team._team.domain;
 
+import com._team._team.domain.enums.ApproverType;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -25,11 +24,11 @@ public class ApprovalPolicyLine extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer stepOrder;
 
-    private Integer parallelGroupId;
+    private Integer parallelGroupId; // 동일 값이면 동시 결재, NULL이면 단독
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ApproverType approverType;
+    private ApproverType approverType; //JOB_TITLE(직책), JOB_GRADE(직급), SPECIFIC(특정인)
 
     private UUID specificMemberPositionId;
     private UUID jobGradeId;

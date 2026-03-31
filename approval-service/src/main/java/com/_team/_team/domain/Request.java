@@ -1,5 +1,7 @@
 package com._team._team.domain;
 
+import com._team._team.domain.enums.RequestStatus;
+import com._team._team.domain.enums.RequestType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,11 +30,11 @@ public class Request extends BaseTimeEntity {
     private ApprovalDocument approvalDocument;
 
     @Column(nullable = false)
-    private UUID memberId; // FK 없음 (member-server)
+    private UUID memberId; // 요청자ID
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private RequestType requestType;
+    private RequestType requestType; // VACATION, ATTENDANCE, HR_MOVEMENT, SALARY, GENERAL,CERTIFICATE
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")

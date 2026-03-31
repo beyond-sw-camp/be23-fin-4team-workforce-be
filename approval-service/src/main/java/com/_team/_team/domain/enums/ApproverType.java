@@ -1,4 +1,4 @@
-package com._team._team.domain;
+package com._team._team.domain.enums;
 
 public enum ApproverType {
     JOB_TITLE, JOB_GRADE, SPECIFIC

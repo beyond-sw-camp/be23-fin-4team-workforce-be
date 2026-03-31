@@ -1,5 +1,6 @@
 package com._team._team.domain;
 
+import com._team._team.domain.enums.ApprovalStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +15,7 @@ import java.util.UUID;
 @Getter
 @Builder
 @Entity
-public class Approval {
+public class Approval extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false)

@@ -1,4 +1,4 @@
-package com._team._team.domain;
+package com._team._team.domain.enums;
 
 public enum ApprovalStatus {
     PENDING,

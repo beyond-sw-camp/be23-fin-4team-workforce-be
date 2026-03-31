@@ -1,5 +1,6 @@
 package com._team._team.domain;
 
+import com._team._team.domain.enums.RequestType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;

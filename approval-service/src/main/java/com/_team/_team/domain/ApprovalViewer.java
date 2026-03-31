@@ -1,5 +1,7 @@
 package com._team._team.domain;
 
+import com._team._team.domain.enums.ViewerReadStatus;
+import com._team._team.domain.enums.ViewerType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +16,7 @@ import java.util.UUID;
 @Getter
 @Builder
 @Entity
-public class ApprovalViewer {
+public class ApprovalViewer extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false)
