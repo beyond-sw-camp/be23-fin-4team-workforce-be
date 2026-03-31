@@ -12,7 +12,6 @@ import java.util.UUID;
  * 급여 항목 템플릿 엔티티
  * - 회사별로 사용할 급여 구성 항목을 정의하는 마스터 테이블 (기본급, 식대, 소득세 등)
  * - 지급(EARNING) / 공제(DEDUCTION)로 구분
- * - SalaryPolicyItem을 통해 급여 정책에 배정됨
  * - 실제 정산 시 PayrollItem에서 이 템플릿을 참조하여 금액을 계산
  */
 @Entity
@@ -39,19 +38,18 @@ public class SalaryItemTemplate extends BaseTimeEntity {
     @Column(nullable = false)
     private ItemType itemType;
 
-    /** 과세 여부 - true면 소득세 계산에 포함 */
+    /** 표시 순서 */
     @Column(nullable = false)
-    private Boolean isTaxable;
+    private Integer displayOrder;
 
-    /** 고정 항목 여부 - true: 매월 동일 금액 / false: 매월 변동 (야근수당 등) */
-    @Column(nullable = false)
-    @Builder.Default
-    private Boolean isFixed = true;
+    /** 과세 여부 - Y이면 소득세 계산에 포함 */
+    @Column(nullable = false, length = 1)
+    private String isTaxableYn;
 
-    /** soft delete 플래그 - true면 조회에서 제외 */
-    @Column(nullable = false)
+    /** 사용 여부 */
+    @Column(length = 1)
     @Builder.Default
-    private Boolean isDeleted = false;
+    private String useYn = "Y";
 
     /**
      * 급여 항목 템플릿 정보 수정
@@ -60,16 +58,15 @@ public class SalaryItemTemplate extends BaseTimeEntity {
     public void update(SalaryItemTemplateUpdateReqDto reqDto) {
         this.itemName = reqDto.getItemName();
         this.itemType = reqDto.getItemType();
-        this.isTaxable = reqDto.getIsTaxable();
-        this.isFixed = reqDto.getIsFixed();
+        this.isTaxableYn = reqDto.getIsTaxableYn();
+        this.displayOrder = reqDto.getDisplayOrder();
     }
 
     /**
      * soft delete 처리
-     * - 실제 DB 삭제 없이 isDeleted 플래그만 변경
-     * - 조회 시 isDeletedFalse 조건으로 필터링
+     * - useYn을 N으로 변경하여 조회에서 제외
      */
     public void softDelete() {
-        this.isDeleted = true;
+        this.useYn = "N";
     }
 }

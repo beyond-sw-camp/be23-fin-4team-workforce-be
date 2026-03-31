@@ -2,10 +2,7 @@ package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.domain.enums.ItemType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -13,8 +10,9 @@ import java.util.UUID;
 /**
  * 급여 항목 템플릿 응답 DTO
  */
-@AllArgsConstructor
+
 @NoArgsConstructor
+@AllArgsConstructor
 @Data
 @Builder
 public class SalaryItemTemplateResDto {
@@ -23,8 +21,9 @@ public class SalaryItemTemplateResDto {
     private UUID companyId;
     private String itemName;
     private ItemType itemType;
-    private Boolean isTaxable;
-    private Boolean isFixed;
+    private Integer displayOrder;
+    private String isTaxableYn;
+    private String useYn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -34,8 +33,9 @@ public class SalaryItemTemplateResDto {
                 .companyId(template.getCompanyId())
                 .itemName(template.getItemName())
                 .itemType(template.getItemType())
-                .isTaxable(template.getIsTaxable())
-                .isFixed(template.getIsFixed())
+                .displayOrder(template.getDisplayOrder())
+                .isTaxableYn(template.getIsTaxableYn())
+                .useYn(template.getUseYn())
                 .createdAt(template.getCreatedAt())
                 .updatedAt(template.getUpdatedAt())
                 .build();

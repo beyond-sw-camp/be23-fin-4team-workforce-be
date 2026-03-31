@@ -2,7 +2,6 @@ package com._team._team.salary.Service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.Repository.SalaryItemTemplateRepository;
-import com._team._team.salary.Repository.SalaryPolicyItemRepository;
 import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateCreateReqDto;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateUpdateReqDto;
@@ -26,13 +25,10 @@ import java.util.UUID;
 public class SalaryItemTemplateService {
 
     private final SalaryItemTemplateRepository salaryItemTemplateRepository;
-    private final SalaryPolicyItemRepository salaryPolicyItemRepository;
 
     /** 생성자 주입 */
-    public SalaryItemTemplateService(SalaryItemTemplateRepository salaryItemTemplateRepository,
-                                     SalaryPolicyItemRepository salaryPolicyItemRepository) {
+    public SalaryItemTemplateService(SalaryItemTemplateRepository salaryItemTemplateRepository) {
         this.salaryItemTemplateRepository = salaryItemTemplateRepository;
-        this.salaryPolicyItemRepository = salaryPolicyItemRepository;
     }
 
     /** 급여 항목 템플릿 생성 */
@@ -55,7 +51,7 @@ public class SalaryItemTemplateService {
     /** 회사별 급여 항목 템플릿 목록 조회 */
     @Transactional(readOnly = true)
     public List<SalaryItemTemplateResDto> findByCompanyId(UUID companyId) {
-        return salaryItemTemplateRepository.findByCompanyIdAndIsDeletedFalse(companyId).stream()
+        return salaryItemTemplateRepository.findByCompanyIdAndUseYn(companyId, "Y").stream()
                 .map(SalaryItemTemplateResDto::fromEntity)
                 .toList();
     }
@@ -74,17 +70,12 @@ public class SalaryItemTemplateService {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
 
-        // 정책에서 사용 중인 항목은 삭제 불가
-        if (salaryPolicyItemRepository.existsBySalaryItemTemplate_SalaryItemTemplateId(salaryItemTemplateId)) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "급여 정책에서 사용 중인 항목은 삭제할 수 없습니다.");
-        }
-
         template.softDelete();
     }
 
     /** 동일 이름 항목 중복 검증 */
     private void validateDuplicateItemName(UUID companyId, String itemName) {
-        if (salaryItemTemplateRepository.existsByCompanyIdAndItemNameAndIsDeletedFalse(companyId, itemName)) {
+        if (salaryItemTemplateRepository.existsByCompanyIdAndItemNameAndUseYn(companyId, itemName, "Y")) {
             throw new BusinessException(HttpStatus.CONFLICT, "동일한 이름의 급여 항목 템플릿이 이미 존재합니다.");
         }
     }
