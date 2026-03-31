@@ -4,6 +4,7 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.service.MailService;
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.member.auth.JwtTokenProvider;
 import com._team._team.annotation.Action;
 import com._team._team.member.constant.PermissionRange;
@@ -16,7 +17,8 @@ import com._team._team.member.domain.enums.MemberStatus;
 import com._team._team.member.dto.reqdto.*;
         import com._team._team.member.dto.resdto.*;
         import com._team._team.member.repository.*;
-        import com._team._team.organization.domain.JobGrade;
+import com._team._team.notification.NotificationType;
+import com._team._team.organization.domain.JobGrade;
 import com._team._team.organization.domain.JobTitle;
 import com._team._team.organization.domain.Organization;
 import com._team._team.organization.repository.JobGradeRepository;
@@ -29,6 +31,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -66,9 +69,10 @@ public class MemberService {
     private final RedisTemplate<String, String> emailRedisTemplate;
     private final EmploymentJobHistoryRepository employmentJobHistoryRepository;
     private final S3Uploader s3Uploader;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader) {
+    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher) {
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.roleRepository = roleRepository;
@@ -85,6 +89,7 @@ public class MemberService {
         this.emailRedisTemplate = emailRedisTemplate;
         this.employmentJobHistoryRepository = employmentJobHistoryRepository;
         this.s3Uploader = s3Uploader;
+        this.eventPublisher = eventPublisher;
     }
 
     // 온보딩 시 기본 역할 4개 + 권한 생성
@@ -1482,6 +1487,17 @@ public class MemberService {
                 .build();
 
         employmentJobHistoryRepository.save(history);
+
+        eventPublisher.publishEvent(
+                NotificationMessage.builder()
+                        .receiverId(target.getMemberId())
+                        .senderId(memberId)
+                        .notificationType(NotificationType.MEMBER_RETURN)
+                        .content("복직 처리됐습니다.")
+                        .targetId(target.getMemberId())
+                        .targetType("MEMBER")
+                        .build()
+        );
     }
 }
 
