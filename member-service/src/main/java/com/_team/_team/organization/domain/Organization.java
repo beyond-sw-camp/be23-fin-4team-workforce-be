@@ -3,18 +3,17 @@ package com._team._team.organization.domain;
 import com._team._team.company.domain.Company;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
-@Getter
-@AllArgsConstructor
-@NoArgsConstructor
-@Builder
 @Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+@Builder
 public class Organization extends BaseTimeEntity {
 
     @Id
@@ -22,11 +21,19 @@ public class Organization extends BaseTimeEntity {
     private UUID organizationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "company_id")
+    @JoinColumn(name = "company_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT),
+            nullable = false)
     private Company company;
 
-    @Column(columnDefinition = "BINARY(16)")
-    private UUID parentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private Organization parent;
+
+    @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Organization> children = new ArrayList<>();
 
     @Column(nullable = false)
     private String name;
@@ -38,7 +45,23 @@ public class Organization extends BaseTimeEntity {
     @Builder.Default
     private String delYn = "NO";
 
-    public void deleteUpdate(){
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    public void updateDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
+    }
+
+    public void updateParent(Organization parent) {
+        this.parent = parent;
+    }
+
+    public void delete() {
         this.delYn = "YES";
+    }
+
+    public void restore() {
+        this.delYn = "NO";
     }
 }

@@ -1,0 +1,47 @@
+package com._team._team.member.repository;
+
+import com._team._team.member.domain.MemberPosition;
+import com._team._team.member.domain.Role;
+import com._team._team.organization.domain.JobGrade;
+import com._team._team.organization.domain.JobTitle;
+import com._team._team.organization.domain.Organization;
+import io.lettuce.core.dynamic.annotation.Param;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface MemberPositionRepository extends JpaRepository<MemberPosition, UUID> {
+    boolean existsByRoleAndDelYn(Role role, String delYn);
+    List<MemberPosition> findByRole(Role role);
+
+    // 조직별 MemberPosition 조회
+    List<MemberPosition> findByOrganizationAndDelYn(Organization organization, String delYn);
+
+    @Query("SELECT mp FROM MemberPosition mp " +
+            "LEFT JOIN FETCH mp.role r " +
+            "LEFT JOIN FETCH r.rolePermissionList rp " +
+            "LEFT JOIN FETCH rp.permission " +
+            "WHERE mp.memberPositionId = :memberPositionId")
+    Optional<MemberPosition> findByIdWithRoleAndPermissions(
+            @Param("memberPositionId") UUID memberPositionId);
+
+    boolean existsByJobGradeAndDelYn(JobGrade jobGrade, String delYn);
+
+    boolean existsByJobTitleAndDelYn(JobTitle jobTitle, String delYn);
+
+    boolean existsByOrganizationAndDelYn(Organization organization, String delYn);
+
+    @Query("SELECT mp FROM MemberPosition mp " +
+            "JOIN FETCH mp.organization " +
+            "JOIN FETCH mp.jobGrade " +
+            "JOIN FETCH mp.jobTitle " +
+            "JOIN FETCH mp.role " +
+            "WHERE mp.memberPositionId = :memberPositionId")
+    Optional<MemberPosition> findByIdWithDetails(
+            @Param("memberPositionId") UUID memberPositionId);
+}

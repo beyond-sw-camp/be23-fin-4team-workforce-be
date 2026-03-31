@@ -3,18 +3,15 @@ package com._team._team.organization.domain;
 import com._team._team.company.domain.Company;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.UUID;
 
-@Getter
-@AllArgsConstructor
-@NoArgsConstructor
-@Builder
 @Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+@Builder
 public class JobGrade extends BaseTimeEntity {
 
     @Id
@@ -22,7 +19,9 @@ public class JobGrade extends BaseTimeEntity {
     private UUID jobGradeId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "company_id")
+    @JoinColumn(name = "company_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT),
+            nullable = false)
     private Company company;
 
     @Column(nullable = false)
@@ -35,8 +34,20 @@ public class JobGrade extends BaseTimeEntity {
     @Builder.Default
     private String delYn = "NO";
 
-    public void deleteUpdate() {
+    // 비즈니스 메서드
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    public void updateDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
+    }
+
+    public void delete() {
         this.delYn = "YES";
     }
 
+    public void restore() {
+        this.delYn = "NO";
+    }
 }

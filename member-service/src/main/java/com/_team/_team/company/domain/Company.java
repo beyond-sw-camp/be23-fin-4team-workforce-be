@@ -10,21 +10,62 @@ import java.util.UUID;
 
 @Entity
 @Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@NoArgsConstructor
-@ToString
 @Builder
 public class Company extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID companyId;
+
     @Column(nullable = false)
     private String companyName;
-    private String logoUrl;
+
+    @Column(nullable = false)
+    private String companyDomain;
+
+    @Column(nullable = false)
+    private String ceoName;
+
+    @Column(nullable = false, unique = true)
     private String businessNumber;
+
+    private String logoUrl;
+
+    @Column(nullable = false)
+    private String address;
+
+    private String detailAddress;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private CompanyStatus status;
+    @Builder.Default
+    private CompanyStatus status = CompanyStatus.ACTIVE;
+
+    // 비즈니스 메서드
+    public void updateLogoUrl(String logoUrl) {
+        this.logoUrl = logoUrl;
+    }
+
+    public void updateCompanyName(String companyName) {
+        this.companyName = companyName;
+    }
+
+    public void updateAddress(String address, String detailAddress) {
+        this.address = address;
+        this.detailAddress = detailAddress;
+    }
+
+    public void suspend() {
+        this.status = CompanyStatus.SUSPENDED;
+    }
+
+    public void activate() {
+        this.status = CompanyStatus.ACTIVE;
+    }
+
+    public void delete() {
+        this.status = CompanyStatus.DELETED;
+    }
 }
