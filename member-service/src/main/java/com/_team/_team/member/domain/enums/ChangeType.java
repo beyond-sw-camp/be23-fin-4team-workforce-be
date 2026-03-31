@@ -5,5 +5,8 @@ public enum ChangeType {
     GRADE_CHANGE,        // 직급 변경
     ORG_CHANGE,          // 조직 이동
     EMPLOYMENT_CHANGE,   // 고용형태 변경
-    PROMOTION            // 승진
+    PROMOTION,            // 승진
+    DORMANT,            // 휴직
+    RETURN,              // 복직
+    TITLE_CHANGE    //직책 변경
 }
