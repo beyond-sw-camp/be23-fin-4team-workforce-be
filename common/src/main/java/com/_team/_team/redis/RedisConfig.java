@@ -5,11 +5,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
@@ -21,6 +24,7 @@ public class RedisConfig {
     private int port;
 
 
+    //리프레쉬토큰
     @Bean
     @Qualifier("rtInventory")
     public RedisConnectionFactory connectionFactory() {
@@ -40,7 +44,7 @@ public class RedisConfig {
         redisTemplate.setConnectionFactory(redisConnectionFactory);
         return redisTemplate;
     }
-
+    //메일 인증
     @Bean
     @Qualifier("emailInventory")
     public RedisConnectionFactory emailConnectionFactory() {
@@ -82,4 +86,45 @@ public class RedisConfig {
         redisTemplate.setConnectionFactory(permissionConnectionFactory);
         return redisTemplate;
     }
+    // Pub/Sub - 알림 실시간 전송
+    @Bean
+    @Qualifier("pubSubRedisConnectionFactory")
+    public RedisConnectionFactory pubSubRedisConnectionFactory() {
+        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
+        configuration.setHostName(host);
+        configuration.setPort(port);
+        // Pub/Sub은 DB 번호 의미 없음 (기본 0)
+        return new LettuceConnectionFactory(configuration);
+    }
+
+    @Bean
+    @Qualifier("pubSubRedisTemplate")
+    public RedisTemplate<String, String> pubSubRedisTemplate(
+            @Qualifier("pubSubRedisConnectionFactory")
+            RedisConnectionFactory pubSubRedisConnectionFactory) {
+        RedisTemplate<String, String> redisTemplate = new RedisTemplate<>();
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        redisTemplate.setValueSerializer(new StringRedisSerializer());
+        redisTemplate.setConnectionFactory(pubSubRedisConnectionFactory);
+        return redisTemplate;
+    }
+
+    @Bean
+    public ChannelTopic notificationTopic() {
+        return new ChannelTopic(RedisChannel.NOTIFICATION_CHANNEL);
+    }
+
+    @Bean
+    public RedisMessageListenerContainer redisMessageListenerContainer(
+            @Qualifier("pubSubRedisConnectionFactory")
+            RedisConnectionFactory pubSubRedisConnectionFactory,
+            MessageListener messageListener,
+            ChannelTopic notificationTopic) {
+        RedisMessageListenerContainer container =
+                new RedisMessageListenerContainer();
+        container.setConnectionFactory(pubSubRedisConnectionFactory);
+        container.addMessageListener(messageListener, notificationTopic);
+        return container;
+    }
 }
+
