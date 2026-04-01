@@ -37,7 +37,7 @@ public class Request extends BaseTimeEntity {
     private RequestType requestType; // VACATION, ATTENDANCE, HR_MOVEMENT, SALARY, GENERAL,CERTIFICATE
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
+    @Column(nullable = false, columnDefinition = "json")
     private String contentJson; // 실제 입력된 값 (key: value 형태)
 
     @Enumerated(EnumType.STRING)

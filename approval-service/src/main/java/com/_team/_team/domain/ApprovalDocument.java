@@ -26,7 +26,7 @@ public class ApprovalDocument extends BaseTimeEntity {
     private String documentName;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
+    @Column(nullable = false, columnDefinition = "json")
     private String formSchema;
 
     @Builder.Default
@@ -41,6 +41,15 @@ public class ApprovalDocument extends BaseTimeEntity {
     @Builder.Default
     @Column(nullable = false)
     private String autoApproveYn="N"; // 자동승인여부
+
+    public void activate(){
+        this.isActiveYn="Y";
+    }
+
+    public void deactivate(){
+        this.isActiveYn="N";
+    }
+
 
 
 }

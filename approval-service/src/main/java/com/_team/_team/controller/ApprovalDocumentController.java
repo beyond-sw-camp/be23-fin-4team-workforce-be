@@ -6,10 +6,9 @@ import com._team._team.service.ApprovalDocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/approval")
@@ -28,6 +27,24 @@ public class ApprovalDocumentController {
         approvalDocumentService.createDocument(dto);
         return new ResponseEntity<>(
                 ApiResponse.success(dto, "문서양식 생성 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    @PatchMapping("/enableForm/{formId}")
+    public ResponseEntity<?> enableForm(@PathVariable UUID formId){
+        approvalDocumentService.formActivate(formId);
+        return new ResponseEntity<>(
+                ApiResponse.success(formId, "문서양식 활성화 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    @PatchMapping("/disableForm/{formId}")
+    public ResponseEntity<?> disableForm(@PathVariable UUID formId){
+        approvalDocumentService.formDeactivate(formId);
+        return new ResponseEntity<>(
+                ApiResponse.success(formId, "문서양식 비활성화 성공"),
                 HttpStatus.OK
         );
     }

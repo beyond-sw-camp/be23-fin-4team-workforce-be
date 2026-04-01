@@ -31,7 +31,4 @@ public class Attachment extends BaseTimeEntity {
     private String url;
 
     private Long fileSize;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
 }

@@ -8,12 +8,18 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.UUID;
+
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
 @Builder
 public class ApprovalDocumentCreateDto {
+
+    @NotNull(message = "회사 ID는 필수입니다")
+    private UUID companyId; // 추가
+
     @NotBlank(message = "문서명은 필수입니다")
     private String documentName;
 

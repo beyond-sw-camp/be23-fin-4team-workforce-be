@@ -38,7 +38,4 @@ public class ApprovalViewer extends BaseTimeEntity {
     private ViewerReadStatus status; // UNREAD(미확인), READ(확인 완료)
 
     private LocalDateTime viewedAt; // 사용자가 실제 문서 확인 시각
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt; // 참조/공람 대상자로 지정된 시각
 }

@@ -31,8 +31,5 @@ public class Approval extends BaseTimeEntity {
 
     @Column(nullable = false)
     private Integer currentStep;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
 }
 
