@@ -4,20 +4,19 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.service.MailService;
 import com._team._team.dto.BusinessException;
-import com._team._team.dto.NotificationMessage;
+import com._team._team.event.MemberChangedEvent;
+import com._team._team.event.MemberDeletedEvent;
+import com._team._team.event.MemberSavedEvent;
+import com._team._team.event.OrganizationSavedEvent;
 import com._team._team.member.auth.JwtTokenProvider;
 import com._team._team.annotation.Action;
 import com._team._team.member.constant.PermissionRange;
 import com._team._team.annotation.Resource;
 import com._team._team.member.domain.*;
-        import com._team._team.member.domain.enums.AccountStatus;
-import com._team._team.member.domain.enums.ChangeType;
-import com._team._team.member.domain.enums.EmploymentType;
-import com._team._team.member.domain.enums.MemberStatus;
+import com._team._team.member.domain.enums.*;
 import com._team._team.member.dto.reqdto.*;
-        import com._team._team.member.dto.resdto.*;
-        import com._team._team.member.repository.*;
-import com._team._team.notification.NotificationType;
+import com._team._team.member.dto.resdto.*;
+import com._team._team.member.repository.*;
 import com._team._team.organization.domain.JobGrade;
 import com._team._team.organization.domain.JobTitle;
 import com._team._team.organization.domain.Organization;
@@ -26,6 +25,7 @@ import com._team._team.organization.repository.JobTitleRepository;
 import com._team._team.organization.repository.OrganizationRepository;
 import com._team._team.s3.S3Uploader;
 import com._team._team.util.PermissionUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +36,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.SecureRandom;
@@ -70,9 +73,10 @@ public class MemberService {
     private final EmploymentJobHistoryRepository employmentJobHistoryRepository;
     private final S3Uploader s3Uploader;
     private final ApplicationEventPublisher eventPublisher;
-
+    private final SearchOutboxEventRepository searchOutboxEventRepository;
+    private final ObjectMapper objectMapper;
     @Autowired
-    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher) {
+    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper) {
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.roleRepository = roleRepository;
@@ -90,6 +94,8 @@ public class MemberService {
         this.employmentJobHistoryRepository = employmentJobHistoryRepository;
         this.s3Uploader = s3Uploader;
         this.eventPublisher = eventPublisher;
+        this.searchOutboxEventRepository = searchOutboxEventRepository;
+        this.objectMapper = objectMapper;
     }
 
     // 온보딩 시 기본 역할 4개 + 권한 생성
@@ -473,10 +479,12 @@ public class MemberService {
                 ));
         Company company = requester.getCompany();
 
+        String sabun = generateSabun(company);
+
         // 2. 회사 이메일 자동 생성
         String companyDomain = company.getCompanyDomain();
 
-        String companyEmail = reqDto.getSabun().toLowerCase()
+        String companyEmail = sabun.toLowerCase()
                 + "." + reqDto.getEnglishInitial().toUpperCase()
                 + "@" + companyDomain + ".company";
 
@@ -487,15 +495,13 @@ public class MemberService {
         if (memberRepository.existsByPersonalEmail(reqDto.getPersonalEmail())) {
             throw new BusinessException(HttpStatus.CONFLICT, "이미 사용중인 개인 이메일입니다.");
         }
-        if (memberRepository.existsBySabunAndCompany(reqDto.getSabun(), company)) {
-            throw new BusinessException(HttpStatus.CONFLICT, "이미 사용중인 사번입니다.");
-        }
+
 
         // 4. 임시 비밀번호 생성
         String tempPassword = generateTempPassword();
 
         // 5. 직원 계정 생성
-        Member member = reqDto.toEntity(companyEmail, passwordEncoder.encode(tempPassword), company);
+        Member member = reqDto.toEntity(companyEmail, passwordEncoder.encode(tempPassword), company, sabun);
         Member savedMember = memberRepository.save(member);
 
         // 6. 조직 조회 + 같은 회사 검증
@@ -566,6 +572,9 @@ public class MemberService {
         employmentJobHistoryRepository.save(history);
         // 13. 임시 비밀번호 개인 이메일로 발송
         mailService.sendTempPassword(reqDto.getPersonalEmail(), companyEmail, tempPassword);
+
+        // 14. 아웃박스 저장
+        eventPublisher.publishEvent(new MemberChangedEvent(savedMember.getMemberId()));
     }
 
     // 직원 목록 조회
@@ -870,6 +879,8 @@ public class MemberService {
 
             employmentJobHistoryRepository.save(newHistory);
         }
+        // 아웃박스 저장
+        eventPublisher.publishEvent(new MemberChangedEvent(targetMemberId));
     }
 
     // 변경 유형 판별
@@ -923,6 +934,9 @@ public class MemberService {
                 reqDto.getExtensionNumber(),
                 reqDto.getTelNumber()
         );
+
+        eventPublisher.publishEvent(
+                new MemberChangedEvent(memberId));
     }
     // 직원 삭제
     public void deleteMember(UUID memberId, UUID targetMemberId) {
@@ -977,6 +991,7 @@ public class MemberService {
                     "PERMISSION:" + position.getMemberPositionId()
             );
         }
+        saveSearchOutboxDeleteEvent(targetMemberId);
     }
 
     // 직원 복원
@@ -1014,6 +1029,10 @@ public class MemberService {
 
         // 6. 계정 상태 변경
         target.updateMemberStatus(MemberStatus.ACTIVE);
+
+        eventPublisher.publishEvent(
+                new MemberChangedEvent(targetMemberId));
+
     }
     public void updateMemberRole(UUID memberId, UUID targetMemberId,
                                  UpdateMemberRoleReqDto reqDto) {
@@ -1423,6 +1442,8 @@ public class MemberService {
                 .build();
 
         employmentJobHistoryRepository.save(history);
+        eventPublisher.publishEvent(
+                new MemberChangedEvent(targetMemberId));
     }
 
     // 복직 처리
@@ -1489,15 +1510,109 @@ public class MemberService {
         employmentJobHistoryRepository.save(history);
 
         eventPublisher.publishEvent(
-                NotificationMessage.builder()
-                        .receiverId(target.getMemberId())
-                        .senderId(memberId)
-                        .notificationType(NotificationType.MEMBER_RETURN)
-                        .content("복직 처리됐습니다.")
-                        .targetId(target.getMemberId())
-                        .targetType("MEMBER")
-                        .build()
-        );
+                new MemberChangedEvent(targetMemberId));
+    }
+
+    // 사번 자동 생성
+    private String generateSabun(Company company) {
+        List<String> sabunList = memberRepository
+                .findLastSabunByCompanyWithLock(company);
+
+        if (sabunList.isEmpty()) {
+            return "EMP0001";
+        }
+
+        // 마지막 사번에서 숫자 추출
+        String lastSabun = sabunList.get(0);
+        int lastNumber = Integer.parseInt(
+                lastSabun.replace("EMP", ""));
+
+        // 숫자 + 1 후 4자리로 포맷
+        return String.format("EMP%04d", lastNumber + 1);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void handleMemberSaveEvent(MemberChangedEvent event) {
+        saveSearchOutboxEvent(event.getMemberId());
+    }
+
+    public void saveSearchOutboxEvent(UUID memberId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
+                ));
+
+        try {
+            MemberPosition position = memberPositionRepository
+                    .findByIdWithDetails(member.getDefaultPositionId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
+                    ));
+
+            Organization org = position.getOrganization();
+
+            List<OrganizationSavedEvent> organizationList =
+                    List.of(OrganizationSavedEvent.builder()
+                            .organizationId(org.getOrganizationId())
+                            .name(org.getName())
+                            .parentId(org.getParent() != null
+                                    ? org.getParent().getOrganizationId()
+                                    : null)
+                            .companyId(member.getCompany().getCompanyId())
+                            .build());
+
+            MemberSavedEvent savedEvent = MemberSavedEvent.builder()
+                    .memberId(member.getMemberId())
+                    .companyId(member.getCompany().getCompanyId())
+                    .name(member.getName())
+                    .organizationList(organizationList)
+                    .titleName(List.of(position.getJobTitle().getName()))
+                    .phoneNumber(member.getPhonePublicYn().equals("YES")
+                            ? member.getPhoneNumber() : null)
+                    .email(member.getEmail())
+                    .memberStatus(member.getMemberStatus().name())
+                    .position(position.getJobTitle().getName())
+                    .build();
+
+            String payload = objectMapper.writeValueAsString(savedEvent);
+
+            SearchOutboxEvent outboxEvent = SearchOutboxEvent.builder()
+                    .topic("member-saved")
+                    .aggregateId(member.getMemberId())
+                    .payload(payload)
+                    .processed("NO")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            searchOutboxEventRepository.save(outboxEvent);
+
+        } catch (Exception e) {
+            log.error("SearchOutboxEvent 저장 실패: {}", e.getMessage());
+        }
+    }
+    private void saveSearchOutboxDeleteEvent(UUID memberId) {
+        try {
+            MemberDeletedEvent event = MemberDeletedEvent.builder()
+                    .memberId(memberId)
+                    .build();
+
+            String payload = objectMapper.writeValueAsString(event);
+
+            SearchOutboxEvent outboxEvent = SearchOutboxEvent.builder()
+                    .topic("member-deleted")
+                    .aggregateId(memberId)
+                    .payload(payload)
+                    .processed("NO")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            searchOutboxEventRepository.save(outboxEvent);
+
+        } catch (Exception e) {
+            log.error("SearchOutboxDeleteEvent 저장 실패: {}", e.getMessage());
+        }
     }
 }
 

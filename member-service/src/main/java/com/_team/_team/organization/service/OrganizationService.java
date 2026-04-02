@@ -1,9 +1,14 @@
 package com._team._team.organization.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.event.OrganizationChangedEvent;
+import com._team._team.event.OrganizationDeletedEvent;
+import com._team._team.event.OrganizationSavedEvent;
 import com._team._team.member.domain.Member;
+import com._team._team.member.domain.SearchOutboxEvent;
 import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
+import com._team._team.member.repository.SearchOutboxEventRepository;
 import com._team._team.member.service.MemberService;
 import com._team._team.organization.dto.reqdto.JobGradeReqDto;
 import com._team._team.organization.dto.reqdto.JobTitleReqDto;
@@ -11,7 +16,9 @@ import com._team._team.organization.dto.reqdto.OrganizationReqDto;
 import com._team._team.organization.dto.resdto.JobGradeResDto;
 import com._team._team.organization.dto.resdto.JobTitleResDto;
 import com._team._team.organization.dto.resdto.OrganizationResDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import com._team._team.company.domain.Company;
@@ -24,8 +31,12 @@ import com._team._team.organization.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -41,14 +52,20 @@ public class OrganizationService {
     private final JobTitleRepository jobTitleRepository;
     private final MemberRepository memberRepository;
     private final MemberPositionRepository memberPositionRepository;
+    private final SearchOutboxEventRepository searchOutboxEventRepository;
+    private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public OrganizationService(OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository) {
+    public OrganizationService(OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper, ApplicationEventPublisher eventPublisher) {
         this.organizationRepository = organizationRepository;
         this.jobGradeRepository = jobGradeRepository;
         this.jobTitleRepository = jobTitleRepository;
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
+        this.searchOutboxEventRepository = searchOutboxEventRepository;
+        this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     // 온보딩 시 기본 조직 생성
@@ -103,7 +120,6 @@ public class OrganizationService {
             }
         }
 
-        // 동시성 해결 - 비관적 락
         int displayOrder = organizationRepository
                 .findByCompanyAndDelYnOrderByDisplayOrderWithLock(company, "NO").size();
 
@@ -114,7 +130,12 @@ public class OrganizationService {
                 .displayOrder(displayOrder)
                 .build();
 
-        return organizationRepository.save(organization).getOrganizationId();
+        Organization saved = organizationRepository.save(organization); // ← 한번만 저장
+
+        eventPublisher.publishEvent(
+                new OrganizationChangedEvent(saved.getOrganizationId()));
+
+        return saved.getOrganizationId();
     }
 
 
@@ -155,6 +176,9 @@ public class OrganizationService {
         }
 
         organization.updateName(reqDto.getName());
+
+        eventPublisher.publishEvent(
+                new OrganizationChangedEvent(organizationId));
     }
 
     // 조직 삭제
@@ -187,6 +211,9 @@ public class OrganizationService {
         }
 
         organization.delete();
+
+        eventPublisher.publishEvent(
+                OrganizationChangedEvent.deleted(organizationId));
     }
     // 직급 생성
     public UUID createJobGrade(UUID memberId, JobGradeReqDto reqDto) {
@@ -404,5 +431,77 @@ public class OrganizationService {
         }
 
         organizationRepository.saveAll(organizations);
+    }
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void handleOrganizationEvent(OrganizationChangedEvent event) {
+        if (event.isDeleted()) {
+            saveOrganizationDeletedOutboxEvent(event.getOrganizationId());
+        } else {
+            saveOrganizationSavedOutboxEvent(event.getOrganizationId());
+        }
+    }
+    public void saveOrganizationSavedOutboxEvent(UUID organizationId) {
+        try {
+            Organization organization = organizationRepository
+                    .findById(organizationId)
+                    .orElseThrow();
+
+            OrganizationSavedEvent savedEvent = OrganizationSavedEvent.builder()
+                    .organizationId(organizationId)
+                    .name(organization.getName())
+                    .parentId(organization.getParent() != null
+                            ? organization.getParent().getOrganizationId()
+                            : null)
+                    .companyId(organization.getCompany().getCompanyId())
+                    .displayOrder(organization.getDisplayOrder())
+                    .build();
+
+            String payload = objectMapper.writeValueAsString(savedEvent);
+
+            SearchOutboxEvent outboxEvent = SearchOutboxEvent.builder()
+                    .topic("organization-saved")
+                    .aggregateId(organizationId)
+                    .payload(payload)
+                    .processed("NO")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            searchOutboxEventRepository.save(outboxEvent);
+
+        } catch (Exception e) {
+            log.error("OrganizationSavedOutboxEvent 저장 실패: {}",
+                    e.getMessage());
+        }
+    }
+    public void saveOrganizationDeletedOutboxEvent(UUID organizationId) {
+        try {
+            // 조직 조회 (이미 삭제됐지만 delYn=YES 상태로 조회 가능)
+            Organization organization = organizationRepository
+                    .findById(organizationId)
+                    .orElseThrow();
+
+            OrganizationDeletedEvent deletedEvent =
+                    OrganizationDeletedEvent.builder()
+                            .organizationId(organizationId)
+                            .companyId(organization.getCompany().getCompanyId())
+                            .build();
+
+            String payload = objectMapper.writeValueAsString(deletedEvent);
+
+            SearchOutboxEvent outboxEvent = SearchOutboxEvent.builder()
+                    .topic("organization-deleted")
+                    .aggregateId(organizationId)
+                    .payload(payload)
+                    .processed("NO")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            searchOutboxEventRepository.save(outboxEvent);
+
+        } catch (Exception e) {
+            log.error("OrganizationDeletedOutboxEvent 저장 실패: {}",
+                    e.getMessage());
+        }
     }
 }
