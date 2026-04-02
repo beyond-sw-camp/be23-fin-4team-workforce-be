@@ -12,6 +12,9 @@ dependencies {
     api 'org.springframework.boot:spring-boot-starter'
     api 'org.projectlombok:lombok'
     api 'software.amazon.awssdk:s3:2.29.50'
+    // ShedLock
+    api 'net.javacrumbs.shedlock:shedlock-spring:5.1.0'
+    api 'net.javacrumbs.shedlock:shedlock-provider-redis-spring:5.1.0'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
