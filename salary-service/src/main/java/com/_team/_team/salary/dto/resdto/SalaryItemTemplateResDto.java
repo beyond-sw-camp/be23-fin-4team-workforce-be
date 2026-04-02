@@ -23,7 +23,7 @@ public class SalaryItemTemplateResDto {
     private ItemType itemType;
     private Integer displayOrder;
     private String isTaxableYn;
-    private String useYn;
+    private String delYn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -35,7 +35,7 @@ public class SalaryItemTemplateResDto {
                 .itemType(template.getItemType())
                 .displayOrder(template.getDisplayOrder())
                 .isTaxableYn(template.getIsTaxableYn())
-                .useYn(template.getUseYn())
+                .delYn(template.getDelYn())
                 .createdAt(template.getCreatedAt())
                 .updatedAt(template.getUpdatedAt())
                 .build();
