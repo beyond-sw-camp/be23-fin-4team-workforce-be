@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +43,7 @@ public class AutoCreateTestData implements ApplicationRunner {
     private final JobTitleRepository jobTitleRepository;
     private final RoleRepository roleRepository;
     private final MemberPositionRepository memberPositionRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -218,6 +220,18 @@ public class AutoCreateTestData implements ApplicationRunner {
                                 .jobTitleId(jobTitleId)
                                 .roleId(roleId)
                                 .build());
+
+                Member createdMember = memberRepository
+                        .findByPersonalEmail(
+                                "emp" + c + "_" + (i + 1) + "@gmail.com")
+                        .orElseThrow();
+
+                createdMember.updatePassword(
+                        passwordEncoder.encode("Test1234!"));
+
+                // 최초 로그인 여부 NO로 변경 ← 추가
+                // (비밀번호 변경 없이 바로 로그인 가능하게)
+                createdMember.completeFirstLogin();
             }
 
             log.info("테스트 데이터 생성 완료 - 회사: {}",
