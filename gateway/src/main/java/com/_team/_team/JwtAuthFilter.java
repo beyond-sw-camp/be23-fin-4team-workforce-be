@@ -36,7 +36,8 @@ public class JwtAuthFilter implements GlobalFilter {
 
     // 토큰 없이 접근 가능한 경로
     private static final List<String> ALLOWED_PATH = List.of(
-            "member/change-password",
+            "/member/login",
+            "/member/change-password",
             "/member/login",
             "/company/check-business-number",
             "/company/send-verification-code",
@@ -49,14 +50,23 @@ public class JwtAuthFilter implements GlobalFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String urlPath = exchange.getRequest().getURI().getRawPath();
+        String urlPath = exchange.getRequest().getURI().getPath();
+        String method = exchange.getRequest().getMethod().name();
+
+        // 1. OPTIONS 요청(Preflight)은 무조건 통과 (CorsConfig가 처리하도록 수정)
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            return chain.filter(exchange);
+        }
+
+        // 2. 허용 경로 체크
         boolean isAllowed = ALLOWED_PATH.stream()
-                .anyMatch(path -> pathMatcher.match(path, urlPath));
-        // 허용 경로는 토큰 검증 없이 통과
+                .anyMatch(pattern -> pathMatcher.match(pattern, urlPath));
+        
         if (isAllowed) {
             return chain.filter(exchange);
         }
 
+        // 3. 토큰 검증 로직
         String bearerToken = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
         try {
@@ -96,5 +106,11 @@ public class JwtAuthFilter implements GlobalFilter {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
+    }
+
+    // 에러 응답 유틸리티
+    private Mono<Void> onError(ServerWebExchange exchange, String err, HttpStatus httpStatus) {
+        exchange.getResponse().setStatusCode(httpStatus);
+        return exchange.getResponse().setComplete();
     }
 }
