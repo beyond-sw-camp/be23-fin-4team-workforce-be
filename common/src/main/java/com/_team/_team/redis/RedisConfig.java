@@ -3,6 +3,7 @@ package com._team._team.redis;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.MessageListener;
@@ -18,9 +19,9 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfig {
 
-    @Value("${spring.data.redis.host}")
+    @Value("${spring.redis.host}")
     private String host;
-    @Value("${spring.data.redis.port}")
+    @Value("${spring.redis.port}")
     private int port;
 
 
@@ -115,6 +116,7 @@ public class RedisConfig {
     }
 
     @Bean
+    @ConditionalOnBean(MessageListener.class)
     public RedisMessageListenerContainer redisMessageListenerContainer(
             @Qualifier("pubSubRedisConnectionFactory")
             RedisConnectionFactory pubSubRedisConnectionFactory,
@@ -126,5 +128,17 @@ public class RedisConfig {
         container.addMessageListener(messageListener, notificationTopic);
         return container;
     }
+    // DB 3 - ShedLock
+    @Bean
+    @Qualifier("shedLockConnectionFactory")
+    public RedisConnectionFactory shedLockConnectionFactory() {
+        RedisStandaloneConfiguration configuration =
+                new RedisStandaloneConfiguration();
+        configuration.setHostName(host);
+        configuration.setPort(port);
+        configuration.setDatabase(3);
+        return new LettuceConnectionFactory(configuration);
+    }
+
 }
 
