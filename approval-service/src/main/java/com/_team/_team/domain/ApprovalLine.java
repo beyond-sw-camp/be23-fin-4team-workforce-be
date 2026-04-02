@@ -57,6 +57,25 @@ public class ApprovalLine extends BaseTimeEntity {
     @Column(length = 45)
     private String ipAddress; // 감사 로그용
 
+    public void approve(String signatureImageUrl, String documentHash, String ipAddress) {
+        this.lineStatus = LineStatus.APPROVED;
+        this.signatureImageUrl = signatureImageUrl;
+        this.documentHash = documentHash;
+        this.ipAddress = ipAddress;
+        this.isSignedYn = "Y";
+        this.signedAt = LocalDateTime.now();
+    }
+
+    public void reject(String comment, String ipAddress) {
+        this.lineStatus = LineStatus.REJECTED;
+        this.comment = comment;
+        this.ipAddress = ipAddress;
+    }
+
+    public void activate() {
+        this.lineStatus = LineStatus.PENDING;
+    }
+
 
 
 

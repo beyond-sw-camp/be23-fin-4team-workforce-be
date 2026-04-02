@@ -23,7 +23,8 @@ public class ApprovalDocumentController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<?> documentCreate(@RequestBody ApprovalDocumentCreateDto dto){
+    public ResponseEntity<?> documentCreate(
+            @RequestBody ApprovalDocumentCreateDto dto){
         approvalDocumentService.createDocument(dto);
         return new ResponseEntity<>(
                 ApiResponse.success(dto, "문서양식 생성 성공"),

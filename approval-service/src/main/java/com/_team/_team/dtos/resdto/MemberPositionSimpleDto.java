@@ -15,6 +15,10 @@ public class MemberPositionSimpleDto {
     private UUID memberPositionId;
     private UUID memberId;
     private UUID organizationId;
+    private String organizationName;
     private UUID jobGradeId;
+    private String jobGradeName;
     private UUID jobTitleId;
+    private String jobTitleName;
+    private String memberName;
 }

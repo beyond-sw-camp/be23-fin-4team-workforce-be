@@ -54,4 +54,25 @@ public class Request extends BaseTimeEntity {
 
     @Column(columnDefinition = "TEXT")
     private String cancelReason;
+
+    public void updateStatus(RequestStatus status) {
+        this.status = status;
+    }
+
+    public void cancel(String reason) {
+        this.status = RequestStatus.REJECTED;
+        this.cancelReason = reason;
+    }
+
+    public void updateContentJson(String contentJson) {
+        this.contentJson = contentJson;
+    }
+
+    public void updateStartDateTime(LocalDateTime startDateTime) {
+        this.startDateTime = startDateTime;
+    }
+
+    public void updateEndDateTime(LocalDateTime endDateTime) {
+        this.endDateTime = endDateTime;
+    }
 }

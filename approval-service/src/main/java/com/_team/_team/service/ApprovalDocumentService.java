@@ -3,7 +3,6 @@ package com._team._team.service;
 import com._team._team.domain.ApprovalDocument;
 import com._team._team.dtos.reqdto.ApprovalDocumentCreateDto;
 import com._team._team.repository.ApprovalDocumentRepository;
-import com._team._team.repository.ApprovalPolicyLineRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
@@ -18,13 +17,11 @@ import java.util.UUID;
 public class ApprovalDocumentService {
 
     private final ApprovalDocumentRepository documentRepository;
-    private final ApprovalPolicyLineRepository approvalPolicyLineRepository;
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public ApprovalDocumentService(ApprovalDocumentRepository documentRepository, ApprovalPolicyLineRepository approvalPolicyLineRepository, ObjectMapper objectMapper) {
+    public ApprovalDocumentService(ApprovalDocumentRepository documentRepository, ObjectMapper objectMapper) {
         this.documentRepository = documentRepository;
-        this.approvalPolicyLineRepository = approvalPolicyLineRepository;
         this.objectMapper = objectMapper;
     }
 

@@ -7,7 +7,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -31,5 +30,17 @@ public class Approval extends BaseTimeEntity {
 
     @Column(nullable = false)
     private Integer currentStep;
+
+    public void approve() {
+        this.status = ApprovalStatus.APPROVED;
+    }
+
+    public void reject() {
+        this.status = ApprovalStatus.REJECTED;
+    }
+
+    public void nextStep() {
+        this.currentStep++;
+    }
 }
 
