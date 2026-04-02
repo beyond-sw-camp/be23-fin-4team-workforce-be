@@ -1,0 +1,48 @@
+package com._team._team.salary.dto.reqdto;
+
+import com._team._team.salary.domain.Payroll;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+/**
+ * 급여대장 생성 요청 DTO
+ * - 클라이언트는 직원 ID와 정산 연월일만 전달
+ * - 급여(Salary) 조회, 항목(PayrollItem) 생성, 금액 계산은 서비스에서 자동 처리
+ */
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@Builder
+public class PayrollCreateReqDto {
+
+    /** 대상 직원 ID */
+    @NotNull(message = "직원 ID는 필수입니다.")
+    private UUID memberId;
+
+    /** 정산 연월일 (예: 2026-03-25) */
+    @NotNull(message = "정산 연월일은 필수 입니다.")
+    private LocalDate payrollYearMonthDay;
+
+    /**
+     * DTO → Payroll 엔티티 변환
+     * - salaryId는 서비스에서 Salary 조회 후 전달
+     * - 금액은 0으로 초기화 (PayrollItem 생성 후 recalculate로 자동 계산)
+     */
+    public Payroll toEntity(UUID companyId, UUID salaryId) {
+        return Payroll.builder()
+                .companyId(companyId)
+                .salaryId(salaryId)
+                .memberId(this.memberId)
+                .payrollYearMonthDay(this.payrollYearMonthDay)
+                .totalPayment(0L)
+                .totalDeduction(0L)
+                .netPay(0L)
+                .build();
+    }
+}

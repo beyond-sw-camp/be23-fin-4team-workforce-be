@@ -8,6 +8,7 @@ import com._team._team.member.service.MemberService;
 import com._team._team.organization.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,7 @@ public class CompanyService {
     private final MailService mailService;
     private final RedisTemplate<String, String> emailRedisTemplate;
 
+    @Autowired
     public CompanyService(
             CompanyRepository companyRepository,
             OrganizationService organizationService,
