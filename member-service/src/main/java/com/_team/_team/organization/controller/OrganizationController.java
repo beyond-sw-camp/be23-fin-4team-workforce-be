@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
+@RequestMapping("/organization")
 public class OrganizationController {
 
     private final OrganizationService organizationService;

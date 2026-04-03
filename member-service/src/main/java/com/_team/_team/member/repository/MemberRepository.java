@@ -3,7 +3,9 @@ package com._team._team.member.repository;
 import com._team._team.company.domain.Company;
 import com._team._team.member.domain.Member;
 import io.lettuce.core.dynamic.annotation.Param;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -25,8 +27,15 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     // 사번 + 회사 중복 체크
     boolean existsBySabunAndCompany(String sabun, Company company);
 
-    // 회사별 직원 목록
-    List<Member> findByCompanyAndDelYn(Company company, String delYn);
+    // 비관적 락으로 마지막 사번 조회
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m.sabun FROM Member m " +
+            "WHERE m.company = :company " +
+            "AND m.delYn = 'NO' " +
+            "AND m.sabun LIKE 'EMP%' " +
+            "ORDER BY m.sabun DESC")
+    List<String> findLastSabunByCompanyWithLock(
+            @Param("company") Company company);
 
     Optional<Member> findByPersonalEmail(String personalEmail);
 

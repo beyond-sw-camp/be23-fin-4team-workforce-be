@@ -1,3 +1,4 @@
+# .gitignore 내용
 venv/
 __pycache__/
 *.pyc

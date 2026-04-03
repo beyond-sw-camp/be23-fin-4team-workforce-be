@@ -33,9 +33,6 @@ public class MemberCreateReqDto {
     @Email(message = "이메일 형식이 올바르지 않습니다.")
     private String personalEmail;
 
-    @NotBlank(message = "사번을 입력해 주세요.")
-    private String sabun;
-
     @NotNull(message = "입사일을 입력해 주세요.")
     private LocalDate joinDate;
 
@@ -65,14 +62,14 @@ public class MemberCreateReqDto {
     private String extensionNumber;
     private String telNumber;
 
-    public Member toEntity(String companyEmail, String encodedPassword, Company company) {
+    public Member toEntity(String companyEmail, String encodedPassword, Company company,String sabun) {
         return Member.builder()
                 .company(company)
                 .email(companyEmail)
                 .personalEmail(this.personalEmail)
                 .password(encodedPassword)
                 .name(this.name)
-                .sabun(this.sabun)
+                .sabun(sabun)
                 .joinDate(this.joinDate)
                 .employmentType(this.employmentType)
                 .phoneNumber(this.phoneNumber)
