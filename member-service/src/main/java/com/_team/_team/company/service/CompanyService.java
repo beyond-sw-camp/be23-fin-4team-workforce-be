@@ -11,6 +11,7 @@ import com._team._team.organization.service.OrganizationService;
 import com._team._team.s3.S3Uploader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,7 @@ public class CompanyService {
     private final MemberRepository memberRepository;
     private final S3Uploader s3Uploader;
 
+    @Autowired
     public CompanyService(
             CompanyRepository companyRepository,
             OrganizationService organizationService,
