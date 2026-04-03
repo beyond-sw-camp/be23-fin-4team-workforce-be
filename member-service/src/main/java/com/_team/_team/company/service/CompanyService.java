@@ -4,8 +4,11 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.repository.CompanyRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.member.domain.Member;
+import com._team._team.member.repository.MemberRepository;
 import com._team._team.member.service.MemberService;
 import com._team._team.organization.service.OrganizationService;
+import com._team._team.s3.S3Uploader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +17,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.security.SecureRandom;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -29,6 +34,8 @@ public class CompanyService {
     private final NtsApiService ntsApiService;
     private final MailService mailService;
     private final RedisTemplate<String, String> emailRedisTemplate;
+    private final MemberRepository memberRepository;
+    private final S3Uploader s3Uploader;
 
     @Autowired
     public CompanyService(
@@ -37,13 +44,15 @@ public class CompanyService {
             MemberService memberService,
             NtsApiService ntsApiService,
             MailService mailService,
-            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate) {
+            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, MemberRepository memberRepository, S3Uploader s3Uploader) {
         this.companyRepository = companyRepository;
         this.organizationService = organizationService;
         this.memberService = memberService;
         this.ntsApiService = ntsApiService;
         this.mailService = mailService;
         this.emailRedisTemplate = emailRedisTemplate;
+        this.memberRepository = memberRepository;
+        this.s3Uploader = s3Uploader;
     }
 
     // 이메일 인증 코드 발송
@@ -159,6 +168,29 @@ public class CompanyService {
                 .detailAddress(reqDto.getDetailAddress())
                 .build();
         return companyRepository.save(company);
+    }
+
+    public void updateLogo(UUID memberId, MultipartFile logo) {
+
+        // 1. 요청자 조회
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+
+        // 2. 회사 조회
+        Company company = member.getCompany();
+
+        // 3. 기존 로고 있으면 삭제
+        if (company.getLogoUrl() != null) {
+            s3Uploader.delete(company.getLogoUrl());
+        }
+
+        // 4. 새 로고 업로드
+        String logoUrl = s3Uploader.upload(logo, "logo");
+
+        // 5. 로고 URL 업데이트
+        company.updateLogoUrl(logoUrl);
     }
 
     private String generateVerificationCode() {
