@@ -7,6 +7,7 @@ import com._team._team.salary.dto.reqdto.SalaryItemTemplateCreateReqDto;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateUpdateReqDto;
 import com._team._team.salary.dto.resdto.SalaryItemTemplateResDto;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class SalaryItemTemplateService {
     private final SalaryItemTemplateRepository salaryItemTemplateRepository;
 
     /** 생성자 주입 */
+    @Autowired
     public SalaryItemTemplateService(SalaryItemTemplateRepository salaryItemTemplateRepository) {
         this.salaryItemTemplateRepository = salaryItemTemplateRepository;
     }
@@ -42,40 +44,53 @@ public class SalaryItemTemplateService {
 
     /** 급여 항목 템플릿 단건 조회 */
     @Transactional(readOnly = true)
-    public SalaryItemTemplateResDto findById(UUID salaryItemTemplateId) {
+    public SalaryItemTemplateResDto findById(UUID companyId, UUID salaryItemTemplateId) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
+
+        if (!template.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
+
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
     /** 회사별 급여 항목 템플릿 목록 조회 */
     @Transactional(readOnly = true)
     public List<SalaryItemTemplateResDto> findByCompanyId(UUID companyId) {
-        return salaryItemTemplateRepository.findByCompanyIdAndUseYn(companyId, "Y").stream()
+        return salaryItemTemplateRepository.findByCompanyIdAndDelYn(companyId, "N").stream()
                 .map(SalaryItemTemplateResDto::fromEntity)
                 .toList();
     }
 
     /** 급여 항목 템플릿 수정 (더티체킹) */
-    public SalaryItemTemplateResDto update(UUID salaryItemTemplateId, SalaryItemTemplateUpdateReqDto reqDto) {
+    public SalaryItemTemplateResDto update(UUID companyId, UUID salaryItemTemplateId, SalaryItemTemplateUpdateReqDto reqDto) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
+
+        if (!template.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
 
         template.update(reqDto);
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
     /** 급여 항목 템플릿 삭제 (soft delete, 더티체킹) */
-    public void delete(UUID salaryItemTemplateId) {
+    public void delete(UUID companyId, UUID salaryItemTemplateId) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
+
+        if (!template.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
 
         template.softDelete();
     }
 
     /** 동일 이름 항목 중복 검증 */
     private void validateDuplicateItemName(UUID companyId, String itemName) {
-        if (salaryItemTemplateRepository.existsByCompanyIdAndItemNameAndUseYn(companyId, itemName, "Y")) {
+        if (salaryItemTemplateRepository.existsByCompanyIdAndItemNameAndDelYn(companyId, itemName, "N")) {
             throw new BusinessException(HttpStatus.CONFLICT, "동일한 이름의 급여 항목 템플릿이 이미 존재합니다.");
         }
     }

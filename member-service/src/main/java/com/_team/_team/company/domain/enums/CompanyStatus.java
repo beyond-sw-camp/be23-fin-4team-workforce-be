@@ -9,6 +9,4 @@ public enum CompanyStatus {
     ACTIVE,  //정상
     SUSPENDED, //정지(요금 미납 등)
     DELETED // 해지
-
-
 }

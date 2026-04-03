@@ -47,9 +47,10 @@ public class SalaryPolicy extends BaseTimeEntity {
 
     private LocalDate effectiveTo;
 
-    @Column(nullable = false)
+    /** 삭제 여부 */
+    @Column(length = 1)
     @Builder.Default
-    private Boolean isDeleted = false;
+    private String delYn = "N";
 
     // 과거 정책인지 확인 (정산 완료)
     public boolean isPast() {
@@ -75,8 +76,8 @@ public class SalaryPolicy extends BaseTimeEntity {
         this.effectiveTo = reqDto.getEffectiveTo();
     }
 
-    // soft delete 처리
+    // 소프트 삭제
     public void softDelete() {
-        this.isDeleted = true;
+        this.delYn = "Y";
     }
 }
