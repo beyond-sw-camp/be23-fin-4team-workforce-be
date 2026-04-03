@@ -229,7 +229,7 @@ public class AutoCreateTestData implements ApplicationRunner {
                 createdMember.updatePassword(
                         passwordEncoder.encode("Test1234!"));
 
-                // 최초 로그인 여부 NO로 변경 ← 추가
+                // 최초 로그인 여부 NO로 변경
                 // (비밀번호 변경 없이 바로 로그인 가능하게)
                 createdMember.completeFirstLogin();
             }
