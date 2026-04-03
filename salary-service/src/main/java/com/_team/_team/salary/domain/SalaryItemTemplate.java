@@ -46,10 +46,10 @@ public class SalaryItemTemplate extends BaseTimeEntity {
     @Column(nullable = false, length = 1)
     private String isTaxableYn;
 
-    /** 사용 여부 */
+    /** 삭제 여부 */
     @Column(length = 1)
     @Builder.Default
-    private String useYn = "Y";
+    private String delYn = "N";
 
     /**
      * 급여 항목 템플릿 정보 수정
@@ -62,11 +62,8 @@ public class SalaryItemTemplate extends BaseTimeEntity {
         this.displayOrder = reqDto.getDisplayOrder();
     }
 
-    /**
-     * soft delete 처리
-     * - useYn을 N으로 변경하여 조회에서 제외
-     */
+    /** 소프트 삭제 */
     public void softDelete() {
-        this.useYn = "N";
+        this.delYn = "Y";
     }
 }
