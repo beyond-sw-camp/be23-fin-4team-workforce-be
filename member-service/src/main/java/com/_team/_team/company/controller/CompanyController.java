@@ -10,6 +10,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/company")
@@ -68,4 +71,16 @@ public class CompanyController {
                 HttpStatus.CREATED
         );
     }
+    // 회사 로고 업로드
+    @PatchMapping("/logo")
+    public ResponseEntity<?> updateLogo(
+            @RequestHeader("X-User-Id") UUID memberId,
+            @RequestPart MultipartFile logo) {
+        companyService.updateLogo(memberId, logo);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "로고 업로드 성공"),
+                HttpStatus.OK
+        );
+    }
+
 }
