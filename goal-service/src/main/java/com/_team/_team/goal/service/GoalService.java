@@ -2,107 +2,138 @@ package com._team._team.goal.service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.goal.domain.Goal;
-import com._team._team.goal.domain.GoalCheckin;
-import com._team._team.goal.domain.GoalCycle;
+import com._team._team.goal.domain.KpiTemplate;
 import com._team._team.goal.domain.enums.GoalStatus;
-import com._team._team.goal.dto.reqdto.GoalCheckinReqDto;
 import com._team._team.goal.dto.reqdto.GoalCreateReqDto;
+import com._team._team.goal.dto.reqdto.GoalUpdateReqDto;
 import com._team._team.goal.dto.resdto.GoalResDto;
-import com._team._team.goal.repository.GoalCheckinRepository;
-import com._team._team.goal.repository.GoalCycleRepository;
 import com._team._team.goal.repository.GoalRepository;
-import lombok.RequiredArgsConstructor;
+import com._team._team.goal.repository.KpiTemplateRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
-@Transactional
 public class GoalService {
 
-    private final GoalRepository goalRepository;
-    private final GoalCycleRepository goalCycleRepository;
-    private final GoalCheckinRepository goalCheckinRepository;
+    final GoalRepository goalRepository;
+    final KpiTemplateRepository kpiTemplateRepository;
 
-    public UUID createGoal(GoalCreateReqDto reqDto) {
-        Goal parentGoal = null;
-        if (reqDto.getParentGoalId() != null) {
-            parentGoal = goalRepository.findById(reqDto.getParentGoalId())
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "상위 목표를 찾을 수 없습니다."));
+    @Autowired
+    public GoalService(GoalRepository goalRepository, KpiTemplateRepository kpiTemplateRepository) {
+        this.goalRepository = goalRepository;
+        this.kpiTemplateRepository = kpiTemplateRepository;
+    }
+
+    @Transactional
+    public GoalResDto createGoal(GoalCreateReqDto dto) {
+        if (!dto.getEndDate().isAfter(dto.getStartDate())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "종료일은 시작일보다 이후여야 합니다.");
+        }
+        if (dto.getTargetValue().compareTo(dto.getBaseline()) == 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "목표값은 기준값과 달라야 합니다.");
         }
 
-        GoalCycle cycle = null;
-        if (reqDto.getCycleId() != null) {
-            cycle = goalCycleRepository.findById(reqDto.getCycleId())
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "목표 사이클을 찾을 수 없습니다."));
+        KpiTemplate kpiTemplate = kpiTemplateRepository.findById(dto.getKpiTemplateId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "KPI 템플릿을 찾을 수 없습니다. id=" + dto.getKpiTemplateId()));
+
+        Goal parentGoal = null;
+        if (dto.getParentGoalId() != null) {
+            parentGoal = goalRepository.findById(dto.getParentGoalId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                            "상위 목표를 찾을 수 없습니다. id=" + dto.getParentGoalId()));
         }
 
         Goal goal = Goal.builder()
-                .companyId(reqDto.getCompanyId())
+                .kpiTemplate(kpiTemplate)
+                .companyId(dto.getCompanyId())
                 .parentGoal(parentGoal)
-                .cycle(cycle)
-                .ownerType(reqDto.getOwnerType())
-                .ownerId(reqDto.getOwnerId())
-                .title(reqDto.getTitle())
-                .description(reqDto.getDescription())
-                .startDate(reqDto.getStartDate())
-                .endDate(reqDto.getEndDate())
-                .baseline(reqDto.getBaseline())
-                .targetValue(reqDto.getTargetValue())
-                .isAutoUpdated(reqDto.getIsAutoUpdated())
-                .visibility(reqDto.getVisibility())
-                .goalStatus(GoalStatus.DRAFT)
+                .ownerType(dto.getOwnerType())
+                .ownerId(dto.getOwnerId())
+                .title(dto.getTitle())
+                .description(dto.getDescription())
+                .startDate(dto.getStartDate())
+                .endDate(dto.getEndDate())
+                .measureType(dto.getMeasureType())
+                .unitType(dto.getUnitType())
+                .unitLabel(dto.getUnitLabel())
+                .baseline(dto.getBaseline())
+                .targetValue(dto.getTargetValue())
+                .capPct(dto.getCapPct())
+                .contributionPct(dto.getContributionPct())
+                .weightPct(dto.getWeightPct())
+                .visibility(dto.getVisibility())
+                .status(GoalStatus.DRAFT)
                 .build();
 
-        try {
-            goal.validateBusinessRule();
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
-
-        return goalRepository.save(goal).getGoalId();
+        Goal saved = goalRepository.save(goal);
+        return GoalResDto.from(saved);
     }
 
     @Transactional(readOnly = true)
-    public List<GoalResDto> getGoalList(UUID companyId) {
+    public List<GoalResDto> listGoals(UUID companyId) {
         return goalRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
                 .stream()
-                .map(GoalResDto::fromEntity)
-                .toList();
+                .map(GoalResDto::from)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public GoalResDto getGoalDetail(UUID goalId) {
+    public GoalResDto getGoal(UUID goalId) {
         Goal goal = goalRepository.findById(goalId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "목표를 찾을 수 없습니다."));
-        return GoalResDto.fromEntity(goal);
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "목표를 찾을 수 없습니다. id=" + goalId));
+        return GoalResDto.from(goal);
     }
 
-    public void checkinGoal(UUID memberId, UUID goalId, GoalCheckinReqDto reqDto) {
+    @Transactional
+    public GoalResDto updateGoal(UUID goalId, GoalUpdateReqDto dto) {
         Goal goal = goalRepository.findById(goalId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "목표를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "목표를 찾을 수 없습니다. id=" + goalId));
+        goal.update(dto.getTitle(), dto.getDescription(), dto.getVisibility(),
+                dto.getWeightPct(), dto.getContributionPct());
+        return GoalResDto.from(goal);
+    }
 
-        if (goal.getGoalStatus() == GoalStatus.CANCELLED || goal.getGoalStatus() == GoalStatus.COMPLETED) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "종료/취소된 목표는 체크인할 수 없습니다.");
+    @Transactional
+    public GoalResDto activateGoal(UUID goalId, UUID approvedBy) {
+        Goal goal = goalRepository.findById(goalId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "목표를 찾을 수 없습니다. id=" + goalId));
+        if (goal.getStatus() != GoalStatus.DRAFT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "DRAFT 상태의 목표만 활성화할 수 있습니다. 현재 상태: " + goal.getStatus());
         }
+        goal.activate(approvedBy);
+        return GoalResDto.from(goal);
+    }
 
-        try {
-            goal.updateCheckin(reqDto.getActualValue(), reqDto.getProgressStatus());
-        } catch (IllegalStateException e) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, e.getMessage());
+    @Transactional
+    public GoalResDto completeGoal(UUID goalId) {
+        Goal goal = goalRepository.findById(goalId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "목표를 찾을 수 없습니다. id=" + goalId));
+        if (goal.getStatus() != GoalStatus.ACTIVE) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "ACTIVE 상태의 목표만 완료할 수 있습니다. 현재 상태: " + goal.getStatus());
         }
+        goal.complete();
+        return GoalResDto.from(goal);
+    }
 
-        GoalCheckin goalCheckin = GoalCheckin.builder()
-                .goal(goal)
-                .memberId(memberId)
-                .actualValue(reqDto.getActualValue())
-                .progressStatus(reqDto.getProgressStatus())
-                .comment(reqDto.getComment())
-                .build();
-        goalCheckinRepository.save(goalCheckin);
+    @Transactional
+    public GoalResDto cancelGoal(UUID goalId) {
+        Goal goal = goalRepository.findById(goalId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "목표를 찾을 수 없습니다. id=" + goalId));
+        goal.cancel();
+        return GoalResDto.from(goal);
     }
 }
