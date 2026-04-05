@@ -44,4 +44,43 @@ public interface MemberPositionRepository extends JpaRepository<MemberPosition, 
             "WHERE mp.memberPositionId = :memberPositionId")
     Optional<MemberPosition> findByIdWithDetails(
             @Param("memberPositionId") UUID memberPositionId);
+
+
+    /// //
+    // 결재 서비스용: 부서 + 직책으로 조회
+    @Query("SELECT mp FROM MemberPosition mp " +
+            "JOIN FETCH mp.member " +
+            "JOIN FETCH mp.organization " +
+            "JOIN FETCH mp.jobTitle " +
+            "JOIN FETCH mp.jobGrade " +
+            "WHERE mp.organization.organizationId = :organizationId " +
+            "AND mp.jobTitle.jobTitleId = :jobTitleId " +
+            "AND mp.isActiveYn = 'YES' AND mp.delYn = 'NO'")
+    List<MemberPosition> findByOrganizationIdAndJobTitleId(
+            @Param("organizationId") UUID organizationId,
+            @Param("jobTitleId") UUID jobTitleId);
+
+    // 결재 서비스용: 부서 + 직급으로 조회
+    @Query("SELECT mp FROM MemberPosition mp " +
+            "JOIN FETCH mp.member " +
+            "JOIN FETCH mp.organization " +
+            "JOIN FETCH mp.jobTitle " +
+            "JOIN FETCH mp.jobGrade " +
+            "WHERE mp.organization.organizationId = :organizationId " +
+            "AND mp.jobGrade.jobGradeId = :jobGradeId " +
+            "AND mp.isActiveYn = 'YES' AND mp.delYn = 'NO'")
+    List<MemberPosition> findByOrganizationIdAndJobGradeId(
+            @Param("organizationId") UUID organizationId,
+            @Param("jobGradeId") UUID jobGradeId);
+
+    // 결재 서비스용: memberPositionId로 상세 조회 (활성 상태만)
+    @Query("SELECT mp FROM MemberPosition mp " +
+            "JOIN FETCH mp.member " +
+            "JOIN FETCH mp.organization " +
+            "JOIN FETCH mp.jobTitle " +
+            "JOIN FETCH mp.jobGrade " +
+            "WHERE mp.memberPositionId = :memberPositionId " +
+            "AND mp.isActiveYn = 'YES' AND mp.delYn = 'NO'")
+    Optional<MemberPosition> findActiveByIdWithDetails(
+            @Param("memberPositionId") UUID memberPositionId);
 }
