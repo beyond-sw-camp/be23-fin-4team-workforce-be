@@ -4,6 +4,7 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.repository.CompanyRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.esg.service.EsgService;
 import com._team._team.member.domain.Member;
 import com._team._team.member.repository.MemberRepository;
 import com._team._team.member.service.MemberService;
@@ -36,6 +37,7 @@ public class CompanyService {
     private final RedisTemplate<String, String> emailRedisTemplate;
     private final MemberRepository memberRepository;
     private final S3Uploader s3Uploader;
+    private final EsgService esgService;
 
     @Autowired
     public CompanyService(
@@ -44,7 +46,7 @@ public class CompanyService {
             MemberService memberService,
             NtsApiService ntsApiService,
             MailService mailService,
-            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, MemberRepository memberRepository, S3Uploader s3Uploader) {
+            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, MemberRepository memberRepository, S3Uploader s3Uploader, EsgService esgService) {
         this.companyRepository = companyRepository;
         this.organizationService = organizationService;
         this.memberService = memberService;
@@ -53,6 +55,7 @@ public class CompanyService {
         this.emailRedisTemplate = emailRedisTemplate;
         this.memberRepository = memberRepository;
         this.s3Uploader = s3Uploader;
+        this.esgService = esgService;
     }
 
     // 이메일 인증 코드 발송
@@ -154,7 +157,10 @@ public class CompanyService {
         // 8. 관리자 계정 생성
         memberService.createAdminMember(reqDto, company);
 
-        // 9. 인증 정보 삭제 - 로컬 테스트용 주석처리
+        // 9. ESG 기본 config 생성 (전체 기능 OFF 상태로 초기화)
+        esgService.createDefaultConfig(company);
+
+        // 10. 인증 정보 삭제 - 로컬 테스트용 주석처리
         // emailRedisTemplate.delete("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
     }
 
