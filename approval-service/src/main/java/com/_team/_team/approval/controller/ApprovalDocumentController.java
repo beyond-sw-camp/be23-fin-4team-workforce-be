@@ -1,0 +1,97 @@
+package com._team._team.approval.controller;
+
+import com._team._team.approval.dtos.reqdto.ApprovalDocumentCreateReqDto;
+import com._team._team.approval.dtos.resdto.ApprovalDocumentResDto;
+import com._team._team.approval.service.ApprovalDocumentService;
+import com._team._team.dto.ApiResponse;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/approval/documents")
+public class ApprovalDocumentController {
+
+    private final ApprovalDocumentService approvalDocumentService;
+
+    @Autowired
+    public ApprovalDocumentController(ApprovalDocumentService approvalDocumentService) {
+        this.approvalDocumentService = approvalDocumentService;
+    }
+
+    // 결재 양식 생성
+    @PostMapping
+    public ResponseEntity<?> create(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @Valid @RequestBody ApprovalDocumentCreateReqDto reqDto) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.create(companyId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 양식이 생성되었습니다."),
+                HttpStatus.CREATED
+        );
+    }
+
+    // 결재 양식 단건 조회
+    @GetMapping("/{documentId}")
+    public ResponseEntity<?> findById(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID documentId) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.findById(companyId, documentId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 양식 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 회사별 활성 양식 목록 조회
+    @GetMapping("/active")
+    public ResponseEntity<?> findActive(
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
+        List<ApprovalDocumentResDto> result = approvalDocumentService.findActiveByCompanyId(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "활성 결재 양식 목록 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 회사별 전체 양식 목록 조회 (관리자용)
+    @GetMapping
+    public ResponseEntity<?> findAll(
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
+        List<ApprovalDocumentResDto> result = approvalDocumentService.findAllByCompanyId(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "전체 결재 양식 목록 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 결재 양식 활성화
+    @PatchMapping("/{documentId}/activate")
+    public ResponseEntity<?> activate(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID documentId) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.activate(companyId, documentId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 양식이 활성화되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    // 결재 양식 비활성화
+    @PatchMapping("/{documentId}/deactivate")
+    public ResponseEntity<?> deactivate(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID documentId) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.deactivate(companyId, documentId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 양식이 비활성화되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+}

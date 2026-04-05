@@ -35,5 +35,13 @@ public class ApprovalPolicyLine extends BaseTimeEntity {
 
     private UUID jobTitleId; // job_title일 때
 
+    @Column(nullable = false)
+    @Builder.Default
+    private String delYn = "N";
+
+    public void approvalPolicyLineDelete() {
+        this.delYn = "Y";
+    }
+
 
 }
