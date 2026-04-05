@@ -16,7 +16,7 @@ import java.util.UUID;
 
 // KPI 템플릿 생성, 목록 조회, 비활성화 컨트롤러
 @RestController
-@RequestMapping("/kpi-template")
+@RequestMapping("/goal/kpi-template")
 public class KpiTemplateController {
 
     final KpiTemplateService kpiTemplateService;

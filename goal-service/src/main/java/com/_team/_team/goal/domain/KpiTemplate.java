@@ -22,7 +22,7 @@ public class KpiTemplate extends BaseTimeEntity {
     @Column(name = "kpi_template_id", columnDefinition = "BINARY(16)")
     private UUID kpiTemplateId;
 
-    @Column(name = "company_id", columnDefinition = "BINARY(16)")
+    @Column(name = "company_id", columnDefinition = "BINARY(16)", nullable = true)
     private UUID companyId;
 
     @Column(name = "name", length = 200, nullable = false)
