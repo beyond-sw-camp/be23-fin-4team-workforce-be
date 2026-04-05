@@ -1,0 +1,104 @@
+package com._team._team.approval.controller;
+
+import com._team._team.approval.domain.enums.RequestStatus;
+import com._team._team.approval.dtos.reqdto.ApprovalRequestCreateReqDto;
+import com._team._team.approval.dtos.reqdto.CancelReqDto;
+import com._team._team.approval.dtos.resdto.ApprovalRequestResDto;
+import com._team._team.approval.service.ApprovalRequestService;
+import com._team._team.dto.ApiResponse;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+
+@RestController
+@RequestMapping("/approval/requests")
+public class ApprovalRequestController {
+
+    private final ApprovalRequestService approvalRequestService;
+
+    @Autowired
+    public ApprovalRequestController(ApprovalRequestService approvalRequestService) {
+        this.approvalRequestService = approvalRequestService;
+    }
+
+    // 결재요청 생성
+    @PostMapping
+    public ResponseEntity<?> create(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @Valid @RequestBody ApprovalRequestCreateReqDto reqDto) {
+        ApprovalRequestResDto resDto = approvalRequestService.create(companyId, memberId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 요청이 생성되었습니다."),
+                HttpStatus.CREATED
+        );
+    }
+
+    // 결재요청 상세 조회
+    @GetMapping("/{requestId}")
+    public ResponseEntity<?> findById(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID requestId) {
+        ApprovalRequestResDto resDto = approvalRequestService.findById(companyId, requestId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 요청 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 내가 올린 결재 목록 (상태별 필터 optional)
+    @GetMapping("/my")
+    public ResponseEntity<?> findMyRequests(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestParam(required = false) RequestStatus status) {
+        List<ApprovalRequestResDto> result;
+
+        if (status != null) {
+            result = approvalRequestService.findByMemberIdAndStatus(memberId, status);
+        } else {
+            result = approvalRequestService.findByMemberId(memberId);
+        }
+
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "내 결재 목록 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 임시저장 수정
+    @PatchMapping("/{requestId}")
+    public ResponseEntity<?> update(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID requestId,
+            @Valid @RequestBody ApprovalRequestCreateReqDto reqDto) {
+        ApprovalRequestResDto resDto =
+                approvalRequestService.update(companyId, memberId, requestId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 요청이 수정되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    // 결재 취소
+    @PatchMapping("/{requestId}/cancel")
+    public ResponseEntity<?> cancel(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID requestId,
+            @Valid @RequestBody CancelReqDto reqDto) {
+        ApprovalRequestResDto resDto =
+                approvalRequestService.cancel(companyId, memberId, requestId, reqDto.getCancelReason());
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재가 취소되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+}
