@@ -1,0 +1,48 @@
+package com._team._team.approval.repository;
+
+import com._team._team.approval.domain.ApprovalRequest;
+import com._team._team.approval.domain.enums.RequestStatus;
+import com._team._team.approval.domain.enums.RequestType;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest, UUID> {
+
+    // 요청자별 결재 신청 목록 (삭제되지 않은 것만)
+    List<ApprovalRequest> findByMemberIdAndDelYn(UUID memberId, String delYn);
+
+    // 요청자별 + 상태별 조회
+    List<ApprovalRequest> findByMemberIdAndRequestStatusAndDelYn(
+            UUID memberId, RequestStatus requestStatus, String delYn);
+
+    // 요청자별 + 요청타입별 조회
+    List<ApprovalRequest> findByMemberIdAndRequestTypeAndDelYn(
+            UUID memberId, RequestType requestType, String delYn);
+
+    // fetch join으로 문서 양식 포함 조회
+    @Query("SELECT ar FROM ApprovalRequest ar " +
+            "JOIN FETCH ar.approvalDocument " +
+            "WHERE ar.requestId = :requestId " +
+            "AND ar.delYn = 'N'")
+    Optional<ApprovalRequest> findByIdWithDocument(
+            @Param("requestId") UUID requestId);
+
+    // 기간별 결재 신청 목록 조회
+    @Query("SELECT ar FROM ApprovalRequest ar " +
+            "JOIN FETCH ar.approvalDocument " +
+            "WHERE ar.memberId = :memberId " +
+            "AND ar.delYn = 'N' " +
+            "AND ar.createdAt BETWEEN :startDate AND :endDate")
+    List<ApprovalRequest> findByMemberIdAndDateRange(
+            @Param("memberId") UUID memberId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+}
