@@ -2,13 +2,17 @@ package com._team._team.evaluation.dto.reqdto;
 
 import com._team._team.evaluation.domain.enums.EvalType;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-@Getter
+@Data
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class EvaluationCreateReqDto {
 
     @NotNull(message = "평가 정책 ID는 필수입니다.")
