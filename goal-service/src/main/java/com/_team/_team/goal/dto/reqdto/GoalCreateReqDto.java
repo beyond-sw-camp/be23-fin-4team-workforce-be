@@ -15,44 +15,46 @@ import java.util.UUID;
 @NoArgsConstructor
 public class GoalCreateReqDto {
 
-    @NotNull
+    @NotNull(message = "KPI 템플릿 ID는 필수입니다.")
     private UUID kpiTemplateId;
 
-    @NotNull
+    @NotNull(message = "회사 ID는 필수입니다.")
     private UUID companyId;
 
     private UUID parentGoalId;
 
-    @NotNull
+    @NotNull(message = "소유 유형은 필수입니다.")
     private GoalOwnerType ownerType;
 
-    @NotNull
+    @NotNull(message = "소유자 ID는 필수입니다.")
     private UUID ownerId;
 
-    @NotBlank
+    @NotBlank(message = "제목은 필수입니다.")
     @Size(max = 300)
     private String title;
 
+    @NotBlank(message = "내용은 필수입니다.")
+    @Size(max = 300)
     private String description;
 
-    @NotNull
+    @NotNull(message = "시작일은 필수입니다.")
     private LocalDate startDate;
 
-    @NotNull
+    @NotNull(message = "종료일은 필수입니다.")
     private LocalDate endDate;
 
-    @NotNull
+    @NotNull(message = "측정 유형은 필수입니다.")
     private MeasureType measureType;
 
-    @NotNull
+    @NotNull(message = "단위 유형은 필수입니다.")
     private UnitType unitType;
 
     private String unitLabel;
 
-    @NotNull
+    @NotNull(message = "기준값은 필수입니다.")
     private BigDecimal baseline;
 
-    @NotNull
+    @NotNull(message = "목표값은 필수입니다.")
     private BigDecimal targetValue;
 
     private int capPct;
@@ -61,6 +63,6 @@ public class GoalCreateReqDto {
 
     private BigDecimal weightPct;
 
-    @NotNull
+    @NotNull(message = "공개 범위는 필수입니다.")
     private GoalVisibility visibility;
 }

@@ -11,13 +11,13 @@ import java.util.UUID;
 @NoArgsConstructor
 public class PerformanceRecordReviewReqDto {
 
-    @NotNull
+    @NotNull(message = "승인 확정 여부는 필수입니다.")
     private boolean confirmed;
 
     private BigDecimal convertedScore;
 
     private String rejectReason;
 
-    @NotNull
+    @NotNull(message = "검토자 ID는 필수입니다.")
     private UUID reviewedBy;
 }

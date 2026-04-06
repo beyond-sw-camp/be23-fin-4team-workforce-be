@@ -12,10 +12,10 @@ import java.util.UUID;
 @NoArgsConstructor
 public class CalibrationCreateReqDto {
 
-    @NotNull
+    @NotNull(message = "평가 ID는 필수입니다.")
     private UUID evaluationId;
 
-    @NotNull
+    @NotNull(message = "조정자 ID는 필수입니다.")
     private UUID adjustedBy;
 
     private String beforeGrade;
@@ -23,6 +23,6 @@ public class CalibrationCreateReqDto {
     private BigDecimal beforeScore;
     private BigDecimal afterScore;
 
-    @NotBlank
+    @NotBlank(message = "조정 사유는 필수입니다.")
     private String reason;
 }

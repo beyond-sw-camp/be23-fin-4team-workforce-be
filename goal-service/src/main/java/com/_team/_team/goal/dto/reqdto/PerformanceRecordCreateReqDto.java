@@ -12,7 +12,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class PerformanceRecordCreateReqDto {
 
-    @NotNull
+    @NotNull(message = "입력 유형은 필수입니다.")
     private InputType inputType;
 
     private BigDecimal actualValue;
@@ -21,6 +21,6 @@ public class PerformanceRecordCreateReqDto {
 
     private BigDecimal selfScore;
 
-    @NotNull
+    @NotNull(message = "제출자 ID는 필수입니다.")
     private UUID submittedBy;
 }

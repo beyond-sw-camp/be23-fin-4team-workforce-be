@@ -45,7 +45,7 @@ public class Goal extends BaseTimeEntity {
     @Column(name = "title", length = 300, nullable = false)
     private String title;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;
 
     @Column(name = "start_date", nullable = false)

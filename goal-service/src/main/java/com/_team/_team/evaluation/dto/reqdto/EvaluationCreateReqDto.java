@@ -11,15 +11,15 @@ import java.util.UUID;
 @NoArgsConstructor
 public class EvaluationCreateReqDto {
 
-    @NotNull
+    @NotNull(message = "평가 정책 ID는 필수입니다.")
     private UUID evaluationPolicyId;
 
-    @NotNull
+    @NotNull(message = "평가자 ID는 필수입니다.")
     private UUID evaluatorId;
 
-    @NotNull
+    @NotNull(message = "피평가자 ID는 필수입니다.")
     private UUID evaluateeId;
 
-    @NotNull
+    @NotNull(message = "평가 유형은 필수입니다.")
     private EvalType evalType;
 }
