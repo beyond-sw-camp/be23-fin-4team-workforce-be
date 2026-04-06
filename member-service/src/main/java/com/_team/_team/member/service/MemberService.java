@@ -637,33 +637,29 @@ public class MemberService {
                                               UUID memberPositionId,
                                               UUID targetMemberId) {
 
-        // 1. 요청자 조회
         Member requester = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
 
-        // 2. 대상 직원 조회
         Member target = memberRepository.findById(targetMemberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."));
 
-        // 3. 같은 회사인지 확인
         if (!target.getCompany().getCompanyId()
                 .equals(requester.getCompany().getCompanyId())) {
             throw new BusinessException(
-                    HttpStatus.FORBIDDEN, "다른 회사의 직원을 조회할 수 없습니다."
-            );
+                    HttpStatus.FORBIDDEN, "다른 회사의 직원을 조회할 수 없습니다.");
         }
 
-        // 4. MemberPosition 조회 (N+1 방지)
         MemberPosition position = memberPositionRepository
                 .findByIdWithDetails(target.getDefaultPositionId())
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
-                ));
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."));
 
+        // 본인 조회면 전체 정보, 타인이면 공개 여부 체크
+        if (memberId.equals(targetMemberId)) {
+            return MemberDetailResDto.fromEntitySelf(target, position);
+        }
         return MemberDetailResDto.fromEntity(target, position);
     }
 
@@ -1581,6 +1577,11 @@ public class MemberService {
                     .email(member.getEmail())
                     .memberStatus(member.getMemberStatus().name())
                     .position(position.getJobTitle().getName())
+                    // 추가
+                    .sabun(member.getSabun())
+                    .joinDate(member.getJoinDate())
+                    .jobGradeName(position.getJobGrade().getName())
+                    .esgScore(member.getEsgScore())
                     .build();
 
             String payload = objectMapper.writeValueAsString(savedEvent);

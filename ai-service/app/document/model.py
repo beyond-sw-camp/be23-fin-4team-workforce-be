@@ -12,5 +12,6 @@ class HrDocument(Base):
     document_name = Column(String(255), nullable=False)
     file_url = Column(String(500), nullable=True)
     content = Column(Text, nullable=True)
+    del_yn = Column(String(3), default="NO", nullable=False)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
