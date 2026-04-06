@@ -4,18 +4,16 @@ import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
+import com._team._team.evaluation.dto.reqdto.EvaluationConfirmReqDto;
 import com._team._team.evaluation.dto.reqdto.EvaluationCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.EvaluationScoreUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.EvaluationResDto;
 import com._team._team.evaluation.service.EvaluationService;
 import jakarta.validation.Valid;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -73,8 +71,8 @@ public class EvaluationController {
     @PatchMapping("/{evaluationId}/confirm")
     public ResponseEntity<ApiResponse<EvaluationResDto>> confirmEvaluation(
             @PathVariable UUID evaluationId,
-            @RequestBody ConfirmRequest request) {
-        EvaluationResDto result = evaluationService.confirmEvaluation(evaluationId, request.getFinalScore(), request.getGrade());
+            @RequestBody @Valid EvaluationConfirmReqDto dto) {
+        EvaluationResDto result = evaluationService.confirmEvaluation(evaluationId, dto.getFinalScore(), dto.getGrade());
         return ResponseEntity.ok(ApiResponse.success(result, "평가가 확정되었습니다."));
     }
 
@@ -96,10 +94,4 @@ public class EvaluationController {
         return ResponseEntity.ok(ApiResponse.success(result, "평가자별 평가 목록 조회 성공"));
     }
 
-    @Getter
-    @NoArgsConstructor
-    public static class ConfirmRequest {
-        private BigDecimal finalScore;
-        private String grade;
-    }
 }

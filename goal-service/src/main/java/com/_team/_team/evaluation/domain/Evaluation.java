@@ -90,11 +90,15 @@ public class Evaluation extends BaseTimeEntity {
     }
 
     public void updateScores(BigDecimal quantScore, BigDecimal qualScore,
-                             String goalScoresJson, String rubricScoresJson) {
+                             String goalScoresJson, String rubricScoresJson,
+                             String comment, String strengthComment, String improveComment) {
         this.quantScore = quantScore;
         this.qualScore = qualScore;
         this.goalScoresJson = goalScoresJson;
         this.rubricScoresJson = rubricScoresJson;
+        this.comment = comment;
+        this.strengthComment = strengthComment;
+        this.improveComment = improveComment;
     }
 
     public void flagBias(String biasType) {

@@ -58,7 +58,8 @@ public class EvaluationService {
         }
 
         evaluation.updateScores(dto.getQuantScore(), dto.getQualScore(),
-                dto.getGoalScoresJson(), dto.getRubricScoresJson());
+                dto.getGoalScoresJson(), dto.getRubricScoresJson(),
+                dto.getComment(), dto.getStrengthComment(), dto.getImproveComment());
 
         return EvaluationResDto.from(evaluation);
     }
@@ -68,6 +69,11 @@ public class EvaluationService {
         Evaluation evaluation = evaluationRepository.findById(evaluationId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가를 찾을 수 없습니다."));
 
+        if (evaluation.getStatus() != EvaluationStatus.DRAFT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "초안(DRAFT) 상태의 평가만 제출할 수 있습니다. 현재 상태: " + evaluation.getStatus());
+        }
+
         evaluation.submit();
         return EvaluationResDto.from(evaluation);
     }
@@ -76,6 +82,11 @@ public class EvaluationService {
     public EvaluationResDto confirmEvaluation(UUID evaluationId, BigDecimal finalScore, String grade) {
         Evaluation evaluation = evaluationRepository.findById(evaluationId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가를 찾을 수 없습니다."));
+
+        if (evaluation.getStatus() != EvaluationStatus.SUBMITTED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "제출(SUBMITTED) 상태의 평가만 확정할 수 있습니다. 현재 상태: " + evaluation.getStatus());
+        }
 
         evaluation.confirm(finalScore, grade);
         return EvaluationResDto.from(evaluation);
