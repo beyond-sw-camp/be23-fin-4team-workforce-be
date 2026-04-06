@@ -16,7 +16,7 @@ import java.util.UUID;
 public class PerformanceRecordReviewReqDto {
 
     @NotNull(message = "승인 확정 여부는 필수입니다.")
-    private boolean confirmed;
+    private Boolean confirmed;
 
     private BigDecimal convertedScore;
 

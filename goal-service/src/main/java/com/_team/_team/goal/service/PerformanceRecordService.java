@@ -4,6 +4,8 @@ import com._team._team.dto.BusinessException;
 import com._team._team.goal.domain.Goal;
 import com._team._team.goal.domain.PerformanceRecord;
 import com._team._team.goal.domain.PerformanceRecordHistory;
+import com._team._team.goal.domain.enums.GoalStatus;
+import com._team._team.goal.domain.enums.ReviewStatus;
 import com._team._team.goal.dto.reqdto.PerformanceRecordCreateReqDto;
 import com._team._team.goal.dto.reqdto.PerformanceRecordReviewReqDto;
 import com._team._team.goal.dto.resdto.PerformanceRecordHistoryResDto;
@@ -43,6 +45,11 @@ public class PerformanceRecordService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "목표를 찾을 수 없습니다. id=" + goalId));
 
+        if (goal.getStatus() != GoalStatus.ACTIVE) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "활성(ACTIVE) 상태의 목표에만 실적을 제출할 수 있습니다. 현재 상태: " + goal.getStatus());
+        }
+
         PerformanceRecord record = PerformanceRecord.builder()
                 .goal(goal)
                 .inputType(dto.getInputType())
@@ -70,11 +77,20 @@ public class PerformanceRecordService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "실적 기록을 찾을 수 없습니다. id=" + performanceRecordId));
 
+        if (record.getReviewStatus() != ReviewStatus.PENDING) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "대기(PENDING) 상태의 실적만 검토할 수 있습니다. 현재 상태: " + record.getReviewStatus());
+        }
+
         BigDecimal beforeValue = record.getActualValue();
         String beforeDesc = record.getDescription();
 
-        if (dto.isConfirmed()) {
+        if (Boolean.TRUE.equals(dto.getConfirmed())) {
             record.confirm(dto.getReviewedBy(), dto.getConvertedScore());
+            // 실적 확인 시 목표의 실제값 및 달성률 갱신
+            if (record.getActualValue() != null) {
+                record.getGoal().updateActualValue(record.getActualValue());
+            }
         } else {
             record.reject(dto.getReviewedBy(), dto.getRejectReason());
         }
@@ -85,7 +101,7 @@ public class PerformanceRecordService {
                 .afterValue(record.getActualValue())
                 .beforeDesc(beforeDesc)
                 .afterDesc(record.getDescription())
-                .changeReason(dto.isConfirmed() ? "실적 확인" : "실적 반려: " + dto.getRejectReason())
+                .changeReason(Boolean.TRUE.equals(dto.getConfirmed()) ? "실적 확인" : "실적 반려: " + dto.getRejectReason())
                 .changedBy(dto.getReviewedBy())
                 .build();
 
