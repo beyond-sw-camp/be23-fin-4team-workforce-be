@@ -43,6 +43,11 @@ public class GoalService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "KPI 템플릿을 찾을 수 없습니다. id=" + dto.getKpiTemplateId()));
 
+        if (!kpiTemplate.isActive()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "비활성 KPI 템플릿으로 목표를 생성할 수 없습니다. id=" + dto.getKpiTemplateId());
+        }
+
         Goal parentGoal = null;
         if (dto.getParentGoalId() != null) {
             parentGoal = goalRepository.findById(dto.getParentGoalId())
@@ -65,7 +70,7 @@ public class GoalService {
                 .unitLabel(dto.getUnitLabel())
                 .baseline(dto.getBaseline())
                 .targetValue(dto.getTargetValue())
-                .capPct(dto.getCapPct())
+                .capPct(dto.getCapPct())   // @NotNull + @Min(1) 보장
                 .contributionPct(dto.getContributionPct())
                 .weightPct(dto.getWeightPct())
                 .visibility(dto.getVisibility())
@@ -97,6 +102,10 @@ public class GoalService {
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "목표를 찾을 수 없습니다. id=" + goalId));
+        if (goal.getStatus() == GoalStatus.COMPLETED || goal.getStatus() == GoalStatus.CANCELLED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "완료되거나 취소된 목표는 수정할 수 없습니다. 현재 상태: " + goal.getStatus());
+        }
         goal.update(dto.getTitle(), dto.getDescription(), dto.getVisibility(),
                 dto.getWeightPct(), dto.getContributionPct());
         return GoalResDto.from(goal);
@@ -133,6 +142,10 @@ public class GoalService {
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "목표를 찾을 수 없습니다. id=" + goalId));
+        if (goal.getStatus() == GoalStatus.COMPLETED || goal.getStatus() == GoalStatus.CANCELLED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "이미 완료되거나 취소된 목표는 취소할 수 없습니다. 현재 상태: " + goal.getStatus());
+        }
         goal.cancel();
         return GoalResDto.from(goal);
     }

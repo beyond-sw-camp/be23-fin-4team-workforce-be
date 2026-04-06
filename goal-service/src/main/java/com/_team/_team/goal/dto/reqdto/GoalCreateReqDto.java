@@ -1,6 +1,7 @@
 package com._team._team.goal.dto.reqdto;
 
 import com._team._team.goal.domain.enums.*;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -61,7 +62,9 @@ public class GoalCreateReqDto {
     @NotNull(message = "목표값은 필수입니다.")
     private BigDecimal targetValue;
 
-    private int capPct;
+    @NotNull(message = "달성률 상한(capPct)은 필수입니다.")
+    @Min(value = 1, message = "달성률 상한은 1 이상이어야 합니다.")
+    private Integer capPct;
 
     private BigDecimal contributionPct;
 
