@@ -86,6 +86,9 @@ public class MeetingRecordService {
         MeetingRecord meetingRecord = meetingRecordRepository.findById(meetingRecordId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "면담 기록을 찾을 수 없습니다. id=" + meetingRecordId));
+        if (meetingRecord.getCompletedAt() != null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 완료된 면담 기록입니다.");
+        }
         meetingRecord.complete(dto.getMemo(), dto.getManagerReaction());
         if (dto.getPrivateMemo() != null) {
             meetingRecord.updatePrivateMemo(dto.getPrivateMemo());

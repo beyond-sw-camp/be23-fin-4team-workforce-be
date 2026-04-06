@@ -130,6 +130,8 @@ public class MemberService {
                 List.of(Action.READ), PermissionRange.COMPANY));
         rolePermissions.addAll(buildRolePermissions(hrManager, Resource.ESG,
                 List.of(Action.CREATE, Action.READ, Action.UPDATE, Action.DELETE), PermissionRange.COMPANY));
+        rolePermissions.addAll(buildRolePermissions(hrManager, Resource.MEETING,
+                List.of(Action.CREATE, Action.READ, Action.UPDATE, Action.DELETE), PermissionRange.COMPANY));
 
         // 팀장 권한
         rolePermissions.addAll(buildRolePermissions(teamLeader, Resource.MEMBER,
@@ -146,6 +148,8 @@ public class MemberService {
                 List.of(Action.CREATE, Action.READ), PermissionRange.TEAM));
         rolePermissions.addAll(buildRolePermissions(teamLeader, Resource.ESG,
                 List.of(Action.READ), PermissionRange.TEAM));
+        rolePermissions.addAll(buildRolePermissions(teamLeader, Resource.MEETING,
+                List.of(Action.CREATE, Action.READ, Action.UPDATE), PermissionRange.TEAM));
 
         // 일반 직원 권한
         rolePermissions.addAll(buildRolePermissions(employee, Resource.MEMBER,
@@ -161,6 +165,8 @@ public class MemberService {
         rolePermissions.addAll(buildRolePermissions(employee, Resource.EVALUATION,
                 List.of(Action.READ), PermissionRange.SELF));
         rolePermissions.addAll(buildRolePermissions(employee, Resource.ESG,
+                List.of(Action.READ), PermissionRange.SELF));
+        rolePermissions.addAll(buildRolePermissions(employee, Resource.MEETING,
                 List.of(Action.READ), PermissionRange.SELF));
 
         rolePermissionRepository.saveAll(rolePermissions);

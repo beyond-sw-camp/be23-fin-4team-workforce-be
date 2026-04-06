@@ -29,7 +29,7 @@ public class MeetingActionController {
     }
 
     // 액션 아이템 생성
-    @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.CREATE)
     @PostMapping("/{meetingRecordId}/action")
     public ApiResponse<MeetingActionResDto> createAction(
             @PathVariable UUID meetingRecordId,
@@ -38,7 +38,7 @@ public class MeetingActionController {
     }
 
     // 액션 아이템 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/{meetingRecordId}/action")
     public ApiResponse<List<MeetingActionResDto>> listActions(
             @PathVariable UUID meetingRecordId) {
@@ -46,7 +46,7 @@ public class MeetingActionController {
     }
 
     // 담당자별 미완료 액션 아이템 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/action/assignee/{assigneeId}/pending")
     public ApiResponse<List<MeetingActionResDto>> listPendingByAssignee(
             @PathVariable UUID assigneeId) {
@@ -54,7 +54,7 @@ public class MeetingActionController {
     }
 
     // 액션 아이템 완료 처리
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/complete")
     public ApiResponse<MeetingActionResDto> completeAction(
             @PathVariable UUID meetingRecordId,
@@ -63,7 +63,7 @@ public class MeetingActionController {
     }
 
     // 액션 아이템 평가
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/rate")
     public ApiResponse<MeetingActionResDto> rateAction(
             @PathVariable UUID meetingRecordId,
@@ -73,7 +73,7 @@ public class MeetingActionController {
     }
 
     // 액션 아이템 결재 연결
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/approval")
     public ApiResponse<MeetingActionResDto> linkApproval(
             @PathVariable UUID meetingRecordId,
@@ -83,7 +83,7 @@ public class MeetingActionController {
     }
 
     // 액션 아이템 삭제
-    @CheckPermission(resource = Resource.GOAL, action = Action.DELETE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.DELETE)
     @DeleteMapping("/{meetingRecordId}/action/{meetingActionId}")
     public ApiResponse<Void> deleteAction(
             @PathVariable UUID meetingRecordId,

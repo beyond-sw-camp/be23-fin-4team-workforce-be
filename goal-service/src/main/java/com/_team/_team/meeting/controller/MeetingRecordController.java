@@ -31,7 +31,7 @@ public class MeetingRecordController {
     }
 
     // 면담 기록 생성
-    @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.CREATE)
     @PostMapping
     public ApiResponse<MeetingRecordResDto> createMeeting(
             @RequestBody @Valid MeetingRecordCreateReqDto dto) {
@@ -39,7 +39,7 @@ public class MeetingRecordController {
     }
 
     // 면담 기록 상세 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/{meetingRecordId}")
     public ApiResponse<MeetingRecordResDto> getMeeting(
             @PathVariable UUID meetingRecordId) {
@@ -47,7 +47,7 @@ public class MeetingRecordController {
     }
 
     // 멤버별 면담 기록 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/member/{memberId}")
     public ApiResponse<List<MeetingRecordResDto>> listByMember(
             @PathVariable UUID memberId) {
@@ -55,7 +55,7 @@ public class MeetingRecordController {
     }
 
     // 매니저별 면담 기록 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/manager/{managerId}")
     public ApiResponse<List<MeetingRecordResDto>> listByManager(
             @PathVariable UUID managerId) {
@@ -63,7 +63,7 @@ public class MeetingRecordController {
     }
 
     // 멤버-매니저 조합 면담 기록 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/member/{memberId}/manager/{managerId}")
     public ApiResponse<List<MeetingRecordResDto>> listByMemberAndManager(
             @PathVariable UUID memberId,
@@ -72,7 +72,7 @@ public class MeetingRecordController {
     }
 
     // 면담 완료 처리
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/complete")
     public ApiResponse<MeetingRecordResDto> completeMeeting(
             @PathVariable UUID meetingRecordId,
@@ -81,7 +81,7 @@ public class MeetingRecordController {
     }
 
     // 면담 기록 수정
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}")
     public ApiResponse<MeetingRecordResDto> updateMeeting(
             @PathVariable UUID meetingRecordId,
@@ -90,7 +90,7 @@ public class MeetingRecordController {
     }
 
     // 멤버 반응 기록
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/member-reaction")
     public ApiResponse<MeetingRecordResDto> recordMemberReaction(
             @PathVariable UUID meetingRecordId,
@@ -99,7 +99,7 @@ public class MeetingRecordController {
     }
 
     // 비공개 메모 수정
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/private-memo")
     public ApiResponse<MeetingRecordResDto> updatePrivateMemo(
             @PathVariable UUID meetingRecordId,
