@@ -13,9 +13,7 @@ public class EsgConfigResDto {
     private String rewardEnabledYn;
     private String campaignEnabledYn;
     private String shopEnabledYn;
-    private String goalSyncEnabledYn;
     private int monthlyPointLimit;
-    private int goalWeightRatio;
 
     public static EsgConfigResDto fromEntity(EsgCompanyConfig config) {
         return EsgConfigResDto.builder()
@@ -23,9 +21,7 @@ public class EsgConfigResDto {
                 .rewardEnabledYn(config.getRewardEnabledYn())
                 .campaignEnabledYn(config.getCampaignEnabledYn())
                 .shopEnabledYn(config.getShopEnabledYn())
-                .goalSyncEnabledYn(config.getGoalSyncEnabledYn())
                 .monthlyPointLimit(config.getMonthlyPointLimit())
-                .goalWeightRatio(config.getGoalWeightRatio())
                 .build();
     }
 }

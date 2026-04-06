@@ -77,9 +77,7 @@ public class EsgService {
                 reqDto.getRewardEnabledYn(),
                 reqDto.getCampaignEnabledYn(),
                 reqDto.getShopEnabledYn(),
-                reqDto.getGoalSyncEnabledYn(),
-                reqDto.getMonthlyPointLimit(),
-                reqDto.getGoalWeightRatio()
+                reqDto.getMonthlyPointLimit()
         );
     }
 
@@ -480,24 +478,8 @@ public class EsgService {
 
         EsgScore saved = scoreRepository.save(score);
 
-        // Member 에 ESG 점수 반영 (절대평가)
+        // Member 에 ESG 점수 반영
         member.updateEsgScore(saved.getTotalScore());
-
-        // goal-service 연동
-//        if (config.isGoalSyncEnabled()) {
-//            try {
-//                goalServiceClient.syncEsgScore(EsgGoalSyncReqDto.builder()
-//                        .memberId(member.getMemberId())
-//                        .esgScore(saved.getTotalScore())
-//                        .esgGrade(saved.getGrade().name())
-//                        .yearMonth(yearMonth)
-//                        .weightRatio(config.getGoalWeightRatio())
-//                        .build());
-//            } catch (Exception ex) {
-//                log.error("goal-service 연동 실패 - memberId: {}, error: {}",
-//                        member.getMemberId(), ex.getMessage());
-//            }
-//        }
 
         return EsgScoreResDto.fromEntity(saved);
     }

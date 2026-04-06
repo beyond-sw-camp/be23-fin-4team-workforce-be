@@ -75,6 +75,7 @@ public class MemberService {
     private final ApplicationEventPublisher eventPublisher;
     private final SearchOutboxEventRepository searchOutboxEventRepository;
     private final ObjectMapper objectMapper;
+
     @Autowired
     public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper) {
         this.memberRepository = memberRepository;
