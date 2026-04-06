@@ -4,79 +4,81 @@ import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
-import com._team._team.goal.dto.reqdto.GoalCheckinReqDto;
 import com._team._team.goal.dto.reqdto.GoalCreateReqDto;
+import com._team._team.goal.dto.reqdto.GoalUpdateReqDto;
+import com._team._team.goal.dto.resdto.GoalResDto;
 import com._team._team.goal.service.GoalService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
+// 목표(Goal) CRUD 및 상태 관리 컨트롤러
 @RestController
 @RequestMapping("/goal")
-@RequiredArgsConstructor
 public class GoalController {
 
-    private final GoalService goalService;
+    final GoalService goalService;
+
+    @Autowired
+    public GoalController(GoalService goalService) {
+        this.goalService = goalService;
+    }
 
     // 목표 생성
     @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
     @PostMapping
-    public ResponseEntity<?> createGoal(
-            @RequestHeader("X-User-UUID") UUID memberId,
-            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
-            @Valid @RequestBody GoalCreateReqDto reqDto
-    ) {
-        return new ResponseEntity<>(
-                ApiResponse.success(goalService.createGoal(reqDto), "목표 생성 성공"),
-                HttpStatus.CREATED
-        );
+    public ApiResponse<GoalResDto> createGoal(
+            @RequestBody @Valid GoalCreateReqDto dto) {
+        return ApiResponse.success(goalService.createGoal(dto), "목표가 생성되었습니다.");
     }
 
     // 목표 목록 조회
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping
-    public ResponseEntity<?> getGoalList(
-            @RequestHeader("X-User-UUID") UUID memberId,
-            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
-            @RequestHeader("X-User-CompanyId") UUID companyId
-    ) {
-        return new ResponseEntity<>(
-                ApiResponse.success(goalService.getGoalList(companyId), "목표 목록 조회 성공"),
-                HttpStatus.OK
-        );
+    public ApiResponse<List<GoalResDto>> listGoals(
+            @RequestParam UUID companyId) {
+        return ApiResponse.success(goalService.listGoals(companyId), "목표 목록 조회 성공");
     }
 
     // 목표 상세 조회
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/{goalId}")
-    public ResponseEntity<?> getGoalDetail(
-            @RequestHeader("X-User-UUID") UUID memberId,
-            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
-            @PathVariable UUID goalId
-    ) {
-        return new ResponseEntity<>(
-                ApiResponse.success(goalService.getGoalDetail(goalId), "목표 상세 조회 성공"),
-                HttpStatus.OK
-        );
+    public ApiResponse<GoalResDto> getGoal(@PathVariable UUID goalId) {
+        return ApiResponse.success(goalService.getGoal(goalId), "목표 조회 성공");
     }
 
-    // 목표 체크인
+    // 목표 수정
     @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PostMapping("/{goalId}/checkin")
-    public ResponseEntity<?> checkinGoal(
-            @RequestHeader("X-User-UUID") UUID memberId,
-            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
+    @PatchMapping("/{goalId}")
+    public ApiResponse<GoalResDto> updateGoal(
             @PathVariable UUID goalId,
-            @Valid @RequestBody GoalCheckinReqDto reqDto
-    ) {
-        goalService.checkinGoal(memberId, goalId, reqDto);
-        return new ResponseEntity<>(
-                ApiResponse.success(null, "목표 체크인 성공"),
-                HttpStatus.OK
-        );
+            @RequestBody @Valid GoalUpdateReqDto dto) {
+        return ApiResponse.success(goalService.updateGoal(goalId, dto), "목표가 수정되었습니다.");
+    }
+
+    // 목표 활성화
+    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @PatchMapping("/{goalId}/activate")
+    public ApiResponse<GoalResDto> activateGoal(
+            @PathVariable UUID goalId,
+            @RequestHeader("X-Member-Id") String memberId) {
+        return ApiResponse.success(goalService.activateGoal(goalId, UUID.fromString(memberId)), "목표가 활성화되었습니다.");
+    }
+
+    // 목표 완료
+    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @PatchMapping("/{goalId}/complete")
+    public ApiResponse<GoalResDto> completeGoal(@PathVariable UUID goalId) {
+        return ApiResponse.success(goalService.completeGoal(goalId), "목표가 완료되었습니다.");
+    }
+
+    // 목표 취소
+    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    @PatchMapping("/{goalId}/cancel")
+    public ApiResponse<GoalResDto> cancelGoal(@PathVariable UUID goalId) {
+        return ApiResponse.success(goalService.cancelGoal(goalId), "목표가 취소되었습니다.");
     }
 }
