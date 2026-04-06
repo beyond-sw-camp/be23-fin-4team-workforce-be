@@ -34,6 +34,7 @@ public class MeetingRecordController {
     @CheckPermission(resource = Resource.MEETING, action = Action.CREATE)
     @PostMapping
     public ApiResponse<MeetingRecordResDto> createMeeting(
+            @RequestHeader("X-Member-Id") String requesterId,
             @RequestBody @Valid MeetingRecordCreateReqDto dto) {
         return ApiResponse.success(meetingRecordService.createMeeting(dto), "면담 기록이 생성되었습니다.");
     }
@@ -42,68 +43,73 @@ public class MeetingRecordController {
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/{meetingRecordId}")
     public ApiResponse<MeetingRecordResDto> getMeeting(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId) {
-        return ApiResponse.success(meetingRecordService.getMeeting(meetingRecordId), "면담 기록 조회 성공");
+        return ApiResponse.success(meetingRecordService.getMeeting(meetingRecordId, UUID.fromString(requesterId)), "면담 기록 조회 성공");
     }
 
-    // 멤버별 면담 기록 목록 조회
+    // 나의 면담 기록 목록 조회 (멤버로서)
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
-    @GetMapping("/member/{memberId}")
-    public ApiResponse<List<MeetingRecordResDto>> listByMember(
-            @PathVariable UUID memberId) {
-        return ApiResponse.success(meetingRecordService.listByMember(memberId), "멤버별 면담 기록 목록 조회 성공");
+    @GetMapping("/me/as-member")
+    public ApiResponse<List<MeetingRecordResDto>> listMyMeetingsAsMember(
+            @RequestHeader("X-Member-Id") String memberId) {
+        return ApiResponse.success(meetingRecordService.listByMember(UUID.fromString(memberId)), "나의 면담 기록 목록 조회 성공");
     }
 
-    // 매니저별 면담 기록 목록 조회
+    // 나의 면담 기록 목록 조회 (매니저로서)
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
-    @GetMapping("/manager/{managerId}")
-    public ApiResponse<List<MeetingRecordResDto>> listByManager(
-            @PathVariable UUID managerId) {
-        return ApiResponse.success(meetingRecordService.listByManager(managerId), "매니저별 면담 기록 목록 조회 성공");
+    @GetMapping("/me/as-manager")
+    public ApiResponse<List<MeetingRecordResDto>> listMyMeetingsAsManager(
+            @RequestHeader("X-Member-Id") String managerId) {
+        return ApiResponse.success(meetingRecordService.listByManager(UUID.fromString(managerId)), "매니저별 면담 기록 목록 조회 성공");
     }
 
-    // 멤버-매니저 조합 면담 기록 목록 조회
+    // 특정 멤버와의 면담 기록 목록 조회 (매니저 권한 등 확인 필요)
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
-    @GetMapping("/member/{memberId}/manager/{managerId}")
-    public ApiResponse<List<MeetingRecordResDto>> listByMemberAndManager(
+    @GetMapping("/member/{memberId}/manager/me")
+    public ApiResponse<List<MeetingRecordResDto>> listWithMember(
             @PathVariable UUID memberId,
-            @PathVariable UUID managerId) {
-        return ApiResponse.success(meetingRecordService.listByMemberAndManager(memberId, managerId), "멤버-매니저 면담 기록 목록 조회 성공");
+            @RequestHeader("X-Member-Id") String managerId) {
+        return ApiResponse.success(meetingRecordService.listByMemberAndManager(memberId, UUID.fromString(managerId)), "멤버-매니저 면담 기록 목록 조회 성공");
     }
 
     // 면담 완료 처리
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/complete")
     public ApiResponse<MeetingRecordResDto> completeMeeting(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @RequestBody MeetingRecordCompleteReqDto dto) {
-        return ApiResponse.success(meetingRecordService.completeMeeting(meetingRecordId, dto), "면담이 완료되었습니다.");
+        return ApiResponse.success(meetingRecordService.completeMeeting(meetingRecordId, UUID.fromString(requesterId), dto), "면담이 완료되었습니다.");
     }
 
     // 면담 기록 수정
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}")
     public ApiResponse<MeetingRecordResDto> updateMeeting(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @RequestBody MeetingRecordUpdateReqDto dto) {
-        return ApiResponse.success(meetingRecordService.updateMeeting(meetingRecordId, dto), "면담 기록이 수정되었습니다.");
+        return ApiResponse.success(meetingRecordService.updateMeeting(meetingRecordId, UUID.fromString(requesterId), dto), "면담 기록이 수정되었습니다.");
     }
 
     // 멤버 반응 기록
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/member-reaction")
     public ApiResponse<MeetingRecordResDto> recordMemberReaction(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @RequestBody @Valid MemberReactionReqDto dto) {
-        return ApiResponse.success(meetingRecordService.recordMemberReaction(meetingRecordId, dto), "멤버 반응이 기록되었습니다.");
+        return ApiResponse.success(meetingRecordService.recordMemberReaction(meetingRecordId, UUID.fromString(requesterId), dto), "멤버 반응이 기록되었습니다.");
     }
 
     // 비공개 메모 수정
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/private-memo")
     public ApiResponse<MeetingRecordResDto> updatePrivateMemo(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @RequestBody PrivateMemoUpdateReqDto dto) {
-        return ApiResponse.success(meetingRecordService.updatePrivateMemo(meetingRecordId, dto.getPrivateMemo()), "비공개 메모가 수정되었습니다.");
+        return ApiResponse.success(meetingRecordService.updatePrivateMemo(meetingRecordId, UUID.fromString(requesterId), dto.getPrivateMemo()), "비공개 메모가 수정되었습니다.");
     }
 }

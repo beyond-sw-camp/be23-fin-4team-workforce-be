@@ -31,8 +31,10 @@ public class CalibrationLogController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.CREATE)
     @PostMapping
     public ResponseEntity<ApiResponse<CalibrationLogResDto>> createCalibration(
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @Valid @RequestBody CalibrationCreateReqDto dto) {
-        CalibrationLogResDto result = calibrationLogService.createCalibration(dto);
+        CalibrationLogResDto result = calibrationLogService.createCalibration(dto, UUID.fromString(memberId), UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(result, "조정 내역이 기록되었습니다."));
     }
 
@@ -40,8 +42,9 @@ public class CalibrationLogController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping("/{evaluationId}")
     public ResponseEntity<ApiResponse<List<CalibrationLogResDto>>> listByEvaluation(
+            @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID evaluationId) {
-        List<CalibrationLogResDto> result = calibrationLogService.listByEvaluation(evaluationId);
+        List<CalibrationLogResDto> result = calibrationLogService.listByEvaluation(evaluationId, UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(result, "평가별 조정 내역 조회 성공"));
     }
 }

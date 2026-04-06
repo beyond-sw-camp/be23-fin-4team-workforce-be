@@ -39,11 +39,22 @@ public class PerformanceRecordService {
         this.goalRepository = goalRepository;
     }
 
+    // 실적 제출
     @Transactional
-    public PerformanceRecordResDto submitRecord(UUID goalId, PerformanceRecordCreateReqDto dto) {
+    public PerformanceRecordResDto submitRecord(UUID goalId, PerformanceRecordCreateReqDto dto, UUID submittedBy, UUID companyId) {
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "목표를 찾을 수 없습니다. id=" + goalId));
+
+        // 회사 격리 확인
+        if (!goal.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 목표에 실적을 제출할 수 없습니다.");
+        }
+
+        // 소유자 확인 (본인의 목표에만 제출 가능)
+        if (!goal.getOwnerId().equals(submittedBy)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 목표에만 실적을 제출할 수 있습니다.");
+        }
 
         if (goal.getStatus() != GoalStatus.ACTIVE) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
@@ -56,7 +67,7 @@ public class PerformanceRecordService {
                 .actualValue(dto.getActualValue())
                 .description(dto.getDescription())
                 .selfScore(dto.getSelfScore())
-                .submittedBy(dto.getSubmittedBy())
+                .submittedBy(submittedBy)
                 .build();
 
         PerformanceRecord saved = performanceRecordRepository.save(record);
@@ -64,18 +75,42 @@ public class PerformanceRecordService {
     }
 
     @Transactional(readOnly = true)
-    public List<PerformanceRecordResDto> listRecords(UUID goalId) {
+    public List<PerformanceRecordResDto> listRecords(UUID goalId, UUID companyId) {
+        Goal goal = goalRepository.findById(goalId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "목표를 찾을 수 없습니다. id=" + goalId));
+
+        // 회사 격리 확인
+        if (!goal.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 실적 목록을 조회할 수 없습니다.");
+        }
+
         return performanceRecordRepository.findByGoal_GoalIdOrderByCreatedAtDesc(goalId)
                 .stream()
                 .map(PerformanceRecordResDto::from)
                 .collect(Collectors.toList());
     }
 
+    // 실적 검토
     @Transactional
-    public PerformanceRecordResDto reviewRecord(UUID performanceRecordId, PerformanceRecordReviewReqDto dto) {
+    public PerformanceRecordResDto reviewRecord(UUID goalId, UUID performanceRecordId,
+                                                PerformanceRecordReviewReqDto dto, UUID reviewedBy, UUID companyId) {
         PerformanceRecord record = performanceRecordRepository.findById(performanceRecordId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "실적 기록을 찾을 수 없습니다. id=" + performanceRecordId));
+
+        // URL의 goalId와 record가 실제로 속한 goalId 일치 검증
+        if (!record.getGoal().getGoalId().equals(goalId)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "해당 실적 기록은 요청한 목표에 속하지 않습니다.");
+        }
+
+        // 회사 격리 확인
+        if (!record.getGoal().getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 실적을 검토할 수 없습니다.");
+        }
+
+        // TODO: 매니저 권한 확인 로직 추가 가능 (record.getGoal().getOwnerId()의 매니저가 reviewedBy인지 확인)
 
         if (record.getReviewStatus() != ReviewStatus.PENDING) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
@@ -86,13 +121,13 @@ public class PerformanceRecordService {
         String beforeDesc = record.getDescription();
 
         if (Boolean.TRUE.equals(dto.getConfirmed())) {
-            record.confirm(dto.getReviewedBy(), dto.getConvertedScore());
+            record.confirm(reviewedBy, dto.getConvertedScore());
             // 실적 확인 시 목표의 실제값 및 달성률 갱신
             if (record.getActualValue() != null) {
                 record.getGoal().updateActualValue(record.getActualValue());
             }
         } else {
-            record.reject(dto.getReviewedBy(), dto.getRejectReason());
+            record.reject(reviewedBy, dto.getRejectReason());
         }
 
         PerformanceRecordHistory history = PerformanceRecordHistory.builder()
@@ -102,7 +137,7 @@ public class PerformanceRecordService {
                 .beforeDesc(beforeDesc)
                 .afterDesc(record.getDescription())
                 .changeReason(Boolean.TRUE.equals(dto.getConfirmed()) ? "실적 확인" : "실적 반려: " + dto.getRejectReason())
-                .changedBy(dto.getReviewedBy())
+                .changedBy(reviewedBy)
                 .build();
 
         performanceRecordHistoryRepository.save(history);
@@ -110,8 +145,24 @@ public class PerformanceRecordService {
         return PerformanceRecordResDto.from(record);
     }
 
+    // 실적 이력 조회
     @Transactional(readOnly = true)
-    public List<PerformanceRecordHistoryResDto> getHistory(UUID performanceRecordId) {
+    public List<PerformanceRecordHistoryResDto> getHistory(UUID goalId, UUID performanceRecordId, UUID companyId) {
+        PerformanceRecord record = performanceRecordRepository.findById(performanceRecordId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "실적 기록을 찾을 수 없습니다. id=" + performanceRecordId));
+
+        // URL의 goalId와 record가 실제로 속한 goalId 일치 검증
+        if (!record.getGoal().getGoalId().equals(goalId)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "해당 실적 기록은 요청한 목표에 속하지 않습니다.");
+        }
+
+        // 회사 격리 확인
+        if (!record.getGoal().getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 실적 이력을 조회할 수 없습니다.");
+        }
+
         return performanceRecordHistoryRepository
                 .findByPerformanceRecord_PerformanceRecordIdOrderByChangedAtDesc(performanceRecordId)
                 .stream()

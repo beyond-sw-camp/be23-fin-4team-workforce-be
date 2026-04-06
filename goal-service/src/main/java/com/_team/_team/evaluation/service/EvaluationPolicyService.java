@@ -89,9 +89,14 @@ public class EvaluationPolicyService {
     }
 
     @Transactional
-    public void deactivatePolicy(UUID policyId) {
+    public void deactivatePolicy(UUID policyId, UUID companyId) {
         EvaluationPolicy policy = evaluationPolicyRepository.findById(policyId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 정책을 찾을 수 없습니다."));
+
+        if (!policy.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 평가 정책을 비활성화할 수 없습니다.");
+        }
+
         policy.deactivate();
     }
 }

@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -24,7 +23,4 @@ public class PerformanceRecordCreateReqDto {
     private String description;
 
     private BigDecimal selfScore;
-
-    @NotNull(message = "제출자 ID는 필수입니다.")
-    private UUID submittedBy;
 }

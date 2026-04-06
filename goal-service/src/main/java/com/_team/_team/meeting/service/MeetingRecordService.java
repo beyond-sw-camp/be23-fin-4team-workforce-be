@@ -50,10 +50,16 @@ public class MeetingRecordService {
     }
 
     @Transactional(readOnly = true)
-    public MeetingRecordResDto getMeeting(UUID meetingRecordId) {
+    public MeetingRecordResDto getMeeting(UUID meetingRecordId, UUID requesterId) {
         MeetingRecord meetingRecord = meetingRecordRepository.findById(meetingRecordId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "면담 기록을 찾을 수 없습니다. id=" + meetingRecordId));
+
+        // 당사자 확인
+        if (!meetingRecord.getMemberId().equals(requesterId) && !meetingRecord.getManagerId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "해당 면담 기록을 조회할 권한이 없습니다.");
+        }
+
         return MeetingRecordResDto.from(meetingRecord);
     }
 
@@ -82,10 +88,16 @@ public class MeetingRecordService {
     }
 
     @Transactional
-    public MeetingRecordResDto completeMeeting(UUID meetingRecordId, MeetingRecordCompleteReqDto dto) {
+    public MeetingRecordResDto completeMeeting(UUID meetingRecordId, UUID requesterId, MeetingRecordCompleteReqDto dto) {
         MeetingRecord meetingRecord = meetingRecordRepository.findById(meetingRecordId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "면담 기록을 찾을 수 없습니다. id=" + meetingRecordId));
+
+        // 매니저 확인
+        if (!meetingRecord.getManagerId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "매니저만 면담을 완료 처리할 수 있습니다.");
+        }
+
         if (meetingRecord.getCompletedAt() != null) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 완료된 면담 기록입니다.");
         }
@@ -97,10 +109,16 @@ public class MeetingRecordService {
     }
 
     @Transactional
-    public MeetingRecordResDto updateMeeting(UUID meetingRecordId, MeetingRecordUpdateReqDto dto) {
+    public MeetingRecordResDto updateMeeting(UUID meetingRecordId, UUID requesterId, MeetingRecordUpdateReqDto dto) {
         MeetingRecord meetingRecord = meetingRecordRepository.findById(meetingRecordId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "면담 기록을 찾을 수 없습니다. id=" + meetingRecordId));
+
+        // 매니저 확인
+        if (!meetingRecord.getManagerId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "매니저만 면담 일정을 수정할 수 있습니다.");
+        }
+
         if (dto.getScheduledAt() != null) {
             meetingRecord.updateScheduledAt(dto.getScheduledAt());
         }
@@ -114,19 +132,31 @@ public class MeetingRecordService {
     }
 
     @Transactional
-    public MeetingRecordResDto recordMemberReaction(UUID meetingRecordId, MemberReactionReqDto dto) {
+    public MeetingRecordResDto recordMemberReaction(UUID meetingRecordId, UUID requesterId, MemberReactionReqDto dto) {
         MeetingRecord meetingRecord = meetingRecordRepository.findById(meetingRecordId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "면담 기록을 찾을 수 없습니다. id=" + meetingRecordId));
+
+        // 멤버 확인
+        if (!meetingRecord.getMemberId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인의 면담에 대해서만 반응을 기록할 수 있습니다.");
+        }
+
         meetingRecord.recordMemberReaction(dto.getMemberReaction());
         return MeetingRecordResDto.from(meetingRecord);
     }
 
     @Transactional
-    public MeetingRecordResDto updatePrivateMemo(UUID meetingRecordId, String privateMemo) {
+    public MeetingRecordResDto updatePrivateMemo(UUID meetingRecordId, UUID requesterId, String privateMemo) {
         MeetingRecord meetingRecord = meetingRecordRepository.findById(meetingRecordId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "면담 기록을 찾을 수 없습니다. id=" + meetingRecordId));
+
+        // 매니저 확인
+        if (!meetingRecord.getManagerId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "매니저만 비공개 메모를 작성할 수 있습니다.");
+        }
+
         meetingRecord.updatePrivateMemo(privateMemo);
         return MeetingRecordResDto.from(meetingRecord);
     }

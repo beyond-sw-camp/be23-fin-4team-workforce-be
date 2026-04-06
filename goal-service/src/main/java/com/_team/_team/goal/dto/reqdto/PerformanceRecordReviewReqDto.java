@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -21,7 +20,4 @@ public class PerformanceRecordReviewReqDto {
     private BigDecimal convertedScore;
 
     private String rejectReason;
-
-    @NotNull(message = "검토자 ID는 필수입니다.")
-    private UUID reviewedBy;
 }

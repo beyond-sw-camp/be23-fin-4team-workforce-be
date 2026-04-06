@@ -32,63 +32,69 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.CREATE)
     @PostMapping("/{meetingRecordId}/action")
     public ApiResponse<MeetingActionResDto> createAction(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @RequestBody @Valid MeetingActionCreateReqDto dto) {
-        return ApiResponse.success(meetingActionService.createAction(meetingRecordId, dto), "액션 아이템이 생성되었습니다.");
+        return ApiResponse.success(meetingActionService.createAction(meetingRecordId, UUID.fromString(requesterId), dto), "액션 아이템이 생성되었습니다.");
     }
 
     // 액션 아이템 목록 조회
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/{meetingRecordId}/action")
     public ApiResponse<List<MeetingActionResDto>> listActions(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId) {
-        return ApiResponse.success(meetingActionService.listActions(meetingRecordId), "액션 아이템 목록 조회 성공");
+        return ApiResponse.success(meetingActionService.listActions(meetingRecordId, UUID.fromString(requesterId)), "액션 아이템 목록 조회 성공");
     }
 
-    // 담당자별 미완료 액션 아이템 조회
+    // 담당자별 미완료 액션 아이템 조회 (나의 것)
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
-    @GetMapping("/action/assignee/{assigneeId}/pending")
-    public ApiResponse<List<MeetingActionResDto>> listPendingByAssignee(
-            @PathVariable UUID assigneeId) {
-        return ApiResponse.success(meetingActionService.listPendingByAssignee(assigneeId), "미완료 액션 아이템 목록 조회 성공");
+    @GetMapping("/action/me/pending")
+    public ApiResponse<List<MeetingActionResDto>> listMyPendingActions(
+            @RequestHeader("X-Member-Id") String memberId) {
+        return ApiResponse.success(meetingActionService.listPendingByAssignee(UUID.fromString(memberId)), "미완료 액션 아이템 목록 조회 성공");
     }
 
     // 액션 아이템 완료 처리
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/complete")
     public ApiResponse<MeetingActionResDto> completeAction(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId) {
-        return ApiResponse.success(meetingActionService.completeAction(meetingActionId), "액션 아이템이 완료되었습니다.");
+        return ApiResponse.success(meetingActionService.completeAction(meetingRecordId, meetingActionId, UUID.fromString(requesterId)), "액션 아이템이 완료되었습니다.");
     }
 
     // 액션 아이템 평가
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/rate")
     public ApiResponse<MeetingActionResDto> rateAction(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId,
             @RequestBody @Valid MeetingActionRateReqDto dto) {
-        return ApiResponse.success(meetingActionService.rateAction(meetingActionId, dto), "액션 아이템 평가가 완료되었습니다.");
+        return ApiResponse.success(meetingActionService.rateAction(meetingRecordId, meetingActionId, UUID.fromString(requesterId), dto), "액션 아이템 평가가 완료되었습니다.");
     }
 
     // 액션 아이템 결재 연결
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/approval")
     public ApiResponse<MeetingActionResDto> linkApproval(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId,
             @RequestBody @Valid LinkApprovalReqDto dto) {
-        return ApiResponse.success(meetingActionService.linkApproval(meetingActionId, dto.getApprovalId()), "결재가 연결되었습니다.");
+        return ApiResponse.success(meetingActionService.linkApproval(meetingRecordId, meetingActionId, UUID.fromString(requesterId), dto.getApprovalId()), "결재가 연결되었습니다.");
     }
 
     // 액션 아이템 삭제
     @CheckPermission(resource = Resource.MEETING, action = Action.DELETE)
     @DeleteMapping("/{meetingRecordId}/action/{meetingActionId}")
     public ApiResponse<Void> deleteAction(
+            @RequestHeader("X-Member-Id") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId) {
-        meetingActionService.deleteAction(meetingActionId);
+        meetingActionService.deleteAction(meetingRecordId, meetingActionId, UUID.fromString(requesterId));
         return ApiResponse.success(null, "액션 아이템이 삭제되었습니다.");
     }
 }

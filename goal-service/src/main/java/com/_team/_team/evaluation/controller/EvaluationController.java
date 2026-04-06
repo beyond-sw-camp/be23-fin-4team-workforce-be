@@ -33,8 +33,10 @@ public class EvaluationController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.CREATE)
     @PostMapping
     public ResponseEntity<ApiResponse<EvaluationResDto>> createEvaluation(
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @Valid @RequestBody EvaluationCreateReqDto dto) {
-        EvaluationResDto result = evaluationService.createEvaluation(dto);
+        EvaluationResDto result = evaluationService.createEvaluation(UUID.fromString(memberId), UUID.fromString(companyId), dto);
         return ResponseEntity.ok(ApiResponse.success(result, "평가가 생성되었습니다."));
     }
 
@@ -42,8 +44,10 @@ public class EvaluationController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping("/{evaluationId}")
     public ResponseEntity<ApiResponse<EvaluationResDto>> getEvaluation(
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID evaluationId) {
-        EvaluationResDto result = evaluationService.getEvaluation(evaluationId);
+        EvaluationResDto result = evaluationService.getEvaluation(evaluationId, UUID.fromString(memberId), UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(result, "평가 조회 성공"));
     }
 
@@ -51,9 +55,10 @@ public class EvaluationController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PatchMapping("/{evaluationId}/scores")
     public ResponseEntity<ApiResponse<EvaluationResDto>> updateScores(
+            @RequestHeader("X-Member-Id") String memberId,
             @PathVariable UUID evaluationId,
             @RequestBody EvaluationScoreUpdateReqDto dto) {
-        EvaluationResDto result = evaluationService.updateScores(evaluationId, dto);
+        EvaluationResDto result = evaluationService.updateScores(evaluationId, UUID.fromString(memberId), dto);
         return ResponseEntity.ok(ApiResponse.success(result, "평가 점수가 수정되었습니다."));
     }
 
@@ -61,8 +66,9 @@ public class EvaluationController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PatchMapping("/{evaluationId}/submit")
     public ResponseEntity<ApiResponse<EvaluationResDto>> submitEvaluation(
+            @RequestHeader("X-Member-Id") String memberId,
             @PathVariable UUID evaluationId) {
-        EvaluationResDto result = evaluationService.submitEvaluation(evaluationId);
+        EvaluationResDto result = evaluationService.submitEvaluation(evaluationId, UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(result, "평가가 제출되었습니다."));
     }
 
@@ -70,9 +76,10 @@ public class EvaluationController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PatchMapping("/{evaluationId}/confirm")
     public ResponseEntity<ApiResponse<EvaluationResDto>> confirmEvaluation(
+            @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID evaluationId,
             @RequestBody @Valid EvaluationConfirmReqDto dto) {
-        EvaluationResDto result = evaluationService.confirmEvaluation(evaluationId, dto.getFinalScore(), dto.getGrade());
+        EvaluationResDto result = evaluationService.confirmEvaluation(evaluationId, UUID.fromString(companyId), dto.getFinalScore(), dto.getGrade());
         return ResponseEntity.ok(ApiResponse.success(result, "평가가 확정되었습니다."));
     }
 
@@ -80,18 +87,19 @@ public class EvaluationController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping("/policy/{policyId}")
     public ResponseEntity<ApiResponse<List<EvaluationResDto>>> listByPolicy(
+            @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID policyId) {
-        List<EvaluationResDto> result = evaluationService.listByPolicy(policyId);
+        List<EvaluationResDto> result = evaluationService.listByPolicy(policyId, UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(result, "정책별 평가 목록 조회 성공"));
     }
 
-    // 평가자별 평가 목록 조회
+    // 평가자별 평가 목록 조회 (본인 것만 조회 가능하도록 수정)
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
-    @GetMapping("/evaluator/{evaluatorId}")
-    public ResponseEntity<ApiResponse<List<EvaluationResDto>>> listByEvaluator(
-            @PathVariable UUID evaluatorId) {
-        List<EvaluationResDto> result = evaluationService.listByEvaluator(evaluatorId);
-        return ResponseEntity.ok(ApiResponse.success(result, "평가자별 평가 목록 조회 성공"));
+    @GetMapping("/evaluator/me")
+    public ResponseEntity<ApiResponse<List<EvaluationResDto>>> listMyEvaluations(
+            @RequestHeader("X-Member-Id") String memberId) {
+        List<EvaluationResDto> result = evaluationService.listByEvaluator(UUID.fromString(memberId));
+        return ResponseEntity.ok(ApiResponse.success(result, "나의 평가 목록 조회 성공"));
     }
 
 }

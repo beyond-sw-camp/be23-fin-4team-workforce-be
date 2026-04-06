@@ -40,19 +40,21 @@ public class EvaluationPolicyController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping
     public ResponseEntity<ApiResponse<List<EvaluationPolicyResDto>>> listPolicies(
-            @RequestParam UUID companyId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @RequestParam(defaultValue = "false") boolean activeOnly) {
         List<EvaluationPolicyResDto> result = activeOnly
-                ? evaluationPolicyService.listActivePolicies(companyId)
-                : evaluationPolicyService.listPolicies(companyId);
+                ? evaluationPolicyService.listActivePolicies(UUID.fromString(companyId))
+                : evaluationPolicyService.listPolicies(UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(result, "평가 정책 목록 조회 성공"));
     }
 
     // 평가 정책 비활성화
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PatchMapping("/{policyId}/deactivate")
-    public ResponseEntity<ApiResponse<Void>> deactivatePolicy(@PathVariable UUID policyId) {
-        evaluationPolicyService.deactivatePolicy(policyId);
+    public ResponseEntity<ApiResponse<Void>> deactivatePolicy(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID policyId) {
+        evaluationPolicyService.deactivatePolicy(policyId, UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(null, "평가 정책이 비활성화되었습니다."));
     }
 }

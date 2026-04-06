@@ -33,15 +33,21 @@ public class PerformanceRecordController {
     @PostMapping
     public ApiResponse<PerformanceRecordResDto> submitRecord(
             @PathVariable UUID goalId,
-            @RequestBody @Valid PerformanceRecordCreateReqDto dto) {
-        return ApiResponse.success(performanceRecordService.submitRecord(goalId, dto), "실적이 제출되었습니다.");
+            @RequestBody @Valid PerformanceRecordCreateReqDto dto,
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                performanceRecordService.submitRecord(goalId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
+                "실적이 제출되었습니다.");
     }
 
     // 실적 목록 조회
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping
-    public ApiResponse<List<PerformanceRecordResDto>> listRecords(@PathVariable UUID goalId) {
-        return ApiResponse.success(performanceRecordService.listRecords(goalId), "실적 목록 조회 성공");
+    public ApiResponse<List<PerformanceRecordResDto>> listRecords(
+            @PathVariable UUID goalId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(performanceRecordService.listRecords(goalId, UUID.fromString(companyId)), "실적 목록 조회 성공");
     }
 
     // 실적 검토
@@ -50,8 +56,12 @@ public class PerformanceRecordController {
     public ApiResponse<PerformanceRecordResDto> reviewRecord(
             @PathVariable UUID goalId,
             @PathVariable UUID performanceRecordId,
-            @RequestBody @Valid PerformanceRecordReviewReqDto dto) {
-        return ApiResponse.success(performanceRecordService.reviewRecord(performanceRecordId, dto), "실적 검토가 완료되었습니다.");
+            @RequestBody @Valid PerformanceRecordReviewReqDto dto,
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                performanceRecordService.reviewRecord(goalId, performanceRecordId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
+                "실적 검토가 완료되었습니다.");
     }
 
     // 실적 이력 조회
@@ -59,7 +69,10 @@ public class PerformanceRecordController {
     @GetMapping("/{performanceRecordId}/history")
     public ApiResponse<List<PerformanceRecordHistoryResDto>> getHistory(
             @PathVariable UUID goalId,
-            @PathVariable UUID performanceRecordId) {
-        return ApiResponse.success(performanceRecordService.getHistory(performanceRecordId), "실적 이력 조회 성공");
+            @PathVariable UUID performanceRecordId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                performanceRecordService.getHistory(goalId, performanceRecordId, UUID.fromString(companyId)),
+                "실적 이력 조회 성공");
     }
 }
