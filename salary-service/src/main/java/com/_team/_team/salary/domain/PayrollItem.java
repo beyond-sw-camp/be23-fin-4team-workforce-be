@@ -65,4 +65,19 @@ public class PayrollItem extends BaseTimeEntity {
     public void delete() {
         this.delYn = "Y";
     }
+
+    /**
+     * 템플릿 기반 자동 생성 (급여대장 생성 시 일괄 사용)
+     * - createPayroll()에서 회사 템플릿 → PayrollItem 변환용
+     * - "기본급"이면 baseSalary, 그 외는 0원으로 호출측에서 amount 결정
+     */
+    public static PayrollItem fromTemplate(Payroll payroll, SalaryItemTemplate template, long amount) {
+        return PayrollItem.builder()
+                .payroll(payroll)
+                .itemName(template.getItemName())
+                .itemType(template.getItemType())
+                .amount(amount)
+                .displayOrder(template.getDisplayOrder())
+                .build();
+    }
 }
