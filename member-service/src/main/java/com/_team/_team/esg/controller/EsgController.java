@@ -51,9 +51,8 @@ public class EsgController {
      * ESG 설정 수정
      * - esgEnabledYn: ESG 전체 기능 ON/OFF
      * - rewardEnabledYn: 포인트 보상 ON/OFF
+     * - shopEnabledYn: 사내 물품 구매 ON/OFF
      * - campaignEnabledYn: 캠페인 기능 ON/OFF
-     * - vacationEnabledYn: 휴가 구매 ON/OFF
-     * - goalSyncEnabledYn: 인사평가 연동 ON/OFF
      * - 포인트 단가 및 월 한도 설정
      * - 권한: ESG 관리 UPDATE
      */

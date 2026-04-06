@@ -12,7 +12,5 @@ public class EsgConfigUpdateReqDto {
     private String rewardEnabledYn;
     private String campaignEnabledYn;
     private String shopEnabledYn;
-    private String goalSyncEnabledYn;
     private int monthlyPointLimit;
-    private int goalWeightRatio;
 }
