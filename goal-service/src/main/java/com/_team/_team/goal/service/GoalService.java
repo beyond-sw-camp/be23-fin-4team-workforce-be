@@ -97,7 +97,6 @@ public class GoalService {
         return GoalResDto.from(saved);
     }
 
-    // [Fix 1+2] visibility 필터링 + company 격리
     @Transactional(readOnly = true)
     public List<GoalResDto> listGoals(UUID companyId, UUID requesterId, UUID requesterCompanyId) {
         validateSameCompany(companyId, requesterCompanyId);
@@ -109,7 +108,6 @@ public class GoalService {
                 .collect(Collectors.toList());
     }
 
-    // [Fix 1+2] visibility 체크 + company 격리
     @Transactional(readOnly = true)
     public GoalResDto getGoal(UUID goalId, UUID requesterId, UUID requesterCompanyId) {
         Goal goal = goalRepository.findById(goalId)
@@ -125,7 +123,6 @@ public class GoalService {
         return GoalResDto.from(goal);
     }
 
-    // [Fix 5] company 격리 추가
     @Transactional
     public GoalResDto updateGoal(UUID goalId, GoalUpdateReqDto dto, UUID requesterCompanyId) {
         Goal goal = goalRepository.findById(goalId)
@@ -143,7 +140,6 @@ public class GoalService {
         return GoalResDto.from(goal);
     }
 
-    // [Fix 5] company 격리 추가
     @Transactional
     public GoalResDto activateGoal(UUID goalId, UUID approvedBy, UUID requesterCompanyId) {
         Goal goal = goalRepository.findById(goalId)
@@ -160,7 +156,6 @@ public class GoalService {
         return GoalResDto.from(goal);
     }
 
-    // [Fix 5] company 격리 추가
     @Transactional
     public GoalResDto completeGoal(UUID goalId, UUID requesterCompanyId) {
         Goal goal = goalRepository.findById(goalId)
@@ -177,7 +172,6 @@ public class GoalService {
         return GoalResDto.from(goal);
     }
 
-    // [Fix 5] company 격리 추가
     @Transactional
     public GoalResDto cancelGoal(UUID goalId, UUID requesterCompanyId) {
         Goal goal = goalRepository.findById(goalId)
@@ -194,14 +188,12 @@ public class GoalService {
         return GoalResDto.from(goal);
     }
 
-    // [Fix 2] 요청자 회사와 목표 회사가 다르면 403
     private void validateSameCompany(UUID goalCompanyId, UUID requesterCompanyId) {
         if (!goalCompanyId.equals(requesterCompanyId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 목표에 접근할 수 없습니다.");
         }
     }
 
-    // [Fix 1] visibility 접근 판단
     // PUBLIC    : 회사 내 전체 허용
     // TEAM_ONLY : 팀 멤버십은 별도 서비스 조회가 필요하므로 현재는 회사 내 전체 허용
     // PRIVATE   : 목표 소유자(ownerId)만 허용

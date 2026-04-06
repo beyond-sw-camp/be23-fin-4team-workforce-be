@@ -122,12 +122,14 @@ public class PerformanceRecordService {
 
         if (Boolean.TRUE.equals(dto.getConfirmed())) {
             record.confirm(reviewedBy, dto.getConvertedScore());
-            // 실적 확인 시 목표의 실제값 및 달성률 갱신
+            // 실적 확인 시 목표의 실제값 및 달성률 동기화 (이미 Goal.updateActualValue가 정교한 계산을 수행함)
             if (record.getActualValue() != null) {
                 record.getGoal().updateActualValue(record.getActualValue());
             }
         } else {
             record.reject(reviewedBy, dto.getRejectReason());
+            // 반려 시에는 가장 최근에 승인된(APPROVED) 실적으로 롤백하는 로직을 추가할 수 있음
+            // 현재는 최신 제출분 기준이므로 상태만 반려로 변경
         }
 
         PerformanceRecordHistory history = PerformanceRecordHistory.builder()
