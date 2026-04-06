@@ -21,7 +21,7 @@ import java.util.UUID;
 
 // 평가 생성, 조회, 점수 수정, 제출, 확정 컨트롤러
 @RestController
-@RequestMapping("/goal/evaluation")
+@RequestMapping("/evaluation")
 public class EvaluationController {
 
     final EvaluationService evaluationService;

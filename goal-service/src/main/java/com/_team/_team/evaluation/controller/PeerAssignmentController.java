@@ -17,7 +17,7 @@ import java.util.UUID;
 
 // 동료 평가 배정, 조회, 완료, 거절 컨트롤러
 @RestController
-@RequestMapping("/goal/peer-assignment")
+@RequestMapping("/evaluation/peer-assignment")
 public class PeerAssignmentController {
 
     final PeerAssignmentService peerAssignmentService;

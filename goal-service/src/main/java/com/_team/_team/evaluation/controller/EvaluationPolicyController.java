@@ -17,7 +17,7 @@ import java.util.UUID;
 
 // 평가 정책 생성, 목록 조회, 비활성화 컨트롤러
 @RestController
-@RequestMapping("/goal/evaluation/policy")
+@RequestMapping("/evaluation/policy")
 public class EvaluationPolicyController {
 
     final EvaluationPolicyService evaluationPolicyService;

@@ -19,10 +19,10 @@ public class KpiTemplate extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "kpi_template_id", columnDefinition = "BINARY(16)")
+    @Column(name = "kpi_template_id")
     private UUID kpiTemplateId;
 
-    @Column(name = "company_id", columnDefinition = "BINARY(16)", nullable = true)
+    @Column(name = "company_id", nullable = true)
     private UUID companyId;
 
     @Column(name = "name", length = 200, nullable = false)

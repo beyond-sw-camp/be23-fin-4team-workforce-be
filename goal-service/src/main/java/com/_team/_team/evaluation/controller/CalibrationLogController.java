@@ -17,7 +17,7 @@ import java.util.UUID;
 
 // 평가 점수 조정(Calibration) 기록 생성 및 조회 컨트롤러
 @RestController
-@RequestMapping("/goal/calibration")
+@RequestMapping("/evaluation/calibration")
 public class CalibrationLogController {
 
     final CalibrationLogService calibrationLogService;
@@ -38,7 +38,7 @@ public class CalibrationLogController {
 
     // 평가별 조정 내역 조회
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
-    @GetMapping("/evaluation/{evaluationId}")
+    @GetMapping("/{evaluationId}")
     public ResponseEntity<ApiResponse<List<CalibrationLogResDto>>> listByEvaluation(
             @PathVariable UUID evaluationId) {
         List<CalibrationLogResDto> result = calibrationLogService.listByEvaluation(evaluationId);
