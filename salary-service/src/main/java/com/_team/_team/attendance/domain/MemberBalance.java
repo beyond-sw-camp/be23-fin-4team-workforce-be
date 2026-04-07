@@ -74,7 +74,7 @@ public class MemberBalance extends BaseTimeEntity {
 
     /**
      * 휴가 차감
-     * - 반드시 PESSIMISTIC_WRITE 락 상태에서 호출할 것
+     * - 반드시 PESSIMISTIC_WRITE 락 상태에서 호출
      *  days 차감 일수 (반차 = 0.5)
      */
     public void use(double days) {

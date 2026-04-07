@@ -39,15 +39,15 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT mb FROM MemberBalance mb " +
-            "WHERE mb.memberId = :memberId " +
-            "AND mb.companyId = :companyId " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.memberId = :memberId " +
             "AND mb.balanceType = :type " +
             "AND mb.isUsableYn = 'Y' " +
             "AND mb.isExpireYn = 'N' " +
             "AND mb.delYn = 'N'")
     Optional<MemberBalance> findWithLock(
-            @Param("memberId") UUID memberId,
             @Param("companyId") UUID companyId,
+            @Param("memberId") UUID memberId,
             @Param("type") BalanceType type);
 }
 
