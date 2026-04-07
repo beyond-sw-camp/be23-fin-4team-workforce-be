@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str
 
+    eureka_server_url: str  #
+
     class Config:
         env_file = ".env"
 

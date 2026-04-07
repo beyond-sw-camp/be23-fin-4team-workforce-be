@@ -11,7 +11,7 @@ router = APIRouter()
 @router.post("/documents/upload", response_model=DocumentUploadRes)
 async def upload_document(
         file: UploadFile = File(...),
-        x_user_company_id: str = Header(...),
+        x_user_company_id: str = Header(..., alias="X-User-CompanyId"),
         db: Session = Depends(get_db)):
     return await service.upload_document(
             file, x_user_company_id, db)
@@ -19,7 +19,7 @@ async def upload_document(
 # 문서 목록 조회
 @router.get("/documents", response_model=List[DocumentListRes])
 def get_documents(
-        x_user_company_id: str = Header(...),
+        x_user_company_id: str = Header(..., alias="X-User-CompanyId"),
         db: Session = Depends(get_db)):
     return service.get_documents(x_user_company_id, db)
 
@@ -27,7 +27,7 @@ def get_documents(
 @router.delete("/documents/{document_id}")
 def delete_document(
         document_id: str,
-        x_user_company_id: str = Header(...),
+        x_user_company_id: str = Header(..., alias="X-User-CompanyId"),
         db: Session = Depends(get_db)):
     service.delete_document(document_id, x_user_company_id, db)
     return {"message": "문서 삭제 성공"}

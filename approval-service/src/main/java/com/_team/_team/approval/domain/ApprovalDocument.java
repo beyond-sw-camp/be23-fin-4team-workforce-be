@@ -51,6 +51,4 @@ public class ApprovalDocument extends BaseTimeEntity {
         this.isActiveYn="N";
     }
 
-
-
 }

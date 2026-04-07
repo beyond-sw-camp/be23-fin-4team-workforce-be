@@ -7,20 +7,48 @@ from pypdf import PdfReader
 from docx import Document
 import uuid
 import io
+import os
 
-# 문서 업로드
+# 파일 업로드
 async def upload_document(
         file: UploadFile,
         company_id: str,
         db: Session) -> HrDocument:
 
-    # 1. 파일 읽기
+    # 1. 파일 확장자 검증
+    ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"]
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="지원하지 않는 파일 형식입니다. (pdf, docx, txt)")
+
+    # 2. 파일 읽기
     content = await file.read()
 
-    # 2. 텍스트 추출
+    # 3. 파일 크기 검증 (10MB)
+    MAX_FILE_SIZE = 10 * 1024 * 1024
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="파일 크기는 10MB 이하여야 합니다.")
+
+    # 4. 파일명 검증 (빈 파일명 방지)
+    if not file.filename or file.filename.strip() == "":
+        raise HTTPException(
+            status_code=400,
+            detail="파일명이 없습니다.")
+
+    # 5. 텍스트 추출
     text = extract_text(file.filename, content)
 
-    # 3. DB 저장
+    # 6. 텍스트 추출 결과 검증 (빈 문서 방지)
+    if not text or text.strip() == "":
+        raise HTTPException(
+            status_code=400,
+            detail="문서에서 텍스트를 추출할 수 없습니다.")
+
+    # 7. DB 저장
     document = HrDocument(
         company_id=company_id,
         document_name=file.filename,
@@ -30,9 +58,17 @@ async def upload_document(
     db.commit()
     db.refresh(document)
 
-    # 4. 청킹 + 임베딩 + Pinecone 저장
-    await process_document(document.id, company_id,
+    # 8. 청킹 + 임베딩 + Pinecone 저장
+    try:
+        await process_document(
+            document.id, company_id,
             file.filename, text)
+    except Exception as e:
+        db.delete(document)
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail=f"문서 처리 실패: {str(e)}")
 
     return document
 
@@ -59,10 +95,8 @@ async def process_document(
         document_name: str,
         text: str):
 
-    # 1. 청킹 (1000자 단위, 200자 overlap)
     chunks = chunk_text(text, chunk_size=1000, overlap=200)
 
-    # 2. 각 청크 임베딩 + Pinecone 저장
     vectors = []
     for i, chunk in enumerate(chunks):
         embedding = get_embedding(chunk)
@@ -98,7 +132,9 @@ def get_documents(
         company_id: str,
         db: Session) -> list[HrDocument]:
     return db.query(HrDocument)\
-        .filter(HrDocument.company_id == company_id)\
+        .filter(
+            HrDocument.company_id == company_id,
+            HrDocument.del_yn == "NO")\
         .all()
 
 # 문서 삭제
@@ -108,8 +144,10 @@ def delete_document(
         db: Session):
 
     document = db.query(HrDocument)\
-        .filter(HrDocument.id == document_id,
-                HrDocument.company_id == company_id)\
+        .filter(
+            HrDocument.id == document_id,
+            HrDocument.company_id == company_id,
+            HrDocument.del_yn == "NO")\
         .first()
 
     if not document:
@@ -117,9 +155,14 @@ def delete_document(
             status_code=404,
             detail="문서를 찾을 수 없습니다.")
 
-    # Pinecone에서 삭제
-    delete_vectors(document_id)
+    # Pinecone 삭제 실패 시 DB 삭제 안 함
+    try:
+        delete_vectors(document_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Pinecone 삭제 실패: {str(e)}")
 
-    # DB에서 삭제
-    db.delete(document)
+    # 소프트 삭제
+    document.del_yn = "YES"
     db.commit()

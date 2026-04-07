@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,4 +23,10 @@ public class MemberSavedEvent {
     private String email;
     private String memberStatus;
     private String position;
+
+    // AI 컨텍스트용 추가 필드
+    private String sabun;
+    private LocalDate joinDate;
+    private String jobGradeName;
+    private int esgScore;
 }

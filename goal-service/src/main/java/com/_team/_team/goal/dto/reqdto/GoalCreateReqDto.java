@@ -1,9 +1,10 @@
 package com._team._team.goal.dto.reqdto;
 
-import com._team._team.goal.domain.enums.GoalOwnerType;
-import com._team._team.goal.domain.enums.GoalVisibility;
+import com._team._team.goal.domain.enums.*;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,27 +19,57 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class GoalCreateReqDto {
-    @NotNull
+
+    @NotNull(message = "KPI 템플릿 ID는 필수입니다.")
+    private UUID kpiTemplateId;
+
+    @NotNull(message = "회사 ID는 필수입니다.")
     private UUID companyId;
+
     private UUID parentGoalId;
-    private UUID cycleId;
-    @NotNull
+
+    @NotNull(message = "소유 유형은 필수입니다.")
     private GoalOwnerType ownerType;
-    @NotNull
+
+    @NotNull(message = "소유자 ID는 필수입니다.")
     private UUID ownerId;
-    @NotBlank
+
+    @NotBlank(message = "제목은 필수입니다.")
+    @Size(max = 300)
     private String title;
+
+    @NotBlank(message = "내용은 필수입니다.")
+    @Size(max = 300)
     private String description;
-    @NotNull
+
+    @NotNull(message = "시작일은 필수입니다.")
     private LocalDate startDate;
-    @NotNull
+
+    @NotNull(message = "종료일은 필수입니다.")
     private LocalDate endDate;
-    @NotNull
+
+    @NotNull(message = "측정 유형은 필수입니다.")
+    private MeasureType measureType;
+
+    @NotNull(message = "단위 유형은 필수입니다.")
+    private UnitType unitType;
+
+    private String unitLabel;
+
+    @NotNull(message = "기준값은 필수입니다.")
     private BigDecimal baseline;
-    @NotNull
+
+    @NotNull(message = "목표값은 필수입니다.")
     private BigDecimal targetValue;
-    @Builder.Default
-    private Boolean isAutoUpdated = false;
-    @Builder.Default
-    private GoalVisibility visibility = GoalVisibility.PRIVATE;
+
+    @NotNull(message = "달성률 상한(capPct)은 필수입니다.")
+    @Min(value = 1, message = "달성률 상한은 1 이상이어야 합니다.")
+    private Integer capPct;
+
+    private BigDecimal contributionPct;
+
+    private BigDecimal weightPct;
+
+    @NotNull(message = "공개 범위는 필수입니다.")
+    private GoalVisibility visibility;
 }
