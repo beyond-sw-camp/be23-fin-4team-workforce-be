@@ -7,8 +7,8 @@ import com._team._team.approval.domain.ApprovalViewer;
 import com._team._team.approval.domain.enums.LineStatus;
 import com._team._team.approval.domain.enums.RequestStatus;
 import com._team._team.approval.domain.enums.ViewerReadStatus;
-import com._team._team.approval.dtos.reqdto.ApprovalRequestCreateReqDto;
-import com._team._team.approval.dtos.resdto.ApprovalRequestResDto;
+import com._team._team.approval.dto.reqdto.ApprovalRequestCreateReqDto;
+import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
 import com._team._team.approval.repository.ApprovalDocumentRepository;
 import com._team._team.approval.repository.ApprovalRepository;
 import com._team._team.approval.repository.ApprovalRequestRepository;
@@ -31,13 +31,15 @@ public class ApprovalRequestService {
     private final ApprovalDocumentRepository approvalDocumentRepository;
     private final ApprovalRepository approvalRepository;
     private final ApprovalViewerRepository approvalViewerRepository;
+    private final AttachmentService attachmentService;
 
     @Autowired
-    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository) {
+    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
+        this.attachmentService = attachmentService;
     }
 
 //    결재요청 생성(결재라인 + 참조/공람자 포함)
@@ -63,6 +65,46 @@ public class ApprovalRequestService {
             }
         }
 
+        // 결재자 중복 검증
+        if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
+            List<UUID> memberPositionIds = reqDto.getApprovalLines().stream()
+                    .map(ApprovalRequestCreateReqDto.ApprovalLineItem::getApproverMemberPositionId)
+                    .toList();
+
+            if (memberPositionIds.size() != memberPositionIds.stream().distinct().count()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "동일한 결재자를 중복 지정할 수 없습니다.");
+            }
+        }
+
+        // 참조/공람자 중복 검증
+        if (reqDto.getViewers() != null && !reqDto.getViewers().isEmpty()) {
+            long distinctCount = reqDto.getViewers().stream()
+                    .map(v -> v.getViewerMemberId().toString() + "_" + v.getViewerType().name())
+                    .distinct()
+                    .count();
+
+            if (distinctCount != reqDto.getViewers().size()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "동일한 참조/공람자를 중복 지정할 수 없습니다.");
+            }
+        }
+
+        // stepOrder 연속성 검증
+        if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
+            List<Integer> orders = reqDto.getApprovalLines().stream()
+                    .map(ApprovalRequestCreateReqDto.ApprovalLineItem::getStepOrder)
+                    .sorted()
+                    .toList();
+
+            for (int i = 0; i < orders.size(); i++) {
+                if (orders.get(i) != i + 1) {
+                    throw new BusinessException(HttpStatus.BAD_REQUEST,
+                            "결재 순서(stepOrder)는 1부터 연속된 값이어야 합니다.");
+                }
+            }
+        }
+
         // ApprovalRequest 생성
         ApprovalRequest request = ApprovalRequest.builder()
                 .approvalDocument(document)
@@ -80,9 +122,10 @@ public class ApprovalRequestService {
             List<Approval> approvals = reqDto.getApprovalLines().stream()
                     .map(line -> Approval.builder()
                             .request(savedRequest)
-                            .memberPositionId(line.getMemberPositionId())
+                            .approverMemberId(line.getApproverMemberId())
+                            .approverMemberPositionId(line.getApproverMemberPositionId())
                             .stepOrder(line.getStepOrder())
-                            .approvalStatus(line.getStepOrder() == 1
+                            .approvalStatus(reqDto.getRequestStatus() == RequestStatus.WAIT && line.getStepOrder() == 1
                                     ? LineStatus.PENDING
                                     : LineStatus.WAITING)
                             .build())
@@ -97,7 +140,8 @@ public class ApprovalRequestService {
             List<ApprovalViewer> viewers = reqDto.getViewers().stream()
                     .map(viewer -> ApprovalViewer.builder()
                             .approvalRequest(savedRequest)
-                            .memberId(viewer.getMemberId())
+                            .viewerMemberId(viewer.getViewerMemberId())
+                            .viewerMemberPositionId(viewer.getViewerMemberPositionId())
                             .viewerType(viewer.getViewerType())
                             .viewerReadStatus(ViewerReadStatus.UNREAD)
                             .build())
@@ -200,6 +244,46 @@ public class ApprovalRequestService {
             }
         }
 
+        // 결재자 중복 검증
+        if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
+            List<UUID> memberPositionIds = reqDto.getApprovalLines().stream()
+                    .map(ApprovalRequestCreateReqDto.ApprovalLineItem::getApproverMemberPositionId)
+                    .toList();
+
+            if (memberPositionIds.size() != memberPositionIds.stream().distinct().count()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "동일한 결재자를 중복 지정할 수 없습니다.");
+            }
+        }
+
+        // 참조/공람자 중복 검증
+        if (reqDto.getViewers() != null && !reqDto.getViewers().isEmpty()) {
+            long distinctCount = reqDto.getViewers().stream()
+                    .map(v -> v.getViewerMemberId().toString() + "_" + v.getViewerType().name())
+                    .distinct()
+                    .count();
+
+            if (distinctCount != reqDto.getViewers().size()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "동일한 참조/공람자를 중복 지정할 수 없습니다.");
+            }
+        }
+
+        // stepOrder 연속성 검증
+        if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
+            List<Integer> orders = reqDto.getApprovalLines().stream()
+                    .map(ApprovalRequestCreateReqDto.ApprovalLineItem::getStepOrder)
+                    .sorted()
+                    .toList();
+
+            for (int i = 0; i < orders.size(); i++) {
+                if (orders.get(i) != i + 1) {
+                    throw new BusinessException(HttpStatus.BAD_REQUEST,
+                            "결재 순서(stepOrder)는 1부터 연속된 값이어야 합니다.");
+                }
+            }
+        }
+
         // 결재요청 내용 수정
         request.updateContentJson(reqDto.getContentJson());
         request.updateStatus(reqDto.getRequestStatus());
@@ -214,9 +298,10 @@ public class ApprovalRequestService {
             List<Approval> newApprovals = reqDto.getApprovalLines().stream()
                     .map(line -> Approval.builder()
                             .request(request)
-                            .memberPositionId(line.getMemberPositionId())
+                            .approverMemberId(line.getApproverMemberId())
+                            .approverMemberPositionId(line.getApproverMemberPositionId())
                             .stepOrder(line.getStepOrder())
-                            .approvalStatus(line.getStepOrder() == 1
+                            .approvalStatus(reqDto.getRequestStatus() == RequestStatus.WAIT && line.getStepOrder() == 1
                                     ? LineStatus.PENDING
                                     : LineStatus.WAITING)
                             .build())
@@ -226,16 +311,19 @@ public class ApprovalRequestService {
         }
 
         // 기존 참조/공람자 물리 삭제 후 새로 저장
-        List<ApprovalViewer> existingViewers =
-                approvalViewerRepository.findByRequestId(requestId);
+        List<ApprovalViewer> existingViewers = approvalViewerRepository.findByRequestId(requestId);
         approvalViewerRepository.deleteAll(existingViewers);
+
+        // 기존 첨부파일 전체 삭제 (S3 + DB)
+        attachmentService.deleteAllByRequestId(requestId);
 
         List<ApprovalViewer> savedViewers = new ArrayList<>();
         if (reqDto.getViewers() != null && !reqDto.getViewers().isEmpty()) {
             List<ApprovalViewer> newViewers = reqDto.getViewers().stream()
                     .map(viewer -> ApprovalViewer.builder()
                             .approvalRequest(request)
-                            .memberId(viewer.getMemberId())
+                            .viewerMemberId(viewer.getViewerMemberId())
+                            .viewerMemberPositionId(viewer.getViewerMemberPositionId())
                             .viewerType(viewer.getViewerType())
                             .viewerReadStatus(ViewerReadStatus.UNREAD)
                             .build())
@@ -292,7 +380,4 @@ public class ApprovalRequestService {
         return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
 
     }
-
-
-
 }

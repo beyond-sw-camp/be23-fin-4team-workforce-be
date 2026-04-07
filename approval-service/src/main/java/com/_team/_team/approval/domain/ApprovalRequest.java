@@ -4,10 +4,7 @@ import com._team._team.approval.domain.enums.RequestStatus;
 import com._team._team.approval.domain.enums.RequestType;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -15,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @AllArgsConstructor
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Builder
 @Entity

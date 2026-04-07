@@ -1,7 +1,7 @@
 package com._team._team.approval.controller;
 
-import com._team._team.approval.dtos.reqdto.ApprovalDocumentCreateReqDto;
-import com._team._team.approval.dtos.resdto.ApprovalDocumentResDto;
+import com._team._team.approval.dto.reqdto.ApprovalDocumentCreateReqDto;
+import com._team._team.approval.dto.resdto.ApprovalDocumentResDto;
 import com._team._team.approval.service.ApprovalDocumentService;
 import com._team._team.dto.ApiResponse;
 import jakarta.validation.Valid;

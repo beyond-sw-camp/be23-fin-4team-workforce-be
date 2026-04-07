@@ -9,7 +9,6 @@ import com._team._team.member.domain.SearchOutboxEvent;
 import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
 import com._team._team.member.repository.SearchOutboxEventRepository;
-import com._team._team.member.service.MemberService;
 import com._team._team.organization.dto.reqdto.JobGradeReqDto;
 import com._team._team.organization.dto.reqdto.JobTitleReqDto;
 import com._team._team.organization.dto.reqdto.OrganizationReqDto;
@@ -28,9 +27,7 @@ import com._team._team.organization.domain.Organization;
 import com._team._team.organization.repository.JobGradeRepository;
 import com._team._team.organization.repository.JobTitleRepository;
 import com._team._team.organization.repository.OrganizationRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
@@ -503,5 +500,28 @@ public class OrganizationService {
             log.error("OrganizationDeletedOutboxEvent 저장 실패: {}",
                     e.getMessage());
         }
+    }
+
+    // 조직 체인 조회 (하위 → 최상위)
+    @Transactional(readOnly = true)
+    public List<OrganizationChainResDto> getOrganizationChain(UUID organizationId) {
+        Organization current = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 조직입니다."));
+
+        List<OrganizationChainResDto> chain = new java.util.ArrayList<>();
+
+        while (current != null) {
+            chain.add(OrganizationChainResDto.builder()
+                    .organizationId(current.getOrganizationId())
+                    .name(current.getName())
+                    .parentId(current.getParent() != null
+                            ? current.getParent().getOrganizationId()
+                            : null)
+                    .build());
+            current = current.getParent();
+        }
+
+        return chain;
     }
 }
