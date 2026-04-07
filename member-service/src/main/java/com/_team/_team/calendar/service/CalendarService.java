@@ -157,6 +157,22 @@ public class CalendarService {
                 reqDto.getEndAt(),
                 "YES"  // 팀 일정은 항상 공개
         );
+        memberPositionRepository
+                .findByOrganization_OrganizationIdAndDelYn(
+                        event.getOrganizationId(), "NO")
+                .forEach(position -> {
+                    if (!position.getMember().getMemberId().equals(memberId)) {
+                        eventPublisher.publishEvent(NotificationMessage.builder()
+                                .receiverId(position.getMember().getMemberId())
+                                .senderId(memberId)
+                                .notificationType(NotificationType.CALENDAR_TEAM_EVENT_CREATED)
+                                .content("팀 일정이 수정됐습니다. [" + reqDto.getTitle() + "] "
+                                        + reqDto.getStartAt().toLocalDate())
+                                .targetId(event.getCalendarEventId())
+                                .targetType("CALENDAR_EVENT")
+                                .build());
+                    }
+                });
     }
 
     // 팀 일정 삭제 (생성자만)
@@ -172,7 +188,8 @@ public class CalendarService {
 
     // 월별 일정 조회 (개인 + 팀 통합)
     @Transactional(readOnly = true)
-    public List<CalendarEventResDto> getMonthlyEvents(UUID memberId, int year, int month) {
+    public List<CalendarEventResDto> getMonthlyEvents(UUID memberId, int year,
+                                                      int month, EventType eventType) {
         Member member = getMember(memberId);
 
         YearMonth yearMonth = YearMonth.of(year, month);
@@ -181,22 +198,24 @@ public class CalendarService {
 
         List<CalendarEvent> events = new ArrayList<>();
 
-        // 1. 개인 일정
-        events.addAll(calendarEventRepository
-                .findPersonalByMonth(member, startAt, endAt));
-
-        // 2. 팀 일정 (본인 조직)
-        MemberPosition position = memberPositionRepository
-                .findById(member.getDefaultPositionId())
-                .orElse(null);
-
-        if (position != null) {
-            events.addAll(calendarEventRepository.findTeamByMonth(
-                    position.getOrganization().getOrganizationId(),
-                    startAt, endAt));
+        // eventType 없으면 전체 조회, 있으면 해당 타입만 조회
+        if (eventType == null || eventType == EventType.PERSONAL) {
+            events.addAll(calendarEventRepository
+                    .findPersonalByMonth(member, startAt, endAt));
         }
 
-        // 시작일시 기준 정렬
+        if (eventType == null || eventType == EventType.TEAM) {
+            MemberPosition position = memberPositionRepository
+                    .findById(member.getDefaultPositionId())
+                    .orElse(null);
+
+            if (position != null) {
+                events.addAll(calendarEventRepository.findTeamByMonth(
+                        position.getOrganization().getOrganizationId(),
+                        startAt, endAt));
+            }
+        }
+
         return events.stream()
                 .sorted((a, b) -> a.getStartAt().compareTo(b.getStartAt()))
                 .map(CalendarEventResDto::fromEntity)

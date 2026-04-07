@@ -140,10 +140,11 @@ public class CalendarController {
     public ResponseEntity<?> getMonthlyEvents(
             @RequestHeader("X-User-UUID") UUID memberId,
             @RequestParam int year,
-            @RequestParam int month) {
+            @RequestParam int month,
+            @RequestParam(required = false) EventType eventType) {
         return new ResponseEntity<>(
                 ApiResponse.success(
-                        calendarService.getMonthlyEvents(memberId, year, month),
+                        calendarService.getMonthlyEvents(memberId, year, month, eventType),
                         "월별 일정 조회 성공"),
                 HttpStatus.OK
         );
