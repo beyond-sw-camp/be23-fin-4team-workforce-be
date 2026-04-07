@@ -30,23 +30,26 @@ public class KpiTemplateController {
     @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
     @PostMapping
     public ApiResponse<KpiTemplateResDto> createKpiTemplate(
+            @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid KpiTemplateCreateReqDto dto) {
-        return ApiResponse.success(kpiTemplateService.createKpiTemplate(dto), "KPI 템플릿이 생성되었습니다.");
+        return ApiResponse.success(kpiTemplateService.createKpiTemplate(dto, UUID.fromString(companyId)), "KPI 템플릿이 생성되었습니다.");
     }
 
     // KPI 템플릿 목록 조회
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping
     public ApiResponse<List<KpiTemplateResDto>> listKpiTemplates(
-            @RequestParam UUID companyId) {
-        return ApiResponse.success(kpiTemplateService.listKpiTemplates(companyId), "KPI 템플릿 목록 조회 성공");
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(kpiTemplateService.listKpiTemplates(UUID.fromString(companyId)), "KPI 템플릿 목록 조회 성공");
     }
 
     // KPI 템플릿 비활성화
     @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
     @PatchMapping("/{kpiTemplateId}/deactivate")
-    public ApiResponse<Void> deactivate(@PathVariable UUID kpiTemplateId) {
-        kpiTemplateService.deactivate(kpiTemplateId);
+    public ApiResponse<Void> deactivate(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID kpiTemplateId) {
+        kpiTemplateService.deactivate(kpiTemplateId, UUID.fromString(companyId));
         return ApiResponse.success(null, "KPI 템플릿이 비활성화되었습니다.");
     }
 }

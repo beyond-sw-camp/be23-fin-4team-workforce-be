@@ -21,6 +21,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
             "WHERE o.company = :company " +
             "AND o.delYn = :delYn " +
             "AND o.parent IS NULL " +
+            "AND (c IS NULL OR c.delYn = :delYn) " +
             "ORDER BY o.displayOrder")
     List<Organization> findByCompanyWithChildren(
             @Param("company") Company company,

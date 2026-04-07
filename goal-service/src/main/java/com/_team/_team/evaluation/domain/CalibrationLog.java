@@ -18,14 +18,14 @@ public class CalibrationLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "calibration_id", columnDefinition = "BINARY(16)")
+    @Column(name = "calibration_id")
     private UUID calibrationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "evaluation_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Evaluation evaluation;
 
-    @Column(name = "adjusted_by", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "adjusted_by", nullable = false)
     private UUID adjustedBy;
 
     @Column(name = "before_grade", length = 5)

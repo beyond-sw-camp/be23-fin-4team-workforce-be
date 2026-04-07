@@ -9,36 +9,36 @@ router = APIRouter()
 
 # 질문 전송
 @router.post("/chat", response_model=ChatResponse)
-def chat(
+async def chat(
         request: ChatRequest,
-        x_user_company_id: str = Header(...),
-        x_user_id: str = Header(...),
+        x_user_company_id: str = Header(..., alias="X-User-CompanyId"),
+        x_user_uuid: str = Header(..., alias="X-User-UUID"),
         db: Session = Depends(get_db)):
-    return service.chat(
+    return await service.chat(
             request.question,
             x_user_company_id,
-            x_user_id,
+            x_user_uuid,
             db)
 
 # 대화 이력 조회
 @router.get("/chat/history", response_model=List[ChatHistoryRes])
-def get_chat_history(
-        x_user_company_id: str = Header(...),
-        x_user_id: str = Header(...),
+async def get_chat_history(
+        x_user_company_id: str = Header(..., alias="X-User-CompanyId"),
+        x_user_uuid: str = Header(..., alias="X-User-UUID"),
         db: Session = Depends(get_db)):
-    return service.get_chat_history(
+    return await service.get_chat_history(
             x_user_company_id,
-            x_user_id,
+            x_user_uuid,
             db)
 
 # 대화 이력 삭제
 @router.delete("/chat/history")
-def delete_chat_history(
-        x_user_company_id: str = Header(...),
-        x_user_id: str = Header(...),
+async def delete_chat_history(
+        x_user_company_id: str = Header(..., alias="X-User-CompanyId"),
+        x_user_uuid: str = Header(..., alias="X-User-UUID"),
         db: Session = Depends(get_db)):
-    service.delete_chat_history(
+    await service.delete_chat_history(
             x_user_company_id,
-            x_user_id,
+            x_user_uuid,
             db)
     return {"message": "대화 이력 삭제 성공"}

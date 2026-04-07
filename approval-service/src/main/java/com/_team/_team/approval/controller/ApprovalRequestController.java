@@ -1,9 +1,9 @@
 package com._team._team.approval.controller;
 
 import com._team._team.approval.domain.enums.RequestStatus;
-import com._team._team.approval.dtos.reqdto.ApprovalRequestCreateReqDto;
-import com._team._team.approval.dtos.reqdto.CancelReqDto;
-import com._team._team.approval.dtos.resdto.ApprovalRequestResDto;
+import com._team._team.approval.dto.reqdto.ApprovalRequestCreateReqDto;
+import com._team._team.approval.dto.reqdto.CancelReqDto;
+import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
 import com._team._team.approval.service.ApprovalRequestService;
 import com._team._team.dto.ApiResponse;
 import jakarta.validation.Valid;

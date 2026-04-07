@@ -21,14 +21,14 @@ public class Goal extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "goal_id", columnDefinition = "BINARY(16)")
+    @Column(name = "goal_id")
     private UUID goalId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "kpi_template_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private KpiTemplate kpiTemplate;
 
-    @Column(name = "company_id", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "company_id", nullable = false)
     private UUID companyId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -39,13 +39,13 @@ public class Goal extends BaseTimeEntity {
     @Column(name = "owner_type", nullable = false)
     private GoalOwnerType ownerType;
 
-    @Column(name = "owner_id", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 
     @Column(name = "title", length = 300, nullable = false)
     private String title;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;
 
     @Column(name = "start_date", nullable = false)
@@ -95,7 +95,7 @@ public class Goal extends BaseTimeEntity {
     @Builder.Default
     private GoalStatus status = GoalStatus.DRAFT;
 
-    @Column(name = "approved_by", columnDefinition = "BINARY(16)")
+    @Column(name = "approved_by")
     private UUID approvedBy;
 
     @Column(name = "approved_at")

@@ -19,16 +19,13 @@ import java.util.UUID;
 @Builder
 public class MemberDetailResDto {
 
-    // 기본 정보
     private UUID memberId;
     private String email;
     private String name;
     private String sabun;
     private LocalDate joinDate;
     private EmploymentType employmentType;
-    private MemberStatus memberStatus;
-    private AccountStatus accountStatus;
-
+    private int esgScore;
     // 연락처
     private String phoneNumber;
     private String phonePublicYn;
@@ -49,12 +46,9 @@ public class MemberDetailResDto {
     private String telNumber;
 
     // 조직 정보
-    private UUID memberPositionId;
     private String organizationName;
     private String jobGradeName;
     private String jobTitleName;
-    private String roleName;
-    private String isSystemAdminYn;
 
     public static MemberDetailResDto fromEntity(Member member, MemberPosition position) {
         return MemberDetailResDto.builder()
@@ -64,25 +58,49 @@ public class MemberDetailResDto {
                 .sabun(member.getSabun())
                 .joinDate(member.getJoinDate())
                 .employmentType(member.getEmploymentType())
-                .memberStatus(member.getMemberStatus())
-                .accountStatus(member.getAccountStatus())
-                .phoneNumber(member.getPhoneNumber())
-                .phonePublicYn(member.getPhonePublicYn())
-                .emergencyContact(member.getEmergencyContact())
-                .address(member.getAddress())
-                .detailAddress(member.getDetailAddress())
-                .addressPublicYn(member.getAddressPublicYn())
-                .bank(member.getBank())
-                .bankAccount(member.getBankAccount())
                 .profileUrl(member.getProfileUrl())
                 .extensionNumber(member.getExtensionNumber())
                 .telNumber(member.getTelNumber())
-                .memberPositionId(position.getMemberPositionId())
+                .phoneNumber("YES".equals(member.getPhonePublicYn())
+                        ? member.getPhoneNumber() : null)
+                .phonePublicYn(member.getPhonePublicYn())
+                .address("YES".equals(member.getAddressPublicYn())
+                        ? member.getAddress() : null)
+                .detailAddress("YES".equals(member.getAddressPublicYn())
+                        ? member.getDetailAddress() : null)
+                .addressPublicYn(member.getAddressPublicYn())
+                .emergencyContact(null)
+                .bank(null)
+                .bankAccount(null)
                 .organizationName(position.getOrganization().getName())
                 .jobGradeName(position.getJobGrade().getName())
                 .jobTitleName(position.getJobTitle().getName())
-                .roleName(position.getRole().getName())
-                .isSystemAdminYn(position.getIsSystemAdminYn())
+                .build();
+    }
+
+    public static MemberDetailResDto fromEntitySelf(Member member, MemberPosition position) {
+        return MemberDetailResDto.builder()
+                .memberId(member.getMemberId())
+                .email(member.getEmail())
+                .name(member.getName())
+                .sabun(member.getSabun())
+                .joinDate(member.getJoinDate())
+                .employmentType(member.getEmploymentType())
+                .profileUrl(member.getProfileUrl())
+                .extensionNumber(member.getExtensionNumber())
+                .telNumber(member.getTelNumber())
+                .phoneNumber(member.getPhoneNumber())
+                .phonePublicYn(member.getPhonePublicYn())
+                .address(member.getAddress())
+                .detailAddress(member.getDetailAddress())
+                .addressPublicYn(member.getAddressPublicYn())
+                .emergencyContact(member.getEmergencyContact())
+                .bank(member.getBank())
+                .bankAccount(member.getBankAccount())
+                .organizationName(position.getOrganization().getName())
+                .jobGradeName(position.getJobGrade().getName())
+                .jobTitleName(position.getJobTitle().getName())
+                .esgScore(member.getEsgScore())
                 .build();
     }
 }

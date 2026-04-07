@@ -31,8 +31,20 @@ public interface ApprovalViewerRepository extends JpaRepository<ApprovalViewer, 
     @Query("SELECT av FROM ApprovalViewer av " +
             "JOIN FETCH av.approvalRequest r " +
             "JOIN FETCH r.approvalDocument " +
-            "WHERE av.memberId = :memberId " +
+            "WHERE av.viewerMemberId = :memberId " +
             "AND r.delYn = 'N'")
-    List<ApprovalViewer> findByMemberId(
+    List<ApprovalViewer> findByViewerMemberId(
             @Param("memberId") UUID memberId);
+
+    @Query("SELECT av FROM ApprovalViewer av " +
+            "JOIN FETCH av.approvalRequest r " +
+            "JOIN FETCH r.approvalDocument " +
+            "WHERE av.viewerMemberId = :memberId " +
+            "AND av.viewerType = :viewerType " +
+            "AND r.delYn = 'N'")
+    List<ApprovalViewer> findByViewerMemberIdAndViewerType(
+            @Param("memberId") UUID memberId,
+            @Param("viewerType") ViewerType viewerType);
 }
+
+

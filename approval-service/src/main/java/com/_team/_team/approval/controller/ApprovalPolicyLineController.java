@@ -1,7 +1,7 @@
 package com._team._team.approval.controller;
 
-import com._team._team.approval.dtos.reqdto.ApprovalPolicyLineCreateReqDto;
-import com._team._team.approval.dtos.resdto.ApprovalPolicyLineResDto;
+import com._team._team.approval.dto.reqdto.ApprovalPolicyLineCreateReqDto;
+import com._team._team.approval.dto.resdto.ApprovalPolicyLineResDto;
 import com._team._team.approval.service.ApprovalPolicyLineService;
 import com._team._team.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -56,6 +56,21 @@ public class ApprovalPolicyLineController {
         policyLineService.deletePolicyLines(companyId, documentId);
         return new ResponseEntity<>(
                 ApiResponse.success(null, "결재라인 정책이 삭제되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    // 양식별 후보 결재자 조회 (요청자 기준 필터링)
+    @GetMapping("/{documentId}/candidates")
+    public ResponseEntity<?> findCandidatesByDocumentId(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
+            @PathVariable UUID documentId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        policyLineService.findCandidatesByDocumentId(
+                                companyId, documentId, memberPositionId),
+                        "후보 결재자 조회 성공"),
                 HttpStatus.OK
         );
     }

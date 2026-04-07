@@ -4,13 +4,17 @@ import com._team._team.goal.domain.KpiTemplate;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.domain.enums.MeasureType;
 import com._team._team.goal.domain.enums.UnitType;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class KpiTemplateResDto {
 
