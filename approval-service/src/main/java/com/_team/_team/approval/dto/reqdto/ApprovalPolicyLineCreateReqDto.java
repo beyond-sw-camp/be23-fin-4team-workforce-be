@@ -1,6 +1,5 @@
-package com._team._team.approval.dtos.reqdto;
+package com._team._team.approval.dto.reqdto;
 
-import com._team._team.approval.domain.enums.ApproverType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -30,16 +29,7 @@ public class ApprovalPolicyLineCreateReqDto {
     @Builder
     public static class PolicyLineItem {
 
-        @NotNull(message = "결재 순서는 필수입니다.")
-        private Integer stepOrder;
-
-        @NotNull(message = "결재자 유형은 필수입니다.")
-        private ApproverType approverType;
-
-        private UUID specificMemberPositionId; // SPECIFIC일 때
-
-        private UUID jobGradeId; // JOB_GRADE일 때
-
-        private UUID jobTitleId; // JOB_TITLE일 때
+        @NotNull(message = "직급 ID는 필수입니다.")
+        private UUID jobGradeId;
     }
 }

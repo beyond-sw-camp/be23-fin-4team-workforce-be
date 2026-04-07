@@ -18,7 +18,7 @@ public class PerformanceRecordHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "performance_record_history_id", columnDefinition = "BINARY(16)")
+    @Column(name = "performance_record_history_id")
     private UUID performanceRecordHistoryId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -40,7 +40,7 @@ public class PerformanceRecordHistory {
     @Column(name = "change_reason", columnDefinition = "TEXT", nullable = false)
     private String changeReason;
 
-    @Column(name = "changed_by", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "changed_by", nullable = false)
     private UUID changedBy;
 
     @CreationTimestamp

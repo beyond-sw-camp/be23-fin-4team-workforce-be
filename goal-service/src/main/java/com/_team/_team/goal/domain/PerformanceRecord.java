@@ -20,7 +20,7 @@ public class PerformanceRecord extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "performance_record_id", columnDefinition = "BINARY(16)")
+    @Column(name = "performance_record_id")
     private UUID performanceRecordId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -49,7 +49,7 @@ public class PerformanceRecord extends BaseTimeEntity {
     @Column(name = "file_size")
     private Long fileSize;
 
-    @Column(name = "submitted_by", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "submitted_by", nullable = false)
     private UUID submittedBy;
 
     @Enumerated(EnumType.STRING)
@@ -63,7 +63,7 @@ public class PerformanceRecord extends BaseTimeEntity {
     @Column(name = "reject_reason", columnDefinition = "TEXT")
     private String rejectReason;
 
-    @Column(name = "reviewed_by", columnDefinition = "BINARY(16)")
+    @Column(name = "reviewed_by")
     private UUID reviewedBy;
 
     @Column(name = "reviewed_at")

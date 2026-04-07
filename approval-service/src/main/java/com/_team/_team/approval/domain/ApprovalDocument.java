@@ -10,7 +10,7 @@ import org.hibernate.type.SqlTypes;
 import java.util.UUID;
 
 @AllArgsConstructor
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Builder
 @Entity

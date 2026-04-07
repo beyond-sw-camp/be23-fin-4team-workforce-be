@@ -2,15 +2,19 @@ package com._team._team.goal.dto.resdto;
 
 import com._team._team.goal.domain.Goal;
 import com._team._team.goal.domain.enums.*;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class GoalResDto {
 

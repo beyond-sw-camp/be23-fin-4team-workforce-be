@@ -1,4 +1,4 @@
-package com._team._team.approval.dtos.reqdto;
+package com._team._team.approval.dto.reqdto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;

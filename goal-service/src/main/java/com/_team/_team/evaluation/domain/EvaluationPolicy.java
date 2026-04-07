@@ -19,10 +19,10 @@ public class EvaluationPolicy extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "evaluation_policy_id", columnDefinition = "BINARY(16)")
+    @Column(name = "evaluation_policy_id")
     private UUID evaluationPolicyId;
 
-    @Column(name = "company_id", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "company_id", nullable = false)
     private UUID companyId;
 
     @Column(name = "policy_name", length = 100, nullable = false)

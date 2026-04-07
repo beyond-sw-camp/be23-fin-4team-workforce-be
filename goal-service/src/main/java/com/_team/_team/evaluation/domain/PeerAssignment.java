@@ -18,20 +18,20 @@ public class PeerAssignment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "peer_assignment_id", columnDefinition = "BINARY(16)")
+    @Column(name = "peer_assignment_id")
     private UUID peerAssignmentId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "evaluation_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Evaluation evaluation;
 
-    @Column(name = "evaluatee_id", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "evaluatee_id", nullable = false)
     private UUID evaluateeId;
 
-    @Column(name = "peer_member_id", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "peer_member_id", nullable = false)
     private UUID peerMemberId;
 
-    @Column(name = "assigned_by", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "assigned_by", nullable = false)
     private UUID assignedBy;
 
     @Enumerated(EnumType.STRING)

@@ -1,14 +1,18 @@
 package com._team._team.goal.dto.resdto;
 
 import com._team._team.goal.domain.PerformanceRecordHistory;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class PerformanceRecordHistoryResDto {
 

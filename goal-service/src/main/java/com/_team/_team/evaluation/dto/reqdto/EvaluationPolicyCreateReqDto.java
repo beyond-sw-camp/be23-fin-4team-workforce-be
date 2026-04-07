@@ -3,30 +3,34 @@ package com._team._team.evaluation.dto.reqdto;
 import com._team._team.evaluation.domain.enums.EvalCycle;
 import com._team._team.evaluation.domain.enums.GradeType;
 import jakarta.validation.constraints.*;
-import lombok.Getter;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
-@Getter
+@Data
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class EvaluationPolicyCreateReqDto {
 
-    @NotNull
+    @NotNull(message = "회사 ID는 필수입니다.")
     private UUID companyId;
 
-    @NotBlank
+    @NotBlank(message = "정책명은 필수입니다.")
     @Size(max = 100)
     private String policyName;
 
-    @NotNull
+    @NotNull(message = "평가 주기는 필수입니다.")
     private EvalCycle evalCycle;
 
-    @NotNull
+    @NotNull(message = "평가 기간 시작일은 필수입니다.")
     private LocalDate periodStart;
 
-    @NotNull
+    @NotNull(message = "평가 기간 종료일은 필수입니다.")
     private LocalDate periodEnd;
 
     private LocalDate resultOpenDate;
@@ -49,7 +53,7 @@ public class EvaluationPolicyCreateReqDto {
     @Min(0) @Max(100)
     private int peerWeightPct;
 
-    @NotNull
+    @NotNull(message = "등급 유형은 필수입니다.")
     private GradeType gradeType;
 
     private String gradeConfigJson;

@@ -25,9 +25,14 @@ public class KpiTemplateService {
     }
 
     @Transactional
-    public KpiTemplateResDto createKpiTemplate(KpiTemplateCreateReqDto dto) {
+    public KpiTemplateResDto createKpiTemplate(KpiTemplateCreateReqDto dto, UUID companyId) {
+        // 회사 격리 확인
+        if (!dto.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 KPI 템플릿을 생성할 수 없습니다.");
+        }
+
         KpiTemplate kpiTemplate = KpiTemplate.builder()
-                .companyId(dto.getCompanyId())
+                .companyId(companyId)
                 .name(dto.getName())
                 .measureType(dto.getMeasureType())
                 .unitType(dto.getUnitType())
@@ -42,6 +47,7 @@ public class KpiTemplateService {
 
     @Transactional(readOnly = true)
     public List<KpiTemplateResDto> listKpiTemplates(UUID companyId) {
+        // 해당 회사의 템플릿 또는 공통(null) 템플릿 조회
         List<KpiTemplate> templates = kpiTemplateRepository.findByCompanyIdIsNullOrCompanyId(companyId);
         return templates.stream()
                 .map(KpiTemplateResDto::from)
@@ -49,10 +55,16 @@ public class KpiTemplateService {
     }
 
     @Transactional
-    public void deactivate(UUID kpiTemplateId) {
+    public void deactivate(UUID kpiTemplateId, UUID companyId) {
         KpiTemplate kpiTemplate = kpiTemplateRepository.findById(kpiTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "KPI 템플릿을 찾을 수 없습니다. id=" + kpiTemplateId));
+
+        // 회사 격리 확인
+        if (kpiTemplate.getCompanyId() != null && !kpiTemplate.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 KPI 템플릿을 비활성화할 수 없습니다.");
+        }
+
         kpiTemplate.deactivate();
     }
 }

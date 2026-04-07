@@ -32,7 +32,7 @@ public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
     @Query("SELECT a FROM Approval a " +
             "JOIN FETCH a.request r " +
             "JOIN FETCH r.approvalDocument " +
-            "WHERE a.memberPositionId = :memberPositionId " +
+            "WHERE a.approverMemberPositionId = :memberPositionId " +
             "AND a.approvalStatus = :status " +
             "AND r.delYn = 'N'")
     List<Approval> findPendingByMemberPositionId(
@@ -47,7 +47,7 @@ public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
     @Query("SELECT a FROM Approval a " +
             "JOIN FETCH a.request r " +
             "JOIN FETCH r.approvalDocument " +
-            "WHERE a.memberPositionId = :memberPositionId " +
+            "WHERE a.approverMemberPositionId = :memberPositionId " +
             "AND a.approvalStatus IN :statuses " +
             "AND r.delYn = 'N' " +
             "ORDER BY a.actedAt DESC")

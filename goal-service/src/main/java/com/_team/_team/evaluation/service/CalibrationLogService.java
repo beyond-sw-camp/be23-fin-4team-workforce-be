@@ -30,13 +30,17 @@ public class CalibrationLogService {
     }
 
     @Transactional
-    public CalibrationLogResDto createCalibration(CalibrationCreateReqDto dto) {
+    public CalibrationLogResDto createCalibration(CalibrationCreateReqDto dto, UUID requesterId, UUID companyId) {
         Evaluation evaluation = evaluationRepository.findById(dto.getEvaluationId())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가를 찾을 수 없습니다."));
 
+        if (!evaluation.getEvaluationPolicy().getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사 평가에 대한 조정 내역을 기록할 수 없습니다.");
+        }
+
         CalibrationLog log = CalibrationLog.builder()
                 .evaluation(evaluation)
-                .adjustedBy(dto.getAdjustedBy())
+                .adjustedBy(requesterId)
                 .beforeGrade(dto.getBeforeGrade())
                 .afterGrade(dto.getAfterGrade())
                 .beforeScore(dto.getBeforeScore())
@@ -48,7 +52,14 @@ public class CalibrationLogService {
     }
 
     @Transactional(readOnly = true)
-    public List<CalibrationLogResDto> listByEvaluation(UUID evaluationId) {
+    public List<CalibrationLogResDto> listByEvaluation(UUID evaluationId, UUID companyId) {
+        Evaluation evaluation = evaluationRepository.findById(evaluationId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가를 찾을 수 없습니다."));
+
+        if (!evaluation.getEvaluationPolicy().getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "타사 평가의 조정 내역을 조회할 수 없습니다.");
+        }
+
         return calibrationLogRepository.findByEvaluation_EvaluationIdOrderByAdjustedAtDesc(evaluationId)
                 .stream()
                 .map(CalibrationLogResDto::from)
