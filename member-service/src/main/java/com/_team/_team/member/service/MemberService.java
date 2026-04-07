@@ -4,6 +4,7 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.service.MailService;
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.event.MemberChangedEvent;
 import com._team._team.event.MemberDeletedEvent;
 import com._team._team.event.MemberSavedEvent;
@@ -17,6 +18,7 @@ import com._team._team.member.domain.enums.*;
 import com._team._team.member.dto.reqdto.*;
 import com._team._team.member.dto.resdto.*;
 import com._team._team.member.repository.*;
+import com._team._team.notification.NotificationType;
 import com._team._team.organization.domain.JobGrade;
 import com._team._team.organization.domain.JobTitle;
 import com._team._team.organization.domain.Organization;
@@ -892,6 +894,16 @@ public class MemberService {
         }
         // 아웃박스 저장
         eventPublisher.publishEvent(new MemberChangedEvent(targetMemberId));
+
+        // 알림 발행
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(targetMemberId)
+                .senderId(memberId)
+                .notificationType(NotificationType.MEMBER_INFO_UPDATED)
+                .content("인사 정보가 수정됐습니다.")
+                .targetId(targetMemberId)
+                .targetType("MEMBER")
+                .build());
     }
 
     // 변경 유형 판별

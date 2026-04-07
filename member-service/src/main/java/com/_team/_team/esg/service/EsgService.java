@@ -2,6 +2,7 @@ package com._team._team.esg.service;
 
 import com._team._team.company.domain.Company;
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.esg.domain.*;
 import com._team._team.esg.domain.enums.*;
 import com._team._team.esg.dtos.reqdto.*;
@@ -9,10 +10,12 @@ import com._team._team.esg.dtos.resdto.*;
 import com._team._team.esg.repository.*;
 import com._team._team.member.domain.Member;
 import com._team._team.member.repository.MemberRepository;
+import com._team._team.notification.NotificationType;
 import com._team._team.s3.S3Uploader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,9 +42,10 @@ public class EsgService {
     private final EsgShopItemRepository shopItemRepository;
     private final EsgShopOrderRepository shopOrderRepository;
     private final S3Uploader s3Uploader;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public EsgService(MemberRepository memberRepository, EsgCompanyConfigRepository configRepository, EsgActivitySubjectRepository subjectRepository, EsgActivityRepository activityRepository, EsgPointHistoryRepository pointHistoryRepository, EsgScoreRepository scoreRepository, EsgCampaignRepository campaignRepository, EsgCampaignMemberRepository campaignMemberRepository, EsgShopItemRepository shopItemRepository, EsgShopOrderRepository shopOrderRepository, S3Uploader s3Uploader) {
+    public EsgService(MemberRepository memberRepository, EsgCompanyConfigRepository configRepository, EsgActivitySubjectRepository subjectRepository, EsgActivityRepository activityRepository, EsgPointHistoryRepository pointHistoryRepository, EsgScoreRepository scoreRepository, EsgCampaignRepository campaignRepository, EsgCampaignMemberRepository campaignMemberRepository, EsgShopItemRepository shopItemRepository, EsgShopOrderRepository shopOrderRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher) {
         this.memberRepository = memberRepository;
         this.configRepository = configRepository;
         this.subjectRepository = subjectRepository;
@@ -53,6 +57,7 @@ public class EsgService {
         this.shopItemRepository = shopItemRepository;
         this.shopOrderRepository = shopOrderRepository;
         this.s3Uploader = s3Uploader;
+        this.eventPublisher = eventPublisher;
     }
 
 
@@ -203,6 +208,15 @@ public class EsgService {
                     activity.getSubject().getTitle() + " 활동 승인"
             );
         }
+        // 알림 발행
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(activity.getMember().getMemberId())
+                .senderId(approver.getMemberId())
+                .notificationType(NotificationType.ESG_ACTIVITY_APPROVED)
+                .content(activity.getSubject().getTitle() + " 활동이 승인됐습니다. +" + points + "P")
+                .targetId(activity.getEsgActivityId())
+                .targetType("ESG_ACTIVITY")
+                .build());
     }
 
     public void rejectActivity(UUID memberId, UUID activityId, EsgRejectReqDto reqDto) {
@@ -216,6 +230,16 @@ public class EsgService {
         }
 
         activity.reject(approver.getMemberId(), reqDto.getReason());
+
+        // 알림 발행
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(activity.getMember().getMemberId())
+                .senderId(approver.getMemberId())
+                .notificationType(NotificationType.ESG_ACTIVITY_REJECTED)
+                .content(activity.getSubject().getTitle() + " 활동이 반려됐습니다. 사유: " + reqDto.getReason())
+                .targetId(activity.getEsgActivityId())
+                .targetType("ESG_ACTIVITY")
+                .build());
     }
 
 
@@ -322,6 +346,16 @@ public class EsgService {
                     campaign.getTitle() + " 캠페인 완료"
             );
         }
+
+        // 알림 발행
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(target.getMemberId())
+                .senderId(manager.getMemberId())
+                .notificationType(NotificationType.ESG_CAMPAIGN_CLOSED)
+                .content(campaign.getTitle() + " 캠페인이 완료 처리됐습니다.")
+                .targetId(campaign.getEsgCampaignId())
+                .targetType("ESG_CAMPAIGN")
+                .build());
     }
 
     public void closeCampaign(UUID memberId, UUID campaignId) {
@@ -434,6 +468,15 @@ public class EsgService {
                 item.getTitle() + " 구매"
         );
 
+        // 알림 발행
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(member.getMemberId())
+                .notificationType(NotificationType.ESG_SHOP_ORDER_COMPLETE)
+                .content(item.getTitle() + " 구매가 완료됐습니다. -" + item.getRequiredPoints() + "P")
+                .targetId(order.getEsgShopOrderId())
+                .targetType("ESG_SHOP_ORDER")
+                .build());
+
         return order.getEsgShopOrderId();
     }
 
@@ -506,6 +549,14 @@ public class EsgService {
                 EsgPointHistory.earn(member, referenceType, referenceId,
                         points, currentBalance + points, description)
         );
+        // 알림 발행
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(member.getMemberId())
+                .notificationType(NotificationType.ESG_POINT_EARNED)
+                .content(description + " +" + points + "P 적립됐습니다. 잔액: " + (currentBalance + points) + "P")
+                .targetId(referenceId)
+                .targetType(referenceType.name())
+                .build());
     }
 
     private void usePoint(Member member, ReferenceType referenceType,

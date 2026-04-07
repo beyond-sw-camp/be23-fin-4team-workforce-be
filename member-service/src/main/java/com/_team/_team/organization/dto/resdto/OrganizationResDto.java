@@ -30,6 +30,7 @@ public class OrganizationResDto {
                 .displayOrder(organization.getDisplayOrder())
                 .children(organization.getChildren() != null ?
                         organization.getChildren().stream()
+                                .filter(child -> "NO".equals(child.getDelYn()))
                                 .map(OrganizationResDto::fromEntity)
                                 .collect(Collectors.toList()) : null)
                 .build();

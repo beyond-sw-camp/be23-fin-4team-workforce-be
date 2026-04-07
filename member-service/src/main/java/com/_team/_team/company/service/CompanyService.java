@@ -2,6 +2,7 @@ package com._team._team.company.service;
 
 import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
+import com._team._team.company.dto.resdto.CompanyInfoResDto;
 import com._team._team.company.repository.CompanyRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.esg.service.EsgService;
@@ -203,5 +204,12 @@ public class CompanyService {
         SecureRandom random = new SecureRandom();
         int code = random.nextInt(900000) + 100000;
         return String.valueOf(code);
+    }
+    @Transactional(readOnly = true)
+    public CompanyInfoResDto getCompanyInfo(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
+        return CompanyInfoResDto.fromEntity(member.getCompany());
     }
 }
