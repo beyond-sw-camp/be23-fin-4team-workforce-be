@@ -31,7 +31,7 @@ public class PeerAssignmentService {
     }
 
     @Transactional
-    public PeerAssignmentResDto assign(PeerAssignmentCreateReqDto dto) {
+    public PeerAssignmentResDto assign(PeerAssignmentCreateReqDto dto, UUID requesterId) {
         boolean duplicate = peerAssignmentRepository.existsByEvaluation_EvaluationIdAndEvaluateeIdAndPeerMemberId(
                 dto.getEvaluationId(), dto.getEvaluateeId(), dto.getPeerMemberId());
         if (duplicate) {
@@ -45,7 +45,7 @@ public class PeerAssignmentService {
                 .evaluation(evaluation)
                 .evaluateeId(dto.getEvaluateeId())
                 .peerMemberId(dto.getPeerMemberId())
-                .assignedBy(dto.getAssignedBy())
+                .assignedBy(requesterId) // DTO가 아닌 인증된 사용자 ID 사용
                 .status(PeerAssignmentStatus.PENDING)
                 .build();
 
@@ -61,16 +61,26 @@ public class PeerAssignmentService {
     }
 
     @Transactional
-    public void complete(UUID peerAssignmentId) {
+    public void complete(UUID peerAssignmentId, UUID requesterId) {
         PeerAssignment peerAssignment = peerAssignmentRepository.findById(peerAssignmentId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "동료 평가 배정을 찾을 수 없습니다."));
+
+        if (!peerAssignment.getPeerMemberId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "자신에게 배정된 동료 평가만 완료할 수 있습니다.");
+        }
+
         peerAssignment.complete();
     }
 
     @Transactional
-    public void decline(UUID peerAssignmentId) {
+    public void decline(UUID peerAssignmentId, UUID requesterId) {
         PeerAssignment peerAssignment = peerAssignmentRepository.findById(peerAssignmentId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "동료 평가 배정을 찾을 수 없습니다."));
+
+        if (!peerAssignment.getPeerMemberId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "자신에게 배정된 동료 평가만 거절할 수 있습니다.");
+        }
+
         peerAssignment.decline();
     }
 }

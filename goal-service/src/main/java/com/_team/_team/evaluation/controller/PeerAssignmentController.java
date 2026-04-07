@@ -17,7 +17,7 @@ import java.util.UUID;
 
 // 동료 평가 배정, 조회, 완료, 거절 컨트롤러
 @RestController
-@RequestMapping("/goal/peer-assignment")
+@RequestMapping("/evaluation/peer-assignment")
 public class PeerAssignmentController {
 
     final PeerAssignmentService peerAssignmentService;
@@ -31,8 +31,9 @@ public class PeerAssignmentController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.CREATE)
     @PostMapping
     public ResponseEntity<ApiResponse<PeerAssignmentResDto>> assign(
+            @RequestHeader("X-Member-Id") String memberId,
             @Valid @RequestBody PeerAssignmentCreateReqDto dto) {
-        PeerAssignmentResDto result = peerAssignmentService.assign(dto);
+        PeerAssignmentResDto result = peerAssignmentService.assign(dto, UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(result, "동료 평가 배정이 완료되었습니다."));
     }
 
@@ -49,16 +50,20 @@ public class PeerAssignmentController {
     // 동료 평가 완료 처리
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PatchMapping("/{peerAssignmentId}/complete")
-    public ResponseEntity<ApiResponse<Void>> complete(@PathVariable UUID peerAssignmentId) {
-        peerAssignmentService.complete(peerAssignmentId);
+    public ResponseEntity<ApiResponse<Void>> complete(
+            @RequestHeader("X-Member-Id") String memberId,
+            @PathVariable UUID peerAssignmentId) {
+        peerAssignmentService.complete(peerAssignmentId, UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(null, "동료 평가가 완료되었습니다."));
     }
 
     // 동료 평가 거절 처리
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PatchMapping("/{peerAssignmentId}/decline")
-    public ResponseEntity<ApiResponse<Void>> decline(@PathVariable UUID peerAssignmentId) {
-        peerAssignmentService.decline(peerAssignmentId);
+    public ResponseEntity<ApiResponse<Void>> decline(
+            @RequestHeader("X-Member-Id") String memberId,
+            @PathVariable UUID peerAssignmentId) {
+        peerAssignmentService.decline(peerAssignmentId, UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(null, "동료 평가가 거절되었습니다."));
     }
 }

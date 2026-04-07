@@ -20,17 +20,17 @@ public class Evaluation extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "evaluation_id", columnDefinition = "BINARY(16)")
+    @Column(name = "evaluation_id")
     private UUID evaluationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "evaluation_policy_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private EvaluationPolicy evaluationPolicy;
 
-    @Column(name = "evaluator_id", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "evaluator_id", nullable = false)
     private UUID evaluatorId;
 
-    @Column(name = "evaluatee_id", columnDefinition = "BINARY(16)", nullable = false)
+    @Column(name = "evaluatee_id", nullable = false)
     private UUID evaluateeId;
 
     @Enumerated(EnumType.STRING)
@@ -90,11 +90,15 @@ public class Evaluation extends BaseTimeEntity {
     }
 
     public void updateScores(BigDecimal quantScore, BigDecimal qualScore,
-                             String goalScoresJson, String rubricScoresJson) {
+                             String goalScoresJson, String rubricScoresJson,
+                             String comment, String strengthComment, String improveComment) {
         this.quantScore = quantScore;
         this.qualScore = qualScore;
         this.goalScoresJson = goalScoresJson;
         this.rubricScoresJson = rubricScoresJson;
+        this.comment = comment;
+        this.strengthComment = strengthComment;
+        this.improveComment = improveComment;
     }
 
     public void flagBias(String biasType) {

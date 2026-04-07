@@ -31,23 +31,33 @@ public class GoalController {
     @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
     @PostMapping
     public ApiResponse<GoalResDto> createGoal(
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid GoalCreateReqDto dto) {
-        return ApiResponse.success(goalService.createGoal(dto), "목표가 생성되었습니다.");
+        return ApiResponse.success(goalService.createGoal(dto, UUID.fromString(memberId), UUID.fromString(companyId)), "목표가 생성되었습니다.");
     }
 
     // 목표 목록 조회
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping
     public ApiResponse<List<GoalResDto>> listGoals(
-            @RequestParam UUID companyId) {
-        return ApiResponse.success(goalService.listGoals(companyId), "목표 목록 조회 성공");
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                goalService.listGoals(UUID.fromString(companyId), UUID.fromString(memberId), UUID.fromString(companyId)),
+                "목표 목록 조회 성공");
     }
 
     // 목표 상세 조회
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/{goalId}")
-    public ApiResponse<GoalResDto> getGoal(@PathVariable UUID goalId) {
-        return ApiResponse.success(goalService.getGoal(goalId), "목표 조회 성공");
+    public ApiResponse<GoalResDto> getGoal(
+            @PathVariable UUID goalId,
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                goalService.getGoal(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
+                "목표 조회 성공");
     }
 
     // 목표 수정
@@ -55,8 +65,11 @@ public class GoalController {
     @PatchMapping("/{goalId}")
     public ApiResponse<GoalResDto> updateGoal(
             @PathVariable UUID goalId,
-            @RequestBody @Valid GoalUpdateReqDto dto) {
-        return ApiResponse.success(goalService.updateGoal(goalId, dto), "목표가 수정되었습니다.");
+            @RequestBody @Valid GoalUpdateReqDto dto,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                goalService.updateGoal(goalId, dto, UUID.fromString(companyId)),
+                "목표가 수정되었습니다.");
     }
 
     // 목표 활성화
@@ -64,21 +77,32 @@ public class GoalController {
     @PatchMapping("/{goalId}/activate")
     public ApiResponse<GoalResDto> activateGoal(
             @PathVariable UUID goalId,
-            @RequestHeader("X-Member-Id") String memberId) {
-        return ApiResponse.success(goalService.activateGoal(goalId, UUID.fromString(memberId)), "목표가 활성화되었습니다.");
+            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                goalService.activateGoal(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
+                "목표가 활성화되었습니다.");
     }
 
     // 목표 완료
     @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
     @PatchMapping("/{goalId}/complete")
-    public ApiResponse<GoalResDto> completeGoal(@PathVariable UUID goalId) {
-        return ApiResponse.success(goalService.completeGoal(goalId), "목표가 완료되었습니다.");
+    public ApiResponse<GoalResDto> completeGoal(
+            @PathVariable UUID goalId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                goalService.completeGoal(goalId, UUID.fromString(companyId)),
+                "목표가 완료되었습니다.");
     }
 
     // 목표 취소
     @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
     @PatchMapping("/{goalId}/cancel")
-    public ApiResponse<GoalResDto> cancelGoal(@PathVariable UUID goalId) {
-        return ApiResponse.success(goalService.cancelGoal(goalId), "목표가 취소되었습니다.");
+    public ApiResponse<GoalResDto> cancelGoal(
+            @PathVariable UUID goalId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                goalService.cancelGoal(goalId, UUID.fromString(companyId)),
+                "목표가 취소되었습니다.");
     }
 }
