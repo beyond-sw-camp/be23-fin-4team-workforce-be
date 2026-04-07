@@ -54,6 +54,8 @@ public class GoalCreateReqDto {
     @NotNull(message = "단위 유형은 필수입니다.")
     private UnitType unitType;
 
+    /** 비어 있으면 KPI 템플릿의 단위 표시명이 사용됩니다. */
+    @Size(max = 20, message = "단위 표시명은 20자 이하여야 합니다.")
     private String unitLabel;
 
     @NotNull(message = "기준값은 필수입니다.")

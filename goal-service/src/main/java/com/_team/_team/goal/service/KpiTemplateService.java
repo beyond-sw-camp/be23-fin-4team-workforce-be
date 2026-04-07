@@ -36,6 +36,7 @@ public class KpiTemplateService {
                 .name(dto.getName())
                 .measureType(dto.getMeasureType())
                 .unitType(dto.getUnitType())
+                .unitLabel(dto.getUnitLabel())
                 .cycle(dto.getCycle())
                 .capPct(dto.getCapPct())
                 .isActive(true)

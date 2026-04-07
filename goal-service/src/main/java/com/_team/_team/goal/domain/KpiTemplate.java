@@ -36,6 +36,10 @@ public class KpiTemplate extends BaseTimeEntity {
     @Column(name = "unit_type", nullable = false)
     private UnitType unitType;
 
+    /** 화면 표시용 단위명 (예: %, 건, 시간) */
+    @Column(name = "unit_label", length = 20, nullable = false)
+    private String unitLabel;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "cycle", nullable = false)
     private KpiCycle cycle;

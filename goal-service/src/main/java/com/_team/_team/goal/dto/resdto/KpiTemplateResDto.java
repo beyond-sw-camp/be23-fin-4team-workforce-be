@@ -23,6 +23,7 @@ public class KpiTemplateResDto {
     private String name;
     private MeasureType measureType;
     private UnitType unitType;
+    private String unitLabel;
     private KpiCycle cycle;
     private int capPct;
     private boolean isActive;
@@ -36,6 +37,7 @@ public class KpiTemplateResDto {
                 .name(kpiTemplate.getName())
                 .measureType(kpiTemplate.getMeasureType())
                 .unitType(kpiTemplate.getUnitType())
+                .unitLabel(kpiTemplate.getUnitLabel())
                 .cycle(kpiTemplate.getCycle())
                 .capPct(kpiTemplate.getCapPct())
                 .isActive(kpiTemplate.isActive())

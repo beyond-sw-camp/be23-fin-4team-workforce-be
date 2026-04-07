@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,6 +31,10 @@ public class KpiTemplateCreateReqDto {
 
     @NotNull(message = "단위 유형은 필수입니다.")
     private UnitType unitType;
+
+    @NotBlank(message = "단위 표시명은 필수입니다.")
+    @Size(max = 20, message = "단위 표시명은 20자 이하여야 합니다.")
+    private String unitLabel;
 
     @NotNull(message = "측정 주기는 필수입니다.")
     private KpiCycle cycle;

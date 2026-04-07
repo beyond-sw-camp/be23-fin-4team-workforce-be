@@ -59,6 +59,11 @@ public class GoalService {
                     "비활성 KPI 템플릿으로 목표를 생성할 수 없습니다. id=" + dto.getKpiTemplateId());
         }
 
+        String unitLabel = dto.getUnitLabel();
+        if (unitLabel == null || unitLabel.isBlank()) {
+            unitLabel = kpiTemplate.getUnitLabel();
+        }
+
         Goal parentGoal = null;
         if (dto.getParentGoalId() != null) {
             parentGoal = goalRepository.findById(dto.getParentGoalId())
@@ -83,7 +88,7 @@ public class GoalService {
                 .endDate(dto.getEndDate())
                 .measureType(dto.getMeasureType())
                 .unitType(dto.getUnitType())
-                .unitLabel(dto.getUnitLabel())
+                .unitLabel(unitLabel)
                 .baseline(dto.getBaseline())
                 .targetValue(dto.getTargetValue())
                 .capPct(dto.getCapPct())
