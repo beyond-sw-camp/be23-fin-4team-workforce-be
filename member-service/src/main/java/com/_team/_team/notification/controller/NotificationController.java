@@ -4,6 +4,7 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.notification.service.NotificationService;
 import com._team._team.notification.sse.SseEmitterManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,11 +15,16 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/notification")
-@RequiredArgsConstructor
 public class NotificationController {
 
     private final SseEmitterManager sseEmitterManager;
     private final NotificationService notificationService;
+
+    @Autowired
+    public NotificationController(SseEmitterManager sseEmitterManager, NotificationService notificationService) {
+        this.sseEmitterManager = sseEmitterManager;
+        this.notificationService = notificationService;
+    }
 
     // SSE 구독
     @GetMapping(value = "/subscribe",
