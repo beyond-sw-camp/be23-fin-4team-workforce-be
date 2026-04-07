@@ -1,17 +1,21 @@
 package com._team._team.notification;
 
 import com._team._team.redis.MessagePublisher;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class KafkaMessagePublisher implements MessagePublisher {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    @Autowired
+    public KafkaMessagePublisher(KafkaTemplate<String, Object> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
+    }
 
     @Override
     public void publish(String topic, String message) {

@@ -102,6 +102,10 @@ public class Member extends BaseTimeEntity {
     @Builder.Default
     private String delYn = "NO";
 
+    @Column(nullable = false)
+    @Builder.Default
+    private int esgScore = 0;
+
     // 비즈니스 메서드
     public void updateDefaultPosition(UUID defaultPositionId) {
         this.defaultPositionId = defaultPositionId;
@@ -177,5 +181,9 @@ public class Member extends BaseTimeEntity {
         if (bankAccount != null) this.bankAccount = bankAccount;
         if (extensionNumber != null) this.extensionNumber = extensionNumber;
         if (telNumber != null) this.telNumber = telNumber;
+    }
+
+    public void updateEsgScore(int score) {
+        this.esgScore = score;
     }
 }

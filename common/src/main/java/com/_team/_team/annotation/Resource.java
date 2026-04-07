@@ -13,7 +13,9 @@ public enum Resource {
     APPROVAL("RE005", "전자결재"),
     ROLE("RE006", "역할/권한 관리"),
     GOAL("RE007", "목표 관리"),         // ← 추가
-    EVALUATION("RE008", "평가 관리");
+    EVALUATION("RE008", "평가 관리"),
+    ESG("RE009", "ESG 관리");
+
 
     private final String codeValue;
     private final String codeName;
