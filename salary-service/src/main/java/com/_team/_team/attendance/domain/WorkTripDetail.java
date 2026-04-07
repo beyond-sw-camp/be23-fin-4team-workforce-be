@@ -3,6 +3,7 @@ package com._team._team.attendance.domain;
 import com._team._team.attendance.domain.enums.ExpenseStatus;
 import com._team._team.attendance.domain.enums.ExpenseType;
 import com._team._team.attendance.domain.enums.WorkTripType;
+import com._team._team.attendance.dto.reqDto.WorkTripUpdateReqDto;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -70,4 +71,36 @@ public class WorkTripDetail extends BaseTimeEntity {
     @Column(nullable = false)
     @Builder.Default
     private String delYn = "N";
+
+    /**
+     * 출장/외근 정보 수정 (부분 업데이트)
+     */
+    public void update(WorkTripUpdateReqDto reqDto) {
+        if (reqDto.getWorkTripType() != null) {
+            this.workTripType = reqDto.getWorkTripType();
+        }
+        if (reqDto.getDestination() != null) {
+            this.destination = reqDto.getDestination();
+        }
+        if (reqDto.getDestinationLat() != null) {
+            this.destinationLat = reqDto.getDestinationLat();
+        }
+        if (reqDto.getDestinationLng() != null) {
+            this.destinationLng = reqDto.getDestinationLng();
+        }
+        if (reqDto.getPurpose() != null) {
+            this.purpose = reqDto.getPurpose();
+        }
+        if (reqDto.getExpenseAmount() != null) {
+            this.expenseAmount = reqDto.getExpenseAmount();
+        }
+        if (reqDto.getExpenseType() != null) {
+            this.expenseType = reqDto.getExpenseType();
+        }
+    }
+
+    /** 소프트 삭제 */
+    public void delete() {
+        this.delYn = "Y";
+    }
 }
