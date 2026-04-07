@@ -27,25 +27,20 @@ public class MemberResDto {
     private EmploymentType employmentType;
     private MemberStatus memberStatus;
     private AccountStatus accountStatus;
-    private String phoneNumber;
-    private String phonePublicYn;
-    private String address;
-    private String addressPublicYn;
-    private String bank;
-    private String bankAccount;
     private String profileUrl;
     private String extensionNumber;
     private String telNumber;
 
-    // 포지션 정보 ← 추가
+    // phonePublicYn = YES 일 때만 노출
+    private String phoneNumber;
+
+    // 포지션 정보
     private UUID memberPositionId;
     private String organizationName;
     private String jobGradeName;
     private String jobTitleName;
     private String roleName;
 
-
-    // fromEntity
     public static MemberResDto fromEntity(Member member) {
         return MemberResDto.builder()
                 .memberId(member.getMemberId())
@@ -56,19 +51,15 @@ public class MemberResDto {
                 .employmentType(member.getEmploymentType())
                 .memberStatus(member.getMemberStatus())
                 .accountStatus(member.getAccountStatus())
-                .phoneNumber(member.getPhoneNumber())
-                .phonePublicYn(member.getPhonePublicYn())
-                .address(member.getAddress())
-                .addressPublicYn(member.getAddressPublicYn())
-                .bank(member.getBank())
-                .bankAccount(member.getBankAccount())
                 .profileUrl(member.getProfileUrl())
                 .extensionNumber(member.getExtensionNumber())
                 .telNumber(member.getTelNumber())
+                // phonePublicYn 확인 후 노출
+                .phoneNumber("YES".equals(member.getPhonePublicYn())
+                        ? member.getPhoneNumber() : null)
                 .build();
     }
 
-    // 포지션 정보 포함 버전
     public static MemberResDto fromEntity(Member member, MemberPosition position) {
         return MemberResDto.builder()
                 .memberId(member.getMemberId())
@@ -79,15 +70,11 @@ public class MemberResDto {
                 .employmentType(member.getEmploymentType())
                 .memberStatus(member.getMemberStatus())
                 .accountStatus(member.getAccountStatus())
-                .phoneNumber(member.getPhoneNumber())
-                .phonePublicYn(member.getPhonePublicYn())
-                .address(member.getAddress())
-                .addressPublicYn(member.getAddressPublicYn())
-                .bank(member.getBank())
-                .bankAccount(member.getBankAccount())
                 .profileUrl(member.getProfileUrl())
                 .extensionNumber(member.getExtensionNumber())
                 .telNumber(member.getTelNumber())
+                .phoneNumber("YES".equals(member.getPhonePublicYn())
+                        ? member.getPhoneNumber() : null)
                 .memberPositionId(position.getMemberPositionId())
                 .organizationName(position.getOrganization().getName())
                 .jobGradeName(position.getJobGrade().getName())
