@@ -1,4 +1,4 @@
-package com._team._team.approval.dtos.resdto;
+package com._team._team.approval.dto.resdto;
 
 import com._team._team.approval.domain.Approval;
 import com._team._team.approval.domain.ApprovalRequest;

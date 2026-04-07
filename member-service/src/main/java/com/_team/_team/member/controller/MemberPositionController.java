@@ -15,7 +15,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/member-position")
+@RequestMapping("/member/position")
 public class MemberPositionController {
 
     private final MemberPositionRepository memberPositionRepository;

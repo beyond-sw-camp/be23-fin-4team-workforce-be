@@ -1,4 +1,4 @@
-package com._team._team.approval.dtos.resdto;
+package com._team._team.approval.dto.resdto;
 
 import com._team._team.approval.domain.ApprovalViewer;
 import com._team._team.approval.domain.enums.ViewerReadStatus;
@@ -19,7 +19,8 @@ public class ApprovalViewerResDto {
 
     private UUID viewerId;
     private UUID requestId;
-    private UUID memberId;
+    private UUID viewerMemberId;
+    private UUID viewerMemberPositionId;
     private ViewerType viewerType;
     private ViewerReadStatus viewerReadStatus;
     private LocalDateTime viewedAt;
@@ -30,7 +31,8 @@ public class ApprovalViewerResDto {
         return ApprovalViewerResDto.builder()
                 .viewerId(entity.getViewerId())
                 .requestId(entity.getApprovalRequest().getRequestId())
-                .memberId(entity.getMemberId())
+                .viewerMemberId(entity.getViewerMemberId())
+                .viewerMemberPositionId(entity.getViewerMemberPositionId())
                 .viewerType(entity.getViewerType())
                 .viewerReadStatus(entity.getViewerReadStatus())
                 .viewedAt(entity.getViewedAt())

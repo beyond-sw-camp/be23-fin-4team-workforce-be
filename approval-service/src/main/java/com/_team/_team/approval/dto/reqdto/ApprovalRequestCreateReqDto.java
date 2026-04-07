@@ -1,8 +1,7 @@
-package com._team._team.approval.dtos.reqdto;
+package com._team._team.approval.dto.reqdto;
 
 import com._team._team.approval.domain.enums.RequestStatus;
 import com._team._team.approval.domain.enums.ViewerType;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,7 +26,6 @@ public class ApprovalRequestCreateReqDto {
     @NotNull(message = "요청 상태는 필수입니다.")
     private RequestStatus requestStatus; // DRAFT or WAIT
 
-    @Valid
     private List<ApprovalLineItem> approvalLines;
 
     private List<ViewerItem> viewers;
@@ -42,7 +40,10 @@ public class ApprovalRequestCreateReqDto {
         private Integer stepOrder;
 
         @NotNull(message = "결재자 직위 ID는 필수입니다.")
-        private UUID memberPositionId;
+        private UUID approverMemberId;
+
+        @NotNull
+        private UUID approverMemberPositionId;
     }
 
     @AllArgsConstructor
@@ -52,7 +53,10 @@ public class ApprovalRequestCreateReqDto {
     public static class ViewerItem {
 
         @NotNull(message = "참조/공람자 ID는 필수입니다.")
-        private UUID memberId;
+        private UUID viewerMemberId;
+
+        @NotNull(message = "참조/공람자 직위 ID는 필수입니다.")
+        private UUID viewerMemberPositionId;
 
         @NotNull(message = "참조/공람 구분은 필수입니다.")
         private ViewerType viewerType; // CC or CIRCULATION

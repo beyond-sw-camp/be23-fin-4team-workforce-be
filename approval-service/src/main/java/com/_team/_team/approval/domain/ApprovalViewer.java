@@ -4,16 +4,13 @@ import com._team._team.approval.domain.enums.ViewerReadStatus;
 import com._team._team.approval.domain.enums.ViewerType;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @AllArgsConstructor
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Builder
 @Entity
@@ -28,7 +25,10 @@ public class ApprovalViewer extends BaseTimeEntity {
     private ApprovalRequest approvalRequest;
 
     @Column(nullable = false)
-    private UUID memberId;
+    private UUID viewerMemberId;
+
+    @Column(nullable = false)
+    private UUID viewerMemberPositionId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

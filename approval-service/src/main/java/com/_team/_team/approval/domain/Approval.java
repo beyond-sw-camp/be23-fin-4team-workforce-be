@@ -1,19 +1,15 @@
 package com._team._team.approval.domain;
 
-import com._team._team.approval.domain.enums.ApprovalStatus;
 import com._team._team.approval.domain.enums.LineStatus;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @AllArgsConstructor
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Builder
 @Entity
@@ -28,7 +24,10 @@ public class Approval extends BaseTimeEntity {
     private ApprovalRequest request;
 
     @Column(nullable = false)
-    private UUID memberPositionId;
+    private UUID approverMemberPositionId;
+
+    @Column(nullable = false)
+    private UUID approverMemberId;
 
     @Column(nullable = false)
     private Integer stepOrder;
@@ -55,8 +54,9 @@ public class Approval extends BaseTimeEntity {
     @Column(length = 45)
     private String ipAddress; // 감사 로그용
 
-    public void approve() {
+    public void approve(String comment) {
         this.approvalStatus = LineStatus.APPROVED;
+        this.comment = comment;
         this.actedAt = LocalDateTime.now();
     }
 
@@ -76,6 +76,10 @@ public class Approval extends BaseTimeEntity {
         this.signatureImageUrl = signatureImageUrl;
         this.documentHash = documentHash;
         this.ipAddress = ipAddress;
+    }
+
+    public void activate() {
+        this.approvalStatus = LineStatus.PENDING;
     }
 
 
