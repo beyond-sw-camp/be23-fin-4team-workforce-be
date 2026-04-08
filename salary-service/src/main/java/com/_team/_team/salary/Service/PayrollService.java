@@ -84,25 +84,20 @@ public class PayrollService {
 
         long totalPayment = 0L;
         long totalDeduction = 0L;
-        List<PayrollItem> items = new ArrayList<>();
+        List<PayrollItem> payrollItems = new ArrayList<>();
 
         for (SalaryItemTemplate template : templates) {
             /**
              * "기본급" 항목이면 Salary의 baseSalary를 금액으로 자동 세팅
              * 그 외 항목(식대, 교통비, 소득세 등)은 0원으로 생성 → DRAFT 상태에서 수정
+             * 추후 각 직원들의 항목 금액 계산식 구축 예정
              */
             long amount = template.getItemName().equals("기본급")
                     ? salary.getBaseSalary() : 0L;
 
-            PayrollItem item = PayrollItem.builder()
-                    .payroll(saved)
-                    .itemName(template.getItemName())
-                    .itemType(template.getItemType())
-                    .amount(amount)
-                    .displayOrder(template.getDisplayOrder())
-                    .build();
-
-            items.add(item);
+            /** payrollItem 생성 */
+            PayrollItem payItem = PayrollItem.fromTemplate(saved, template, amount);
+            payrollItems.add(payItem);
 
             /** EARNING/DEDUCTION 분류하여 합계 누적 */
             if (template.getItemType() == ItemType.EARNING) {
@@ -113,7 +108,7 @@ public class PayrollService {
         }
 
         /** saveAll로 배치 저장 (개별 save 대비 INSERT 횟수 최소화) */
-        payrollItemRepository.saveAll(items);
+        payrollItemRepository.saveAll(payrollItems);
 
         /** 5. 합계 자동 계산 (이미 Java에서 계산했으므로 DB 재조회 없음) */
         saved.recalculate(totalPayment, totalDeduction);
@@ -138,8 +133,9 @@ public class PayrollService {
      */
     @Transactional(readOnly = true)
     public List<PayrollResDto> findPayrollByMemberId(UUID companyId, UUID memberId) {
-        return payrollRepository.findByMemberIdAndCompanyIdAndDelYnOrderByPayrollYearMonthDayDesc(memberId, companyId, "N")
-                .stream().map(PayrollResDto::fromEntity).toList();
+        return payrollRepository.findByMemberIdAndCompanyIdAndDelYnOrderByPayrollYearMonthDayDesc(memberId, companyId, "N").stream()
+                .map(PayrollResDto::fromEntity)
+                .toList();
     }
 
     /**
@@ -240,15 +236,8 @@ public class PayrollService {
         }
 
         /** PayrollItem 생성 (템플릿에서 항목명, 유형 복사) */
-        PayrollItem item = PayrollItem.builder()
-                .payroll(payroll)
-                .itemName(template.getItemName())
-                .itemType(template.getItemType())
-                .amount(reqDto.getAmount())
-                .displayOrder(template.getDisplayOrder())
-                .build();
-
-        PayrollItem saved = payrollItemRepository.save(item);
+        PayrollItem payrollItem = reqDto.toEntity(payroll, template);
+        PayrollItem saved = payrollItemRepository.save(payrollItem);
 
         /** 항목 추가 후 Payroll 합계 자동 재계산 */
         recalculatePayroll(payroll);

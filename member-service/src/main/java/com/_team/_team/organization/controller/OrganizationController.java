@@ -195,4 +195,19 @@ public class OrganizationController {
                 HttpStatus.OK
         );
     }
+    /**
+     * 조직도 조회
+     * - 회사 전체 조직 트리
+     * - 조직별 직급별 직원 목록
+     */
+    @GetMapping("/org-chart")
+    public ResponseEntity<?> getOrgChart(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        organizationService.getOrgChart(memberId),
+                        "조직도 조회 성공"),
+                HttpStatus.OK
+        );
+    }
 }

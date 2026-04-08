@@ -26,4 +26,11 @@ public interface EsgPointHistoryRepository extends JpaRepository<EsgPointHistory
             "ORDER BY h.createdAt DESC " +
             "LIMIT 1")
     Optional<EsgPointHistory> findLatestByMember(@Param("member") Member member);
+
+    @Query("SELECT COALESCE(SUM(h.points), 0) FROM EsgPointHistory h " +
+            "WHERE h.member = :member " +
+            "AND h.pointType = 'EARN' " +
+            "AND FUNCTION('DATE_FORMAT', h.createdAt, '%Y-%m') = :yearMonth")
+    int findMonthlyEarnedByMember(@Param("member") Member member,
+                                  @Param("yearMonth") String yearMonth);
 }

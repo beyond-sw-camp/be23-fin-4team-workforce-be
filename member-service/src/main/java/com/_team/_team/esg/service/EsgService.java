@@ -578,13 +578,12 @@ public class EsgService {
     private void validateMonthlyLimit(Member member, int points) {
         EsgCompanyConfig config = getConfig(member.getCompany());
 
-        String currentYearMonth = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        String currentYearMonth = YearMonth.now()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM"));
 
-        int monthlyEarned = activityRepository
-                .findApprovedByMemberAndYearMonth(member, currentYearMonth)
-                .stream()
-                .mapToInt(a -> a.getEarnedPoints() != null ? a.getEarnedPoints() : 0)
-                .sum();
+        // 활동 + 캠페인 전체 적립 포인트 합산
+        int monthlyEarned = pointHistoryRepository
+                .findMonthlyEarnedByMember(member, currentYearMonth);
 
         if (monthlyEarned + points > config.getMonthlyPointLimit()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,

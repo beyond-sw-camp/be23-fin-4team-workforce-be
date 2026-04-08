@@ -1,5 +1,8 @@
 package com._team._team.salary.dto.reqdto;
 
+import com._team._team.salary.domain.Payroll;
+import com._team._team.salary.domain.PayrollItem;
+import com._team._team.salary.domain.SalaryItemTemplate;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,4 +30,14 @@ public class PayrollItemCreateReqDto {
     /** 금액 */
     @NotNull(message = "금액은 필수입니다.")
     private Long amount;
+
+    public PayrollItem toEntity(Payroll payroll, SalaryItemTemplate template) {
+        return PayrollItem.builder()
+                .payroll(payroll)
+                .itemName(template.getItemName())
+                .itemType(template.getItemType())
+                .amount(this.amount)
+                .displayOrder(template.getDisplayOrder())
+                .build();
+    }
 }

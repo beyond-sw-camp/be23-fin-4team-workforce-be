@@ -8,6 +8,7 @@ import com._team._team.search.repository.MemberSearchRepository;
 import com._team._team.search.repository.OrganizationSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -22,7 +23,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SearchService {
 
     private final MemberSearchRepository memberSearchRepository;
@@ -30,12 +30,20 @@ public class SearchService {
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient elasticsearchClient;
 
+    @Autowired
+    public SearchService(MemberSearchRepository memberSearchRepository, OrganizationSearchRepository organizationSearchRepository, ElasticsearchOperations elasticsearchOperations, ElasticsearchClient elasticsearchClient) {
+        this.memberSearchRepository = memberSearchRepository;
+        this.organizationSearchRepository = organizationSearchRepository;
+        this.elasticsearchOperations = elasticsearchOperations;
+        this.elasticsearchClient = elasticsearchClient;
+    }
+
     // 직원 통합 검색
     public Page<MemberSearchResDto> searchEmployees(
-            String query, String companyId, Pageable pageable) {
+            String query, UUID companyId, Pageable pageable) {
 
         Query searchQuery = buildEmployeeSearchQuery(
-                query, companyId, pageable);
+                query, companyId.toString(), pageable);
 
         SearchHits<MemberDocument> searchHits =
                 elasticsearchOperations.search(
@@ -47,16 +55,15 @@ public class SearchService {
                         .fromDocument(hit.getContent()));
     }
 
-    // 조직 트리 조회 (정렬 추가)
-    public List<OrganizationDocument> getOrganizationTree(
-            String companyId) {
+    // 조직 트리 조회
+    public List<OrganizationDocument> getOrganizationTree(UUID companyId) {
         return organizationSearchRepository
-                .findByCompanyIdOrderByLabelAsc(companyId);
+                .findByCompanyIdOrderByLabelAsc(companyId.toString());
     }
 
-    // 조직별 직원 검색 (nested 쿼리)
+    // 조직별 직원 검색
     public Page<MemberSearchResDto> searchEmployeesByOrganization(
-            String organizationId, UUID companyId, Pageable pageable) {
+            UUID organizationId, UUID companyId, Pageable pageable) {
 
         Query searchQuery = new NativeQueryBuilder()
                 .withQuery(q -> q.bool(b -> b
@@ -64,7 +71,7 @@ public class SearchService {
                                 .path("organizationList")
                                 .query(nq -> nq.term(t -> t
                                         .field("organizationList.organizationId")
-                                        .value(organizationId)))))
+                                        .value(organizationId.toString())))))
                         .filter(f -> f.term(t -> t
                                 .field("companyId")
                                 .value(companyId.toString())))))
@@ -85,7 +92,6 @@ public class SearchService {
     private Query buildEmployeeSearchQuery(
             String query, String companyId, Pageable pageable) {
 
-        // 전화번호 검색 (숫자/하이픈만 있는 경우)
         if (query.matches("^[0-9\\-]+$")) {
             return new NativeQueryBuilder()
                     .withQuery(q -> q.bool(b -> b
@@ -99,7 +105,6 @@ public class SearchService {
                     .build();
         }
 
-        // 일반 검색 (이름, 직책, 이메일, 조직)
         return new NativeQueryBuilder()
                 .withQuery(q -> q.bool(b -> b
                         .should(s -> s.multiMatch(mm -> mm
