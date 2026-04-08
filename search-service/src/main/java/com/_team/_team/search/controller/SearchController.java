@@ -2,7 +2,7 @@ package com._team._team.search.controller;
 
 import com._team._team.dto.ApiResponse;
 import com._team._team.search.service.SearchService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,13 +11,18 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequiredArgsConstructor
+@RequestMapping("/search")
 public class SearchController {
 
     private final SearchService searchService;
 
+    @Autowired
+    public SearchController(SearchService searchService) {
+        this.searchService = searchService;
+    }
+
     // 직원 통합 검색
-    @GetMapping("/com/_team/_team/search/employees")
+    @GetMapping("/employees")
     public ResponseEntity<?> searchEmployees(
             @RequestParam String query,
             @RequestHeader("X-User-CompanyId") String companyId,
@@ -32,7 +37,7 @@ public class SearchController {
     }
 
     // 조직 트리 조회
-    @GetMapping("/com/_team/_team/search/organization")
+    @GetMapping("/organization")
     public ResponseEntity<?> getOrganizationTree(
             @RequestHeader("X-User-CompanyId") String companyId) {
         return new ResponseEntity<>(
@@ -44,7 +49,7 @@ public class SearchController {
     }
 
     // 조직별 직원 검색
-    @GetMapping("/com/_team/_team/search/employees/organization")
+    @GetMapping("/employees/organization")
     public ResponseEntity<?> searchEmployeesByOrganization(
             @RequestParam String organizationId,
             @RequestHeader("X-User-CompanyId") UUID companyId,

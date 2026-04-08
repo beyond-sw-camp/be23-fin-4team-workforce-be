@@ -7,13 +7,16 @@ import com._team._team.calendar.dto.reqdto.CalendarEventUpdateReqDto;
 import com._team._team.calendar.dto.resdto.CalendarEventResDto;
 import com._team._team.calendar.repository.CalendarEventRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.member.domain.Member;
 import com._team._team.member.domain.MemberPosition;
 import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
+import com._team._team.notification.NotificationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,12 +36,14 @@ public class CalendarService {
     private final CalendarEventRepository calendarEventRepository;
     private final MemberRepository memberRepository;
     private final MemberPositionRepository memberPositionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository) {
+    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, ApplicationEventPublisher eventPublisher) {
         this.calendarEventRepository = calendarEventRepository;
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
+        this.eventPublisher = eventPublisher;
     }
 
 
@@ -115,6 +120,23 @@ public class CalendarService {
                 .eventType(EventType.TEAM)
                 .isPublicYn("YES")  // 팀 일정은 항상 공개
                 .build();
+
+        // 같은 조직 직원 전체에게 알림
+        memberPositionRepository
+                .findByOrganization_OrganizationIdAndDelYn(reqDto.getOrganizationId(), "NO")
+                .forEach(position -> {
+                    if (!position.getMember().getMemberId().equals(memberId)) {
+                        eventPublisher.publishEvent(NotificationMessage.builder()
+                                .receiverId(position.getMember().getMemberId())
+                                .senderId(memberId)
+                                .notificationType(NotificationType.CALENDAR_TEAM_EVENT_CREATED)
+                                .content("팀 일정이 등록됐습니다. " + reqDto.getTitle()
+                                        + " (" + reqDto.getStartAt().toLocalDate() + ")")
+                                .targetId(event.getCalendarEventId())
+                                .targetType("CALENDAR_EVENT")
+                                .build());
+                    }
+                });
 
         return calendarEventRepository.save(event).getCalendarEventId();
     }
