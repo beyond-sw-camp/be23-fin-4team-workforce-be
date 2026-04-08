@@ -21,6 +21,21 @@ public enum NotificationType {
 
     // 인사
     MEMBER_DORMANT,          // 휴직 처리
-    MEMBER_RETURN            // 복직 처리
+    MEMBER_RETURN,            // 복직 처리
+
+    //ESG
+    ESG_ACTIVITY_APPROVED,   // 활동 승인됨
+    ESG_ACTIVITY_REJECTED,   // 활동 반려됨
+    ESG_POINT_EARNED,        // 포인트 적립됨
+    ESG_CAMPAIGN_STARTED,    // 캠페인 시작
+    ESG_CAMPAIGN_CLOSED,     // 캠페인 종료
+    ESG_SHOP_ORDER_COMPLETE, // 물품 구매 완료
+
+    // 캘린더
+    CALENDAR_TEAM_EVENT_CREATED,  // 팀 일정 등록됨
+
+    // 직원 관리
+    MEMBER_ROLE_CHANGED,     // 역할 변경됨
+    MEMBER_INFO_UPDATED,     // 인사 정보 수정됨
 }
 

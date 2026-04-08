@@ -1,7 +1,10 @@
 package com._team._team.approval.controller;
 
-import com._team._team.approval.dtos.reqdto.ApprovalDocumentCreateReqDto;
-import com._team._team.approval.dtos.resdto.ApprovalDocumentResDto;
+import com._team._team.annotation.Action;
+import com._team._team.annotation.CheckPermission;
+import com._team._team.annotation.Resource;
+import com._team._team.approval.dto.reqdto.ApprovalDocumentCreateReqDto;
+import com._team._team.approval.dto.resdto.ApprovalDocumentResDto;
 import com._team._team.approval.service.ApprovalDocumentService;
 import com._team._team.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -25,6 +28,7 @@ public class ApprovalDocumentController {
     }
 
     // 결재 양식 생성
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.CREATE)
     @PostMapping
     public ResponseEntity<?> create(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -37,6 +41,7 @@ public class ApprovalDocumentController {
     }
 
     // 결재 양식 단건 조회
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.READ)
     @GetMapping("/{documentId}")
     public ResponseEntity<?> findById(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -60,6 +65,7 @@ public class ApprovalDocumentController {
     }
 
     // 회사별 전체 양식 목록 조회 (관리자용)
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.READ)
     @GetMapping
     public ResponseEntity<?> findAll(
             @RequestHeader("X-User-CompanyId") UUID companyId) {
@@ -71,6 +77,7 @@ public class ApprovalDocumentController {
     }
 
     // 결재 양식 활성화
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
     @PatchMapping("/{documentId}/activate")
     public ResponseEntity<?> activate(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -83,6 +90,7 @@ public class ApprovalDocumentController {
     }
 
     // 결재 양식 비활성화
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
     @PatchMapping("/{documentId}/deactivate")
     public ResponseEntity<?> deactivate(
             @RequestHeader("X-User-CompanyId") UUID companyId,

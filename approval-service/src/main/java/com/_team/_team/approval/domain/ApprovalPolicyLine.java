@@ -8,7 +8,7 @@ import lombok.*;
 import java.util.UUID;
 
 @AllArgsConstructor
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Builder
 @Entity
@@ -23,17 +23,7 @@ public class ApprovalPolicyLine extends BaseTimeEntity {
     private ApprovalDocument approvalDocument;
 
     @Column(nullable = false)
-    private Integer stepOrder;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ApproverType approverType; // JOB_TITLE(직책), JOB_GRADE(직급), SPECIFIC(특정인)
-
-    private UUID specificMemberPositionId; // specific일 때 member_position
-
-    private UUID jobGradeId; // job_grade일 때
-
-    private UUID jobTitleId; // job_title일 때
+    private UUID jobGradeId;
 
     @Column(nullable = false)
     @Builder.Default

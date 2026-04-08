@@ -16,7 +16,8 @@ public enum Resource {
     EVALUATION("RE008", "평가 관리"),
     ESG("RE009", "ESG 관리"),
     MEETING("RE010", "면담 관리"),
-    CALENDAR("RE010", "캘린더 관리");
+    CALENDAR("RE010", "캘린더 관리"),
+    APPROVAL_AD("RE011", "결재 관리");
 
     private final String codeValue;
     private final String codeName;

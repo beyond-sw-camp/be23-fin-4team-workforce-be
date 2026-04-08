@@ -40,6 +40,13 @@ public class SalaryService {
         // 적용 기간 검증
         validateDateRange(reqDto.getEffectiveFrom(), reqDto.getEffectiveTo());
 
+        // 이전 급여가 있었을 경우, 이전 급여의 effectiveTo를 자동으로 닫아줌
+        // 새 급여 시작일 전날로 이전 급여 종료
+        salaryRepository.findActiveSalary(reqDto.getMemberId(), companyId, reqDto.getEffectiveFrom())
+                .ifPresent(prevSalary -> {
+                    prevSalary.closeEffectivePeriod(reqDto.getEffectiveFrom().minusDays(1));
+                });
+
         Salary salary = reqDto.toEntity(companyId);
         Salary saved = salaryRepository.save(salary);
         return SalaryResDto.fromEntity(saved);

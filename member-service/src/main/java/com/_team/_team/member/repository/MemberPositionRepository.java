@@ -83,4 +83,7 @@ public interface MemberPositionRepository extends JpaRepository<MemberPosition, 
             "AND mp.isActiveYn = 'YES' AND mp.delYn = 'NO'")
     Optional<MemberPosition> findActiveByIdWithDetails(
             @Param("memberPositionId") UUID memberPositionId);
+
+
+    List<MemberPosition> findByOrganization_OrganizationIdAndDelYn(UUID organizationId, String delYn);
 }

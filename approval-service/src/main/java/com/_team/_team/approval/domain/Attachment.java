@@ -2,15 +2,12 @@ package com._team._team.approval.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.UUID;
 
 @AllArgsConstructor
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Builder
 @Entity
@@ -27,8 +24,8 @@ public class Attachment extends BaseTimeEntity {
     @Column(nullable = false)
     private String fileName;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String url;
+    @Column(nullable = false)
+    private String approvalUrl;
 
     private Long fileSize;
 }

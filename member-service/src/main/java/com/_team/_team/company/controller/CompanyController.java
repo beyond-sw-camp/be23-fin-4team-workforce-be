@@ -82,5 +82,14 @@ public class CompanyController {
                 HttpStatus.OK
         );
     }
+    // 회사 정보 조회
+    @GetMapping("/info")
+    public ResponseEntity<?> getCompanyInfo(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(companyService.getCompanyInfo(memberId), "회사 정보 조회 성공"),
+                HttpStatus.OK
+        );
+    }
 
 }

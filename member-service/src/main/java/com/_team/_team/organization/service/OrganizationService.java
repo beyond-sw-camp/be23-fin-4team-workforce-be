@@ -9,7 +9,6 @@ import com._team._team.member.domain.SearchOutboxEvent;
 import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
 import com._team._team.member.repository.SearchOutboxEventRepository;
-import com._team._team.member.service.MemberService;
 import com._team._team.organization.dto.reqdto.JobGradeReqDto;
 import com._team._team.organization.dto.reqdto.JobTitleReqDto;
 import com._team._team.organization.dto.reqdto.OrganizationReqDto;
@@ -28,9 +27,7 @@ import com._team._team.organization.domain.Organization;
 import com._team._team.organization.repository.JobGradeRepository;
 import com._team._team.organization.repository.JobTitleRepository;
 import com._team._team.organization.repository.OrganizationRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
@@ -504,4 +501,5 @@ public class OrganizationService {
                     e.getMessage());
         }
     }
+
 }
