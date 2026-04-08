@@ -195,15 +195,18 @@ public class OrganizationController {
                 HttpStatus.OK
         );
     }
-
-    // 조직 체인 조회 (하위 → 최상위)
-    @GetMapping("/{organizationId}/chain")
-    public ResponseEntity<?> getOrganizationChain(
-            @PathVariable UUID organizationId) {
+    /**
+     * 조직도 조회
+     * - 회사 전체 조직 트리
+     * - 조직별 직급별 직원 목록
+     */
+    @GetMapping("/org-chart")
+    public ResponseEntity<?> getOrgChart(
+            @RequestHeader("X-User-UUID") UUID memberId) {
         return new ResponseEntity<>(
                 ApiResponse.success(
-                        organizationService.getOrganizationChain(organizationId),
-                        "조직 체인 조회 성공"),
+                        organizationService.getOrgChart(memberId),
+                        "조직도 조회 성공"),
                 HttpStatus.OK
         );
     }

@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -131,10 +132,43 @@ public class CalendarController {
 
 
     /**
+     * 일별 일정 조회
+     * GET /calendar/daily?date=2026-04-07&eventType=PERSONAL
+     */
+    @GetMapping("/daily")
+    public ResponseEntity<?> getDailyEvents(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestParam LocalDate date,
+            @RequestParam(required = false) EventType eventType) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        calendarService.getDailyEvents(memberId, date, eventType),
+                        "일별 일정 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    /**
+     * 주간별 일정 조회
+     * GET /calendar/weekly?date=2026-04-07&eventType=TEAM
+     * date 가 속한 주의 월~일 조회
+     */
+    @GetMapping("/weekly")
+    public ResponseEntity<?> getWeeklyEvents(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestParam LocalDate date,
+            @RequestParam(required = false) EventType eventType) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        calendarService.getWeeklyEvents(memberId, date, eventType),
+                        "주간별 일정 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    /**
      * 월별 일정 조회
-     * - 개인 일정 + 팀 일정 통합 반환
-     * - year, month 파라미터로 조회
-     * - 모든 직원 접근 가능
+     * GET /calendar?year=2026&month=4&eventType=PERSONAL
      */
     @GetMapping
     public ResponseEntity<?> getMonthlyEvents(

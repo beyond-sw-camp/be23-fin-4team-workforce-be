@@ -21,6 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -186,19 +188,55 @@ public class CalendarService {
     }
 
 
-    // 월별 일정 조회 (개인 + 팀 통합)
+    // 일별 조회
     @Transactional(readOnly = true)
-    public List<CalendarEventResDto> getMonthlyEvents(UUID memberId, int year,
-                                                      int month, EventType eventType) {
+    public List<CalendarEventResDto> getDailyEvents(UUID memberId,
+                                                    LocalDate date,
+                                                    EventType eventType) {
+        Member member = getMember(memberId);
+
+        LocalDateTime startAt = date.atStartOfDay();
+        LocalDateTime endAt = date.atTime(23, 59, 59);
+
+        return getEvents(member, startAt, endAt, eventType);
+    }
+
+    // 주간별 조회
+    @Transactional(readOnly = true)
+    public List<CalendarEventResDto> getWeeklyEvents(UUID memberId,
+                                                     LocalDate date,
+                                                     EventType eventType) {
+        Member member = getMember(memberId);
+
+        // 해당 날짜가 속한 주의 월요일 ~ 일요일
+        LocalDateTime startAt = date.with(DayOfWeek.MONDAY).atStartOfDay();
+        LocalDateTime endAt = date.with(DayOfWeek.SUNDAY).atTime(23, 59, 59);
+
+        return getEvents(member, startAt, endAt, eventType);
+    }
+
+    // 월별 조회
+    @Transactional(readOnly = true)
+    public List<CalendarEventResDto> getMonthlyEvents(UUID memberId,
+                                                      int year,
+                                                      int month,
+                                                      EventType eventType) {
         Member member = getMember(memberId);
 
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDateTime startAt = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endAt = yearMonth.atEndOfMonth().atTime(23, 59, 59);
 
+        return getEvents(member, startAt, endAt, eventType);
+    }
+
+    // 공통 조회 로직
+    private List<CalendarEvent> fetchEvents(Member member,
+                                            LocalDateTime startAt,
+                                            LocalDateTime endAt,
+                                            EventType eventType) {
         List<CalendarEvent> events = new ArrayList<>();
 
-        // eventType 없으면 전체 조회, 있으면 해당 타입만 조회
         if (eventType == null || eventType == EventType.PERSONAL) {
             events.addAll(calendarEventRepository
                     .findPersonalByMonth(member, startAt, endAt));
@@ -216,7 +254,15 @@ public class CalendarService {
             }
         }
 
-        return events.stream()
+        return events;
+    }
+
+    private List<CalendarEventResDto> getEvents(Member member,
+                                                LocalDateTime startAt,
+                                                LocalDateTime endAt,
+                                                EventType eventType) {
+        return fetchEvents(member, startAt, endAt, eventType)
+                .stream()
                 .sorted((a, b) -> a.getStartAt().compareTo(b.getStartAt()))
                 .map(CalendarEventResDto::fromEntity)
                 .collect(Collectors.toList());
