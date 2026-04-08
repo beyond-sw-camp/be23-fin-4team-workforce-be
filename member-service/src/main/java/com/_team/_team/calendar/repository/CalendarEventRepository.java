@@ -19,26 +19,26 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, UU
     List<CalendarEvent> findByMemberAndEventTypeAndDelYnOrderByStartAtAsc(
             Member member, EventType eventType, String delYn);
 
-    // 월별 개인 일정 조회
+    // 개인 일정 조회
     @Query("SELECT c FROM CalendarEvent c " +
             "WHERE c.member = :member " +
             "AND c.delYn = 'NO' " +
-            "AND c.startAt >= :startAt " +
             "AND c.startAt < :endAt " +
+            "AND c.endAt >= :startAt " +
             "ORDER BY c.startAt ASC")
     List<CalendarEvent> findPersonalByMonth(
             @Param("member") Member member,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt);
 
-    // 월별 팀 일정 조회 (같은 조직 + 공개 설정)
+    // 팀 일정 조회
     @Query("SELECT c FROM CalendarEvent c " +
             "WHERE c.organizationId = :organizationId " +
             "AND c.eventType = 'TEAM' " +
             "AND c.isPublicYn = 'YES' " +
             "AND c.delYn = 'NO' " +
-            "AND c.startAt >= :startAt " +
             "AND c.startAt < :endAt " +
+            "AND c.endAt >= :startAt " +
             "ORDER BY c.startAt ASC")
     List<CalendarEvent> findTeamByMonth(
             @Param("organizationId") UUID organizationId,
@@ -48,4 +48,6 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, UU
     // 단건 조회
     Optional<CalendarEvent> findByCalendarEventIdAndDelYn(
             UUID calendarEventId, String delYn);
+
+
 }
