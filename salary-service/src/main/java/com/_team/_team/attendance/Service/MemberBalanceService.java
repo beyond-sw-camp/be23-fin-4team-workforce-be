@@ -51,7 +51,7 @@ public class MemberBalanceService {
      * ===== 시나리오 =====
      * 사원이 연차 1일 신청 → approval-service에서 승인
      * → Kafka 이벤트: "memberId=abc, ANNUAL, 1.0일 차감"
-     * → 이 메서드 호출
+     * → 이 메서드 호출 (내부 시스템 API)
      *
      * ===== 워크플로우 =====
      * [단계 1] findWithLock — 비관적 락으로 해당 사원의 잔여 조회
@@ -85,7 +85,7 @@ public class MemberBalanceService {
      * ===== 시나리오 =====
      * 승인된 연차 1일이 취소됨 (사원 취소 or 관리자 반려)
      * → Kafka 이벤트: "memberId=abc, ANNUAL, 1.0일 복구"
-     * → 이 메서드 호출
+     * → 이 메서드 호출 (내부 시스템 API)
      *
      * ===== 차감과 동일하게 비관적 락 사용 =====
      * 복구도 remaining을 변경하는 작업이므로 동시성 보호 필요

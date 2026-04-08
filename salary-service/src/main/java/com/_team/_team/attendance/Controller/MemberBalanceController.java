@@ -65,7 +65,7 @@ public class MemberBalanceController {
         );
     }
 
-    // 휴가 차감 (approval-service 연동)
+    // 휴가 차감 (approval-service 연동) - 내부 시스템 API
     @PostMapping("/use")
     public ResponseEntity<?> useBalance(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -78,7 +78,7 @@ public class MemberBalanceController {
         );
     }
 
-    // 휴가 복구 (취소/반려 시), 승인 취소 or 관리자 반려 시 호출
+    // 휴가 복구 (취소/반려 시), 승인 취소 or 관리자 반려 시 호출 - 내부 시스템 API
     @PostMapping("/restore")
     public ResponseEntity<?> restoreBalance(
             @RequestHeader("X-User-CompanyId") UUID companyId,
