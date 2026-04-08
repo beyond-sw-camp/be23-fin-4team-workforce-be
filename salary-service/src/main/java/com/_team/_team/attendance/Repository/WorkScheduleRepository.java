@@ -15,7 +15,7 @@ import java.util.UUID;
 public interface WorkScheduleRepository extends JpaRepository<WorkSchedule, UUID> {
 
     List<WorkSchedule> findByCompanyIdAndDelYn(UUID companyId, String delYn);
-    Optional<WorkSchedule> findByCompanyIdAndScheduleIdAndDelYn(UUID companyId, UUID scheduleId, String delYn);
+    Optional<WorkSchedule> findByCompanyIdAndWorkScheduleIdAndDelYn(UUID companyId, UUID scheduleId, String delYn);
     /**
      * 특정 날짜에 유효한 스케줄 조회
      * - memberId 매칭 우선, null(회사 기본)은 후순위

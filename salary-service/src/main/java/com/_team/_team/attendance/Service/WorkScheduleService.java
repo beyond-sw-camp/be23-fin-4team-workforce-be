@@ -43,7 +43,7 @@ public class WorkScheduleService {
     @Transactional(readOnly = true)
     public WorkScheduleResDto findSchedule(UUID companyId, UUID scheduleId) {
         WorkSchedule workSchedule = workScheduleRepository
-                .findByCompanyIdAndScheduleIdAndDelYn(companyId, scheduleId, "N")
+                .findByCompanyIdAndWorkScheduleIdAndDelYn(companyId, scheduleId, "N")
                 .orElseThrow(()-> new BusinessException(HttpStatus.NOT_FOUND, "근무 스케줄을 찾을 수 없습니다."));
         return WorkScheduleResDto.fromEntity(workSchedule);
     }
@@ -51,7 +51,7 @@ public class WorkScheduleService {
     /** 스케줄 수정 */
     public WorkScheduleResDto updateSchedule(UUID companyId, UUID scheduleId, WorkScheduleUpdateReqDto reqDto){
         WorkSchedule workSchedule = workScheduleRepository
-                .findByCompanyIdAndScheduleIdAndDelYn(companyId, scheduleId, "N")
+                .findByCompanyIdAndWorkScheduleIdAndDelYn(companyId, scheduleId, "N")
                 .orElseThrow(()-> new BusinessException(HttpStatus.NOT_FOUND, "근무 스케줄을 찾을 수 없습니다."));
         workSchedule.update(reqDto);
         return WorkScheduleResDto.fromEntity(workSchedule);
@@ -60,7 +60,7 @@ public class WorkScheduleService {
     /** 스케줄 삭제 */
     public void deleteSchedule(UUID companyId, UUID scheduleId){
         WorkSchedule workSchedule = workScheduleRepository
-                .findByCompanyIdAndScheduleIdAndDelYn(companyId, scheduleId, "N")
+                .findByCompanyIdAndWorkScheduleIdAndDelYn(companyId, scheduleId, "N")
                 .orElseThrow(()-> new BusinessException(HttpStatus.NOT_FOUND, "근무 스케줄을 찾을 수 없습니다."));
         workSchedule.delete();
     }
