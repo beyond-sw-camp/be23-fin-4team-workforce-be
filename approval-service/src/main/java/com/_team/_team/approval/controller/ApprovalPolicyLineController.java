@@ -1,5 +1,8 @@
 package com._team._team.approval.controller;
 
+import com._team._team.annotation.Action;
+import com._team._team.annotation.CheckPermission;
+import com._team._team.annotation.Resource;
 import com._team._team.approval.dto.reqdto.ApprovalPolicyLineCreateReqDto;
 import com._team._team.approval.dto.resdto.ApprovalPolicyLineResDto;
 import com._team._team.approval.service.ApprovalPolicyLineService;
@@ -25,6 +28,7 @@ public class ApprovalPolicyLineController {
     }
 
     // 결재라인 정책 일괄 저장
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.CREATE)
     @PostMapping
     public ResponseEntity<ApiResponse<List<ApprovalPolicyLineResDto>>> savePolicyLines(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -49,6 +53,7 @@ public class ApprovalPolicyLineController {
     }
 
     // 양식별 결재라인 정책 전체 삭제
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.DELETE)
     @DeleteMapping("/{documentId}")
     public ResponseEntity<ApiResponse<Void>> deletePolicyLines(
             @RequestHeader("X-User-CompanyId") UUID companyId,
