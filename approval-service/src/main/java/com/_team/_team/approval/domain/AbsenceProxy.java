@@ -23,7 +23,7 @@ public class AbsenceProxy extends BaseTimeEntity {
     private UUID memberId; // 부재자(원래 결재자)
 
     @Column(nullable = false)
-    private UUID substituteId; // 대리결재자^^
+    private UUID substituteId; // 대리결재자
 
     @Column(nullable = false)
     private LocalDateTime startDate;

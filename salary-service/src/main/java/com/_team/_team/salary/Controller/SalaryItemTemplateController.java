@@ -4,14 +4,12 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.salary.Service.SalaryItemTemplateService;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateCreateReqDto;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateUpdateReqDto;
-import com._team._team.salary.dto.resdto.SalaryItemTemplateResDto;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -30,55 +28,51 @@ public class SalaryItemTemplateController {
 
     /** 급여 항목 템플릿 생성 */
     @PostMapping("/create")
-    public ResponseEntity<ApiResponse<SalaryItemTemplateResDto>> create(
+    public ResponseEntity<?> create(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @Valid @RequestBody SalaryItemTemplateCreateReqDto reqDto) {
-        SalaryItemTemplateResDto resDto = salaryItemTemplateService.save(companyId, reqDto);
         return new ResponseEntity<>(
-                ApiResponse.success(resDto, "급여 항목 템플릿이 생성되었습니다."),
+                ApiResponse.success(salaryItemTemplateService.save(companyId, reqDto), "급여 항목 템플릿이 생성되었습니다."),
                 HttpStatus.CREATED
         );
     }
 
     /** 급여 항목 템플릿 단건 조회 */
     @GetMapping("/{salaryItemTemplateId}")
-    public ResponseEntity<ApiResponse<SalaryItemTemplateResDto>> findById(
+    public ResponseEntity<?> findById(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID salaryItemTemplateId) {
-        SalaryItemTemplateResDto resDto = salaryItemTemplateService.findById(companyId, salaryItemTemplateId);
         return new ResponseEntity<>(
-                ApiResponse.success(resDto, "급여 항목 템플릿 조회 성공"),
+                ApiResponse.success(salaryItemTemplateService.findById(companyId, salaryItemTemplateId), "급여 항목 템플릿 조회 성공"),
                 HttpStatus.OK
         );
     }
 
     /** 회사별 급여 항목 템플릿 목록 조회 */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<SalaryItemTemplateResDto>>> findByCompanyId(
+    public ResponseEntity<?> findByCompanyId(
             @RequestHeader("X-User-CompanyId") UUID companyId) {
-        List<SalaryItemTemplateResDto> resDtos = salaryItemTemplateService.findByCompanyId(companyId);
         return new ResponseEntity<>(
-                ApiResponse.success(resDtos, "급여 항목 템플릿 목록 조회 성공"),
+                ApiResponse.success(salaryItemTemplateService.findByCompanyId(companyId), "급여 항목 템플릿 목록 조회 성공"),
                 HttpStatus.OK
         );
     }
 
     /** 급여 항목 템플릿 수정 */
     @PutMapping("/{salaryItemTemplateId}")
-    public ResponseEntity<ApiResponse<SalaryItemTemplateResDto>> update(
+    public ResponseEntity<?> update(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID salaryItemTemplateId,
             @Valid @RequestBody SalaryItemTemplateUpdateReqDto reqDto) {
-        SalaryItemTemplateResDto resDto = salaryItemTemplateService.update(companyId, salaryItemTemplateId, reqDto);
         return new ResponseEntity<>(
-                ApiResponse.success(resDto, "급여 항목 템플릿이 수정되었습니다."),
+                ApiResponse.success(salaryItemTemplateService.update(companyId, salaryItemTemplateId, reqDto), "급여 항목 템플릿이 수정되었습니다."),
                 HttpStatus.OK
         );
     }
 
     /** 급여 항목 템플릿 삭제 (soft delete) */
     @DeleteMapping("/{salaryItemTemplateId}")
-    public ResponseEntity<ApiResponse<Void>> delete(
+    public ResponseEntity<?> delete(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID salaryItemTemplateId) {
         salaryItemTemplateService.delete(companyId, salaryItemTemplateId);

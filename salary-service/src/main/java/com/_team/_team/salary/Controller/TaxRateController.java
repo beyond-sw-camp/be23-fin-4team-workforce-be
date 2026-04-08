@@ -4,14 +4,12 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.salary.Service.TaxRateService;
 import com._team._team.salary.dto.reqdto.TaxRateCreateReqDto;
 import com._team._team.salary.dto.reqdto.TaxRateUpdateReqDto;
-import com._team._team.salary.dto.resdto.TaxRateResDto;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -27,52 +25,48 @@ public class TaxRateController {
 
     /** 세율 생성 */
     @PostMapping("/create")
-    public ResponseEntity<ApiResponse<TaxRateResDto>> create(
+    public ResponseEntity<?> create(
             @Valid @RequestBody TaxRateCreateReqDto reqDto){
-        TaxRateResDto resDto = taxRateService.save(reqDto);
         return new ResponseEntity<>(
-                ApiResponse.success(resDto, "세율이 생성되었습니다."),
+                ApiResponse.success(taxRateService.save(reqDto), "세율이 생성되었습니다."),
                 HttpStatus.CREATED
         );
     }
 
     /** 세율 단건 조회 */
     @GetMapping("/{taxRateId}")
-    public ResponseEntity<ApiResponse<TaxRateResDto>> findById(
+    public ResponseEntity<?> findById(
             @PathVariable UUID taxRateId){
-        TaxRateResDto resDto = taxRateService.findById(taxRateId);
         return new ResponseEntity<>(
-                ApiResponse.success(resDto, "세율 조회 성공"),
+                ApiResponse.success(taxRateService.findById(taxRateId), "세율 조회 성공"),
                 HttpStatus.OK
         );
     }
 
     /** 연도별 세율 목록 조회 */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<TaxRateResDto>>> findByApplyYear(
+    public ResponseEntity<?> findByApplyYear(
             @RequestParam Integer applyYear){
-        List<TaxRateResDto> resDtos = taxRateService.findByApplyYear(applyYear);
         return new ResponseEntity<>(
-                ApiResponse.success(resDtos, "연도별 세율 목록 조회 성공"),
+                ApiResponse.success(taxRateService.findByApplyYear(applyYear), "연도별 세율 목록 조회 성공"),
                 HttpStatus.OK
         );
     }
 
     /** 세율 수정 */
     @PutMapping("/{taxRateId}")
-    public ResponseEntity<ApiResponse<TaxRateResDto>> update(
+    public ResponseEntity<?> update(
             @PathVariable UUID taxRateId,
             @Valid @RequestBody TaxRateUpdateReqDto reqDto){
-        TaxRateResDto resDto = taxRateService.update(taxRateId, reqDto);
         return new ResponseEntity<>(
-                ApiResponse.success(resDto, "세율이 수정되었습니다."),
+                ApiResponse.success(taxRateService.update(taxRateId, reqDto), "세율이 수정되었습니다."),
                 HttpStatus.OK
         );
     }
 
     /** 세율 삭제 */
     @DeleteMapping("/{taxRateId}")
-    public ResponseEntity<ApiResponse<Void>> delete(
+    public ResponseEntity<?> delete(
             @PathVariable UUID taxRateId){
         taxRateService.delete(taxRateId);
         return new ResponseEntity<>(
