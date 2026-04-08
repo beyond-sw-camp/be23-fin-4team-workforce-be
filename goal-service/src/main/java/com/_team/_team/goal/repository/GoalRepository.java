@@ -12,6 +12,11 @@ import java.util.UUID;
 public interface GoalRepository extends JpaRepository<Goal, UUID> {
 
     List<Goal> findByCompanyIdOrderByCreatedAtDesc(UUID companyId);
+    List<Goal> findByCompanyId(UUID companyId);
+    List<Goal> findByCompanyIdAndOwnerId(UUID companyId, UUID ownerId);
+    List<Goal> findByCompanyIdAndParentGoalIsNull(UUID companyId);
+    List<Goal> findByParentGoal_GoalId(UUID parentGoalId);
+    long countByParentGoal_GoalId(UUID parentGoalId);
 
     List<Goal> findByKpiTemplate_KpiTemplateIdAndStatus(UUID kpiTemplateId, GoalStatus status);
 }
