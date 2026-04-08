@@ -101,7 +101,7 @@ public class AttendanceLogService {
         AttendanceLog log = reqDto.toEntity(dailyAttendance, EventType.CLOCK_IN, eventTime);
         attendanceLogRepository.save(log);
 
-        // [단계 5] DailyAttendance 갱신
+        // DailyAttendance 갱신
         // firstClockIn: 출근 시간 기록
         // status: ABSENT → NORMAL로 변경
         dailyAttendance.updateClockIn(eventTime);
@@ -320,7 +320,7 @@ public class AttendanceLogService {
      *
      * findDailyAttendance()는 "요약"만 보여줌 (출근시간, 퇴근시간, 총 근무시간).
      * 사원이 "오늘 내가 언제 휴게 시작하고 끝냈지?" 같은 상세 이력을 보고 싶을 때
-     * 이 메서드로 개별 로그를 시간순으로 조회함.
+     * 이 메서드로 개별 로그를 시간순으로 조회
      *
      * ===== 호출 시점 =====
      * 사원이 "오늘 출퇴근 상세" 탭 클릭

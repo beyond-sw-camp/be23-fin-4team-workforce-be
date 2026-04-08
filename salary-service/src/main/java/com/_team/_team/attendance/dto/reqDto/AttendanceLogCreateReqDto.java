@@ -36,6 +36,7 @@ public class AttendanceLogCreateReqDto {
     public AttendanceLog toEntity(DailyAttendance daily, EventType eventType, LocalDateTime eventTime) {
         return AttendanceLog.builder()
                 .dailyAttendance(daily)
+                .memberId(daily.getMemberId())
                 .eventType(eventType)
                 .eventTime(eventTime)
                 .latitude(this.latitude)
