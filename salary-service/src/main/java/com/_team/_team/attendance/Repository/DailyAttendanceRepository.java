@@ -24,8 +24,8 @@ import java.util.UUID;
 public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance, UUID> {
 
     /** 특정 직원의 특정일 근태 (출퇴근 처리 시 조회/생성용) */
-    Optional<DailyAttendance> findByMemberIdAndAttendanceDate(
-            UUID memberId, LocalDate attendanceDate);
+    Optional<DailyAttendance> findByCompanyIdAndMemberIdAndAttendanceDate(
+            UUID companyId, UUID memberId, LocalDate attendanceDate);
 
     /**
      * 개인 월간 근태 (직원 본인 조회)

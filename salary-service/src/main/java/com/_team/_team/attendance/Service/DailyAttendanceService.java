@@ -43,7 +43,7 @@ public class DailyAttendanceService {
     public DailyAttendance findOrCreateDaily(UUID companyId, UUID memberId, LocalDate date){
         // 1. 당일 근태 기록이 이미 있으면 그대로 반환
         Optional<DailyAttendance> existing = dailyAttendanceRepository
-                .findByMemberIdAndAttendanceDate(memberId, date);
+                .findByCompanyIdAndMemberIdAndAttendanceDate(companyId, memberId, date);
 
         if (existing.isPresent()) {
             return existing.get();
@@ -80,7 +80,7 @@ public class DailyAttendanceService {
     @Transactional(readOnly = true)
     public DailyAttendance findDaily(UUID companyId, UUID memberId, LocalDate date){
         return dailyAttendanceRepository
-                .findByMemberIdAndAttendanceDate(memberId, date)
+                .findByCompanyIdAndMemberIdAndAttendanceDate(companyId, memberId, date)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.BAD_REQUEST, "오늘 출근 기록이 없습니다. 출근을 먼저 해주세요."));
     }
@@ -92,7 +92,7 @@ public class DailyAttendanceService {
     @Transactional(readOnly = true)
     public DailyAttendanceResDto findDailyAttendance(UUID companyId, UUID memberId, LocalDate date) {
         DailyAttendance daily = dailyAttendanceRepository
-                .findByMemberIdAndAttendanceDate(memberId, date)
+                .findByCompanyIdAndMemberIdAndAttendanceDate(companyId, memberId, date)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "해당 날짜의 근태 기록이 없습니다."));
         return DailyAttendanceResDto.fromEntity(daily);

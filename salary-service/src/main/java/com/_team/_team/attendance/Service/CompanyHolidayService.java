@@ -56,9 +56,9 @@ public class CompanyHolidayService {
      * 공휴일 수정
      * - 공휴일명, 날짜, 유급여부 부분 업데이트
      */
-    public CompanyHolidayResDto updateHoliday(UUID companyId, UUID holidayId, CompanyHolidayUpdateReqDto reqDto) {
+    public CompanyHolidayResDto updateHoliday(UUID companyId, UUID companyHolidayId, CompanyHolidayUpdateReqDto reqDto) {
         CompanyHoliday holiday = companyHolidayRepository
-                .findByCompanyIdAndHolidayIdAndDelYn(companyId, holidayId, "N")
+                .findByCompanyIdAndCompanyHolidayIdAndDelYn(companyId, companyHolidayId, "N")
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "공휴일을 찾을 수 없습니다."));
 
@@ -69,9 +69,9 @@ public class CompanyHolidayService {
     /**
      * 공휴일 삭제 (소프트 삭제)
      */
-    public void deleteHoliday(UUID companyId, UUID holidayId) {
+    public void deleteHoliday(UUID companyId, UUID companyHolidayId) {
         CompanyHoliday holiday = companyHolidayRepository
-                .findByCompanyIdAndHolidayIdAndDelYn(companyId, holidayId, "N")
+                .findByCompanyIdAndCompanyHolidayIdAndDelYn(companyId, companyHolidayId, "N")
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "공휴일을 찾을 수 없습니다."));
         holiday.delete();
     }

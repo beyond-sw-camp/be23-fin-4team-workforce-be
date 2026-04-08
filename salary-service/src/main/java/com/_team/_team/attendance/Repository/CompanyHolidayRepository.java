@@ -27,5 +27,5 @@ public interface CompanyHolidayRepository extends JpaRepository<CompanyHoliday, 
             UUID companyId, LocalDate date, String delYn);
 
     /** */
-    Optional<CompanyHoliday> findByCompanyIdAndHolidayIdAndDelYn(UUID companyId, UUID holidayId, String delYn);
+    Optional<CompanyHoliday> findByCompanyIdAndCompanyHolidayIdAndDelYn(UUID companyId, UUID companyHolidayId, String delYn);
 }
