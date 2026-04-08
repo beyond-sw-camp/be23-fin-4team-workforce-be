@@ -5,6 +5,7 @@ import com._team._team.event.OrganizationChangedEvent;
 import com._team._team.event.OrganizationDeletedEvent;
 import com._team._team.event.OrganizationSavedEvent;
 import com._team._team.member.domain.Member;
+import com._team._team.member.domain.MemberPosition;
 import com._team._team.member.domain.SearchOutboxEvent;
 import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
@@ -12,9 +13,7 @@ import com._team._team.member.repository.SearchOutboxEventRepository;
 import com._team._team.organization.dto.reqdto.JobGradeReqDto;
 import com._team._team.organization.dto.reqdto.JobTitleReqDto;
 import com._team._team.organization.dto.reqdto.OrganizationReqDto;
-import com._team._team.organization.dto.resdto.JobGradeResDto;
-import com._team._team.organization.dto.resdto.JobTitleResDto;
-import com._team._team.organization.dto.resdto.OrganizationResDto;
+import com._team._team.organization.dto.resdto.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,9 +33,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -502,4 +499,79 @@ public class OrganizationService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public OrgChartWrapperResDto getOrgChart(UUID memberId) {
+        Member member = getMember(memberId);
+        Company company = member.getCompany();
+
+        List<Organization> allOrgs = organizationRepository
+                .findByCompanyAndDelYnOrderByDisplayOrder(company, "NO");
+
+        List<OrgChartResDto> orgTree = buildOrgTree(allOrgs, null);
+
+        return OrgChartWrapperResDto.builder()
+                .companyName(company.getCompanyName())
+                .organizations(orgTree)
+                .build();
+    }
+
+    private List<OrgChartResDto> buildOrgTree(
+            List<Organization> allOrgs,
+            UUID parentId) {
+
+        return allOrgs.stream()
+                .filter(org -> parentId == null
+                        ? org.getParent() == null
+                        : org.getParent() != null
+                        && org.getParent().getOrganizationId().equals(parentId))
+                .map(org -> {
+                    // 해당 조직 직원 조회
+                    List<MemberPosition> positions = memberPositionRepository
+                            .findByOrganizationAndDelYn(org, "NO");
+
+                    // 직급별 그룹핑 (직급 displayOrder 기준 정렬)
+                    Map<String, List<OrgChartMemberResDto>> groupedByJobGrade = positions.stream()
+                            .filter(p -> "NO".equals(p.getMember().getDelYn()))
+                            .sorted(Comparator.comparingInt(
+                                    p -> p.getJobGrade().getDisplayOrder()))
+                            .collect(Collectors.groupingBy(
+                                    p -> p.getJobGrade().getName(),
+                                    LinkedHashMap::new,
+                                    Collectors.mapping(
+                                            p -> OrgChartMemberResDto.fromEntity(
+                                                    p.getMember(), p),
+                                            Collectors.toList()
+                                    )
+                            ));
+
+                    // 직급별 DTO 변환
+                    List<OrgChartJobGradeResDto> jobGrades = groupedByJobGrade
+                            .entrySet()
+                            .stream()
+                            .map(entry -> OrgChartJobGradeResDto.builder()
+                                    .jobGradeName(entry.getKey())
+                                    .members(entry.getValue())
+                                    .build())
+                            .collect(Collectors.toList());
+
+                    // 재귀로 자식 조직 조회
+                    List<OrgChartResDto> children = buildOrgTree(
+                            allOrgs,
+                            org.getOrganizationId());
+
+                    return OrgChartResDto.builder()
+                            .organizationId(org.getOrganizationId())
+                            .name(org.getName())
+                            .jobGrades(jobGrades)
+                            .children(children)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Member getMember(UUID memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
+    }
 }
