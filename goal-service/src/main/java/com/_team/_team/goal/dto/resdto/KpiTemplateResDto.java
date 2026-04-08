@@ -1,7 +1,9 @@
 package com._team._team.goal.dto.resdto;
 
 import com._team._team.goal.domain.KpiTemplate;
+import com._team._team.goal.domain.converter.KpiDefinition;
 import com._team._team.goal.domain.enums.KpiCycle;
+import com._team._team.goal.domain.enums.KpiSpecCycleType;
 import com._team._team.goal.domain.enums.MeasureType;
 import com._team._team.goal.domain.enums.UnitType;
 import lombok.AllArgsConstructor;
@@ -10,6 +12,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -27,6 +31,10 @@ public class KpiTemplateResDto {
     private KpiCycle cycle;
     private int capPct;
     private boolean isActive;
+    private KpiSpecCycleType specCycleType;
+    private UUID targetTeamId;
+    private boolean requireApproval;
+    private List<KpiDefinition> kpis;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -41,6 +49,10 @@ public class KpiTemplateResDto {
                 .cycle(kpiTemplate.getCycle())
                 .capPct(kpiTemplate.getCapPct())
                 .isActive(kpiTemplate.isActive())
+                .specCycleType(kpiTemplate.getSpecCycleType())
+                .targetTeamId(kpiTemplate.getTargetTeamId())
+                .requireApproval(kpiTemplate.isRequireApproval())
+                .kpis(kpiTemplate.getKpis() != null ? kpiTemplate.getKpis() : Collections.emptyList())
                 .createdAt(kpiTemplate.getCreatedAt())
                 .updatedAt(kpiTemplate.getUpdatedAt())
                 .build();

@@ -1,6 +1,7 @@
 package com._team._team.goal.dto.reqdto;
 
 import com._team._team.goal.domain.enums.*;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -20,13 +22,17 @@ import java.util.UUID;
 @Builder
 public class GoalCreateReqDto {
 
-    @NotNull(message = "KPI 템플릿 ID는 필수입니다.")
+    /** 비어 있으면 측정/단위 기본값으로 목표만 생성합니다. */
     private UUID kpiTemplateId;
 
     @NotNull(message = "회사 ID는 필수입니다.")
     private UUID companyId;
 
     private UUID parentGoalId;
+
+    private KpiCycle cycle;
+
+    private RollupPolicy rollupPolicy;
 
     @NotNull(message = "소유 유형은 필수입니다.")
     private GoalOwnerType ownerType;
@@ -38,8 +44,7 @@ public class GoalCreateReqDto {
     @Size(max = 300)
     private String title;
 
-    @NotBlank(message = "내용은 필수입니다.")
-    @Size(max = 300)
+    @Size(max = 2000)
     private String description;
 
     @NotNull(message = "시작일은 필수입니다.")
@@ -48,23 +53,19 @@ public class GoalCreateReqDto {
     @NotNull(message = "종료일은 필수입니다.")
     private LocalDate endDate;
 
-    @NotNull(message = "측정 유형은 필수입니다.")
     private MeasureType measureType;
 
-    @NotNull(message = "단위 유형은 필수입니다.")
     private UnitType unitType;
 
-    /** 비어 있으면 KPI 템플릿의 단위 표시명이 사용됩니다. */
     @Size(max = 20, message = "단위 표시명은 20자 이하여야 합니다.")
     private String unitLabel;
 
-    @NotNull(message = "기준값은 필수입니다.")
     private BigDecimal baseline;
 
     @NotNull(message = "목표값은 필수입니다.")
+    @DecimalMin(value = "1", message = "목표 수치는 1 이상이어야 합니다.")
     private BigDecimal targetValue;
 
-    @NotNull(message = "달성률 상한(capPct)은 필수입니다.")
     @Min(value = 1, message = "달성률 상한은 1 이상이어야 합니다.")
     private Integer capPct;
 
@@ -74,4 +75,26 @@ public class GoalCreateReqDto {
 
     @NotNull(message = "공개 범위는 필수입니다.")
     private GoalVisibility visibility;
+
+    @Builder.Default
+    private GoalKind goalKind = GoalKind.KR;
+
+    @Builder.Default
+    private Boolean autoUpdate = true;
+
+    @Builder.Default
+    private Boolean requireApproval = false;
+
+    /**
+     * false 이면 DRAFT 로만 저장(일괄 생성 후 번들 승인 등).
+     * 단건 생성에서는 기본 true 로 즉시 승인 플로 또는 활성화를 진행합니다.
+     */
+    @Builder.Default
+    private Boolean activateImmediately = true;
+
+    private UUID approverId;
+
+    private List<UUID> visibleTeamIds;
+
+    private List<UUID> memberIds;
 }

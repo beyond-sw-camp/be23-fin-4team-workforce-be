@@ -1,8 +1,10 @@
 package com._team._team.goal.dto.reqdto;
 
+import com._team._team.goal.domain.enums.KpiSpecCycleType;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.domain.enums.MeasureType;
 import com._team._team.goal.domain.enums.UnitType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -13,6 +15,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -42,4 +45,13 @@ public class KpiTemplateCreateReqDto {
     @Min(0)
     @Max(200)
     private int capPct;
+
+    /** v2 명세 KPI 템플릿 항목 — 설정 시 JSON으로 저장됩니다. */
+    private List<@Valid KpiDefinitionItemReqDto> kpis;
+
+    private KpiSpecCycleType specCycleType;
+
+    private UUID targetTeamId;
+
+    private Boolean requireApproval;
 }
