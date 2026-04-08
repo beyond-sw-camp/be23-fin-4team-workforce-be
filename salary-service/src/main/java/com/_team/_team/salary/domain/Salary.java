@@ -71,4 +71,12 @@ public class Salary extends BaseTimeEntity {
         boolean notEnded = effectiveTo == null || !effectiveTo.isBefore(today);
         return started && notEnded;
     }
+
+    /**
+     * 적용 기간 종료 - 새 급여 생성 시 이전 급여를 자동 마감
+     * 예: 새 급여 effectiveFrom이 03-01이면, 이전 급여 effectiveTo를 02-28로 설정
+     */
+    public void closeEffectivePeriod(LocalDate endDate) {
+        this.effectiveTo = endDate;
+    }
 }
