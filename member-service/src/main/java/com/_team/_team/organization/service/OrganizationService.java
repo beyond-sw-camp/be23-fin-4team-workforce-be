@@ -501,27 +501,4 @@ public class OrganizationService {
                     e.getMessage());
         }
     }
-
-    // 조직 체인 조회 (하위 → 최상위)
-    @Transactional(readOnly = true)
-    public List<OrganizationChainResDto> getOrganizationChain(UUID organizationId) {
-        Organization current = organizationRepository.findById(organizationId)
-                .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 조직입니다."));
-
-        List<OrganizationChainResDto> chain = new java.util.ArrayList<>();
-
-        while (current != null) {
-            chain.add(OrganizationChainResDto.builder()
-                    .organizationId(current.getOrganizationId())
-                    .name(current.getName())
-                    .parentId(current.getParent() != null
-                            ? current.getParent().getOrganizationId()
-                            : null)
-                    .build());
-            current = current.getParent();
-        }
-
-        return chain;
-    }
 }

@@ -195,16 +195,4 @@ public class OrganizationController {
                 HttpStatus.OK
         );
     }
-
-    // 조직 체인 조회 (하위 → 최상위)
-    @GetMapping("/{organizationId}/chain")
-    public ResponseEntity<?> getOrganizationChain(
-            @PathVariable UUID organizationId) {
-        return new ResponseEntity<>(
-                ApiResponse.success(
-                        organizationService.getOrganizationChain(organizationId),
-                        "조직 체인 조회 성공"),
-                HttpStatus.OK
-        );
-    }
 }
