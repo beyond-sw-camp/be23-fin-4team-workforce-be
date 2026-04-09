@@ -34,6 +34,9 @@ public class SalaryPolicy extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer payDay;
 
+    /** 초과근무 인정 단위(분) - null이면 1분 단위(절사 없음) */
+    private Integer overtimeRoundingMinutes;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PeriodStartType periodStartType;
@@ -74,6 +77,7 @@ public class SalaryPolicy extends BaseTimeEntity {
         this.periodEndType = reqDto.getPeriodEndType();
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();
+        this.overtimeRoundingMinutes = reqDto.getOvertimeRoundingMinutes();
     }
 
     // 소프트 삭제
