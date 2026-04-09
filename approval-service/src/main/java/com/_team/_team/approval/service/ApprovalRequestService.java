@@ -58,8 +58,8 @@ public class ApprovalRequestService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "요청 상태는 DRAFT 또는 WAIT만 가능합니다.");
         }
 
-        // WAIT(제출)일 때 결재자 최소 1명 검증
-        if (reqDto.getRequestStatus() == RequestStatus.WAIT) {
+        // WAIT(제출)일 때 결재자 최소 1명 검증 (자동승인 제외)
+        if (reqDto.getRequestStatus() == RequestStatus.WAIT && "N".equals(document.getAutoApproveYn())) {
             if (reqDto.getApprovalLines() == null || reqDto.getApprovalLines().isEmpty()) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "결재 제출 시 결재자는 최소 1명 이상이어야 합니다.");
             }
@@ -216,6 +216,8 @@ public class ApprovalRequestService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "결재 요청을 찾을 수 없습니다."));
 
+        ApprovalDocument document = request.getApprovalDocument();
+
         if (!request.getApprovalDocument().getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
         }
@@ -237,7 +239,7 @@ public class ApprovalRequestService {
         }
 
         // WAIT(제출)일 때 결재자 최소 1명 검증
-        if (reqDto.getRequestStatus() == RequestStatus.WAIT) {
+        if (reqDto.getRequestStatus() == RequestStatus.WAIT && !"Y".equals(document.getAutoApproveYn())) {
             if (reqDto.getApprovalLines() == null || reqDto.getApprovalLines().isEmpty()) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST,
                         "결재 제출 시 결재자는 최소 1명 이상이어야 합니다.");

@@ -51,4 +51,15 @@ public class ApprovalDocument extends BaseTimeEntity {
         this.isActiveYn="N";
     }
 
+    public void enableAutoApprove() {
+        this.autoApproveYn = "Y";
+    }
+
+    public void disableAutoApprove() {
+        this.autoApproveYn = "N";
+    }
+
+
+
+
 }
