@@ -29,7 +29,12 @@ public class ApprovalPolicyLineCreateReqDto {
     @Builder
     public static class PolicyLineItem {
 
-        @NotNull(message = "직급 ID는 필수입니다.")
-        private UUID jobGradeId;
+        @NotNull(message = "직책 ID는 필수입니다.")
+        private UUID jobTitleId;
+
+        @NotNull(message = "결재 순서는 필수입니다.")
+        private Integer stepOrder;
+
+        private UUID organizationId; // 없으면 요청자 조직 계열에서 검색
     }
 }

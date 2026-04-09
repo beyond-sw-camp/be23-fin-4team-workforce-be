@@ -18,11 +18,9 @@ public class ApprovalPolicyLineResDto {
 
     private UUID policyLineId;
     private UUID documentId;
-    private Integer stepOrder;
-    private ApproverType approverType;
-    private UUID specificMemberPositionId;
-    private UUID jobGradeId;
     private UUID jobTitleId;
+    private Integer stepOrder;
+    private UUID organizationId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -30,11 +28,9 @@ public class ApprovalPolicyLineResDto {
         return ApprovalPolicyLineResDto.builder()
                 .policyLineId(entity.getPolicyLineId())
                 .documentId(entity.getApprovalDocument().getDocumentId())
-                .stepOrder(entity.getStepOrder())
-                .approverType(entity.getApproverType())
-                .specificMemberPositionId(entity.getSpecificMemberPositionId())
-                .jobGradeId(entity.getJobGradeId())
                 .jobTitleId(entity.getJobTitleId())
+                .stepOrder(entity.getStepOrder())
+                .organizationId(entity.getOrganizationId())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
