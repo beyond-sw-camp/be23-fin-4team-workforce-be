@@ -16,7 +16,7 @@ import java.util.UUID;
  * 급여 항목 템플릿 컨트롤러
  */
 @RestController
-@RequestMapping("/salary-item-templates")
+@RequestMapping("/salary/salary-item-templates")
 public class SalaryItemTemplateController {
 
     private final SalaryItemTemplateService salaryItemTemplateService;

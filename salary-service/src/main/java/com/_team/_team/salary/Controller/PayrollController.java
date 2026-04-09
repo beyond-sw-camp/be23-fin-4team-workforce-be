@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/payroll")
+@RequestMapping("/salary/payroll")
 public class PayrollController {
 
     private final PayrollService payrollService;
