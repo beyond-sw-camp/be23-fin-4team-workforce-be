@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/salary-policies")
+@RequestMapping("/salary/salary-policies")
 public class SalaryPolicyController {
 
     private final SalaryPolicyService salaryService;

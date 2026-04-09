@@ -451,40 +451,31 @@ public class MemberService {
                                   UUID memberPositionId,
                                   HttpServletRequest request) {
 
-        // 1. RT 검증
-        jwtTokenProvider.validateAndGetRtClaims(
-                request, memberId.toString()
-        );
+        jwtTokenProvider.validateAndGetRtClaims(request, memberId.toString());
 
-        // 2. 회원 조회
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
 
-        // 3. 삭제된 계정 확인
         if ("YES".equals(member.getDelYn())) {
             throw new BusinessException(
-                    HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다."
-            );
+                    HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다.");
         }
 
-        // 4. 계정 잠금 확인
         if (member.getAccountStatus() == AccountStatus.BLOCKED) {
             throw new BusinessException(
-                    HttpStatus.FORBIDDEN, "계정이 잠금 상태입니다."
-            );
+                    HttpStatus.FORBIDDEN, "계정이 잠금 상태입니다.");
         }
 
-        // 5. MemberPosition 조회
         MemberPosition memberPosition = memberPositionRepository
-                .findById(memberPositionId)
+                .findByIdWithRoleAndPermissions(memberPositionId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 포지션입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 포지션입니다."));
 
-        // 6. AT 재발급
         String accessToken = jwtTokenProvider.createAtToken(member, memberPosition);
+
+        // 권한 캐시 재캐싱 추가
+        cachePermissions(memberPosition);
 
         return LoginResDto.builder()
                 .accessToken(accessToken)
