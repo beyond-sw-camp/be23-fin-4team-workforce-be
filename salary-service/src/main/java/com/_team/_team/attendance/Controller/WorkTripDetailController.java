@@ -38,7 +38,7 @@ public class WorkTripDetailController {
     @PostMapping("/create")
     public ResponseEntity<?> createWorkTrip(
             @RequestHeader("X-User-CompanyId")UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody WorkTripCreateReqDto reqDto){
         WorkTripResDto resDto = workTripDetailService.createWorkTrip(companyId, memberId, reqDto);
         return new ResponseEntity<>(
@@ -51,7 +51,7 @@ public class WorkTripDetailController {
     @GetMapping
     public ResponseEntity<?> findWorkTrips(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId) {
+            @RequestHeader("X-User-UUID") UUID memberId) {
         List<WorkTripResDto> resDtos = workTripDetailService.findWorkTrips(companyId, memberId);
         return new ResponseEntity<>(
                 ApiResponse.success(resDtos, "출장/외근 이력 조회 성공"),
@@ -63,7 +63,7 @@ public class WorkTripDetailController {
     @GetMapping("/daily/{dailyAttendanceId}")
     public ResponseEntity<?> findWorkTripsByDaily(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable UUID dailyAttendanceId) {
         List<WorkTripResDto> resDtoList = workTripDetailService
                 .findWorkTripsByDaily(companyId, memberId, dailyAttendanceId);
@@ -77,7 +77,7 @@ public class WorkTripDetailController {
     @PutMapping("/{workTripDetailId}")
     public ResponseEntity<?> updateWorkTrip(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable UUID workTripDetailId,
             @Valid @RequestBody WorkTripUpdateReqDto reqDto) {
         WorkTripResDto resDto = workTripDetailService.updateWorkTrip(companyId, memberId, workTripDetailId, reqDto);
@@ -91,7 +91,7 @@ public class WorkTripDetailController {
     @DeleteMapping("/{workTripDetailId}")
     public ResponseEntity<?> deleteWorkTrip(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable UUID workTripDetailId) {
         workTripDetailService.deleteWorkTrip(companyId, memberId, workTripDetailId);
         return new ResponseEntity<>(

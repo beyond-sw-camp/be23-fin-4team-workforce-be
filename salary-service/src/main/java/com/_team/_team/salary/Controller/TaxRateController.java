@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/taxRate")
+@RequestMapping("/salary/taxRate")
 public class TaxRateController {
 
     private final TaxRateService taxRateService;
