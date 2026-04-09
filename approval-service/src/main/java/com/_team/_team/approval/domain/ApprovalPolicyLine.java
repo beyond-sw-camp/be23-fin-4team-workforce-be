@@ -23,7 +23,12 @@ public class ApprovalPolicyLine extends BaseTimeEntity {
     private ApprovalDocument approvalDocument;
 
     @Column(nullable = false)
-    private UUID jobGradeId;
+    private UUID jobTitleId;
+
+    @Column(nullable = false)
+    private Integer stepOrder;
+
+    private UUID organizationId;
 
     @Column(nullable = false)
     @Builder.Default

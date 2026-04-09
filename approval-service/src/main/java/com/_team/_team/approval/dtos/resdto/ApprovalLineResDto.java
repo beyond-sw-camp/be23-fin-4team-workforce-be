@@ -17,7 +17,8 @@ import java.util.UUID;
 public class ApprovalLineResDto {
     private UUID approvalId;
     private UUID requestId;
-    private UUID memberPositionId;
+    private UUID approverMemberId;
+    private UUID approverMemberPositionId;
     private Integer stepOrder;
     private LineStatus approvalStatus;
     private LocalDateTime actedAt;
@@ -31,7 +32,7 @@ public class ApprovalLineResDto {
         return ApprovalLineResDto.builder()
                 .approvalId(entity.getApprovalId())
                 .requestId(entity.getRequest().getRequestId())
-                .memberPositionId(entity.getMemberPositionId())
+                .approverMemberId(entity.getApproverMemberId())
                 .stepOrder(entity.getStepOrder())
                 .approvalStatus(entity.getApprovalStatus())
                 .actedAt(entity.getActedAt())

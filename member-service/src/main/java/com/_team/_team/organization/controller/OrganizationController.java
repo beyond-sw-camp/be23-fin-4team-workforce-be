@@ -7,6 +7,7 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.organization.dto.reqdto.JobGradeReqDto;
 import com._team._team.organization.dto.reqdto.JobTitleReqDto;
 import com._team._team.organization.dto.reqdto.OrganizationReqDto;
+import com._team._team.organization.dto.resdto.OrganizationResDto;
 import com._team._team.organization.service.OrganizationService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -207,6 +208,16 @@ public class OrganizationController {
                 ApiResponse.success(
                         organizationService.getOrgChart(memberId),
                         "조직도 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 조직 단건 조회
+    @GetMapping("/organization/{organizationId}")
+    public ResponseEntity<?> findById(@PathVariable UUID organizationId) {
+        OrganizationResDto result = organizationService.findById(organizationId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "조직 조회 성공"),
                 HttpStatus.OK
         );
     }
