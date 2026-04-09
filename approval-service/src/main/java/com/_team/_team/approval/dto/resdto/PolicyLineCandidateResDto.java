@@ -16,7 +16,8 @@ import java.util.UUID;
 public class PolicyLineCandidateResDto {
     private UUID policyLineId;
     private UUID documentId;
-    private UUID jobGradeId;
-    private String jobGradeName;
+    private UUID jobTitleId;
+    private Integer stepOrder;
+    private UUID organizationId;
     private List<MemberPositionResDto> candidates;
 }

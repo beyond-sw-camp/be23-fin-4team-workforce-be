@@ -12,11 +12,11 @@ import java.util.UUID;
 @Repository
 public interface ApprovalPolicyLineRepository extends JpaRepository<ApprovalPolicyLine, UUID> {
 
-    // 문서 양식별 활성 결재라인 정책 조회
+    // 문서 양식별 활성 결재라인 정책 조회 (stepOrder 순)
     @Query("SELECT apl FROM ApprovalPolicyLine apl " +
             "WHERE apl.approvalDocument.documentId = :documentId " +
-            "AND apl.delYn = 'N'")
+            "AND apl.delYn = 'N' " +
+            "ORDER BY apl.stepOrder ASC")
     List<ApprovalPolicyLine> findByDocumentId(
             @Param("documentId") UUID documentId);
-
 }
