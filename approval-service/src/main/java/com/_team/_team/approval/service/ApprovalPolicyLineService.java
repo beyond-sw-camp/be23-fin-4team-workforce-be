@@ -10,7 +10,6 @@ import com._team._team.approval.feignclients.dto.MemberPositionResDto;
 import com._team._team.approval.feignclients.dto.OrganizationResDto;
 import com._team._team.approval.repository.ApprovalDocumentRepository;
 import com._team._team.approval.repository.ApprovalPolicyLineRepository;
-import com._team._team.dto.ApiResponse;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

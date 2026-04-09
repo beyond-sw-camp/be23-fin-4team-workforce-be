@@ -40,6 +40,12 @@ public class ApprovalDocumentController {
         );
     }
 
+    // 내부용: 기본 결재양식 자동 생성
+    @PostMapping("/init")
+    public void initDefaultDocuments(@RequestParam UUID companyId) {
+        approvalDocumentService.initDefaultDocuments(companyId);
+    }
+
     // 결재 양식 단건 조회
     @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.READ)
     @GetMapping("/{documentId}")
@@ -98,6 +104,30 @@ public class ApprovalDocumentController {
         ApprovalDocumentResDto resDto = approvalDocumentService.deactivate(companyId, documentId);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "결재 양식이 비활성화되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
+    @PatchMapping("/{documentId}/auto-approve/enable")
+    public ResponseEntity<?> enableAutoApprove(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID documentId) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.enableAutoApprove(companyId, documentId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "자동승인이 활성화되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
+    @PatchMapping("/{documentId}/auto-approve/disable")
+    public ResponseEntity<?> disableAutoApprove(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID documentId) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.disableAutoApprove(companyId, documentId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "자동승인이 비활성화되었습니다."),
                 HttpStatus.OK
         );
     }
