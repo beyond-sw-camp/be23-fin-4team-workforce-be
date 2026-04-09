@@ -574,4 +574,10 @@ public class OrganizationService {
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
     }
+
+    public OrganizationResDto findById(UUID organizationId) {
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new RuntimeException("조직을 찾을 수 없습니다."));
+        return OrganizationResDto.fromEntity(organization);
+    }
 }

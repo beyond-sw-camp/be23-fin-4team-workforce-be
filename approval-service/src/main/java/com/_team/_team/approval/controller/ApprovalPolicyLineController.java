@@ -52,6 +52,8 @@ public class ApprovalPolicyLineController {
         );
     }
 
+
+
     // 양식별 결재라인 정책 전체 삭제
     @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.DELETE)
     @DeleteMapping("/{documentId}")

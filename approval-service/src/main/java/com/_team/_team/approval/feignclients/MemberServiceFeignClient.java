@@ -1,6 +1,7 @@
 package com._team._team.approval.feignclients;
 
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
+import com._team._team.approval.feignclients.dto.OrganizationResDto;
 import com._team._team.dto.ApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,10 +20,15 @@ public interface MemberServiceFeignClient {
             @PathVariable("memberPositionId") UUID memberPositionId);
 
 
-    // 조직 + 직급 기반 결재자 후보 조회
-    @GetMapping("/member/position/search/by-job-grade")
-    ApiResponse<List<MemberPositionResDto>> searchByJobGrade(
+    // 조직 + 직책 기반 결재자 후보 조회
+    @GetMapping("/member/member-position/search/by-job-title")
+    ApiResponse<List<MemberPositionResDto>> searchByJobTitle(
             @RequestParam("organizationId") UUID organizationId,
-            @RequestParam("jobGradeId") UUID jobGradeId);
+            @RequestParam("jobTitleId") UUID jobTitleId);
+
+    // 조직 단건 조회 (상위 조직 탐색용)
+    @GetMapping("/organization/{organizationId}")
+    ApiResponse<OrganizationResDto> getOrganization(
+            @PathVariable("organizationId") UUID organizationId);
 
 }
