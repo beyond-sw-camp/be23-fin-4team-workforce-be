@@ -23,6 +23,7 @@ public class SalaryPolicyResDto {
     private String policyName;
     private PayType payType;
     private Integer payDay;
+    private Integer overtimeRoundingMinutes;
     private PeriodStartType periodStartType;
     private PeriodEndType periodEndType;
     private LocalDate effectiveFrom;
@@ -37,6 +38,7 @@ public class SalaryPolicyResDto {
                 .policyName(salaryPolicy.getPolicyName())
                 .payType(salaryPolicy.getPayType())
                 .payDay(salaryPolicy.getPayDay())
+                .overtimeRoundingMinutes(salaryPolicy.getOvertimeRoundingMinutes())
                 .periodStartType(salaryPolicy.getPeriodStartType())
                 .periodEndType(salaryPolicy.getPeriodEndType())
                 .effectiveFrom(salaryPolicy.getEffectiveFrom())

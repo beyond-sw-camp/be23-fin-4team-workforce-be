@@ -32,6 +32,9 @@ public class SalaryPolicyCreateReqDto {
     @Max(value=31, message = "지급일은 31이하여야합니다.")
     private Integer payDay;
 
+    @Min(value = 1, message = "초과근무 인정 단위는 1분 이상이어야 합니다.")
+    private Integer overtimeRoundingMinutes;
+
     @NotNull(message = "정산 시작 기준은 필수입니다.")
     private PeriodStartType periodStartType;
 
@@ -49,6 +52,7 @@ public class SalaryPolicyCreateReqDto {
                 .policyName(policyName)
                 .payType(payType)
                 .payDay(payDay)
+                .overtimeRoundingMinutes(overtimeRoundingMinutes)
                 .periodStartType(periodStartType)
                 .periodEndType(periodEndType)
                 .effectiveFrom(effectiveFrom)
