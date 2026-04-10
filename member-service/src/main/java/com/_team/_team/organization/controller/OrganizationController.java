@@ -212,7 +212,7 @@ public class OrganizationController {
         );
     }
 
-    // 조직 단건 조회
+    // 조직 단건 조회 ///
     @GetMapping("/organization/{organizationId}")
     public ResponseEntity<?> findById(@PathVariable UUID organizationId) {
         OrganizationResDto result = organizationService.findById(organizationId);
@@ -220,5 +220,10 @@ public class OrganizationController {
                 ApiResponse.success(result, "조직 조회 성공"),
                 HttpStatus.OK
         );
+    }
+
+    @GetMapping("/internal/{organizationId}")
+    public OrganizationResDto findByIdInternal(@PathVariable UUID organizationId) {
+        return organizationService.findById(organizationId);
     }
 }
