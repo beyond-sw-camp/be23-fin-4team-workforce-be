@@ -28,7 +28,7 @@ public class ApprovalRequestsController {
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping
     public ApiResponse<List<GoalApprovalBundleSummaryResDto>> myPending(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 goalApprovalService.listPendingSummariesForApprover(
@@ -41,7 +41,7 @@ public class ApprovalRequestsController {
     @GetMapping("/{requestId}")
     public ApiResponse<GoalApprovalBundleDetailResDto> detail(
             @PathVariable UUID requestId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 goalApprovalService.getBundleDetail(
@@ -53,7 +53,7 @@ public class ApprovalRequestsController {
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/history")
     public ApiResponse<List<GoalApprovalBundleSummaryResDto>> history(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 goalApprovalService.listHistorySummariesForMember(
@@ -66,7 +66,7 @@ public class ApprovalRequestsController {
     @PostMapping("/{requestId}/approve")
     public ApiResponse<GoalApprovalBundleDetailResDto> approve(
             @PathVariable UUID requestId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody(required = false) GoalApprovalDecisionReqDto dto) {
         return ApiResponse.success(
@@ -80,7 +80,7 @@ public class ApprovalRequestsController {
     @PostMapping("/{requestId}/reject")
     public ApiResponse<GoalApprovalBundleDetailResDto> reject(
             @PathVariable UUID requestId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody(required = false) GoalApprovalDecisionReqDto dto) {
         return ApiResponse.success(

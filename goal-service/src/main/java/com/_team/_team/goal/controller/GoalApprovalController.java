@@ -30,7 +30,7 @@ public class GoalApprovalController {
     @PostMapping("/{goalId}/approval/request")
     public ApiResponse<GoalApprovalResDto> request(
             @PathVariable UUID goalId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @Valid @RequestBody GoalApprovalRequestCreateReqDto dto) {
         return ApiResponse.success(
@@ -55,7 +55,7 @@ public class GoalApprovalController {
     public ApiResponse<GoalApprovalResDto> approve(
             @PathVariable UUID goalId,
             @PathVariable UUID requestId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody GoalApprovalDecisionReqDto dto) {
         return ApiResponse.success(
@@ -69,7 +69,7 @@ public class GoalApprovalController {
     public ApiResponse<GoalApprovalResDto> reject(
             @PathVariable UUID goalId,
             @PathVariable UUID requestId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody GoalApprovalDecisionReqDto dto) {
         return ApiResponse.success(

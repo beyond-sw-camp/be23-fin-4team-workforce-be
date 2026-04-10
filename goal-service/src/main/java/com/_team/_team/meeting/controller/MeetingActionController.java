@@ -32,7 +32,7 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.CREATE)
     @PostMapping("/{meetingRecordId}/action")
     public ApiResponse<MeetingActionResDto> createAction(
-            @RequestHeader("X-Member-Id") String requesterId,
+            @RequestHeader("X-User-UUID") String requesterId,
             @PathVariable UUID meetingRecordId,
             @RequestBody @Valid MeetingActionCreateReqDto dto) {
         return ApiResponse.success(meetingActionService.createAction(meetingRecordId, UUID.fromString(requesterId), dto), "액션 아이템이 생성되었습니다.");
@@ -42,7 +42,7 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/{meetingRecordId}/action")
     public ApiResponse<List<MeetingActionResDto>> listActions(
-            @RequestHeader("X-Member-Id") String requesterId,
+            @RequestHeader("X-User-UUID") String requesterId,
             @PathVariable UUID meetingRecordId) {
         return ApiResponse.success(meetingActionService.listActions(meetingRecordId, UUID.fromString(requesterId)), "액션 아이템 목록 조회 성공");
     }
@@ -51,7 +51,7 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.READ)
     @GetMapping("/action/me/pending")
     public ApiResponse<List<MeetingActionResDto>> listMyPendingActions(
-            @RequestHeader("X-Member-Id") String memberId) {
+            @RequestHeader("X-User-UUID") String memberId) {
         return ApiResponse.success(meetingActionService.listPendingByAssignee(UUID.fromString(memberId)), "미완료 액션 아이템 목록 조회 성공");
     }
 
@@ -59,7 +59,7 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/complete")
     public ApiResponse<MeetingActionResDto> completeAction(
-            @RequestHeader("X-Member-Id") String requesterId,
+            @RequestHeader("X-User-UUID") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId) {
         return ApiResponse.success(meetingActionService.completeAction(meetingRecordId, meetingActionId, UUID.fromString(requesterId)), "액션 아이템이 완료되었습니다.");
@@ -69,7 +69,7 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/rate")
     public ApiResponse<MeetingActionResDto> rateAction(
-            @RequestHeader("X-Member-Id") String requesterId,
+            @RequestHeader("X-User-UUID") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId,
             @RequestBody @Valid MeetingActionRateReqDto dto) {
@@ -80,7 +80,7 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
     @PatchMapping("/{meetingRecordId}/action/{meetingActionId}/approval")
     public ApiResponse<MeetingActionResDto> linkApproval(
-            @RequestHeader("X-Member-Id") String requesterId,
+            @RequestHeader("X-User-UUID") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId,
             @RequestBody @Valid LinkApprovalReqDto dto) {
@@ -91,7 +91,7 @@ public class MeetingActionController {
     @CheckPermission(resource = Resource.MEETING, action = Action.DELETE)
     @DeleteMapping("/{meetingRecordId}/action/{meetingActionId}")
     public ApiResponse<Void> deleteAction(
-            @RequestHeader("X-Member-Id") String requesterId,
+            @RequestHeader("X-User-UUID") String requesterId,
             @PathVariable UUID meetingRecordId,
             @PathVariable UUID meetingActionId) {
         meetingActionService.deleteAction(meetingRecordId, meetingActionId, UUID.fromString(requesterId));

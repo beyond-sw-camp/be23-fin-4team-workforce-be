@@ -67,7 +67,7 @@ public class GoalController {
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping
     public ApiResponse<List<GoalResDto>> listGoals(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestParam(required = false) UUID parentId,
             @RequestParam(required = false) KpiCycle cycle,
@@ -91,7 +91,7 @@ public class GoalController {
     @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/tree")
     public ApiResponse<List<GoalResDto>> treeGoals(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestParam(required = false, defaultValue = "all") String scope,
             @RequestParam(required = false) UUID orgId,
@@ -128,7 +128,7 @@ public class GoalController {
     public ApiResponse<GoalResDto> updateGoal(
             @PathVariable UUID goalId,
             @RequestBody @Valid GoalUpdateReqDto dto,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             HttpServletRequest request) {
         boolean hasGoalUpdate = positionPermissionReader.hasPermission(request, Resource.GOAL, Action.UPDATE);
@@ -205,7 +205,7 @@ public class GoalController {
     public ApiResponse<GoalProgressUpdateResDto> addProgressUpdate(
             @PathVariable UUID goalId,
             @RequestBody @Valid GoalProgressUpdateReqDto dto,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             HttpServletRequest request) {
         boolean hasGoalUpdate = positionPermissionReader.hasPermission(request, Resource.GOAL, Action.UPDATE);
@@ -225,7 +225,7 @@ public class GoalController {
     public ApiResponse<GoalResDto> submitCompletion(
             @PathVariable UUID goalId,
             @RequestBody @Valid GoalCompletionSubmitReqDto dto,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             HttpServletRequest request) {
         boolean hasGoalUpdate = positionPermissionReader.hasPermission(request, Resource.GOAL, Action.UPDATE);
@@ -265,7 +265,7 @@ public class GoalController {
     public ApiResponse<GoalCommentResDto> addComment(
             @PathVariable UUID goalId,
             @RequestBody @Valid GoalCommentReqDto dto,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 goalCommentService.create(goalId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
@@ -288,7 +288,7 @@ public class GoalController {
             @PathVariable UUID goalId,
             @PathVariable UUID commentId,
             @RequestBody @Valid GoalCommentReqDto dto,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 goalCommentService.update(goalId, commentId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
@@ -301,7 +301,7 @@ public class GoalController {
     public ApiResponse<Void> deleteComment(
             @PathVariable UUID goalId,
             @PathVariable UUID commentId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         goalCommentService.delete(goalId, commentId, UUID.fromString(memberId), UUID.fromString(companyId));
         return ApiResponse.success(null, "댓글이 삭제되었습니다.");

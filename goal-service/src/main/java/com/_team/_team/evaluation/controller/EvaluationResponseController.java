@@ -29,7 +29,7 @@ public class EvaluationResponseController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping
     public ResponseEntity<ApiResponse<List<ResponseResDto>>> listMyResponses(
-            @RequestHeader("X-Member-Id") String memberId) {
+            @RequestHeader("X-User-UUID") String memberId) {
         List<ResponseResDto> result = responseService.listMyResponses(UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(result, "내 평가 목록 조회 성공"));
     }
@@ -38,7 +38,7 @@ public class EvaluationResponseController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping("/{responseId}")
     public ResponseEntity<ApiResponse<ResponseResDto>> getResponse(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @PathVariable UUID responseId) {
         ResponseResDto result = responseService.getResponse(responseId, UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(result, "평가 응답 조회 성공"));
@@ -48,7 +48,7 @@ public class EvaluationResponseController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PatchMapping("/{responseId}")
     public ResponseEntity<ApiResponse<ResponseResDto>> saveResponse(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @PathVariable UUID responseId,
             @RequestBody ResponseSaveReqDto dto) {
         ResponseResDto result = responseService.saveResponse(responseId, UUID.fromString(memberId), dto);
@@ -59,7 +59,7 @@ public class EvaluationResponseController {
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PostMapping("/{responseId}/submit")
     public ResponseEntity<ApiResponse<ResponseResDto>> submitResponse(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @PathVariable UUID responseId) {
         ResponseResDto result = responseService.submitResponse(responseId, UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(result, "평가가 제출되었습니다."));

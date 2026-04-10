@@ -72,7 +72,7 @@ public class KpiTemplateController {
     @PostMapping("/{kpiTemplateId}/generate")
     public ApiResponse<List<GoalResDto>> generate(
             @PathVariable UUID kpiTemplateId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid KpiTemplateGenerateReqDto dto) {
         return ApiResponse.success(
