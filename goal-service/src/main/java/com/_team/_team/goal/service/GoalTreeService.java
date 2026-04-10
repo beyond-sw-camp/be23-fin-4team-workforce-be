@@ -9,6 +9,8 @@ import java.util.*;
 @Service
 public class GoalTreeService {
 
+    private static final int MAX_DEPTH = 32;
+
     public List<GoalResDto> decorate(List<Goal> goals) {
         Map<UUID, Goal> byId = new HashMap<>();
         Map<UUID, List<Goal>> childrenMap = new HashMap<>();
@@ -35,11 +37,17 @@ public class GoalTreeService {
     }
 
     private int getDepth(Goal goal, Map<UUID, Goal> byId) {
+        Set<UUID> visited = new HashSet<>();
+        visited.add(goal.getGoalId());
         int depth = 0;
         Goal cursor = goal;
-        while (cursor.getParentGoal() != null) {
+        while (cursor.getParentGoal() != null && depth < MAX_DEPTH) {
+            UUID parentId = cursor.getParentGoal().getGoalId();
+            if (!visited.add(parentId)) {
+                break; // 사이클 감지 — 중단
+            }
             depth++;
-            cursor = byId.get(cursor.getParentGoal().getGoalId());
+            cursor = byId.get(parentId);
             if (cursor == null) break;
         }
         return depth;
@@ -47,16 +55,24 @@ public class GoalTreeService {
 
     private List<UUID> buildPath(Goal goal, Map<UUID, Goal> byId) {
         LinkedList<UUID> path = new LinkedList<>();
+        Set<UUID> visited = new HashSet<>();
         Goal cursor = goal;
         path.addFirst(cursor.getGoalId());
-        while (cursor.getParentGoal() != null) {
-            Goal parent = byId.get(cursor.getParentGoal().getGoalId());
+        visited.add(cursor.getGoalId());
+        int steps = 0;
+        while (cursor.getParentGoal() != null && steps < MAX_DEPTH) {
+            UUID parentId = cursor.getParentGoal().getGoalId();
+            if (!visited.add(parentId)) {
+                break; // 사이클 감지
+            }
+            Goal parent = byId.get(parentId);
             if (parent == null) {
-                path.addFirst(cursor.getParentGoal().getGoalId());
+                path.addFirst(parentId);
                 break;
             }
             path.addFirst(parent.getGoalId());
             cursor = parent;
+            steps++;
         }
         return path;
     }

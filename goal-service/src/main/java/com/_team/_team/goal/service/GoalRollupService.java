@@ -14,23 +14,44 @@ import java.util.*;
 @Service
 public class GoalRollupService {
 
+    /** 목표 트리 최대 허용 깊이 — 이상 깊이는 데이터 이상으로 판단. */
+    private static final int MAX_DEPTH = 32;
+
     private final GoalRepository goalRepository;
 
     public GoalRollupService(GoalRepository goalRepository) {
         this.goalRepository = goalRepository;
     }
 
+    /**
+     * 해당 목표 및 모든 조상 목표들의 rolled achievement 를 재계산
+     */
     public void recalculateFrom(UUID goalId) {
         Goal start = goalRepository.findById(goalId).orElse(null);
         if (start == null) return;
-        recalculateRecursively(start);
+
+        Set<UUID> visited = new HashSet<>();
+        recalculateSubtree(start, visited, 0);
+
+        // 부모 방향으로도 올라가며 재계산. 사이클 방어.
+        Set<UUID> parentVisited = new HashSet<>();
+        parentVisited.add(start.getGoalId());
         Goal cursor = start.getParentGoal();
-        while (cursor != null) {
-            recalculateRecursively(cursor);
+        int steps = 0;
+        while (cursor != null && steps < MAX_DEPTH) {
+            if (!parentVisited.add(cursor.getGoalId())) {
+                break; // 사이클 감지
+            }
+            // 부모의 서브트리 재계산 (이미 계산된 노드는 visited 로 스킵)
+            recalculateSubtree(cursor, new HashSet<>(), 0);
             cursor = cursor.getParentGoal();
+            steps++;
         }
     }
 
+    /**
+     * 외부에서 현재 상태를 조회할 때 사용. 저장은 하지 않음.
+     */
     public BigDecimal calculateRolledAchievement(Goal goal, Map<UUID, List<Goal>> childrenMap) {
         List<Goal> children = childrenMap.getOrDefault(goal.getGoalId(), List.of())
                 .stream()
@@ -45,51 +66,55 @@ public class GoalRollupService {
         return avg(children);
     }
 
-    private void recalculateRecursively(Goal goal) {
-        Map<UUID, List<Goal>> childrenMap = new HashMap<>();
-        List<Goal> companyGoals = goalRepository.findByCompanyId(goal.getCompanyId());
-        for (Goal g : companyGoals) {
-            if (g.getParentGoal() != null) {
-                childrenMap.computeIfAbsent(g.getParentGoal().getGoalId(), key -> new ArrayList<>()).add(g);
-            }
+    /**
+     * goal 을 루트로 하는 서브트리를 재계산하여 영속화.
+     *
+     * @return 재계산된 rolled 값
+     */
+    private BigDecimal recalculateSubtree(Goal goal, Set<UUID> visited, int depth) {
+        if (depth > MAX_DEPTH) {
+            // 깊이 초과 — 더 이상 파고들지 않음. 자기 값 반환.
+            return goal.getAchievementPct() == null ? BigDecimal.ZERO : goal.getAchievementPct();
         }
-        calculateAndPersist(goal, childrenMap);
-    }
+        if (!visited.add(goal.getGoalId())) {
+            // 사이클 감지 — 현재 값 그대로 반환.
+            return goal.getRolledAchievementPct() == null ? BigDecimal.ZERO : goal.getRolledAchievementPct();
+        }
 
-    private BigDecimal calculateAndPersist(Goal goal, Map<UUID, List<Goal>> childrenMap) {
-        List<Goal> children = childrenMap.getOrDefault(goal.getGoalId(), List.of())
-                .stream()
+        // 자식 목표 직접 조회 (회사 전체 스캔 제거)
+        List<Goal> allChildren = goalRepository.findByParentGoal_GoalId(goal.getGoalId());
+        List<Goal> included = allChildren.stream()
                 .filter(this::isRollupChildIncluded)
                 .toList();
-        if (children.isEmpty()) {
+
+        if (included.isEmpty()) {
             BigDecimal self = goal.getAchievementPct() == null ? BigDecimal.ZERO : goal.getAchievementPct();
             goal.updateRollup(self, RollupSource.SELF);
             return self;
         }
 
-        for (Goal child : children) {
-            calculateAndPersist(child, childrenMap);
+        // 먼저 자식들을 재귀 재계산
+        for (Goal child : included) {
+            recalculateSubtree(child, visited, depth + 1);
         }
 
+        // 자동 집계가 꺼진 목표는 자기 값 유지
         if (!goal.isAutoUpdate()) {
             BigDecimal self = goal.getAchievementPct() == null ? BigDecimal.ZERO : goal.getAchievementPct();
             goal.updateRollup(self, RollupSource.SELF);
             return self;
         }
 
-        List<BigDecimal> childValues = new ArrayList<>();
-        for (Goal child : children) {
-            BigDecimal cv = child.getRolledAchievementPct() == null ? BigDecimal.ZERO : child.getRolledAchievementPct();
-            childValues.add(cv);
-        }
-
         BigDecimal rolled;
         RollupSource source;
         if (goal.getRollupPolicy() == RollupPolicy.CHILDREN_WEIGHTED) {
-            rolled = weighted(children);
+            rolled = weighted(included);
             source = RollupSource.CHILDREN_WEIGHTED;
         } else {
-            rolled = avgByValues(childValues);
+            List<BigDecimal> values = included.stream()
+                    .map(c -> c.getRolledAchievementPct() == null ? BigDecimal.ZERO : c.getRolledAchievementPct())
+                    .toList();
+            rolled = avgByValues(values);
             source = RollupSource.CHILDREN_AVG;
         }
         goal.updateRollup(rolled, source);
@@ -125,7 +150,9 @@ public class GoalRollupService {
         return weightedSum.divide(weightSum, 2, RoundingMode.HALF_UP);
     }
 
+    // 집계 포함 여부 : CANCELLED는 제외, DRAFT는 아직 승인, 활성 이전이므로 달성률 오염시키지 않도록 제외
     private boolean isRollupChildIncluded(Goal child) {
-        return child.getStatus() != GoalStatus.CANCELLED;
+        GoalStatus status = child.getStatus();
+        return status != GoalStatus.CANCELLED && status != GoalStatus.DRAFT;
     }
 }

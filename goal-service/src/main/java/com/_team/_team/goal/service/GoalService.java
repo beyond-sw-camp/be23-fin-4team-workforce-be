@@ -242,6 +242,12 @@ public class GoalService {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "완료되거나 취소된 목표는 수정할 수 없습니다. 현재 상태: " + goal.getStatus());
         }
+        // 결재 진행 중에는 목표를 수정할 수 없도록 차단한다.
+        // (승인자가 검토하는 동안 내용이 바뀌면 결재 근거가 흐트러짐)
+        if (goal.getGoalApprovalStatus() == GoalApprovalStatus.PENDING) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "결재 진행 중인 목표는 수정할 수 없습니다. 결재 완료 또는 반려 후 수정해 주세요.");
+        }
         boolean isOwnMemberGoal =
                 goal.getOwnerType() == GoalOwnerType.MEMBER
                         && actorMemberId != null
@@ -267,6 +273,14 @@ public class GoalService {
             goal.updateRollupPolicy(dto.getRollupPolicy());
         }
         if (dto.getParentGoalId() != null) {
+            // 자기 자신 혹은 자손 목표로의 부모 지정은 트리에 사이클을 만들어버리므로 차단.
+            if (dto.getParentGoalId().equals(goal.getGoalId())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "목표 자신을 상위 목표로 지정할 수 없습니다.");
+            }
+            if (isDescendant(goal.getGoalId(), dto.getParentGoalId())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "하위 목표를 상위 목표로 지정할 수 없습니다 (사이클 방지).");
+            }
             Goal parent = goalRepository.findById(dto.getParentGoalId())
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                             "상위 목표를 찾을 수 없습니다. id=" + dto.getParentGoalId()));
@@ -390,6 +404,32 @@ public class GoalService {
                 : "목표 완료 제출이 등록되었습니다.";
         goalActivityService.append(goalId, GoalActivityType.COMPLETION_SUBMITTED, requesterId, summary, null);
         return GoalResDto.from(goalRepository.findById(goalId).orElse(goal));
+    }
+
+    /**
+     * candidateParentId 가 ancestorGoalId 의 자손인지 여부를 BFS 로 확인.
+     * 자기 자신을 부모로 지정하는 경우와 사이클을 예방합니다.
+     */
+    private boolean isDescendant(UUID ancestorGoalId, UUID candidateParentId) {
+        if (ancestorGoalId == null || candidateParentId == null) return false;
+        java.util.ArrayDeque<UUID> stack = new java.util.ArrayDeque<>();
+        java.util.Set<UUID> visited = new java.util.HashSet<>();
+        stack.push(ancestorGoalId);
+        visited.add(ancestorGoalId);
+        int steps = 0;
+        while (!stack.isEmpty() && steps < 1024) {
+            UUID current = stack.pop();
+            List<Goal> children = goalRepository.findByParentGoal_GoalId(current);
+            for (Goal child : children) {
+                UUID cid = child.getGoalId();
+                if (cid.equals(candidateParentId)) return true;
+                if (visited.add(cid)) {
+                    stack.push(cid);
+                }
+            }
+            steps++;
+        }
+        return false;
     }
 
     private void validateSameCompany(UUID goalCompanyId, UUID requesterCompanyId) {

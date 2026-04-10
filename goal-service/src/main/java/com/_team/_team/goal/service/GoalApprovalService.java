@@ -175,9 +175,27 @@ public class GoalApprovalService {
         if (!bundle.getApproverId().equals(approverId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "지정된 승인자가 아닙니다.");
         }
+
+        // 번들 내 모든 목표를 선 검증 — 하나라도 상태 이상이 있으면 전부 롤백
+        List<Goal> goals = goalsInBundle(bundle.getBundleId());
+        if (goals.isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "번들에 목표가 없습니다.");
+        }
+        for (Goal g : goals) {
+            if (g.getStatus() == GoalStatus.COMPLETED || g.getStatus() == GoalStatus.CANCELLED) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "완료/취소된 목표가 번들에 포함되어 있어 승인할 수 없습니다. goalId=" + g.getGoalId());
+            }
+            if (g.getGoalApprovalStatus() != GoalApprovalStatus.PENDING) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "결재 진행 상태가 아닌 목표가 번들에 포함되어 있습니다. goalId=" + g.getGoalId());
+            }
+        }
+
         String note = dto != null ? dto.resolveNote() : null;
         bundle.approve(note);
-        List<Goal> goals = goalsInBundle(bundle.getBundleId());
+
+        // 상태 전이는 검증 후 일괄 수행
         for (Goal g : goals) {
             if (g.getStatus() == GoalStatus.DRAFT) {
                 g.activate(approverId);
@@ -185,6 +203,10 @@ public class GoalApprovalService {
                 g.complete();
             }
             g.updateGoalApprovalStatus(GoalApprovalStatus.APPROVED);
+        }
+        // Rollup 은 상태 전이 후 한 번에 — 같은 부모를 공유할 경우 중복 호출이 있어도
+        // idempotent 하도록 설계돼 있으므로 수용 가능.
+        for (Goal g : goals) {
             goalRollupService.recalculateFrom(g.getGoalId());
             goalActivityService.append(
                     g.getGoalId(),
@@ -375,3 +397,4 @@ public class GoalApprovalService {
         return getBundleDetail(bundleId, companyId, approverId);
     }
 }
+     
