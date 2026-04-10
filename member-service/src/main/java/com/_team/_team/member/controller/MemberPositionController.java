@@ -26,31 +26,24 @@ public class MemberPositionController {
         this.memberPositionRepository = memberPositionRepository;
     }
     // memberPositionId로 상세 조회
-    @GetMapping("/{memberPositionId}")
-    public ResponseEntity<?> getMemberPosition(
+    @GetMapping("/internal/{memberPositionId}")
+    public MemberPositionResDto getMemberPositionInternal(
             @PathVariable UUID memberPositionId) {
         MemberPosition mp = memberPositionRepository.findActiveByIdWithDetails(memberPositionId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 직위 정보를 찾을 수 없습니다."));
-        return new ResponseEntity<>(
-                ApiResponse.success(MemberPositionResDto.fromEntity(mp), "직위 조회 성공"),
-                HttpStatus.OK
-        );
+        return MemberPositionResDto.fromEntity(mp);
     }
 
     // 부서 + 직책으로 조회
-    @GetMapping("/search/by-job-title")
-    public ResponseEntity<?> searchByJobTitle(
+    @GetMapping("/internal/search/by-job-title")
+    public List<MemberPositionResDto> searchByJobTitleInternal(
             @RequestParam UUID organizationId,
             @RequestParam UUID jobTitleId) {
-        List<MemberPositionResDto> result = memberPositionRepository
+        return memberPositionRepository
                 .findByOrganizationIdAndJobTitleId(organizationId, jobTitleId)
                 .stream()
                 .map(MemberPositionResDto::fromEntity)
                 .collect(Collectors.toList());
-        return new ResponseEntity<>(
-                ApiResponse.success(result, "직책 기반 조회 성공"),
-                HttpStatus.OK
-        );
     }
 
     // 부서 + 직급으로 조회

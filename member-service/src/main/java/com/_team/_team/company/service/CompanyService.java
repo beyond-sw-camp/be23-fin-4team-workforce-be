@@ -3,6 +3,7 @@ package com._team._team.company.service;
 import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.dto.resdto.CompanyInfoResDto;
+import com._team._team.company.feignclients.ApprovalServiceClient;
 import com._team._team.company.repository.CompanyRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.esg.service.EsgService;
@@ -16,9 +17,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.SecureRandom;
@@ -39,6 +44,7 @@ public class CompanyService {
     private final MemberRepository memberRepository;
     private final S3Uploader s3Uploader;
     private final EsgService esgService;
+    private final ApprovalServiceClient approvalServiceClient;
 
     @Autowired
     public CompanyService(
@@ -47,7 +53,7 @@ public class CompanyService {
             MemberService memberService,
             NtsApiService ntsApiService,
             MailService mailService,
-            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, MemberRepository memberRepository, S3Uploader s3Uploader, EsgService esgService) {
+            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, MemberRepository memberRepository, S3Uploader s3Uploader, EsgService esgService, ApprovalServiceClient approvalServiceClient) {
         this.companyRepository = companyRepository;
         this.organizationService = organizationService;
         this.memberService = memberService;
@@ -57,6 +63,7 @@ public class CompanyService {
         this.memberRepository = memberRepository;
         this.s3Uploader = s3Uploader;
         this.esgService = esgService;
+        this.approvalServiceClient = approvalServiceClient;
     }
 
     // 이메일 인증 코드 발송
@@ -163,6 +170,13 @@ public class CompanyService {
 
         // 10. 인증 정보 삭제 - 로컬 테스트용 주석처리
         // emailRedisTemplate.delete("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
+
+        // 기본 결재양식 생성 (approval-service 호출)
+        try {
+            approvalServiceClient.initDefaultDocuments(company.getCompanyId());
+        } catch (Exception e) {
+            log.warn("기본 결재양식 생성 실패: {}", e.getMessage());
+        }
     }
 
     private Company createCompany(CompanyOnboardingReqDto reqDto) {
