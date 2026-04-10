@@ -34,7 +34,7 @@ public class PerformanceRecordController {
     public ApiResponse<PerformanceRecordResDto> submitRecord(
             @PathVariable UUID goalId,
             @RequestBody @Valid PerformanceRecordCreateReqDto dto,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 performanceRecordService.submitRecord(goalId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
@@ -57,7 +57,7 @@ public class PerformanceRecordController {
             @PathVariable UUID goalId,
             @PathVariable UUID performanceRecordId,
             @RequestBody @Valid PerformanceRecordReviewReqDto dto,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 performanceRecordService.reviewRecord(goalId, performanceRecordId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
