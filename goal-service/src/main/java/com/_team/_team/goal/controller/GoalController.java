@@ -55,7 +55,7 @@ public class GoalController {
     @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
     @PostMapping
     public ApiResponse<GoalResDto> createGoal(
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid GoalCreateReqDto dto) {
         return ApiResponse.success(
@@ -115,7 +115,7 @@ public class GoalController {
     @GetMapping("/{goalId}")
     public ApiResponse<GoalResDto> getGoal(
             @PathVariable UUID goalId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 goalService.getGoal(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
@@ -157,7 +157,7 @@ public class GoalController {
     @PatchMapping("/{goalId}/activate")
     public ApiResponse<GoalResDto> activateGoal(
             @PathVariable UUID goalId,
-            @RequestHeader("X-Member-Id") String memberId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
                 goalService.activateGoal(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
