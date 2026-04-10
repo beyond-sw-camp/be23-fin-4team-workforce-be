@@ -13,7 +13,8 @@ import com._team._team.member.domain.MemberPosition;
 import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
 import com._team._team.notification.NotificationType;
-import lombok.RequiredArgsConstructor;
+import com._team._team.organization.domain.Organization;
+import com._team._team.organization.repository.OrganizationRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,13 +39,15 @@ public class CalendarService {
     private final CalendarEventRepository calendarEventRepository;
     private final MemberRepository memberRepository;
     private final MemberPositionRepository memberPositionRepository;
+    private final OrganizationRepository organizationRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, ApplicationEventPublisher eventPublisher) {
+    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, OrganizationRepository organizationRepository, ApplicationEventPublisher eventPublisher) {
         this.calendarEventRepository = calendarEventRepository;
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
+        this.organizationRepository = organizationRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -106,15 +109,12 @@ public class CalendarService {
         Member member = getMember(memberId);
 
         validateDate(reqDto.getStartAt(), reqDto.getEndAt());
-
-        if (reqDto.getOrganizationId() == null) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "팀 일정은 조직 정보가 필요합니다.");
-        }
+        Organization organization = validateTeamOrganization(member, reqDto.getOrganizationId());
 
         CalendarEvent event = CalendarEvent.builder()
                 .company(member.getCompany())
                 .member(member)
-                .organizationId(reqDto.getOrganizationId())
+                .organizationId(organization.getOrganizationId())
                 .title(reqDto.getTitle())
                 .description(reqDto.getDescription())
                 .startAt(reqDto.getStartAt())
@@ -125,7 +125,7 @@ public class CalendarService {
 
         // 같은 조직 직원 전체에게 알림
         memberPositionRepository
-                .findByOrganization_OrganizationIdAndDelYn(reqDto.getOrganizationId(), "NO")
+                .findByOrganization_OrganizationIdAndDelYn(organization.getOrganizationId(), "NO")
                 .forEach(position -> {
                     if (!position.getMember().getMemberId().equals(memberId)) {
                         eventPublisher.publishEvent(NotificationMessage.builder()
@@ -309,6 +309,27 @@ public class CalendarService {
             throw new BusinessException(
                     HttpStatus.BAD_REQUEST, "종료일시는 시작일시보다 이후여야 합니다.");
         }
+    }
+
+    /**
+     * TEAM 일정은 유효한 하위 조직(루트 제외)으로만 생성 가능.
+     */
+    private Organization validateTeamOrganization(Member member, UUID organizationId) {
+        if (organizationId == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "팀 일정은 organizationId가 필수입니다.");
+        }
+        Organization org = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "유효하지 않은 organizationId입니다."));
+        if (!"NO".equals(org.getDelYn())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "삭제된 조직에는 팀 일정을 생성할 수 없습니다.");
+        }
+        if (org.getParent() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "루트 조직(전사)에는 팀 일정을 생성할 수 없습니다.");
+        }
+        if (!org.getCompany().getCompanyId().equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "다른 회사 조직에는 팀 일정을 생성할 수 없습니다.");
+        }
+        return org;
     }
 
     private void validateOwner(CalendarEvent event, UUID memberId) {
