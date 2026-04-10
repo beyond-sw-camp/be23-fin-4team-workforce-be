@@ -15,7 +15,7 @@ import java.util.UUID;
 
 // 승인 대기함 조회
 @RestController
-@RequestMapping("/approval-requests")
+@RequestMapping("/goal/approval-requests")
 public class ApprovalRequestsController {
 
     private final GoalApprovalService goalApprovalService;
