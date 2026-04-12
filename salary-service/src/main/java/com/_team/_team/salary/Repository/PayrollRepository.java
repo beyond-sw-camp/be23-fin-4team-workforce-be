@@ -30,6 +30,15 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
      */
     boolean existsByMemberIdAndPayrollYearMonthDayAndDelYn(UUID memberId, LocalDate payrollYearMonthDay, String delYn);
 
+
+    /**
+     * 직원 + 정산일 기존 대장 조회 (delYn 무관)
+     * - Unique Constraint 검사용
+     * - 존재하면 재생성 불가 (회계 원칙: 삭제 후 재생성 금지)
+     */
+    Optional<Payroll> findByCompanyIdAndMemberIdAndPayrollYearMonthDay(
+            UUID companyId, UUID memberId, LocalDate payrollYearMonthDay);
+
     /**
      * 직원별 + 상태별 급여대장 조회 (회사 + 삭제되지 않은 것만)
      */
@@ -37,7 +46,12 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
 
     /**
      * 급여(Salary) ID로 급여대장 조회
-     * - 특정 급여 정책에 연결된 급여대장들을 조회할 때 사용
+     * - 특정 급여 정책에 연결된 급여대장들을 조회
      */
     List<Payroll> findBySalaryIdAndDelYn(UUID salaryId, String delYn);
+
+    /**
+     * 급여대장을 상태·삭제여부로 전부 조회
+     */
+    List<Payroll> findByPayrollStatusAndDelYn(PayrollStatus payrollStatus, String delYn);
 }
