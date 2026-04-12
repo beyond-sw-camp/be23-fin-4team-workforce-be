@@ -5,6 +5,7 @@ import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.PeriodEndType;
 import com._team._team.salary.domain.enums.PeriodStartType;
 import com._team._team.salary.dto.reqdto.SalaryPolicyUpdateReqDto;
+import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -37,6 +38,23 @@ public class SalaryPolicy extends BaseTimeEntity {
     /** 초과근무 인정 단위(분) - null이면 1분 단위(절사 없음) */
     private Integer overtimeRoundingMinutes;
 
+    /**
+     * 임금제 유형 (COMPREHENSIVE: 포괄 / NON_COMPREHENSIVE: 비포괄)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private WageSystemType wageSystemType = WageSystemType.NON_COMPREHENSIVE;
+
+    /**
+     * 포괄임금제에서 기본급에 포함된 고정 오버타임시간(분)
+     * - COMPREHENSIVE: 예) 1200 (월 20시간)
+     * - NON_COMPREHENSIVE: 항상 0
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer fixedOvertimeMinutes = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PeriodStartType periodStartType;
@@ -51,7 +69,7 @@ public class SalaryPolicy extends BaseTimeEntity {
     private LocalDate effectiveTo;
 
     /** 삭제 여부 */
-    @Column(length = 1)
+    @Column(nullable = false, length = 1)
     @Builder.Default
     private String delYn = "N";
 
@@ -78,6 +96,10 @@ public class SalaryPolicy extends BaseTimeEntity {
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();
         this.overtimeRoundingMinutes = reqDto.getOvertimeRoundingMinutes();
+        this.wageSystemType = reqDto.getWageSystemType();
+        this.fixedOvertimeMinutes = reqDto.getWageSystemType() == WageSystemType.NON_COMPREHENSIVE
+                ? 0
+                : (reqDto.getFixedOvertimeMinutes() == null ? 0 : reqDto.getFixedOvertimeMinutes());
     }
 
     // 소프트 삭제
