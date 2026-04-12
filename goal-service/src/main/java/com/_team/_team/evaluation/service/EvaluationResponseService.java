@@ -210,6 +210,14 @@ public class EvaluationResponseService {
                 .stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .collect(Collectors.toList());
+        // 모든 응답이 제출(SUBMITTED)되어야 캘리브레이션 확정 가능
+        long notSubmitted = responses.stream()
+                .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
+                .count();
+        if (notSubmitted > 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "제출되지 않은 평가 응답이 " + notSubmitted + "건 있어 캘리브레이션을 확정할 수 없습니다.");
+        }
         for (EvaluationResponse r : responses) {
             try {
                 ObjectNode calibration;
@@ -241,6 +249,18 @@ public class EvaluationResponseService {
         if (season.getPhase() != SeasonPhase.CONFIRMED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "확정(CONFIRMED) 이후에만 결과를 공개할 수 있습니다. 현재 phase=" + season.getPhase());
+        }
+        // 모든 응답에 캘리브레이션(등급) 정보가 있어야 결과 공개 가능
+        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
+                .stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .collect(Collectors.toList());
+        long missingCalibration = responses.stream()
+                .filter(r -> r.getCalibrationJson() == null || r.getCalibrationJson().isBlank())
+                .count();
+        if (missingCalibration > 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "캘리브레이션 데이터가 없는 응답이 " + missingCalibration + "건 있어 결과를 공개할 수 없습니다.");
         }
         season.transitionTo(SeasonPhase.PUBLISHED);
         // 피드백 면담 자동 생성 (같은 트랜잭션에서 수행)

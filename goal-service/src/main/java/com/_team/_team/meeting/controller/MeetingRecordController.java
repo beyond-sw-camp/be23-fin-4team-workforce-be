@@ -35,8 +35,11 @@ public class MeetingRecordController {
     @PostMapping
     public ApiResponse<MeetingRecordResDto> createMeeting(
             @RequestHeader("X-User-UUID") String requesterId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid MeetingRecordCreateReqDto dto) {
-        return ApiResponse.success(meetingRecordService.createMeeting(dto), "면담 기록이 생성되었습니다.");
+        return ApiResponse.success(
+                meetingRecordService.createMeeting(dto, UUID.fromString(companyId)),
+                "면담 기록이 생성되었습니다.");
     }
 
     // 면담 기록 상세 조회

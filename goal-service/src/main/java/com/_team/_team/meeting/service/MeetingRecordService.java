@@ -51,6 +51,11 @@ public class MeetingRecordService {
      */
     @Transactional
     public void createFeedbackMeetingsForSeason(UUID seasonId, UUID companyId) {
+        // 멱등성: 이미 해당 시즌에 피드백 면담이 생성되어 있으면 중복 생성하지 않음
+        if (meetingRecordRepository.existsByRelatedSeasonIdAndCompanyId(seasonId, companyId)) {
+            return;
+        }
+
         Set<UUID> alreadyScheduled = new HashSet<>();
 
         List<EvaluationResponse> responses = evaluationResponseRepository.findByGroup_Season_SeasonId(seasonId);
@@ -73,12 +78,16 @@ public class MeetingRecordService {
                     .relatedSeasonId(seasonId)
                     .companyId(companyId)
                     .build();
+            // 평가 응답에 연결된 목표 ID 를 면담에 자동 링크
+            if (response.getTargetGoalIdsJson() != null && !response.getTargetGoalIdsJson().isBlank()) {
+                feedback.linkGoals(response.getTargetGoalIdsJson());
+            }
             meetingRecordRepository.save(feedback);
         }
     }
 
     @Transactional
-    public MeetingRecordResDto createMeeting(MeetingRecordCreateReqDto dto) {
+    public MeetingRecordResDto createMeeting(MeetingRecordCreateReqDto dto, UUID companyId) {
         // [M3] memberId == managerId 인 셀프 미팅은 비정상 케이스로 차단
         if (dto.getMemberId() != null && dto.getMemberId().equals(dto.getManagerId())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
@@ -104,6 +113,7 @@ public class MeetingRecordService {
                 .repeatCycle(dto.getRepeatCycle())
                 .scheduledAt(dto.getScheduledAt())
                 .agenda(dto.getAgenda())
+                .companyId(companyId)
                 .build();
 
         MeetingRecord saved = meetingRecordRepository.save(meetingRecord);
@@ -137,7 +147,12 @@ public class MeetingRecordService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "해당 면담 기록을 조회할 권한이 없습니다.");
         }
 
-        return MeetingRecordResDto.from(meetingRecord);
+        MeetingRecordResDto dto = MeetingRecordResDto.from(meetingRecord);
+        // privateMemo 는 매니저에게만 노출 — 멤버가 조회하면 null 처리
+        if (!meetingRecord.getManagerId().equals(requesterId)) {
+            dto.setPrivateMemo(null);
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)

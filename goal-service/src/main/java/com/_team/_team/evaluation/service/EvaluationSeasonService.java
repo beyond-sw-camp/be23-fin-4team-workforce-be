@@ -164,12 +164,44 @@ public class EvaluationSeasonService {
 
     /**
      * Phase 전이: ACTIVE 상태인 시즌에 한해 관리자가 페이즈를 진행시킬 수 있습니다.
+     * 현재 phase에 해당하는 평가 유형의 응답이 모두 제출(SUBMITTED)되었는지 사전 검증합니다.
      */
     @Transactional
     public SeasonResDto transitionPhase(UUID seasonId, UUID companyId, SeasonPhase next) {
         EvaluationSeason season = findSeasonOrThrow(seasonId, companyId);
+
+        // 현재 phase에 대응하는 평가 유형의 미제출 응답이 있으면 전이 차단
+        EvalType requiredType = mapPhaseToEvalType(season.getPhase());
+        if (requiredType != null) {
+            long notSubmitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                    .filter(r -> r.getCompanyId().equals(companyId))
+                    .filter(r -> r.getEvaluationType() == requiredType)
+                    .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
+                    .count();
+            if (notSubmitted > 0) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        requiredType.name() + " 유형의 미제출 응답이 " + notSubmitted
+                                + "건 있어 phase 를 전이할 수 없습니다.");
+            }
+        }
+
         season.transitionTo(next);
         return SeasonResDto.from(season);
+    }
+
+    /**
+     * 평가 phase 에 대응하는 EvalType 을 반환합니다.
+     * 대응 관계가 없는 phase (NOT_STARTED, CALIBRATION 등) 는 null 을 반환합니다.
+     */
+    private static EvalType mapPhaseToEvalType(SeasonPhase phase) {
+        if (phase == null) return null;
+        return switch (phase) {
+            case SELF_EVAL -> EvalType.SELF;
+            case PEER_EVAL -> EvalType.PEER;
+            case UPWARD_EVAL -> EvalType.UPWARD;
+            case DOWNWARD_EVAL -> EvalType.DOWNWARD;
+            default -> null;
+        };
     }
 
     private EvaluationSeason findSeasonOrThrow(UUID seasonId, UUID companyId) {
