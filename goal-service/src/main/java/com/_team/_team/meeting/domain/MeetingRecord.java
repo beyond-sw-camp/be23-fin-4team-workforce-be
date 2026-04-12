@@ -59,10 +59,49 @@ public class MeetingRecord extends BaseTimeEntity {
     @Column(name = "member_reaction")
     private Reaction memberReaction;
 
+    /**
+     * [M9] 회의에서 논의하는 연관 목표 ID 목록 (JSON 배열).
+     * 미팅이 단순 일정관리가 아니라 목표/성과 기반 대화로 연결되도록 추적합니다.
+     */
+    @Column(name = "related_goal_ids_json", columnDefinition = "TEXT")
+    private String relatedGoalIdsJson;
+
+    /**
+     * [M9] 연결된 평가 응답 ID — 피드백 면담으로 자동 생성된 회의 혹은 수동으로 평가와 연결한 회의.
+     */
+    @Column(name = "related_evaluation_response_id")
+    private UUID relatedEvaluationResponseId;
+
+    /**
+     * [M9] 이 미팅이 속한 평가 시즌 (피드백 면담 추적용).
+     */
+    @Column(name = "related_season_id")
+    private UUID relatedSeasonId;
+
+    @Column(name = "company_id")
+    private UUID companyId;
+
     public void complete(String memo, Reaction managerReaction) {
+        if (memo == null || memo.isBlank()) {
+            // [M1] 완료 시 memo 는 필수 — 회의록 없는 "완료" 는 의미가 없음
+            throw new IllegalArgumentException("면담 완료 시 메모(memo)는 필수입니다.");
+        }
         this.completedAt = LocalDateTime.now();
         this.memo = memo;
         this.managerReaction = managerReaction;
+    }
+
+    public void linkGoals(String relatedGoalIdsJson) {
+        this.relatedGoalIdsJson = relatedGoalIdsJson;
+    }
+
+    public void linkEvaluation(UUID seasonId, UUID responseId) {
+        this.relatedSeasonId = seasonId;
+        this.relatedEvaluationResponseId = responseId;
+    }
+
+    public void assignCompany(UUID companyId) {
+        this.companyId = companyId;
     }
 
     public void recordMemberReaction(Reaction memberReaction) {
