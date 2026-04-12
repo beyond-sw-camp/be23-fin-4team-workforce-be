@@ -1,12 +1,19 @@
 package com._team._team.evaluation.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.evaluation.domain.CalibrationHistory;
 import com._team._team.evaluation.domain.EvaluationResponse;
+import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
+import com._team._team.evaluation.domain.enums.SeasonPhase;
+import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.CalibrationAdjustReqDto;
 import com._team._team.evaluation.dto.reqdto.ResponseSaveReqDto;
 import com._team._team.evaluation.dto.resdto.ResponseResDto;
+import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
+import com._team._team.evaluation.repository.EvaluationSeasonRepository;
+import com._team._team.meeting.service.MeetingRecordService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.http.HttpStatus;
@@ -22,12 +29,21 @@ import java.util.stream.Collectors;
 public class EvaluationResponseService {
 
     private final EvaluationResponseRepository responseRepository;
+    private final EvaluationSeasonRepository seasonRepository;
+    private final CalibrationHistoryRepository calibrationHistoryRepository;
     private final ObjectMapper objectMapper;
+    private final MeetingRecordService meetingRecordService;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
-                                      ObjectMapper objectMapper) {
+                                      EvaluationSeasonRepository seasonRepository,
+                                      CalibrationHistoryRepository calibrationHistoryRepository,
+                                      ObjectMapper objectMapper,
+                                      MeetingRecordService meetingRecordService) {
         this.responseRepository = responseRepository;
+        this.seasonRepository = seasonRepository;
+        this.calibrationHistoryRepository = calibrationHistoryRepository;
         this.objectMapper = objectMapper;
+        this.meetingRecordService = meetingRecordService;
     }
 
     @Transactional(readOnly = true)
@@ -40,7 +56,6 @@ public class EvaluationResponseService {
     public ResponseResDto getResponse(UUID responseId, UUID requesterId) {
         EvaluationResponse response = responseRepository.findById(responseId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
-        // 평가자 본인 또는 관리자만 조회 가능 (관리자 체크는 컨트롤러/AOP에서 처리)
         return ResponseResDto.from(response);
     }
 
@@ -53,6 +68,12 @@ public class EvaluationResponseService {
         }
         if (response.getStatus() == EvaluationStatus.SUBMITTED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 제출된 평가는 수정할 수 없습니다.");
+        }
+        // 현재 시즌 phase 가 응답 편집 가능한 단계가 아니면 차단
+        EvaluationSeason season = response.getGroup().getSeason();
+        if (season.getStatus() != SeasonStatus.ACTIVE || !season.isResponseEditablePhase()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "현재 평가 페이즈에서는 응답을 저장할 수 없습니다. phase=" + season.getPhase());
         }
         response.saveAnswers(dto.getAnswersJson());
         return ResponseResDto.from(response);
@@ -68,6 +89,15 @@ public class EvaluationResponseService {
         if (response.getStatus() == EvaluationStatus.SUBMITTED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 제출된 평가입니다.");
         }
+        // 현재 phase 가 편집 가능한 단계가 아니면 제출 차단
+        EvaluationSeason season = response.getGroup().getSeason();
+        if (season.getStatus() != SeasonStatus.ACTIVE || !season.isResponseEditablePhase()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "현재 평가 페이즈에서는 제출할 수 없습니다. phase=" + season.getPhase());
+        }
+        if (response.getAnswersJson() == null || response.getAnswersJson().isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "응답 내용이 비어있어 제출할 수 없습니다.");
+        }
         response.submit();
         return ResponseResDto.from(response);
     }
@@ -78,6 +108,12 @@ public class EvaluationResponseService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
         if (!response.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다.");
+        }
+        // 캘리브레이션이 확정된 뒤에는 재개방 불가
+        EvaluationSeason season = response.getGroup().getSeason();
+        if (season.getPhase() == SeasonPhase.CONFIRMED || season.getPhase() == SeasonPhase.PUBLISHED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "캘리브레이션 확정/결과 공개 이후에는 응답을 재개방할 수 없습니다.");
         }
         response.reopen();
         return ResponseResDto.from(response);
@@ -94,7 +130,6 @@ public class EvaluationResponseService {
         for (EvaluationResponse r : responses) {
             r.updateRemindedAt();
         }
-        // TODO: 인앱 알림 발송 연동
     }
 
     @Transactional
@@ -107,35 +142,70 @@ public class EvaluationResponseService {
         for (EvaluationResponse r : responses) {
             r.updateRemindedAt();
         }
-        // TODO: 인앱 알림 일괄 발송 연동
     }
 
     // 캘리브레이션
     @Transactional
-    public void adjustCalibrations(UUID seasonId, UUID companyId, CalibrationAdjustReqDto dto) {
+    public void adjustCalibrations(UUID seasonId, UUID companyId, UUID actorMemberId, CalibrationAdjustReqDto dto) {
+        EvaluationSeason season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
+        if (!season.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
+        }
+        // 캘리브레이션 단계에서만 조정 가능
+        if (!season.isCalibrationPhase()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "캘리브레이션 페이즈에서만 조정이 가능합니다. 현재 phase=" + season.getPhase());
+        }
         for (CalibrationAdjustReqDto.Adjustment adj : dto.getAdjustments()) {
             EvaluationResponse response = responseRepository.findById(adj.getResponseId())
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
             if (!response.getCompanyId().equals(companyId)) {
                 throw new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다.");
             }
+            if (response.getStatus() != EvaluationStatus.SUBMITTED) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "제출되지 않은 응답은 캘리브레이션할 수 없습니다. responseId=" + response.getResponseId());
+            }
+            String previousGrade = extractAdjustedGrade(response.getCalibrationJson());
             try {
                 ObjectNode calibration = objectMapper.createObjectNode();
-                // 기존 calibration 데이터가 있으면 병합
                 if (response.getCalibrationJson() != null) {
                     calibration = (ObjectNode) objectMapper.readTree(response.getCalibrationJson());
                 }
                 calibration.put("adjustedGrade", adj.getAdjustedGrade());
                 calibration.put("adjustmentReason", adj.getAdjustmentReason());
+                calibration.put("adjustedAt", LocalDateTime.now().toString());
+                calibration.put("adjustedBy", actorMemberId != null ? actorMemberId.toString() : "unknown");
                 response.updateCalibration(objectMapper.writeValueAsString(calibration));
             } catch (Exception e) {
                 throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "캘리브레이션 데이터 처리 실패");
             }
+            // 감사 이력 저장 — 매 조정마다 append
+            calibrationHistoryRepository.save(CalibrationHistory.builder()
+                    .companyId(companyId)
+                    .seasonId(seasonId)
+                    .responseId(response.getResponseId())
+                    .adjustedGrade(adj.getAdjustedGrade())
+                    .adjustmentReason(adj.getAdjustmentReason())
+                    .previousGrade(previousGrade)
+                    .adjustedBy(actorMemberId != null ? actorMemberId : companyId)
+                    .build());
         }
     }
 
     @Transactional
     public void confirmCalibration(UUID seasonId, UUID companyId) {
+        EvaluationSeason season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
+        if (!season.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
+        }
+        // 캘리브레이션 페이즈에서만 확정 가능
+        if (!season.isCalibrationPhase()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "캘리브레이션 페이즈에서만 확정할 수 있습니다. 현재 phase=" + season.getPhase());
+        }
         List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
                 .stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
@@ -154,6 +224,39 @@ public class EvaluationResponseService {
                 throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "캘리브레이션 확정 처리 실패");
             }
         }
+        // Phase 전이: CALIBRATION → CONFIRMED
+        season.transitionTo(SeasonPhase.CONFIRMED);
+    }
+
+    /**
+     * 결과 공개 — CONFIRMED → PUBLISHED 전이 후 피드백 면담을 바로 생성
+     */
+    @Transactional
+    public void publishResults(UUID seasonId, UUID companyId) {
+        EvaluationSeason season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
+        if (!season.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
+        }
+        if (season.getPhase() != SeasonPhase.CONFIRMED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "확정(CONFIRMED) 이후에만 결과를 공개할 수 있습니다. 현재 phase=" + season.getPhase());
+        }
+        season.transitionTo(SeasonPhase.PUBLISHED);
+        // 피드백 면담 자동 생성 (같은 트랜잭션에서 수행)
+        meetingRecordService.createFeedbackMeetingsForSeason(seasonId, companyId);
+    }
+
+    private String extractAdjustedGrade(String calibrationJson) {
+        if (calibrationJson == null) return null;
+        try {
+            var node = objectMapper.readTree(calibrationJson);
+            if (node.has("adjustedGrade")) {
+                return node.get("adjustedGrade").asText();
+            }
+        } catch (Exception ignore) {
+        }
+        return null;
     }
 
     // 진행도
