@@ -3,13 +3,12 @@ package com._team._team.salary.dto.reqdto;
 import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.PeriodEndType;
 import com._team._team.salary.domain.enums.PeriodStartType;
+import com._team._team.salary.domain.enums.WageSystemType;
+import jakarta.persistence.Column;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 
@@ -33,6 +32,12 @@ public class SalaryPolicyUpdateReqDto {
     @Min(value = 1, message = "초과근무 인정 단위는 1분 이상이어야 합니다.")
     private Integer overtimeRoundingMinutes;
 
+    @NotNull(message = "임금제 유형은 필수입니다.")
+    private WageSystemType wageSystemType;
+
+    @Min(value = 0, message = "고정 오버타임시간(분)은 0 이상이어야 합니다.")
+    private Integer fixedOvertimeMinutes;
+
     @NotNull(message = "정산 시작 기준은 필수입니다.")
     private PeriodStartType periodStartType;
 
@@ -43,4 +48,5 @@ public class SalaryPolicyUpdateReqDto {
     private LocalDate effectiveFrom;
 
     private LocalDate effectiveTo;
+
 }
