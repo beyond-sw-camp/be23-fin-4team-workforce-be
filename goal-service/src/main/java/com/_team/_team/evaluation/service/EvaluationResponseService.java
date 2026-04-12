@@ -20,6 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -142,6 +144,89 @@ public class EvaluationResponseService {
         for (EvaluationResponse r : responses) {
             r.updateRemindedAt();
         }
+    }
+
+    /**
+     * 기준점(baseline) 기반 정규화 점수 재계산.
+     * answersJson 에서 항목별 점수를 합산한 뒤, baselineValue 를 기준으로 0~100 스케일로 정규화합니다.
+     * range = "team" 이면 시즌 전체 평균을 기준으로, "individual" 이면 baselineValue 를 직접 기준으로 사용합니다.
+     */
+    @Transactional
+    public void applyBaseline(UUID seasonId, UUID companyId, String range, Double baselineValue) {
+        EvaluationSeason season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
+        if (!season.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
+        }
+        if (!season.isCalibrationPhase()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "캘리브레이션 페이즈에서만 기준점을 적용할 수 있습니다. 현재 phase=" + season.getPhase());
+        }
+
+        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
+                .stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
+                .collect(Collectors.toList());
+
+        if (responses.isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "제출된 응답이 없어 기준점을 적용할 수 없습니다.");
+        }
+
+        // 각 응답의 원시 점수 추출 (answersJson 에서 "totalScore" 필드)
+        List<BigDecimal> rawScores = responses.stream()
+                .map(this::extractRawScore)
+                .collect(Collectors.toList());
+
+        // 기준점 결정
+        BigDecimal baseline;
+        if ("team".equalsIgnoreCase(range)) {
+            // 팀 전체 평균을 기준으로 사용
+            BigDecimal sum = rawScores.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            baseline = sum.divide(BigDecimal.valueOf(rawScores.size()), 4, RoundingMode.HALF_UP);
+        } else {
+            // individual: 직접 지정한 baselineValue 사용
+            baseline = baselineValue != null ? BigDecimal.valueOf(baselineValue) : BigDecimal.ZERO;
+        }
+
+        if (baseline.compareTo(BigDecimal.ZERO) == 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "기준점이 0이면 정규화할 수 없습니다.");
+        }
+
+        // 정규화 점수 계산: (rawScore / baseline) * 50 → 기준점 = 50점
+        for (int i = 0; i < responses.size(); i++) {
+            EvaluationResponse response = responses.get(i);
+            BigDecimal rawScore = rawScores.get(i);
+            BigDecimal normalized = rawScore
+                    .divide(baseline, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(50))
+                    .min(BigDecimal.valueOf(100))
+                    .max(BigDecimal.ZERO)
+                    .setScale(2, RoundingMode.HALF_UP);
+            response.updateNormalizedScore(normalized);
+        }
+    }
+
+    private BigDecimal extractRawScore(EvaluationResponse response) {
+        if (response.getAnswersJson() == null) return BigDecimal.ZERO;
+        try {
+            var node = objectMapper.readTree(response.getAnswersJson());
+            if (node.has("totalScore")) {
+                return BigDecimal.valueOf(node.get("totalScore").asDouble());
+            }
+            // totalScore 필드가 없으면 items 배열의 score 합산 시도
+            if (node.has("items") && node.get("items").isArray()) {
+                BigDecimal sum = BigDecimal.ZERO;
+                for (var item : node.get("items")) {
+                    if (item.has("score")) {
+                        sum = sum.add(BigDecimal.valueOf(item.get("score").asDouble()));
+                    }
+                }
+                return sum;
+            }
+        } catch (Exception ignore) {
+        }
+        return BigDecimal.ZERO;
     }
 
     // 캘리브레이션

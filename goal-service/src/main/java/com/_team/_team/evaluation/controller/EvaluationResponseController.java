@@ -113,7 +113,7 @@ public class EvaluationResponseController {
             @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID seasonId,
             @RequestBody CalibrationBaselineReqDto dto) {
-        // TODO: 기준점 기반 점수 재계산 로직
+        responseService.applyBaseline(seasonId, UUID.fromString(companyId), dto.getRange(), dto.getBaselineValue());
         return ResponseEntity.ok(ApiResponse.success(null, "기준점이 적용되었습니다."));
     }
 
