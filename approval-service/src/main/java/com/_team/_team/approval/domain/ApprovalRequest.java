@@ -53,6 +53,17 @@ public class ApprovalRequest extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String cancelReason;
 
+    // === 요청자 스냅샷 (작성 시점 정보) ===
+    @Column(nullable = false)
+    private String requesterName; // 요청자 이름 (작성 시점)
+
+    @Column
+    private UUID requesterOrganizationId; // 요청자 조직 ID (작성 시점, 조직 없는 사용자는 NULL 허용)
+
+    @Column
+    private String requesterOrganizationName; // 요청자 조직명 (작성 시점)
+
+
     public void updateStatus(RequestStatus status) {
         this.requestStatus = status;
     }

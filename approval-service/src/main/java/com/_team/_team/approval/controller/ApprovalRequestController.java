@@ -32,8 +32,9 @@ public class ApprovalRequestController {
     public ResponseEntity<?> create(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
             @Valid @RequestBody ApprovalRequestCreateReqDto reqDto) {
-        ApprovalRequestResDto resDto = approvalRequestService.create(companyId, memberId, reqDto);
+        ApprovalRequestResDto resDto = approvalRequestService.create(companyId, memberId, memberPositionId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "결재 요청이 생성되었습니다."),
                 HttpStatus.CREATED
@@ -97,6 +98,20 @@ public class ApprovalRequestController {
                 approvalRequestService.cancel(companyId, memberId, requestId, reqDto.getCancelReason());
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "결재가 취소되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    // 부서 문서함 (본인 부서 + 하위 조직의 결재 요청 모아보기)
+    @GetMapping("/department")
+    public ResponseEntity<?> findDepartmentRequests(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
+            @RequestParam UUID organizationId) {
+        List<ApprovalRequestResDto> result = approvalRequestService
+                .findDepartmentRequests(companyId, memberPositionId, organizationId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "부서 문서함 조회 성공"),
                 HttpStatus.OK
         );
     }

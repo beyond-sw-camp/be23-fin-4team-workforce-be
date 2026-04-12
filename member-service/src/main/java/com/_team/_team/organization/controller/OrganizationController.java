@@ -226,4 +226,9 @@ public class OrganizationController {
     public OrganizationResDto findByIdInternal(@PathVariable UUID organizationId) {
         return organizationService.findById(organizationId);
     }
+
+    @GetMapping("/internal/{organizationId}/descendants")
+    public List<UUID> findDescendantIdsInternal(@PathVariable UUID organizationId) {
+        return organizationService.findDescendantIds(organizationId);
+    }
 }

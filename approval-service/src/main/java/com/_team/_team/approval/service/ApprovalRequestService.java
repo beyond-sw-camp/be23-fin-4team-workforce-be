@@ -9,6 +9,8 @@ import com._team._team.approval.domain.enums.RequestStatus;
 import com._team._team.approval.domain.enums.ViewerReadStatus;
 import com._team._team.approval.dto.reqdto.ApprovalRequestCreateReqDto;
 import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
+import com._team._team.approval.feignclients.MemberServiceClient;
+import com._team._team.approval.feignclients.dto.MemberPositionResDto;
 import com._team._team.approval.repository.ApprovalDocumentRepository;
 import com._team._team.approval.repository.ApprovalRepository;
 import com._team._team.approval.repository.ApprovalRequestRepository;
@@ -32,18 +34,20 @@ public class ApprovalRequestService {
     private final ApprovalRepository approvalRepository;
     private final ApprovalViewerRepository approvalViewerRepository;
     private final AttachmentService attachmentService;
+    private final MemberServiceClient memberServiceClient;
 
     @Autowired
-    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService) {
+    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.attachmentService = attachmentService;
+        this.memberServiceClient = memberServiceClient;
     }
 
 //    결재요청 생성(결재라인 + 참조/공람자 포함)
-    public ApprovalRequestResDto create(UUID companyId, UUID memberId, ApprovalRequestCreateReqDto reqDto){
+    public ApprovalRequestResDto create(UUID companyId, UUID memberId, UUID memberPositionId, ApprovalRequestCreateReqDto reqDto){
 
 //        양식 조회 + 권한 체크
         ApprovalDocument document = approvalDocumentRepository.findById(reqDto.getDocumentId())
@@ -105,6 +109,13 @@ public class ApprovalRequestService {
             }
         }
 
+        // === 요청자 스냅샷 조회 ===
+        // member-service에 요청자 정보 조회 (Feign 실패 시 트랜잭션 롤백)
+        MemberPositionResDto requester = memberServiceClient.getMemberPosition(memberPositionId);
+        if (requester == null) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "요청자 정보를 찾을 수 없습니다.");
+        }
+
         // ApprovalRequest 생성
         ApprovalRequest request = ApprovalRequest.builder()
                 .approvalDocument(document)
@@ -112,6 +123,9 @@ public class ApprovalRequestService {
                 .requestType(document.getRequestType())
                 .contentJson(reqDto.getContentJson())
                 .requestStatus(reqDto.getRequestStatus())
+                .requesterName(requester.getMemberName())
+                .requesterOrganizationId(requester.getOrganizationId())
+                .requesterOrganizationName(requester.getOrganizationName())
                 .build();
 
         ApprovalRequest savedRequest = approvalRequestRepository.save(request);
@@ -381,5 +395,45 @@ public class ApprovalRequestService {
 
         return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
 
+    }
+
+    // 부서 문서함 조회 (본인 부서 + 하위 조직의 결재 요청, 작성 시점 부서 기준)
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestResDto> findDepartmentRequests(
+            UUID companyId, UUID memberPositionId, UUID organizationId) {
+
+        // 1. 요청자 본인 정보 조회
+        MemberPositionResDto requester = memberServiceClient.getMemberPosition(memberPositionId);
+        if (requester == null) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
+        }
+
+        // 2. 본인 접근 가능 범위 (본인 부서 + 하위 조직 전체)
+        List<UUID> accessibleOrgIds = memberServiceClient
+                .getOrganizationDescendantIds(requester.getOrganizationId());
+
+        // 3. 요청된 organizationId가 본인 접근 범위 안에 있는지 검증
+        if (!accessibleOrgIds.contains(organizationId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN,
+                    "해당 부서의 문서함에 접근할 권한이 없습니다.");
+        }
+
+        // 4. 조회 대상 부서의 descendants (자기 자신 포함)
+        List<UUID> targetOrgIds = memberServiceClient
+                .getOrganizationDescendantIds(organizationId);
+
+        // 5. 부서 문서함 조회
+        List<ApprovalRequest> requests = approvalRequestRepository
+                .findDepartmentRequests(companyId, targetOrgIds);
+
+        return requests.stream()
+                .map(request -> {
+                    List<Approval> approvals =
+                            approvalRepository.findByRequestIdWithRequest(request.getRequestId());
+                    List<ApprovalViewer> viewers =
+                            approvalViewerRepository.findByRequestId(request.getRequestId());
+                    return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
+                })
+                .toList();
     }
 }
