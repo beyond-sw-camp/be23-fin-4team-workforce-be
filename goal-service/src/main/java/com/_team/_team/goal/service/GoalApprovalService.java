@@ -11,7 +11,10 @@ import com._team._team.goal.dto.resdto.GoalApprovalBundleSummaryResDto;
 import com._team._team.goal.dto.resdto.GoalApprovalResDto;
 import com._team._team.goal.dto.resdto.GoalApprovalWatcherResDto;
 import com._team._team.goal.dto.resdto.GoalResDto;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.goal.repository.*;
+import com._team._team.notification.NotificationType;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,18 +31,21 @@ public class GoalApprovalService {
     private final GoalApprovalBundleGoalRepository bundleGoalRepository;
     private final GoalActivityService goalActivityService;
     private final GoalRollupService goalRollupService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public GoalApprovalService(
             GoalRepository goalRepository,
             GoalApprovalBundleRepository bundleRepository,
             GoalApprovalBundleGoalRepository bundleGoalRepository,
             GoalActivityService goalActivityService,
-            GoalRollupService goalRollupService) {
+            GoalRollupService goalRollupService,
+            ApplicationEventPublisher eventPublisher) {
         this.goalRepository = goalRepository;
         this.bundleRepository = bundleRepository;
         this.bundleGoalRepository = bundleGoalRepository;
         this.goalActivityService = goalActivityService;
         this.goalRollupService = goalRollupService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -113,6 +119,16 @@ public class GoalApprovalService {
         for (UUID gid : goalIds) {
             goalActivityService.append(gid, GoalActivityType.APPROVAL_REQUESTED, requesterId, "승인 요청이 등록되었습니다.", null);
         }
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(dto.getApproverId())
+                .senderId(requesterId)
+                .notificationType(NotificationType.APPROVAL_REQUESTED)
+                .content(goalIds.size() > 1
+                        ? "목표 " + goalIds.size() + "건에 대한 승인 요청이 도착했습니다."
+                        : "목표 승인 요청이 도착했습니다.")
+                .targetId(bundle.getBundleId())
+                .targetType("GOAL_APPROVAL_BUNDLE")
+                .build());
         return get(goalIds.get(0), companyId);
     }
 
@@ -212,6 +228,14 @@ public class GoalApprovalService {
                     g.getStatus() == GoalStatus.COMPLETED ? "목표 완료 승인" : "목표 활성 승인",
                     null);
         }
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(bundle.getRequestedBy())
+                .senderId(approverId)
+                .notificationType(NotificationType.APPROVAL_APPROVED)
+                .content("목표 승인이 완료되었습니다.")
+                .targetId(bundle.getBundleId())
+                .targetType("GOAL_APPROVAL_BUNDLE")
+                .build());
         return get(goalId, companyId);
     }
 
@@ -232,6 +256,16 @@ public class GoalApprovalService {
             g.updateGoalApprovalStatus(GoalApprovalStatus.REJECTED);
             goalActivityService.append(g.getGoalId(), GoalActivityType.REJECTED, approverId, "목표 승인 반려", reason);
         }
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(bundle.getRequestedBy())
+                .senderId(approverId)
+                .notificationType(NotificationType.APPROVAL_REJECTED)
+                .content(reason != null && !reason.isBlank()
+                        ? "목표 승인이 반려되었습니다. 사유: " + reason
+                        : "목표 승인이 반려되었습니다.")
+                .targetId(bundle.getBundleId())
+                .targetType("GOAL_APPROVAL_BUNDLE")
+                .build());
         return get(goalId, companyId);
     }
 

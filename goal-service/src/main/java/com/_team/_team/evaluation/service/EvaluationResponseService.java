@@ -1,6 +1,7 @@
 package com._team._team.evaluation.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.evaluation.domain.CalibrationHistory;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationResponse;
@@ -16,9 +17,11 @@ import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
 import com._team._team.meeting.service.MeetingRecordService;
+import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,17 +43,20 @@ public class EvaluationResponseService {
     private final CalibrationHistoryRepository calibrationHistoryRepository;
     private final ObjectMapper objectMapper;
     private final MeetingRecordService meetingRecordService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
                                       EvaluationSeasonRepository seasonRepository,
                                       CalibrationHistoryRepository calibrationHistoryRepository,
                                       ObjectMapper objectMapper,
-                                      MeetingRecordService meetingRecordService) {
+                                      MeetingRecordService meetingRecordService,
+                                      ApplicationEventPublisher eventPublisher) {
         this.responseRepository = responseRepository;
         this.seasonRepository = seasonRepository;
         this.calibrationHistoryRepository = calibrationHistoryRepository;
         this.objectMapper = objectMapper;
         this.meetingRecordService = meetingRecordService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -169,20 +175,36 @@ public class EvaluationResponseService {
                     "캘리브레이션 확정/결과 공개 이후에는 응답을 재개방할 수 없습니다.");
         }
         response.reopen();
+        String seasonName = season.getName() != null ? season.getName() : "평가";
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(response.getEvaluatorId())
+                .notificationType(NotificationType.EVALUATION_REOPENED)
+                .content("\"" + seasonName + "\" 평가 응답이 재작성 가능한 상태로 변경되었습니다.")
+                .targetId(responseId)
+                .targetType("EVALUATION_RESPONSE")
+                .build());
         return ResponseResDto.from(response);
     }
 
     // 리마인드
     @Transactional
     public void sendReminder(UUID seasonId, UUID memberId, UUID companyId) {
-        List<EvaluationResponse> responses = responseRepository.findByEvaluatorId(memberId)
+        List<EvaluationResponse> pending = responseRepository.findByGroup_Season_SeasonId(seasonId)
                 .stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getEvaluatorId().equals(memberId))
                 .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
                 .collect(Collectors.toList());
-        for (EvaluationResponse r : responses) {
+        if (pending.isEmpty()) {
+            return;
+        }
+        for (EvaluationResponse r : pending) {
             r.updateRemindedAt();
         }
+        String seasonName = seasonRepository.findById(seasonId)
+                .map(EvaluationSeason::getName)
+                .orElse("평가");
+        publishEvaluationReminder(memberId, seasonId, seasonName, pending.size());
     }
 
     @Transactional
@@ -192,9 +214,32 @@ public class EvaluationResponseService {
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
                 .collect(Collectors.toList());
-        for (EvaluationResponse r : responses) {
-            r.updateRemindedAt();
+        if (responses.isEmpty()) {
+            return;
         }
+        String seasonName = seasonRepository.findById(seasonId)
+                .map(EvaluationSeason::getName)
+                .orElse("평가");
+        Map<UUID, List<EvaluationResponse>> byEvaluator = responses.stream()
+                .collect(Collectors.groupingBy(EvaluationResponse::getEvaluatorId));
+        for (List<EvaluationResponse> list : byEvaluator.values()) {
+            for (EvaluationResponse r : list) {
+                r.updateRemindedAt();
+            }
+        }
+        for (Map.Entry<UUID, List<EvaluationResponse>> e : byEvaluator.entrySet()) {
+            publishEvaluationReminder(e.getKey(), seasonId, seasonName, e.getValue().size());
+        }
+    }
+
+    private void publishEvaluationReminder(UUID receiverId, UUID seasonId, String seasonName, int pendingCount) {
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(receiverId)
+                .notificationType(NotificationType.EVALUATION_REMINDER)
+                .content("\"" + seasonName + "\" 미제출 평가가 " + pendingCount + "건 있습니다.")
+                .targetId(seasonId)
+                .targetType("EVALUATION_SEASON")
+                .build());
     }
 
     /**
