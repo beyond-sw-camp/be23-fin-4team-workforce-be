@@ -17,10 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -249,25 +246,15 @@ public class GoalApprovalService {
 
     @Transactional(readOnly = true)
     public List<GoalApprovalBundle> listPendingForMember(UUID companyId, UUID memberId) {
-        List<GoalApprovalBundle> asApprover =
-                bundleRepository.findByCompanyIdAndStatusAndDecisionAndApproverIdOrderByRequestedAtDesc(
-                        companyId, BundleApprovalStatus.PENDING, GoalApprovalDecision.PENDING, memberId);
-        List<GoalApprovalBundle> asRequester =
-                bundleRepository.findByCompanyIdAndStatusAndDecisionAndRequestedByOrderByRequestedAtDesc(
-                        companyId, BundleApprovalStatus.PENDING, GoalApprovalDecision.PENDING, memberId);
-        Map<UUID, GoalApprovalBundle> dedup = new LinkedHashMap<>();
-        for (GoalApprovalBundle b : asApprover) dedup.put(b.getBundleId(), b);
-        for (GoalApprovalBundle b : asRequester) dedup.putIfAbsent(b.getBundleId(), b);
-        List<GoalApprovalBundle> merged = new ArrayList<>(dedup.values());
-        merged.sort((a, b) -> {
-            LocalDateTime at = a.getRequestedAt();
-            LocalDateTime bt = b.getRequestedAt();
-            if (at == null && bt == null) return 0;
-            if (at == null) return 1;
-            if (bt == null) return -1;
-            return bt.compareTo(at);
-        });
-        return merged;
+        // "내가 처리할 승인"은 지정 승인자(approver)인 요청만 반환한다.
+        return bundleRepository.findByCompanyIdAndStatusAndDecisionAndApproverIdOrderByRequestedAtDesc(
+                companyId, BundleApprovalStatus.PENDING, GoalApprovalDecision.PENDING, memberId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GoalApprovalBundle> listRequestedHistoryForMember(UUID companyId, UUID memberId) {
+        // "내가 보낸 요청"은 요청자(requestedBy)인 건만 상태와 무관하게 반환한다.
+        return bundleRepository.findByCompanyIdAndRequestedByOrderByRequestedAtDesc(companyId, memberId);
     }
 
     @Transactional(readOnly = true)
@@ -286,23 +273,7 @@ public class GoalApprovalService {
 
     @Transactional(readOnly = true)
     public List<GoalApprovalBundleSummaryResDto> listHistorySummariesForMember(UUID companyId, UUID memberId) {
-        List<GoalApprovalBundle> asApprover =
-                bundleRepository.findByCompanyIdAndApproverIdOrderByRequestedAtDesc(companyId, memberId);
-        List<GoalApprovalBundle> asRequester =
-                bundleRepository.findByCompanyIdAndRequestedByOrderByRequestedAtDesc(companyId, memberId);
-        Map<UUID, GoalApprovalBundle> dedup = new LinkedHashMap<>();
-        for (GoalApprovalBundle b : asApprover) dedup.put(b.getBundleId(), b);
-        for (GoalApprovalBundle b : asRequester) dedup.putIfAbsent(b.getBundleId(), b);
-        List<GoalApprovalBundle> merged = new ArrayList<>(dedup.values());
-        merged.sort((a, b) -> {
-            LocalDateTime at = a.getRequestedAt();
-            LocalDateTime bt = b.getRequestedAt();
-            if (at == null && bt == null) return 0;
-            if (at == null) return 1;
-            if (bt == null) return -1;
-            return bt.compareTo(at);
-        });
-        return merged.stream()
+        return listRequestedHistoryForMember(companyId, memberId).stream()
                 .map(b -> GoalApprovalBundleSummaryResDto.builder()
                         .requestId(b.getBundleId())
                         .status(b.getStatus().name().toLowerCase())

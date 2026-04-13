@@ -2,8 +2,10 @@ package com._team._team.evaluation.service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.evaluation.domain.CalibrationHistory;
+import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationResponse;
 import com._team._team.evaluation.domain.EvaluationSeason;
+import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
 import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
@@ -14,6 +16,7 @@ import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
 import com._team._team.meeting.service.MeetingRecordService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.http.HttpStatus;
@@ -23,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -52,6 +57,52 @@ public class EvaluationResponseService {
     public List<ResponseResDto> listMyResponses(UUID evaluatorId) {
         return responseRepository.findByEvaluatorId(evaluatorId)
                 .stream().map(ResponseResDto::from).collect(Collectors.toList());
+    }
+
+    /**
+     * 시즌 시작 이후에 평가자 매핑이 추가·변경된 경우, 기존에는 JSON만 갱신되고 {@link EvaluationResponse} 행이
+     * 생기지 않아 평가자 목록에 안 보이던 문제를 해소합니다. (startSeason 시점에만 생성되던 동작 보완)
+     */
+    @Transactional
+    public void materializeMissingResponsesForGroup(EvaluationGroup group) {
+        if (group.getEvaluatorMapsJson() == null || group.getEvaluatorMapsJson().isBlank()) {
+            return;
+        }
+        final List<Map<String, String>> maps;
+        try {
+            maps = objectMapper.readValue(group.getEvaluatorMapsJson(), new TypeReference<>() {});
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "평가자 매핑 JSON이 올바르지 않습니다.");
+        }
+        UUID companyId = group.getCompanyId();
+        UUID groupId = group.getGroupId();
+        List<EvaluationResponse> toSave = new ArrayList<>();
+        for (Map<String, String> map : maps) {
+            try {
+                UUID targetMemberId = UUID.fromString(map.get("targetMemberId"));
+                UUID evaluatorId = UUID.fromString(map.get("evaluatorId"));
+                EvalType evalType = EvalType.valueOf(map.get("evaluationType"));
+                if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
+                    continue;
+                }
+                if (responseRepository.existsByGroup_GroupIdAndTargetMemberIdAndEvaluatorIdAndEvaluationType(
+                        groupId, targetMemberId, evaluatorId, evalType)) {
+                    continue;
+                }
+                toSave.add(EvaluationResponse.builder()
+                        .companyId(companyId)
+                        .group(group)
+                        .targetMemberId(targetMemberId)
+                        .evaluatorId(evaluatorId)
+                        .evaluationType(evalType)
+                        .build());
+            } catch (IllegalArgumentException ignored) {
+                // 잘못된 UUID/enum 행은 건너뜀 — startSeason 과 동일
+            }
+        }
+        if (!toSave.isEmpty()) {
+            responseRepository.saveAll(toSave);
+        }
     }
 
     @Transactional(readOnly = true)
