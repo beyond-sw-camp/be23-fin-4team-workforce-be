@@ -60,13 +60,4 @@ public class EvaluationDesignController {
         DesignResDto result = designService.updateDesign(designId, UUID.fromString(companyId), dto);
         return ResponseEntity.ok(ApiResponse.success(result, "평가 설계가 수정되었습니다."));
     }
-
-    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
-    @GetMapping("/{designId}/preview")
-    public ResponseEntity<ApiResponse<DesignResDto>> previewDesign(
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @PathVariable UUID designId) {
-        DesignResDto result = designService.getDesign(designId, UUID.fromString(companyId));
-        return ResponseEntity.ok(ApiResponse.success(result, "평가 설계 미리보기"));
-    }
 }
