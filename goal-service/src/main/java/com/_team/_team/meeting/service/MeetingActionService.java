@@ -41,6 +41,17 @@ public class MeetingActionService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "매니저만 액션 아이템을 생성할 수 있습니다.");
         }
 
+        // [M2] assigneeId 는 필수 — DTO 레벨의 @NotNull 을 보조하는 서비스 레벨 가드.
+        if (dto.getAssigneeId() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "담당자(assigneeId)는 필수입니다.");
+        }
+        // [M2] assignee 는 해당 미팅의 당사자(멤버/매니저) 중 한 명이어야 합리적.
+        if (!dto.getAssigneeId().equals(meetingRecord.getMemberId())
+                && !dto.getAssigneeId().equals(meetingRecord.getManagerId())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "액션 담당자는 해당 면담의 멤버 또는 매니저여야 합니다.");
+        }
+
         MeetingAction meetingAction = MeetingAction.builder()
                 .meetingRecord(meetingRecord)
                 .assigneeId(dto.getAssigneeId())
@@ -119,7 +130,12 @@ public class MeetingActionService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "매니저만 액션 아이템을 평가할 수 있습니다.");
         }
 
-        meetingAction.rate(dto.getTlRating());
+        // [M4] 완료되지 않은 액션은 평가 불가 — 엔티티 가드를 BusinessException 으로 변환
+        try {
+            meetingAction.rate(dto.getTlRating());
+        } catch (IllegalStateException e) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
         return MeetingActionResDto.from(meetingAction);
     }
 

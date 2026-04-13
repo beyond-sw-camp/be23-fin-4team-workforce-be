@@ -113,7 +113,7 @@ public class EvaluationResponseController {
             @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID seasonId,
             @RequestBody CalibrationBaselineReqDto dto) {
-        // TODO: 기준점 기반 점수 재계산 로직
+        responseService.applyBaseline(seasonId, UUID.fromString(companyId), dto.getRange(), dto.getBaselineValue());
         return ResponseEntity.ok(ApiResponse.success(null, "기준점이 적용되었습니다."));
     }
 
@@ -121,9 +121,11 @@ public class EvaluationResponseController {
     @PatchMapping("/seasons/{seasonId}/calibration/adjustments")
     public ResponseEntity<ApiResponse<Void>> adjustCalibrations(
             @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader(value = "X-User-UUID", required = false) String memberId,
             @PathVariable UUID seasonId,
             @RequestBody CalibrationAdjustReqDto dto) {
-        responseService.adjustCalibrations(seasonId, UUID.fromString(companyId), dto);
+        UUID actorMemberId = (memberId != null && !memberId.isBlank()) ? UUID.fromString(memberId) : null;
+        responseService.adjustCalibrations(seasonId, UUID.fromString(companyId), actorMemberId, dto);
         return ResponseEntity.ok(ApiResponse.success(null, "등급 조율이 저장되었습니다."));
     }
 

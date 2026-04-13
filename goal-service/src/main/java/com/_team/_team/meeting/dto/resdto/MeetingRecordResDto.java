@@ -29,6 +29,10 @@ public class MeetingRecordResDto {
     private String privateMemo;
     private Reaction managerReaction;
     private Reaction memberReaction;
+    private String relatedGoalIdsJson;
+    private UUID relatedEvaluationResponseId;
+    private UUID relatedSeasonId;
+    private UUID companyId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -48,6 +52,10 @@ public class MeetingRecordResDto {
                 .privateMemo(meetingRecord.getPrivateMemo())
                 .managerReaction(meetingRecord.getManagerReaction())
                 .memberReaction(meetingRecord.getMemberReaction())
+                .relatedGoalIdsJson(meetingRecord.getRelatedGoalIdsJson())
+                .relatedEvaluationResponseId(meetingRecord.getRelatedEvaluationResponseId())
+                .relatedSeasonId(meetingRecord.getRelatedSeasonId())
+                .companyId(meetingRecord.getCompanyId())
                 .createdAt(meetingRecord.getCreatedAt())
                 .updatedAt(meetingRecord.getUpdatedAt())
                 .build();
