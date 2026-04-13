@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public interface ChatHistoryRepository extends JpaRepository<ChatHistory, UUID> {
 
-    List<ChatHistory> findByMemberIdAndCompanyIdOrderByCreatedAtDesc(
+    List<ChatHistory> findByMemberIdAndCompanyIdOrderByCreatedAtAsc(
             UUID memberId, UUID companyId);
 
     void deleteByMemberIdAndCompanyId(UUID memberId, UUID companyId);

@@ -134,7 +134,7 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<ChatHistoryResDto> getChatHistory(UUID memberId, UUID companyId) {
         return chatHistoryRepository
-                .findByMemberIdAndCompanyIdOrderByCreatedAtDesc(memberId, companyId)
+                .findByMemberIdAndCompanyIdOrderByCreatedAtAsc(memberId, companyId)
                 .stream()
                 .map(ChatHistoryResDto::fromEntity)
                 .collect(Collectors.toList());
