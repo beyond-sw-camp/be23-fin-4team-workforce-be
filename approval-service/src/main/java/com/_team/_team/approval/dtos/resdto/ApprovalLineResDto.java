@@ -28,11 +28,20 @@ public class ApprovalLineResDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // --- 대결 관련 ---
+    private UUID actualApproverMemberId;
+    private UUID actualApproverMemberPositionId;
+    private String isProxyYn;
+
     public static ApprovalLineResDto fromEntity(Approval entity) {
+        boolean proxy = entity.getActualApproverMemberId() != null
+                && !entity.getActualApproverMemberId().equals(entity.getApproverMemberId());
+
         return ApprovalLineResDto.builder()
                 .approvalId(entity.getApprovalId())
                 .requestId(entity.getRequest().getRequestId())
                 .approverMemberId(entity.getApproverMemberId())
+                .approverMemberPositionId(entity.getApproverMemberPositionId())
                 .stepOrder(entity.getStepOrder())
                 .approvalStatus(entity.getApprovalStatus())
                 .actedAt(entity.getActedAt())
@@ -41,6 +50,9 @@ public class ApprovalLineResDto {
                 .isSignedYn(entity.getIsSignedYn())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .actualApproverMemberId(entity.getActualApproverMemberId())
+                .actualApproverMemberPositionId(entity.getActualApproverMemberPositionId())
+                .isProxyYn(entity.getIsProxyYn())
                 .build();
     }
 }

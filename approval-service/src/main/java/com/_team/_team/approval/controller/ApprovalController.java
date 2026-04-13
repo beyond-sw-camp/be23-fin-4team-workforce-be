@@ -23,11 +23,14 @@ public class ApprovalController {
         this.approvalService = approvalService;
     }
 
-    // 결재 대기함 (내가 결재할 문서 목록)
+    // 결재 대기함 (내가 결재할 문서 + 대결 문서)
     @GetMapping("/pending")
     public ResponseEntity<?> findPending(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
-        List<ApprovalRequestResDto> result = approvalService.findPending(memberPositionId);
+        List<ApprovalRequestResDto> result =
+                approvalService.findPending(companyId, memberId, memberPositionId);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "결재 대기 목록 조회 성공"),
                 HttpStatus.OK
@@ -37,8 +40,9 @@ public class ApprovalController {
     // 결재 완료함 (내가 결재한 문서 목록)
     @GetMapping("/acted")
     public ResponseEntity<?> findActed(
+            @RequestHeader("X-User-UUID") UUID memberId,
             @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
-        List<ApprovalRequestResDto> result = approvalService.findActed(memberPositionId);
+        List<ApprovalRequestResDto> result = approvalService.findActed(memberId, memberPositionId);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "결재 완료 목록 조회 성공"),
                 HttpStatus.OK
@@ -48,11 +52,13 @@ public class ApprovalController {
     // 승인 처리
     @PatchMapping("/{approvalId}/approve")
     public ResponseEntity<?> approve(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
             @PathVariable UUID approvalId,
             @RequestBody ApprovalActionReqDto reqDto) {
         ApprovalRequestResDto resDto =
-                approvalService.approve(memberPositionId, approvalId, reqDto);
+                approvalService.approve(companyId, memberId, memberPositionId, approvalId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "결재가 승인되었습니다."),
                 HttpStatus.OK
@@ -61,14 +67,18 @@ public class ApprovalController {
 
     @PatchMapping("/{approvalId}/reject")
     public ResponseEntity<?> reject(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
             @PathVariable UUID approvalId,
             @RequestBody ApprovalActionReqDto reqDto) {
 
-        ApprovalRequestResDto result = approvalService.reject(memberPositionId, approvalId, reqDto);
+        ApprovalRequestResDto result = approvalService.reject(companyId, memberId, memberPositionId, approvalId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "결재가 반려되었습니다."),
                 HttpStatus.OK
         );
     }
+
+
 }
