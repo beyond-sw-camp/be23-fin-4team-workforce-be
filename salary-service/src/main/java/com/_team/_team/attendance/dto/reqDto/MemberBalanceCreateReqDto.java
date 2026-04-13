@@ -20,7 +20,7 @@ import java.util.UUID;
  * - 이월 연차 별도 부여 가능
  *
  * memberId      : 부여 대상 사원 (관리자가 지정)
- * balanceType   : ANNUAL(당해 연차) / CARRYOVER(이월 연차)
+ * balanceType   : ANNUAL(당해 연차) / CARRYOVER(이월 연차) / MONTHLY: 월차
  * totalGranted  : 부여 일수 (ex: 15.0)
  * expirationDate: 만료일 (이 날짜 이후 배치에서 isExpireYn='Y' 처리)
  *                 ANNUAL → 보통 다음해 12/31
