@@ -35,6 +35,7 @@ public class CalendarController {
     @PostMapping("/personal")
     public ResponseEntity<?> createPersonalEvent(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @Valid @RequestBody CalendarEventCreateReqDto reqDto) {
         return new ResponseEntity<>(
                 ApiResponse.success(
@@ -51,6 +52,7 @@ public class CalendarController {
     @PutMapping("/personal/{eventId}")
     public ResponseEntity<?> updatePersonalEvent(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID eventId,
             @Valid @RequestBody CalendarEventUpdateReqDto reqDto) {
         calendarService.updatePersonalEvent(memberId, eventId, reqDto);
@@ -68,6 +70,7 @@ public class CalendarController {
     @DeleteMapping("/personal/{eventId}")
     public ResponseEntity<?> deletePersonalEvent(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID eventId) {
         calendarService.deletePersonalEvent(memberId, eventId);
         return new ResponseEntity<>(
@@ -86,6 +89,7 @@ public class CalendarController {
     @PostMapping("/team")
     public ResponseEntity<?> createTeamEvent(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @Valid @RequestBody CalendarEventCreateReqDto reqDto) {
         return new ResponseEntity<>(
                 ApiResponse.success(
@@ -104,6 +108,7 @@ public class CalendarController {
     @PutMapping("/team/{eventId}")
     public ResponseEntity<?> updateTeamEvent(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID eventId,
             @Valid @RequestBody CalendarEventUpdateReqDto reqDto) {
         calendarService.updateTeamEvent(memberId, eventId, reqDto);
@@ -122,6 +127,7 @@ public class CalendarController {
     @DeleteMapping("/team/{eventId}")
     public ResponseEntity<?> deleteTeamEvent(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID eventId) {
         calendarService.deleteTeamEvent(memberId, eventId);
         return new ResponseEntity<>(
@@ -138,6 +144,7 @@ public class CalendarController {
     @GetMapping("/daily")
     public ResponseEntity<?> getDailyEvents(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestParam LocalDate date,
             @RequestParam(required = false) EventType eventType) {
         return new ResponseEntity<>(
@@ -156,6 +163,7 @@ public class CalendarController {
     @GetMapping("/weekly")
     public ResponseEntity<?> getWeeklyEvents(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestParam LocalDate date,
             @RequestParam(required = false) EventType eventType) {
         return new ResponseEntity<>(
@@ -173,6 +181,7 @@ public class CalendarController {
     @GetMapping
     public ResponseEntity<?> getMonthlyEvents(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestParam int year,
             @RequestParam int month,
             @RequestParam(required = false) EventType eventType) {
@@ -192,6 +201,7 @@ public class CalendarController {
     @GetMapping("/{eventId}")
     public ResponseEntity<?> getEventDetail(
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID eventId) {
         return new ResponseEntity<>(
                 ApiResponse.success(
