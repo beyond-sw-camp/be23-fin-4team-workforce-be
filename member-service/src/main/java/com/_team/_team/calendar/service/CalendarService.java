@@ -13,7 +13,8 @@ import com._team._team.member.domain.MemberPosition;
 import com._team._team.member.repository.MemberPositionRepository;
 import com._team._team.member.repository.MemberRepository;
 import com._team._team.notification.NotificationType;
-import lombok.RequiredArgsConstructor;
+import com._team._team.organization.domain.Organization;
+import com._team._team.organization.repository.OrganizationRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -21,6 +22,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -36,13 +39,15 @@ public class CalendarService {
     private final CalendarEventRepository calendarEventRepository;
     private final MemberRepository memberRepository;
     private final MemberPositionRepository memberPositionRepository;
+    private final OrganizationRepository organizationRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, ApplicationEventPublisher eventPublisher) {
+    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, OrganizationRepository organizationRepository, ApplicationEventPublisher eventPublisher) {
         this.calendarEventRepository = calendarEventRepository;
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
+        this.organizationRepository = organizationRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -104,15 +109,12 @@ public class CalendarService {
         Member member = getMember(memberId);
 
         validateDate(reqDto.getStartAt(), reqDto.getEndAt());
-
-        if (reqDto.getOrganizationId() == null) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "팀 일정은 조직 정보가 필요합니다.");
-        }
+        Organization organization = validateTeamOrganization(member, reqDto.getOrganizationId());
 
         CalendarEvent event = CalendarEvent.builder()
                 .company(member.getCompany())
                 .member(member)
-                .organizationId(reqDto.getOrganizationId())
+                .organizationId(organization.getOrganizationId())
                 .title(reqDto.getTitle())
                 .description(reqDto.getDescription())
                 .startAt(reqDto.getStartAt())
@@ -123,7 +125,7 @@ public class CalendarService {
 
         // 같은 조직 직원 전체에게 알림
         memberPositionRepository
-                .findByOrganization_OrganizationIdAndDelYn(reqDto.getOrganizationId(), "NO")
+                .findByOrganization_OrganizationIdAndDelYn(organization.getOrganizationId(), "NO")
                 .forEach(position -> {
                     if (!position.getMember().getMemberId().equals(memberId)) {
                         eventPublisher.publishEvent(NotificationMessage.builder()
@@ -157,6 +159,22 @@ public class CalendarService {
                 reqDto.getEndAt(),
                 "YES"  // 팀 일정은 항상 공개
         );
+        memberPositionRepository
+                .findByOrganization_OrganizationIdAndDelYn(
+                        event.getOrganizationId(), "NO")
+                .forEach(position -> {
+                    if (!position.getMember().getMemberId().equals(memberId)) {
+                        eventPublisher.publishEvent(NotificationMessage.builder()
+                                .receiverId(position.getMember().getMemberId())
+                                .senderId(memberId)
+                                .notificationType(NotificationType.CALENDAR_TEAM_EVENT_CREATED)
+                                .content("팀 일정이 수정됐습니다. [" + reqDto.getTitle() + "] "
+                                        + reqDto.getStartAt().toLocalDate())
+                                .targetId(event.getCalendarEventId())
+                                .targetType("CALENDAR_EVENT")
+                                .build());
+                    }
+                });
     }
 
     // 팀 일정 삭제 (생성자만)
@@ -170,34 +188,81 @@ public class CalendarService {
     }
 
 
-    // 월별 일정 조회 (개인 + 팀 통합)
+    // 일별 조회
     @Transactional(readOnly = true)
-    public List<CalendarEventResDto> getMonthlyEvents(UUID memberId, int year, int month) {
+    public List<CalendarEventResDto> getDailyEvents(UUID memberId,
+                                                    LocalDate date,
+                                                    EventType eventType) {
+        Member member = getMember(memberId);
+
+        LocalDateTime startAt = date.atStartOfDay();
+        LocalDateTime endAt = date.atTime(23, 59, 59);
+
+        return getEvents(member, startAt, endAt, eventType);
+    }
+
+    // 주간별 조회
+    @Transactional(readOnly = true)
+    public List<CalendarEventResDto> getWeeklyEvents(UUID memberId,
+                                                     LocalDate date,
+                                                     EventType eventType) {
+        Member member = getMember(memberId);
+
+        // 해당 날짜가 속한 주의 월요일 ~ 일요일
+        LocalDateTime startAt = date.with(DayOfWeek.MONDAY).atStartOfDay();
+        LocalDateTime endAt = date.with(DayOfWeek.SUNDAY).atTime(23, 59, 59);
+
+        return getEvents(member, startAt, endAt, eventType);
+    }
+
+    // 월별 조회
+    @Transactional(readOnly = true)
+    public List<CalendarEventResDto> getMonthlyEvents(UUID memberId,
+                                                      int year,
+                                                      int month,
+                                                      EventType eventType) {
         Member member = getMember(memberId);
 
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDateTime startAt = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endAt = yearMonth.atEndOfMonth().atTime(23, 59, 59);
 
+        return getEvents(member, startAt, endAt, eventType);
+    }
+
+    // 공통 조회 로직
+    private List<CalendarEvent> fetchEvents(Member member,
+                                            LocalDateTime startAt,
+                                            LocalDateTime endAt,
+                                            EventType eventType) {
         List<CalendarEvent> events = new ArrayList<>();
 
-        // 1. 개인 일정
-        events.addAll(calendarEventRepository
-                .findPersonalByMonth(member, startAt, endAt));
-
-        // 2. 팀 일정 (본인 조직)
-        MemberPosition position = memberPositionRepository
-                .findById(member.getDefaultPositionId())
-                .orElse(null);
-
-        if (position != null) {
-            events.addAll(calendarEventRepository.findTeamByMonth(
-                    position.getOrganization().getOrganizationId(),
-                    startAt, endAt));
+        if (eventType == null || eventType == EventType.PERSONAL) {
+            events.addAll(calendarEventRepository
+                    .findPersonalByMonth(member, startAt, endAt));
         }
 
-        // 시작일시 기준 정렬
-        return events.stream()
+        if (eventType == null || eventType == EventType.TEAM) {
+            MemberPosition position = memberPositionRepository
+                    .findById(member.getDefaultPositionId())
+                    .orElse(null);
+
+            if (position != null) {
+                events.addAll(calendarEventRepository.findTeamByMonth(
+                        position.getOrganization().getOrganizationId(),
+                        startAt, endAt));
+            }
+        }
+
+        return events;
+    }
+
+    private List<CalendarEventResDto> getEvents(Member member,
+                                                LocalDateTime startAt,
+                                                LocalDateTime endAt,
+                                                EventType eventType) {
+        return fetchEvents(member, startAt, endAt, eventType)
+                .stream()
                 .sorted((a, b) -> a.getStartAt().compareTo(b.getStartAt()))
                 .map(CalendarEventResDto::fromEntity)
                 .collect(Collectors.toList());
@@ -244,6 +309,27 @@ public class CalendarService {
             throw new BusinessException(
                     HttpStatus.BAD_REQUEST, "종료일시는 시작일시보다 이후여야 합니다.");
         }
+    }
+
+    /**
+     * TEAM 일정은 유효한 하위 조직(루트 제외)으로만 생성 가능.
+     */
+    private Organization validateTeamOrganization(Member member, UUID organizationId) {
+        if (organizationId == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "팀 일정은 organizationId가 필수입니다.");
+        }
+        Organization org = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "유효하지 않은 organizationId입니다."));
+        if (!"NO".equals(org.getDelYn())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "삭제된 조직에는 팀 일정을 생성할 수 없습니다.");
+        }
+        if (org.getParent() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "루트 조직(전사)에는 팀 일정을 생성할 수 없습니다.");
+        }
+        if (!org.getCompany().getCompanyId().equals(member.getCompany().getCompanyId())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "다른 회사 조직에는 팀 일정을 생성할 수 없습니다.");
+        }
+        return org;
     }
 
     private void validateOwner(CalendarEvent event, UUID memberId) {

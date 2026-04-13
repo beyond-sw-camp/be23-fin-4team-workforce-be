@@ -13,7 +13,7 @@ dependencies {
 
     // Redis (캐싱, 이메일 인증 코드 저장)
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-
+    implementation 'redis.clients:jedis:5.1.0'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     //aop 의존성
     implementation 'org.springframework.boot:spring-boot-starter-aop'
@@ -29,6 +29,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
 }
 
 tasks.named('test') {

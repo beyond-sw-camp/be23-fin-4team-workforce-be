@@ -86,4 +86,7 @@ public interface MemberPositionRepository extends JpaRepository<MemberPosition, 
 
 
     List<MemberPosition> findByOrganization_OrganizationIdAndDelYn(UUID organizationId, String delYn);
+
+
+
 }

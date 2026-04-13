@@ -298,11 +298,13 @@ public class MemberService {
         }
         return result;
     }
+
     //이메일 검증
     @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
         return memberRepository.existsByEmail(email);
     }
+
     // 권한 캐싱 메서드 추가
     private void cachePermissions(MemberPosition memberPosition) {
 
@@ -453,40 +455,31 @@ public class MemberService {
                                   UUID memberPositionId,
                                   HttpServletRequest request) {
 
-        // 1. RT 검증
-        jwtTokenProvider.validateAndGetRtClaims(
-                request, memberId.toString()
-        );
+        jwtTokenProvider.validateAndGetRtClaims(request, memberId.toString());
 
-        // 2. 회원 조회
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
 
-        // 3. 삭제된 계정 확인
         if ("YES".equals(member.getDelYn())) {
             throw new BusinessException(
-                    HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다."
-            );
+                    HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다.");
         }
 
-        // 4. 계정 잠금 확인
         if (member.getAccountStatus() == AccountStatus.BLOCKED) {
             throw new BusinessException(
-                    HttpStatus.FORBIDDEN, "계정이 잠금 상태입니다."
-            );
+                    HttpStatus.FORBIDDEN, "계정이 잠금 상태입니다.");
         }
 
-        // 5. MemberPosition 조회
         MemberPosition memberPosition = memberPositionRepository
-                .findById(memberPositionId)
+                .findByIdWithRoleAndPermissions(memberPositionId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 포지션입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 포지션입니다."));
 
-        // 6. AT 재발급
         String accessToken = jwtTokenProvider.createAtToken(member, memberPosition);
+
+        // 권한 캐시 재캐싱 추가
+        cachePermissions(memberPosition);
 
         return LoginResDto.builder()
                 .accessToken(accessToken)
@@ -494,6 +487,7 @@ public class MemberService {
                 .memberPositionId(memberPositionId)
                 .build();
     }
+
     // 직원 계정 생성
     public void createMember(UUID memberId, UUID memberPositionId, MemberCreateReqDto reqDto) {
 
@@ -799,6 +793,7 @@ public class MemberService {
         int code = random.nextInt(900000) + 100000;
         return String.valueOf(code);
     }
+
     // 직원 수정 (인사팀)
     public void updateMember(UUID memberId, UUID memberPositionId,
                              UUID targetMemberId, MemberUpdateReqDto reqDto) {
@@ -969,6 +964,7 @@ public class MemberService {
         eventPublisher.publishEvent(
                 new MemberChangedEvent(memberId));
     }
+
     // 직원 삭제
     public void deleteMember(UUID memberId, UUID targetMemberId) {
 
@@ -1065,6 +1061,7 @@ public class MemberService {
                 new MemberChangedEvent(targetMemberId));
 
     }
+
     public void updateMemberRole(UUID memberId, UUID targetMemberId,
                                  UpdateMemberRoleReqDto reqDto) {
 
@@ -1331,6 +1328,7 @@ public class MemberService {
 
         role.delete();
     }
+
     // 계정 잠금 해제
     public void unblockMember(UUID memberId, UUID targetMemberId) {
 
@@ -1364,6 +1362,7 @@ public class MemberService {
         // 5. 잠금 해제
         target.unblock();
     }
+
     // 프로필 이미지 업로드
     public void updateProfileImage(UUID memberId, MultipartFile profileImage) {
 
@@ -1404,6 +1403,7 @@ public class MemberService {
         // profileUrl null로 업데이트
         member.updateProfileUrl(null);
     }
+
     // 휴직 처리
     public void dormantMember(UUID memberId, UUID targetMemberId) {
 
@@ -1628,6 +1628,7 @@ public class MemberService {
             log.error("SearchOutboxEvent 저장 실패: {}", e.getMessage());
         }
     }
+
     private void saveSearchOutboxDeleteEvent(UUID memberId) {
         try {
             MemberDeletedEvent event = MemberDeletedEvent.builder()

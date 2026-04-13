@@ -7,6 +7,7 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.organization.dto.reqdto.JobGradeReqDto;
 import com._team._team.organization.dto.reqdto.JobTitleReqDto;
 import com._team._team.organization.dto.reqdto.OrganizationReqDto;
+import com._team._team.organization.dto.resdto.OrganizationResDto;
 import com._team._team.organization.service.OrganizationService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -194,5 +195,35 @@ public class OrganizationController {
                 ApiResponse.success(null, "조직 순서 변경 성공"),
                 HttpStatus.OK
         );
+    }
+    /**
+     * 조직도 조회
+     * - 회사 전체 조직 트리
+     * - 조직별 직급별 직원 목록
+     */
+    @GetMapping("/org-chart")
+    public ResponseEntity<?> getOrgChart(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        organizationService.getOrgChart(memberId),
+                        "조직도 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 조직 단건 조회 ///
+    @GetMapping("/organization/{organizationId}")
+    public ResponseEntity<?> findById(@PathVariable UUID organizationId) {
+        OrganizationResDto result = organizationService.findById(organizationId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "조직 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    @GetMapping("/internal/{organizationId}")
+    public OrganizationResDto findByIdInternal(@PathVariable UUID organizationId) {
+        return organizationService.findById(organizationId);
     }
 }

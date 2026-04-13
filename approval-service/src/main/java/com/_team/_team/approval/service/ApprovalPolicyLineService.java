@@ -5,11 +5,11 @@ import com._team._team.approval.domain.ApprovalPolicyLine;
 import com._team._team.approval.dto.reqdto.ApprovalPolicyLineCreateReqDto;
 import com._team._team.approval.dto.resdto.ApprovalPolicyLineResDto;
 import com._team._team.approval.dto.resdto.PolicyLineCandidateResDto;
-import com._team._team.approval.feignclients.MemberServiceFeignClient;
+import com._team._team.approval.feignclients.MemberServiceClient;
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
+import com._team._team.approval.feignclients.dto.OrganizationResDto;
 import com._team._team.approval.repository.ApprovalDocumentRepository;
 import com._team._team.approval.repository.ApprovalPolicyLineRepository;
-import com._team._team.dto.ApiResponse;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -25,13 +25,13 @@ import java.util.UUID;
 public class ApprovalPolicyLineService {
     private final ApprovalPolicyLineRepository policyLineRepository;
     private final ApprovalDocumentRepository approvalDocumentRepository;
-    private final MemberServiceFeignClient memberServiceFeignClient;
+    private final MemberServiceClient memberServiceClient;
 
     @Autowired
-    public ApprovalPolicyLineService(ApprovalPolicyLineRepository policyLineRepository, ApprovalDocumentRepository approvalDocumentRepository, MemberServiceFeignClient memberServiceFeignClient) {
+    public ApprovalPolicyLineService(ApprovalPolicyLineRepository policyLineRepository, ApprovalDocumentRepository approvalDocumentRepository, MemberServiceClient memberServiceClient) {
         this.policyLineRepository = policyLineRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
-        this.memberServiceFeignClient = memberServiceFeignClient;
+        this.memberServiceClient = memberServiceClient;
     }
 
 //    결재라인 정책 일괄 저장(전체 교체)
@@ -44,14 +44,23 @@ public class ApprovalPolicyLineService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
         }
 
-        // 직급 중복 검증
-        List<UUID> jobGradeIds = reqDto.getPolicyLines().stream()
-                .map(ApprovalPolicyLineCreateReqDto.PolicyLineItem::getJobGradeId)
+        // stepOrder 연속성 검증 (1, 2, 3...)
+        List<Integer> stepOrders = reqDto.getPolicyLines().stream()
+                .map(ApprovalPolicyLineCreateReqDto.PolicyLineItem::getStepOrder)
+                .sorted()
                 .toList();
 
-        if (jobGradeIds.size() != jobGradeIds.stream().distinct().count()) {
+        for (int i = 0; i < stepOrders.size(); i++) {
+            if (stepOrders.get(i) != i + 1) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "결재 순서는 1부터 연속되어야 합니다.");
+            }
+        }
+
+        // stepOrder 중복 검증
+        if (stepOrders.size() != stepOrders.stream().distinct().count()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "동일한 직급을 중복 지정할 수 없습니다.");
+                    "동일한 결재 순서를 중복 지정할 수 없습니다.");
         }
 
 
@@ -64,15 +73,34 @@ public class ApprovalPolicyLineService {
         List<ApprovalPolicyLine> newLines = reqDto.getPolicyLines().stream()
                 .map(item -> ApprovalPolicyLine.builder()
                         .approvalDocument(document)
-                        .jobGradeId(item.getJobGradeId())
+                        .jobTitleId(item.getJobTitleId())
+                        .stepOrder(item.getStepOrder())
+                        .organizationId(item.getOrganizationId())
                         .build())
                 .toList();
-
 
         List<ApprovalPolicyLine> saved = policyLineRepository.saveAll(newLines);
 
         return saved.stream()
                 .map(ApprovalPolicyLineResDto::fromEntity)
+                .toList();
+    }
+
+
+
+    // 특정 조직에서 직책으로 검색 (본인 제외)
+    private List<MemberPositionResDto> searchInOrganization(
+            UUID organizationId, UUID jobTitleId, UUID requesterMemberPositionId) {
+
+        List<MemberPositionResDto> found =
+                memberServiceClient.searchByJobTitle(organizationId, jobTitleId);
+
+        if (found == null || found.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return found.stream()
+                .filter(c -> !c.getMemberPositionId().equals(requesterMemberPositionId))
                 .toList();
     }
 
@@ -107,7 +135,7 @@ public class ApprovalPolicyLineService {
         existingLines.forEach(ApprovalPolicyLine::approvalPolicyLineDelete);
     }
 
-    // 양식별 결재라인 정책 조회 + 후보 결재자 목록 (요청자 기준 필터링)
+    // 양식별 후보 결재자 조회
     @Transactional(readOnly = true)
     public List<PolicyLineCandidateResDto> findCandidatesByDocumentId(
             UUID companyId, UUID documentId, UUID memberPositionId) {
@@ -120,53 +148,92 @@ public class ApprovalPolicyLineService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
         }
 
-        // 1. 요청자 MemberPosition 조회 (소속 조직, 직급 정보)
-        ApiResponse<MemberPositionResDto> memberResponse =
-                memberServiceFeignClient.getMemberPosition(memberPositionId);
-        MemberPositionResDto requester = memberResponse.getData();
+        // 1. 요청자 MemberPosition 조회
+        MemberPositionResDto requester =
+                memberServiceClient.getMemberPosition(memberPositionId);
 
         if (requester == null) {
             throw new BusinessException(HttpStatus.NOT_FOUND,
                     "요청자 정보를 찾을 수 없습니다.");
         }
 
-        // 2. PolicyLine에서 직급 목록 가져오기
+        // 2. 정책라인 조회 (stepOrder 순)
         List<ApprovalPolicyLine> policyLines =
                 policyLineRepository.findByDocumentId(documentId);
 
-        // 3. 각 직급별로 요청자 소속 조직에서 후보 결재자 조회
+        // 3. 요청자의 직책이 정책라인에 있으면 그 다음 stepOrder부터 필터
+        Integer requesterStepOrder = null;
+        for (ApprovalPolicyLine line : policyLines) {
+            if (line.getJobTitleId().equals(requester.getJobTitleId())
+                    && line.getOrganizationId() == null) {
+                requesterStepOrder = line.getStepOrder();
+                break;
+            }
+        }
+
         List<PolicyLineCandidateResDto> result = new ArrayList<>();
 
         for (ApprovalPolicyLine policyLine : policyLines) {
-            ApiResponse<List<MemberPositionResDto>> candidateResponse =
-                    memberServiceFeignClient.searchByJobGrade(
-                            requester.getOrganizationId(),
-                            policyLine.getJobGradeId());
-
-            List<MemberPositionResDto> found = candidateResponse.getData();
-            List<MemberPositionResDto> candidates = new ArrayList<>();
-
-            if (found != null && !found.isEmpty()) {
-                // 요청자 본인 제외
-                candidates = found.stream()
-                        .filter(c -> !c.getMemberPositionId().equals(memberPositionId))
-                        .toList();
+            // 요청자 직책 이하의 stepOrder는 건너뛰기
+            if (requesterStepOrder != null && policyLine.getStepOrder() <= requesterStepOrder) {
+                continue;
             }
 
-            String jobGradeName = candidates.isEmpty()
-                    ? null
-                    : candidates.get(0).getJobGradeName();
+            List<MemberPositionResDto> candidates;
+
+            if (policyLine.getOrganizationId() != null) {
+                // organizationId 지정됨 → 해당 조직에서 직책 검색
+                candidates = searchInOrganization(
+                        policyLine.getOrganizationId(),
+                        policyLine.getJobTitleId(),
+                        memberPositionId);
+            } else {
+                // organizationId 없음 → 요청자 조직부터 상위로 올라가며 검색
+                candidates = searchUpOrganizationTree(
+                        requester.getOrganizationId(),
+                        policyLine.getJobTitleId(),
+                        memberPositionId);
+            }
 
             result.add(PolicyLineCandidateResDto.builder()
                     .policyLineId(policyLine.getPolicyLineId())
                     .documentId(documentId)
-                    .jobGradeId(policyLine.getJobGradeId())
-                    .jobGradeName(jobGradeName)
+                    .jobTitleId(policyLine.getJobTitleId())
+                    .stepOrder(policyLine.getStepOrder())
+                    .organizationId(policyLine.getOrganizationId())
                     .candidates(candidates)
                     .build());
         }
 
         return result;
+    }
+
+    // 요청자 소속 조직부터 상위로 올라가며 검색 (본인 제외 후 후보 없으면 상위로)
+    private List<MemberPositionResDto> searchUpOrganizationTree(
+            UUID startOrganizationId, UUID jobTitleId, UUID requesterMemberPositionId) {
+
+        UUID currentOrgId = startOrganizationId;
+        int maxDepth = 10; // 무한 루프 방지
+
+        for (int i = 0; i < maxDepth; i++) {
+            List<MemberPositionResDto> candidates =
+                    searchInOrganization(currentOrgId, jobTitleId, requesterMemberPositionId);
+
+            if (!candidates.isEmpty()) {
+                return candidates;
+            }
+
+            OrganizationResDto org =
+                    memberServiceClient.getOrganization(currentOrgId);
+
+            if (org == null || org.getParentId() == null) {
+                return new ArrayList<>();
+            }
+
+            currentOrgId = org.getParentId();
+        }
+
+        return new ArrayList<>();
     }
 
 }
