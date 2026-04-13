@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-
 /**
  * 급여대장 엔티티 (직원별 월별 급여명세서)
  * - 직원 1명의 월별 급여 정산 내역
@@ -23,6 +22,15 @@ import java.util.UUID;
 @Getter
 @Builder
 @Entity
+@Table(
+        name = "payroll",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_payroll_company_member_date",
+                        columnNames = {"companyId", "memberId", "payrollYearMonthDay"}
+                )
+        }
+)
 public class Payroll extends BaseTimeEntity {
 
     @Id
@@ -61,7 +69,7 @@ public class Payroll extends BaseTimeEntity {
     private Long netPay;
 
     /** 삭제 여부 */
-    @Column(length = 1)
+    @Column(nullable = false, length = 1)
     @Builder.Default
     private String delYn = "N";
 
@@ -85,7 +93,7 @@ public class Payroll extends BaseTimeEntity {
         this.payrollYearMonthDay = payrollYearMonthDay;
         this.totalPayment = totalPayment;
         this.totalDeduction = totalDeduction;
-        this.netPay = totalPayment - totalDeduction;
+        this.netPay = netPay;
     }
 
     /** 금액 재계산 (항목 추가/수정/삭제 후 호출) */
