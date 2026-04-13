@@ -11,7 +11,11 @@ import java.util.UUID;
 public class ResponseResDto {
     private UUID responseId;
     private UUID companyId;
+    /** 평가 그룹이 속한 시즌 — 클라이언트가 그룹/설계 조회 시 경로 확보용 */
+    private UUID seasonId;
     private UUID groupId;
+    /** 그룹에 연결된 평가 설계 — 작성 화면에서 문항 로드용 */
+    private UUID designId;
     private UUID targetMemberId;
     private UUID evaluatorId;
     private EvalType evaluationType;
@@ -25,7 +29,9 @@ public class ResponseResDto {
         return ResponseResDto.builder()
                 .responseId(e.getResponseId())
                 .companyId(e.getCompanyId())
+                .seasonId(e.getGroup().getSeason().getSeasonId())
                 .groupId(e.getGroup().getGroupId())
+                .designId(e.getGroup().getDesign() != null ? e.getGroup().getDesign().getDesignId() : null)
                 .targetMemberId(e.getTargetMemberId())
                 .evaluatorId(e.getEvaluatorId())
                 .evaluationType(e.getEvaluationType())
