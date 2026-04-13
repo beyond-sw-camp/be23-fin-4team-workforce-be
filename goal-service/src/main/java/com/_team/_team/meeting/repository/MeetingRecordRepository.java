@@ -17,4 +17,7 @@ public interface MeetingRecordRepository extends JpaRepository<MeetingRecord, UU
     List<MeetingRecord> findByMemberIdAndManagerIdOrderByScheduledAtDesc(UUID memberId, UUID managerId);
 
     List<MeetingRecord> findByParentRecord_MeetingRecordIdOrderByScheduledAtAsc(UUID parentRecordId);
+
+    /** 특정 시즌에 대해 이미 생성된 피드백 면담이 있는지 확인 (중복 생성 방지) */
+    boolean existsByRelatedSeasonIdAndCompanyId(UUID relatedSeasonId, UUID companyId);
 }

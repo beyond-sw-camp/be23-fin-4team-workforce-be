@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,7 +30,6 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
 
     /**
      * 개인 월간 근태 (직원 본인 조회)
-     * - attendance_date로 정렬, 페이징 적용
      */
     @Query("SELECT da FROM DailyAttendance da " +
             "WHERE da.memberId = :memberId " +
@@ -68,4 +68,29 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
             Pageable pageable);
+
+    /**
+     * 급여 계산용: 직원 1명의 정산기간 내 근태 전체 조회
+     * - 1명 × 최대 31일 = 최대 31건
+     * - 급여 계산은 전체 기간을 한 번에 봐야 하므로 페이징 부적절.
+     * - PayrollService.createPayroll() → 초과근무수당/공휴일근무수당 계산 데이터
+     */
+    @Query("SELECT da FROM DailyAttendance da " +
+            "WHERE da.memberId = :memberId " +
+            "AND da.companyId = :companyId " +
+            "AND da.attendanceDate BETWEEN :from AND :to " +
+            "ORDER BY da.attendanceDate")
+    List<DailyAttendance> findByMemberAndPeriod(
+            @Param("memberId") UUID memberId,
+            @Param("companyId") UUID companyId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /**
+     * 특정 근무일 기준, 출근은 기록됐으나 퇴근이 아직 없는 일별 근태 전체 조회.
+     * firstClockIn != null: 해당일 첫 출근 시각이 있는데
+     * lastClockOut == null: 마지막 퇴근 시각이 없음 → 근무 중 또는 퇴근 누락 후보
+     * 일 마감/배치, 미퇴근 알림, 관리자 점검 등에 사용
+     */
+    List<DailyAttendance> findByAttendanceDateAndFirstClockInIsNotNullAndLastClockOutIsNull(LocalDate attendanceDate);
 }

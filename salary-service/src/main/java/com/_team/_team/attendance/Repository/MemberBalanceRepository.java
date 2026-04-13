@@ -9,9 +9,11 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
 
 /**
  * 휴가 잔여 Repository
@@ -49,5 +51,74 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
             @Param("companyId") UUID companyId,
             @Param("memberId") UUID memberId,
             @Param("type") BalanceType type);
-}
 
+    /**
+     * 연차 잔여일수 읽기 전용 조회 (급여 계산용)
+     * - 급여 계산 시에는 잔여일수를 "읽기만" 함 (차감 안 함)
+     * - 연차미사용수당은 연 1회 정산
+     */
+    @Query("SELECT mb FROM MemberBalance mb " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.memberId = :memberId " +
+            "AND mb.balanceType = 'ANNUAL' " +
+            "AND mb.isUsableYn = 'Y' " +
+            "AND mb.isExpireYn = 'N' " +
+            "AND mb.delYn = 'N'")
+    Optional<MemberBalance> findAnnualBalance(
+            @Param("companyId") UUID companyId,
+            @Param("memberId") UUID memberId);
+
+    /**
+     * [배치 중복 방지] 특정 사원에게 특정 기간 만료 예정인 해당 타입 휴가 잔여일이 이미 있는지 체크
+     */
+    @Query("SELECT COUNT(mb) > 0 FROM MemberBalance mb " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.memberId = :memberId " +
+            "AND mb.balanceType = :type " +
+            "AND mb.expirationDate BETWEEN :from AND :to " +
+            "AND mb.delYn = 'N'")
+    boolean existsInExpirationRange(
+            @Param("companyId") UUID companyId,
+            @Param("memberId") UUID memberId,
+            @Param("type") BalanceType type,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /**
+     * 아직 만료 처리 안 된 휴가 잔여일 조회
+     */
+    @Query("SELECT mb FROM MemberBalance mb " +
+            "WHERE mb.expirationDate < :baseDate " +
+            "AND mb.isExpireYn = 'N' " +
+            "AND mb.delYn = 'N'")
+    List<MemberBalance> findExpirationTargets(
+            @Param("baseDate") LocalDate baseDate);
+
+    /**
+     * [배치 최적화] 이미 부여된 사원 ID 집합 조회
+     * - 회사 단위로 한 번만 SELECT → 루프 안에서 O(1) 중복 체크용
+     * - 같은 companyId + balanceType + expirationDate 범위 내에 이미 있는 memberId 만 모음
+     */
+    @Query("SELECT mb.memberId FROM MemberBalance mb " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.balanceType = :type " +
+            "AND mb.expirationDate BETWEEN :from AND :to " +
+            "AND mb.delYn = 'N'")
+    Set<UUID> findGrantedMemberIds(
+            @Param("companyId") UUID companyId,
+            @Param("type") BalanceType type,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /**
+     * 회사 내 활성 MONTHLY 잔액 엔티티 조회
+     */
+    @Query("SELECT mb FROM MemberBalance mb " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.balanceType = 'MONTHLY' " +
+            "AND mb.isExpireYn = 'N' " +
+            "AND mb.delYn = 'N'")
+    List<MemberBalance> findMonthlyBalancesByCompany(
+            @Param("companyId") UUID companyId);
+
+}

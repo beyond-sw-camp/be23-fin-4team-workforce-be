@@ -55,7 +55,7 @@ public class AttendanceLogController {
     @PostMapping("/clock-in")
     public ResponseEntity<?> clockIn(
             @RequestHeader("X-User-CompanyId")UUID companyId,
-            @RequestHeader("X-User-UUID")UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody AttendanceLogCreateReqDto reqDto){
         DailyAttendanceResDto resDto = attendanceLogService.clockIn(companyId, memberId, reqDto);
         return new ResponseEntity<>(
@@ -68,7 +68,7 @@ public class AttendanceLogController {
     @PostMapping("/clock-out")
     public ResponseEntity<?> clockOut(
             @RequestHeader("X-User-CompanyId")UUID companyId,
-            @RequestHeader("X-User-UUID")UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody AttendanceLogCreateReqDto reqDto) {
         DailyAttendanceResDto resDto = attendanceLogService.clockOut(companyId, memberId, reqDto);
         return new ResponseEntity<>(

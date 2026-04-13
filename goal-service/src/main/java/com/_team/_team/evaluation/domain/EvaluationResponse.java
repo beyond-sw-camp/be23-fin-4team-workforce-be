@@ -55,6 +55,21 @@ public class EvaluationResponse extends BaseTimeEntity {
     @Column(name = "calibration_json", columnDefinition = "JSON")
     private String calibrationJson;
 
+    /**
+     * 이 평가 응답이 평가 대상으로 삼은 goal id 목록 (JSON 배열).
+     * goal-service 모듈 내 Goal 엔티티에 대한 참조를 외래키 대신 ID 목록으로 유지하여
+     * 결재/캘리브레이션 과정에서 실제 성과와의 링크를 추적할 수 있게 합니다.
+     */
+    @Column(name = "target_goal_ids_json", columnDefinition = "TEXT")
+    private String targetGoalIdsJson;
+
+    /**
+     * 응답 채점으로 산출된 정규화된 점수 (0~100).
+     * answersJson 만 있고 점수가 없어서 집계가 불가능했던 문제를 해결합니다.
+     */
+    @Column(name = "normalized_score", precision = 7, scale = 2)
+    private java.math.BigDecimal normalizedScore;
+
     public void startProgress() {
         if (this.status == EvaluationStatus.NOT_STARTED) {
             this.status = EvaluationStatus.IN_PROGRESS;
@@ -84,5 +99,13 @@ public class EvaluationResponse extends BaseTimeEntity {
 
     public void updateCalibration(String calibrationJson) {
         this.calibrationJson = calibrationJson;
+    }
+
+    public void updateTargetGoalIds(String targetGoalIdsJson) {
+        this.targetGoalIdsJson = targetGoalIdsJson;
+    }
+
+    public void updateNormalizedScore(java.math.BigDecimal score) {
+        this.normalizedScore = score;
     }
 }

@@ -8,6 +8,7 @@ import com._team._team.meeting.dto.reqdto.MeetingRecordCompleteReqDto;
 import com._team._team.meeting.dto.reqdto.MeetingRecordCreateReqDto;
 import com._team._team.meeting.dto.reqdto.MeetingRecordUpdateReqDto;
 import com._team._team.meeting.dto.reqdto.MemberReactionReqDto;
+import com._team._team.meeting.dto.reqdto.LinkGoalsReqDto;
 import com._team._team.meeting.dto.reqdto.PrivateMemoUpdateReqDto;
 import com._team._team.meeting.dto.resdto.MeetingRecordResDto;
 import com._team._team.meeting.service.MeetingRecordService;
@@ -35,8 +36,11 @@ public class MeetingRecordController {
     @PostMapping
     public ApiResponse<MeetingRecordResDto> createMeeting(
             @RequestHeader("X-User-UUID") String requesterId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid MeetingRecordCreateReqDto dto) {
-        return ApiResponse.success(meetingRecordService.createMeeting(dto), "면담 기록이 생성되었습니다.");
+        return ApiResponse.success(
+                meetingRecordService.createMeeting(dto, UUID.fromString(companyId)),
+                "면담 기록이 생성되었습니다.");
     }
 
     // 면담 기록 상세 조회
@@ -71,6 +75,18 @@ public class MeetingRecordController {
             @PathVariable UUID memberId,
             @RequestHeader("X-User-UUID") String managerId) {
         return ApiResponse.success(meetingRecordService.listByMemberAndManager(memberId, UUID.fromString(managerId)), "멤버-매니저 면담 기록 목록 조회 성공");
+    }
+
+    // 연관 목표 연결
+    @CheckPermission(resource = Resource.MEETING, action = Action.UPDATE)
+    @PatchMapping("/{meetingRecordId}/goals")
+    public ApiResponse<MeetingRecordResDto> linkGoals(
+            @RequestHeader("X-User-UUID") String requesterId,
+            @PathVariable UUID meetingRecordId,
+            @RequestBody LinkGoalsReqDto dto) {
+        return ApiResponse.success(
+                meetingRecordService.linkGoals(meetingRecordId, UUID.fromString(requesterId), dto.getRelatedGoalIdsJson()),
+                "연관 목표가 연결되었습니다.");
     }
 
     // 면담 완료 처리
