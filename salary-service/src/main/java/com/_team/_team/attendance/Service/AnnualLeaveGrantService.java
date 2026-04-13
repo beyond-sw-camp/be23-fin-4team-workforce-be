@@ -2,7 +2,7 @@ package com._team._team.attendance.Service;
 
 import com._team._team.attendance.Repository.LeavePolicyRepository;
 import com._team._team.attendance.domain.LeavePolicy;
-import com._team._team.hr.batch.attendance.worker.AnnualLeaveGrantWorker;
+import com._team._team.batch.leave.worker.AnnualLeaveGrantWorker;
 import com._team._team.attendance.domain.enums.AccrualBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

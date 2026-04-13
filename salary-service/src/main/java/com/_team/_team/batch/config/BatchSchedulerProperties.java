@@ -1,4 +1,4 @@
-package com._team._team.hr.batch.config;
+package com._team._team.batch.config;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -8,12 +8,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * HR Quartz 스케줄 등록을 YAML에서 제어
+ * Quartz 스케줄 등록을 YAML에서 제어
  */
 @Getter
 @Setter
-@ConfigurationProperties(prefix = "hr.batch.scheduler")
-public class HrBatchSchedulerProperties {
+@ConfigurationProperties(prefix = "batch.scheduler")
+public class BatchSchedulerProperties {
 
     /**
      * 운영 환경에서는 JDBC JobStore 및 크론을 검증한 뒤 true 설정

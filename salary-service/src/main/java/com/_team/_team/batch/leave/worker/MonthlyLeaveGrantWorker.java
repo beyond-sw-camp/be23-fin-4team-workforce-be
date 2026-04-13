@@ -1,4 +1,4 @@
-package com._team._team.hr.batch.attendance.worker;
+package com._team._team.batch.leave.worker;
 
 import com._team._team.attendance.Repository.MemberBalanceRepository;
 import com._team._team.attendance.Service.AnnualLeaveGrantService;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 /**
  * 근속 1년 미만 직원에게 발생하는 월차(월 단위 누적)를 부여하는 워커
  * 회사별 월차 누적 부여량을 한 번에 조회하여 Map으로 보관한 뒤, Feign으로 조회한 직원 목록과 결합하여 N+1을 방지
- * 회사 단위 트랜잭션은 (propagation = REQUIRES_NEW)}로 분리
+ * 회사 단위 트랜잭션은 propagation = REQUIRES_NEW 로 분리
  */
 @Component
 public class MonthlyLeaveGrantWorker {
@@ -53,10 +53,8 @@ public class MonthlyLeaveGrantWorker {
         UUID companyId = policy.getCompanyId();
         AnnualLeaveGrantService.BatchResult batchResult = new AnnualLeaveGrantService.BatchResult();
 
-        // 회사 소속 직원 전체 조회
         List<MemberResDto> members = fetchMembers(companyId);
 
-        // 기존 MONTHLY(월차) 잔여 조회
         Map<UUID, MemberBalance> existingMap = memberBalanceRepository
                 .findMonthlyBalancesByCompany(companyId)
                 .stream()
@@ -66,10 +64,8 @@ public class MonthlyLeaveGrantWorker {
                         (a, b) -> a
                 ));
 
-        // 직원별 부여 판정
         List<MemberBalance> insertBuffer = new ArrayList<>(BATCH_SIZE);
 
-        // 입사일 없거나 1년 이상 → 월차 대상 아님
         for (MemberResDto member : members) {
             LocalDate joinDate = member.getJoinDate();
 
@@ -87,16 +83,14 @@ public class MonthlyLeaveGrantWorker {
             MemberBalance existing = existingMap.get(member.getMemberId());
 
             if (existing != null) {
-                // 기존 행 있으면 UPDATE
                 double diff = expectedMonths - existing.getTotalGranted();
                 if (diff > 0) {
-                    existing.addGranted(diff);   // dirty checking → 커밋 시 UPDATE
+                    existing.addGranted(diff);
                     batchResult.successCount++;
                 } else {
                     batchResult.skipCount++;
                 }
             } else {
-                // 기존 행 없면 INSERT
                 LocalDate expirationDate = joinDate.plusYears(1).minusDays(1);
                 insertBuffer.add(buildMonthlyBalance(
                         companyId, member.getMemberId(),
@@ -109,18 +103,13 @@ public class MonthlyLeaveGrantWorker {
             }
         }
 
-        // 남은 INSERT 버퍼 처리
         if (!insertBuffer.isEmpty()) {
             flushBuffer(insertBuffer);
         }
 
-        // UPDATE 대상은 dirty checking으로 트랜잭션 커밋 시 자동 flush
         return batchResult;
     }
 
-    /**
-     * 입사 후 baseDate 시점까지 경과한 월차 발생 개월 수(최대 11)를 계산
-     */
     private int calculateExpectedMonthlyLeaves(LocalDate joinDate, LocalDate baseDate) {
         int monthsPassed = 0;
         for (int i = 1; i <= 11; i++) {
@@ -133,7 +122,6 @@ public class MonthlyLeaveGrantWorker {
         return monthsPassed;
     }
 
-    /** 버퍼를 일괄 저장한 뒤 영속성 컨텍스트를 비움 */
     private void flushBuffer(List<MemberBalance> buffer) {
         memberBalanceRepository.saveAll(buffer);
         memberBalanceRepository.flush();
@@ -141,7 +129,6 @@ public class MonthlyLeaveGrantWorker {
         buffer.clear();
     }
 
-    /** Feign으로 회사 소속 직원을 조회 */
     private List<MemberResDto> fetchMembers(UUID companyId) {
         ApiResponse<List<MemberResDto>> response = memberFeignClient.getMembersByCompany(companyId);
         if (response == null || response.getData() == null) {
@@ -150,7 +137,6 @@ public class MonthlyLeaveGrantWorker {
         return response.getData();
     }
 
-    /** 월차 분은 MONTHLY에 저장 */
     private MemberBalance buildMonthlyBalance(UUID companyId, UUID memberId, Double days, LocalDate expirationDate) {
         return MemberBalance.builder()
                 .memberId(memberId)

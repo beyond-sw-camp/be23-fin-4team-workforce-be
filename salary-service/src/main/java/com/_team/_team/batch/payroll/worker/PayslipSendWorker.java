@@ -1,4 +1,4 @@
-package com._team._team.hr.batch.salary.worker;
+package com._team._team.batch.payroll.worker;
 
 import com._team._team.salary.Repository.PayrollRepository;
 import com._team._team.salary.domain.Payroll;
@@ -28,7 +28,6 @@ public class PayslipSendWorker {
     /** 명세서 발송 배치 실행 */
     @Transactional(readOnly = true)
     public void run() {
-        // CONFIRMED = 확정만. 실제 PDF 붙일 때 여기서 루프 돌리기
         List<Payroll> targets = payrollRepository.findByPayrollStatusAndDelYn(PayrollStatus.CONFIRMED, "N");
         log.info("PayslipSendWorker: 명세서 발송 대상(CONFIRMED) {}건 — 발송 연동 전이라 로그만", targets.size());
     }

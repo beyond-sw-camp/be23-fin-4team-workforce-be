@@ -1,4 +1,4 @@
-package com._team._team.hr.batch.salary.worker;
+package com._team._team.batch.payroll.worker;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.FeignClients.MemberFeignClient;
@@ -60,7 +60,6 @@ public class PayrollCalculateWorker {
                 log.warn("PayrollCalculateWorker: companyId={} 활성 SalaryPolicy 없음 — 건너뜀", companyId);
                 continue;
             }
-            // 급여대장 한 장이 어떤 지급일을 기준으로 잡힌 대장인지 나타내는 날짜
             LocalDate settlement = resolveSettlementDate(today, policy.getPayDay());
 
             List<MemberResDto> members = fetchMembers(companyId);
@@ -74,7 +73,6 @@ public class PayrollCalculateWorker {
                                     .build());
                     ok++;
                 } catch (BusinessException e) {
-                    // 중복 정산일·급여 없음 등은 스킵
                     skip++;
                 } catch (Exception e) {
                     fail++;
@@ -96,20 +94,14 @@ public class PayrollCalculateWorker {
                 fail);
     }
 
-    // 오늘 기준으로 이번에 만들 payrollYearMonthDay. payDay는 정책 지급일, 말일 보정은 PayrollCalculationService랑 동일
     private static LocalDate resolveSettlementDate(LocalDate today, int payDay) {
-
-        // lengthOfMonth : today가 속한 달이 며칠까지 있는지 정수로 받음
         int dayThisMonth = Math.min(payDay, today.lengthOfMonth());
-        // 오늘이 속한 달의 지급일 달력상 날짜
         LocalDate payThisMonth = today.withDayOfMonth(dayThisMonth);
 
-        // 오늘이 지급일이거나, 지급일보다 뒤면
         if (!today.isBefore(payThisMonth)) {
             return payThisMonth;
         }
 
-        // 한 달 전 같은 시점의 날짜 (월만 빼고, 일은 가능한 한 유지하되 말일 보정됨) , 예: 3/31에서 한 달 빼면 2/28(또는 29)
         LocalDate prevMonth = today.minusMonths(1);
         int dayPrevMonth = Math.min(payDay, prevMonth.lengthOfMonth());
         return prevMonth.withDayOfMonth(dayPrevMonth);

@@ -1,16 +1,16 @@
-package com._team._team.hr.batch.config;
+package com._team._team.batch.config;
 
-import com._team._team.hr.batch.attendance.worker.DailyAttendanceCloseWorker;
-import com._team._team.hr.batch.attendance.worker.LeaveExpireWorker;
-import com._team._team.hr.batch.attendance.worker.LeaveGrantWorker;
-import com._team._team.hr.batch.salary.worker.PayrollCalculateWorker;
-import com._team._team.hr.batch.salary.worker.PayslipSendWorker;
-import com._team._team.hr.batch.salary.worker.SeverancePayWorker;
+import com._team._team.batch.leave.worker.DailyAttendanceCloseWorker;
+import com._team._team.batch.leave.worker.LeaveExpireWorker;
+import com._team._team.batch.leave.worker.LeaveGrantWorker;
+import com._team._team.batch.payroll.worker.PayrollCalculateWorker;
+import com._team._team.batch.payroll.worker.PayslipSendWorker;
+import com._team._team.batch.payroll.worker.SeverancePayWorker;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
-import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,11 +21,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import java.time.LocalDate;
 
 /**
- * HR 도메인 Spring Batch Job /Step  빈을 모아 두는 설정 클래스
+ * Spring Batch Job / Step 빈 정의
  */
 @Configuration
 @EnableBatchProcessing
-public class HrBatchJobConfig {
+public class BatchJobConfig {
 
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
@@ -38,7 +38,7 @@ public class HrBatchJobConfig {
     private final PayslipSendWorker payslipSendWorker;
 
     @Autowired
-    public HrBatchJobConfig(
+    public BatchJobConfig(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             LeaveGrantWorker leaveGrantWorker,
@@ -57,9 +57,6 @@ public class HrBatchJobConfig {
         this.payslipSendWorker = payslipSendWorker;
     }
 
-    /**
-     * 연차·회계연도 연차·월차 부여를 한 번에 수행하는 Batch Job.
-     */
     @Bean
     public Job leaveGrantJob() {
         return new JobBuilder("leaveGrantJob", jobRepository)
@@ -67,9 +64,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /**
-     * 기준일은 현재 LocalDate now()
-     */
     @Bean
     public Step leaveGrantStep() {
         return new StepBuilder("leaveGrantStep", jobRepository)
@@ -80,9 +74,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /**
-     * 일일 근태 마감 Batch Job (구현 예정).
-     */
     @Bean
     public Job dailyAttendanceCloseJob() {
         return new JobBuilder("dailyAttendanceCloseJob", jobRepository)
@@ -90,7 +81,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /** 일일 근태 마감 Step. */
     @Bean
     public Step dailyAttendanceCloseStep() {
         return new StepBuilder("dailyAttendanceCloseStep", jobRepository)
@@ -101,9 +91,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /**
-     * 휴가 잔액 만료(소멸) 처리 Batch Job (구현 예정).
-     */
     @Bean
     public Job leaveExpireJob() {
         return new JobBuilder("leaveExpireJob", jobRepository)
@@ -111,7 +98,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /** 휴가 만료 처리 Step. */
     @Bean
     public Step leaveExpireStep() {
         return new StepBuilder("leaveExpireStep", jobRepository)
@@ -122,9 +108,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /**
-     * 월 급여 일괄 계산 Batch Job (구현 예정).
-     */
     @Bean
     public Job payrollCalculateJob() {
         return new JobBuilder("payrollCalculateJob", jobRepository)
@@ -132,7 +115,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /** 급여 계산 Step. */
     @Bean
     public Step payrollCalculateStep() {
         return new StepBuilder("payrollCalculateStep", jobRepository)
@@ -143,9 +125,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /**
-     * 퇴직금 산정 Batch Job (구현 예정).
-     */
     @Bean
     public Job severancePayJob() {
         return new JobBuilder("severancePayJob", jobRepository)
@@ -153,7 +132,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /** 퇴직금 계산 Step. */
     @Bean
     public Step severancePayStep() {
         return new StepBuilder("severancePayStep", jobRepository)
@@ -164,9 +142,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /**
-     * 급여명세서 발송 Batch Job (구현 예정).
-     */
     @Bean
     public Job payslipSendJob() {
         return new JobBuilder("payslipSendJob", jobRepository)
@@ -174,7 +149,6 @@ public class HrBatchJobConfig {
                 .build();
     }
 
-    /** 명세서 발송 Step. */
     @Bean
     public Step payslipSendStep() {
         return new StepBuilder("payslipSendStep", jobRepository)

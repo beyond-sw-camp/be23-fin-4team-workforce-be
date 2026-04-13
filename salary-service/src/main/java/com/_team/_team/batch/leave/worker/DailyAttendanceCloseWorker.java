@@ -1,4 +1,4 @@
-package com._team._team.hr.batch.attendance.worker;
+package com._team._team.batch.leave.worker;
 
 import com._team._team.attendance.Repository.DailyAttendanceRepository;
 import com._team._team.attendance.domain.DailyAttendance;
@@ -30,7 +30,6 @@ public class DailyAttendanceCloseWorker {
     public void run() {
         LocalDate targetDate = LocalDate.now().minusDays(1);
         List<DailyAttendance> open = dailyAttendanceRepository.findByAttendanceDateAndFirstClockInIsNotNullAndLastClockOutIsNull(targetDate);
-        // 퇴근만 안 찍은 건 집계. 이후 정책 나오면 상태/알림 붙일 예정
         log.info("DailyAttendanceCloseWorker: targetDate={} 미퇴근(출근만 있음) {}건", targetDate, open.size());
     }
 }

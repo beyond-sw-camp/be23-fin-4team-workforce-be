@@ -1,4 +1,4 @@
-package com._team._team.hr.batch;
+package com._team._team.batch;
 
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobExecutionContext;
@@ -47,7 +47,7 @@ public class BatchScheduledJob extends QuartzJobBean {
                     .toJobParameters();
 
             jobLauncher.run(job, jobParameters);
-            
+
             log.info("Successfully completed Spring Batch Job: {}", jobName);
 
         } catch (Exception e) {
