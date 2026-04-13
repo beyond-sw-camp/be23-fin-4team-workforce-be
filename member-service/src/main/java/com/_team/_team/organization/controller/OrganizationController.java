@@ -226,4 +226,15 @@ public class OrganizationController {
     public OrganizationResDto findByIdInternal(@PathVariable UUID organizationId) {
         return organizationService.findById(organizationId);
     }
+    // 캘린더 팀 필터용 조직 목록 조회
+    @GetMapping("/simple-list")
+    public ResponseEntity<?> getOrganizationSimpleList(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        organizationService.getOrganizationList(memberId),
+                        "조직 목록 조회 성공"),
+                HttpStatus.OK
+        );
+    }
 }
