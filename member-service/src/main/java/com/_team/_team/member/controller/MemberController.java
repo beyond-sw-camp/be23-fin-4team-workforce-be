@@ -6,6 +6,7 @@ import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
 import com._team._team.member.dto.reqdto.*;
 import com._team._team.member.dto.resdto.LoginResDto;
+import com._team._team.member.dto.resdto.MemberResDto;
 import com._team._team.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -355,6 +357,21 @@ public class MemberController {
         memberService.returnMember(memberId, targetMemberId);
         return new ResponseEntity<>(
                 ApiResponse.success(null, "복직 처리 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    /**
+     * 회사별 재직 사원 전체 조회
+     * salary-service의 연차 부여 배치(@Scheduled)에서 Feign으로 호출
+     * → MemberFeignClient.getMembersByCompany()
+     */
+    @GetMapping("/internal/by-company")
+    public ResponseEntity<?> findAllByCompanyIdForBatch(
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
+        List<MemberResDto> result = memberService.findAllByCompanyIdForBatch(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "재직 사원 조회 성공"),
                 HttpStatus.OK
         );
     }
