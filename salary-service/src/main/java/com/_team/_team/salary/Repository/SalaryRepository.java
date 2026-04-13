@@ -33,4 +33,8 @@ public interface SalaryRepository extends JpaRepository<Salary, UUID> {
     Optional<Salary> findActiveSalary(@Param("memberId") UUID memberId,
                                       @Param("companyId") UUID companyId,
                                       @Param("date") LocalDate date);
+
+    // 급여 계산 배치시 회사 ID 조회
+    @Query("SELECT DISTINCT s.companyId FROM Salary s")
+    List<UUID> findDistinctCompanyIds();
 }

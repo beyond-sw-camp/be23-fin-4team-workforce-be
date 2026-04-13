@@ -4,6 +4,7 @@ import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.PeriodEndType;
 import com._team._team.salary.domain.enums.PeriodStartType;
+import com._team._team.salary.domain.enums.WageSystemType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,6 +24,9 @@ public class SalaryPolicyResDto {
     private String policyName;
     private PayType payType;
     private Integer payDay;
+    private Integer overtimeRoundingMinutes;
+    private WageSystemType wageSystemType;
+    private Integer fixedOvertimeMinutes;
     private PeriodStartType periodStartType;
     private PeriodEndType periodEndType;
     private LocalDate effectiveFrom;
@@ -37,6 +41,9 @@ public class SalaryPolicyResDto {
                 .policyName(salaryPolicy.getPolicyName())
                 .payType(salaryPolicy.getPayType())
                 .payDay(salaryPolicy.getPayDay())
+                .overtimeRoundingMinutes(salaryPolicy.getOvertimeRoundingMinutes())
+                .wageSystemType(salaryPolicy.getWageSystemType())
+                .fixedOvertimeMinutes(salaryPolicy.getFixedOvertimeMinutes())
                 .periodStartType(salaryPolicy.getPeriodStartType())
                 .periodEndType(salaryPolicy.getPeriodEndType())
                 .effectiveFrom(salaryPolicy.getEffectiveFrom())

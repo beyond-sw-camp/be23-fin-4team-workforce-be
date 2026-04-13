@@ -62,6 +62,16 @@ public class LeavePolicy extends BaseTimeEntity {
     @Builder.Default
     private String isPayoutYn = "N";
 
+    /**
+     * 기본 부여 일수 (회사 커스텀)
+     * FISCAL 모드: 1/1 일괄 부여 시 이 값만큼 부여 , HIRE_DATE 모드: 입사 기념일에 이 값만큼 부여
+     * ===== 근로기준법 : 1년 이상 재직자 기준 법정 최소 15일.
+     * (근속 연수별 가산은 추후 확장 — 일단 단일 값으로 시작) =====
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Double defaultAnnualDays = 15.0;
+
     /** 연차 발생 기준 (FISCAL: 회계연도 1/1 / HIRE_DATE: 입사일 기준) */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -92,6 +102,9 @@ public class LeavePolicy extends BaseTimeEntity {
         }
         if (reqDto.getIsPayoutYn() != null) {
             this.isPayoutYn = reqDto.getIsPayoutYn();
+        }
+        if (reqDto.getDefaultAnnualDays() != null) {
+            this.defaultAnnualDays = reqDto.getDefaultAnnualDays();
         }
         if (reqDto.getAccrualBase() != null) {
             this.accrualBase = reqDto.getAccrualBase();

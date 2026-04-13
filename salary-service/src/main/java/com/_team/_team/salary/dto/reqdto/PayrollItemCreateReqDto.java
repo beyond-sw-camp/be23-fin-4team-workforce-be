@@ -38,6 +38,7 @@ public class PayrollItemCreateReqDto {
                 .itemType(template.getItemType())
                 .amount(this.amount)
                 .displayOrder(template.getDisplayOrder())
+                .isTaxableYn(template.getIsTaxableYn())
                 .build();
     }
 }

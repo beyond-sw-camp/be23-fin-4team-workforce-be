@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * 휴가 잔여 (직원별)
- * - ANNUAL: 당해 연차 / CARRYOVER: 이월 연차
+ * - ANNUAL: 당해 연차 / CARRYOVER: 이월 연차 / MONTHLY: 월차
  * - remaining = totalGranted - totalUsed (코드에서 동기화 유지)
  * - 동시 차감 방지: Repository에서 PESSIMISTIC_WRITE 락 사용
  * - expirationDate 지나면 isExpireYn = 'Y'로 배치 처리
@@ -38,7 +38,7 @@ public class MemberBalance extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID companyId;
 
-    /** 잔여 유형 (ANNUAL: 연차 / CARRYOVER: 이월) */
+    /** 잔여 유형 (ANNUAL: 연차 / CARRYOVER: 이월 연차 / MONTHLY: 월차) */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private BalanceType balanceType;
@@ -87,5 +87,19 @@ public class MemberBalance extends BaseTimeEntity {
     public void restore(double days) {
         this.totalUsed -= days;
         this.remaining += days;
+    }
+
+    /**
+     * 월차 누적 부여
+     */
+    public void addGranted(double days) {
+        this.totalGranted += days;
+        this.remaining += days;
+    }
+
+    /** 만료 배치에서 소멸 처리 */
+    public void markExpired() {
+        this.isExpireYn = "Y";
+        this.isUsableYn = "N";
     }
 }
