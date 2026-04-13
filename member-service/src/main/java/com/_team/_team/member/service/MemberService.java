@@ -8,6 +8,8 @@ import com._team._team.dto.NotificationMessage;
 import com._team._team.event.MemberChangedEvent;
 import com._team._team.event.MemberDeletedEvent;
 import com._team._team.event.MemberSavedEvent;
+import com._team._team.member.domain.enums.MemberStatus;
+import com._team._team.member.dto.resdto.MemberResDto;
 import com._team._team.event.OrganizationSavedEvent;
 import com._team._team.member.auth.JwtTokenProvider;
 import com._team._team.annotation.Action;
@@ -1647,6 +1649,19 @@ public class MemberService {
         } catch (Exception e) {
             log.error("SearchOutboxDeleteEvent 저장 실패: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 회사별 재직 사원 조회 (배치용 내부 API)
+     * → salary-service의 연차 부여 배치에서 호출
+     */
+    @Transactional(readOnly = true)
+    public List<MemberResDto> findAllByCompanyIdForBatch(UUID companyId) {
+        return memberRepository
+                .findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE)
+                .stream()
+                .map(MemberResDto::fromEntity)
+                .toList();
     }
 }
 
