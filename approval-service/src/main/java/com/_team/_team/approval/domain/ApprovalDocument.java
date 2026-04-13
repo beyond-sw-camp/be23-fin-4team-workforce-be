@@ -43,6 +43,10 @@ public class ApprovalDocument extends BaseTimeEntity {
     @Column(nullable = false)
     private String autoApproveYn="N"; // 자동승인여부
 
+    @Builder.Default
+    @Column(nullable = false)
+    private String isDeptVisibleYn = "Y"; // 부서 문서함 노출 여부 (민감 양식은 'N')
+
     public void activate(){
         this.isActiveYn="Y";
     }
@@ -59,7 +63,12 @@ public class ApprovalDocument extends BaseTimeEntity {
         this.autoApproveYn = "N";
     }
 
+    public void enableDeptVisible() {
+        this.isDeptVisibleYn = "Y";
+    }
 
-
+    public void disableDeptVisible() {
+        this.isDeptVisibleYn = "N";
+    }
 
 }

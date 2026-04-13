@@ -20,6 +20,9 @@ public class AbsenceProxy extends BaseTimeEntity {
     private UUID proxyId;
 
     @Column(nullable = false)
+    private UUID companyId;
+
+    @Column(nullable = false)
     private UUID memberId; // 부재자(원래 결재자)
 
     @Column(nullable = false)

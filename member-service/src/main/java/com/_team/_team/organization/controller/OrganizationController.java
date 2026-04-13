@@ -237,4 +237,9 @@ public class OrganizationController {
                 HttpStatus.OK
         );
     }
+
+    @GetMapping("/internal/{organizationId}/descendants")
+    public List<UUID> findDescendantIdsInternal(@PathVariable UUID organizationId) {
+        return organizationService.findDescendantIds(organizationId);
+    }
 }

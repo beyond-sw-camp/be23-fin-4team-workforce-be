@@ -45,4 +45,20 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("memberId") UUID memberId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
+
+    // 부서 문서함 - requesterOrganizationId 기준, isDeptVisibleYn='Y', 승인완료/반려만
+    @Query("SELECT ar FROM ApprovalRequest ar " +
+            "JOIN FETCH ar.approvalDocument doc " +
+            "WHERE doc.companyId = :companyId " +
+            "AND doc.isDeptVisibleYn = 'Y' " +
+            "AND ar.requesterOrganizationId IN :organizationIds " +
+            "AND ar.requestStatus IN (" +
+            "   com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+            "   com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+            ") " +
+            "AND ar.delYn = 'N' " +
+            "ORDER BY ar.createdAt DESC")
+    List<ApprovalRequest> findDepartmentRequests(
+            @Param("companyId") UUID companyId,
+            @Param("organizationIds") List<UUID> organizationIds);
 }
