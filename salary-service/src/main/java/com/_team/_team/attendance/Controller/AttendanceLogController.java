@@ -55,7 +55,7 @@ public class AttendanceLogController {
     @PostMapping("/clock-in")
     public ResponseEntity<?> clockIn(
             @RequestHeader("X-User-CompanyId")UUID companyId,
-            @RequestHeader("X-User-MemberId")UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody AttendanceLogCreateReqDto reqDto){
         DailyAttendanceResDto resDto = attendanceLogService.clockIn(companyId, memberId, reqDto);
         return new ResponseEntity<>(
@@ -68,7 +68,7 @@ public class AttendanceLogController {
     @PostMapping("/clock-out")
     public ResponseEntity<?> clockOut(
             @RequestHeader("X-User-CompanyId")UUID companyId,
-            @RequestHeader("X-User-MemberId")UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody AttendanceLogCreateReqDto reqDto) {
         DailyAttendanceResDto resDto = attendanceLogService.clockOut(companyId, memberId, reqDto);
         return new ResponseEntity<>(
@@ -81,7 +81,7 @@ public class AttendanceLogController {
     @PostMapping("/break-start")
     public ResponseEntity<?> breakStart(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody AttendanceLogCreateReqDto reqDto){
         AttendanceLogResDto resDto = attendanceLogService.breakStart(companyId, memberId, reqDto);
         return new ResponseEntity<>(
@@ -94,7 +94,7 @@ public class AttendanceLogController {
     @PostMapping("/break-end")
     public ResponseEntity<?> breakEnd(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody AttendanceLogCreateReqDto reqDto) {
         AttendanceLogResDto resDto = attendanceLogService.breakEnd(companyId, memberId, reqDto);
         return new ResponseEntity<>(
@@ -109,7 +109,7 @@ public class AttendanceLogController {
     @GetMapping("/daily/{date}")
     public ResponseEntity<?> findDailyAttendance(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         DailyAttendanceResDto resDto = dailyAttendanceService.findDailyAttendance(companyId, memberId, date);
         return new ResponseEntity<>(
@@ -122,7 +122,7 @@ public class AttendanceLogController {
     @GetMapping("/logs/{date}")
     public ResponseEntity<?> findLogs(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         List<AttendanceLogResDto> resDtoList = attendanceLogService.findLogs(companyId, memberId, date);
         return new ResponseEntity<>(
@@ -135,7 +135,7 @@ public class AttendanceLogController {
     @GetMapping("/monthly")
     public ResponseEntity<?> findMonthlyByMember(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @PageableDefault(size = 31) Pageable pageable) {

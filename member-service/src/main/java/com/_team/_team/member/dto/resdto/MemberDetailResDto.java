@@ -51,6 +51,11 @@ public class MemberDetailResDto {
     private String jobGradeName;
     private String jobTitleName;
 
+    //인사전용
+    private MemberStatus memberStatus;
+    private AccountStatus accountStatus;
+    private String roleName;
+
     public static MemberDetailResDto fromEntity(Member member, MemberPosition position) {
         return MemberDetailResDto.builder()
                 .memberId(member.getMemberId())
@@ -76,6 +81,9 @@ public class MemberDetailResDto {
                 .organizationName(position.getOrganization().getName())
                 .jobGradeName(position.getJobGrade().getName())
                 .jobTitleName(position.getJobTitle().getName())
+                .memberStatus(member.getMemberStatus())
+                .accountStatus(member.getAccountStatus())
+                .roleName(position.getRole() != null ? position.getRole().getName() : null)
                 .memberPositionId(position.getMemberPositionId())
                 .build();
     }

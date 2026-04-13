@@ -1,16 +1,19 @@
 package com._team._team.salary.Service;
 
+import com._team._team.attendance.Repository.CompanyHolidayRepository;
+import com._team._team.attendance.Repository.DailyAttendanceRepository;
+import com._team._team.attendance.domain.CompanyHoliday;
+import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.Repository.PayrollItemRepository;
 import com._team._team.salary.Repository.PayrollRepository;
 import com._team._team.salary.Repository.SalaryItemTemplateRepository;
 import com._team._team.salary.Repository.SalaryRepository;
-import com._team._team.salary.domain.Payroll;
-import com._team._team.salary.domain.PayrollItem;
-import com._team._team.salary.domain.Salary;
-import com._team._team.salary.domain.SalaryItemTemplate;
+import com._team._team.salary.domain.*;
 import com._team._team.salary.domain.enums.ItemType;
 import com._team._team.salary.domain.enums.PayrollStatus;
+import com._team._team.salary.domain.vo.AutoPayrollItem;
+import com._team._team.salary.domain.vo.SettlementPeriod;
 import com._team._team.salary.dto.reqdto.PayrollCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemUpdateReqDto;
@@ -18,13 +21,17 @@ import com._team._team.salary.dto.reqdto.PayrollUpdateReqDto;
 import com._team._team.salary.dto.resdto.PayrollItemResDto;
 import com._team._team.salary.dto.resdto.PayrollResDto;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -34,16 +41,22 @@ public class PayrollService {
     private final PayrollItemRepository payrollItemRepository;
     private final SalaryRepository salaryRepository;
     private final SalaryItemTemplateRepository salaryItemTemplateRepository;
+    private final PayrollCalculationService payrollCalculationService;
+    private final DailyAttendanceRepository dailyAttendanceRepository;
+    private final CompanyHolidayRepository companyHolidayRepository;
 
     @Autowired
     public PayrollService(PayrollRepository payrollRepository,
                           PayrollItemRepository payrollItemRepository,
                           SalaryRepository salaryRepository,
-                          SalaryItemTemplateRepository salaryItemTemplateRepository){
+                          SalaryItemTemplateRepository salaryItemTemplateRepository, PayrollCalculationService payrollCalculationService, DailyAttendanceRepository dailyAttendanceRepository, CompanyHolidayRepository companyHolidayRepository){
         this.payrollRepository = payrollRepository;
         this.payrollItemRepository = payrollItemRepository;
         this.salaryRepository = salaryRepository;
         this.salaryItemTemplateRepository = salaryItemTemplateRepository;
+        this.payrollCalculationService = payrollCalculationService;
+        this.dailyAttendanceRepository = dailyAttendanceRepository;
+        this.companyHolidayRepository = companyHolidayRepository;
     }
 
     // ===================== 급여대장 =====================
@@ -67,22 +80,44 @@ public class PayrollService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "해당 직원의 적용 중인 급여 정보를 찾을 수 없습니다."));
 
-        /** 2. 직원 + 정산일 중복 체크 (삭제되지 않은 것만) */
-        if(payrollRepository.existsByMemberIdAndPayrollYearMonthDayAndDelYn(
-                reqDto.getMemberId(), reqDto.getPayrollYearMonthDay(), "N")){
+        /**
+         * 2. 직원 + 정산일 기존 이력 체크
+         * 활성 대장이 있으면: 중복 생성 금지
+         * 삭제된 대장만 있으면 : 재생성 금지
+         * 완전히 없으면: 생성 진행
+         */
+        payrollRepository.findByCompanyIdAndMemberIdAndPayrollYearMonthDay(
+                        companyId, reqDto.getMemberId(), reqDto.getPayrollYearMonthDay())
+                .ifPresent(existing -> {
+                    if ("N".equals(existing.getDelYn())) {
+                        throw new BusinessException(HttpStatus.CONFLICT,
+                                "해당 직원의 동일 정산일에 이미 급여대장이 존재합니다.");
+                    } else {
+                        throw new BusinessException(HttpStatus.CONFLICT,
+                                "해당 직원의 동일 정산일에 이전 급여대장 이력이 존재합니다. 다른 정산일로 생성하거나 기존 대장을 수정해주세요.");
+                    }
+                });
+
+        /** 3. (신규) 정산기간 계산 */
+        SettlementPeriod period = payrollCalculationService.calculateSettlementPeriod(
+                companyId, reqDto.getPayrollYearMonthDay());
+
+        /** 4. Payroll 생성 (금액은 0으로 초기화, 항목 생성 후 재계산) */
+        Payroll payroll = reqDto.toEntity(companyId, salary.getSalaryId());
+        Payroll saved;
+        try {
+            saved = payrollRepository.saveAndFlush(payroll);
+        } catch (DataIntegrityViolationException e) {
             throw new BusinessException(HttpStatus.CONFLICT,
-                    "해당 직원의 동일 정산일에 이미 급여대장이 존재합니다.");
+                    "동시에 동일한 급여대장 생성 요청이 감지되었습니다. 잠시 후 다시 시도해주세요.");
         }
 
-        /** 3. Payroll 생성 (금액은 0으로 초기화, 항목 생성 후 재계산) */
-        Payroll payroll = reqDto.toEntity(companyId, salary.getSalaryId());
-        Payroll saved = payrollRepository.save(payroll);
-
-        /** 4. 회사의 급여 항목 템플릿 조회 → PayrollItem 일괄 생성 */
+        /** 5. 회사의 급여 항목 템플릿 조회 → PayrollItem 일괄 생성 */
         List<SalaryItemTemplate> templates = salaryItemTemplateRepository
                 .findByCompanyIdAndDelYn(companyId, "N");
 
         long totalPayment = 0L;
+        long totalTaxableEarning = 0L;   // 과세 대상 EARNING 합계 (4대보험/소득세 기준액)
         long totalDeduction = 0L;
         List<PayrollItem> payrollItems = new ArrayList<>();
 
@@ -90,30 +125,104 @@ public class PayrollService {
             /**
              * "기본급" 항목이면 Salary의 baseSalary를 금액으로 자동 세팅
              * 그 외 항목(식대, 교통비, 소득세 등)은 0원으로 생성 → DRAFT 상태에서 수정
-             * 추후 각 직원들의 항목 금액 계산식 구축 예정
              */
             long amount = template.getItemName().equals("기본급")
                     ? salary.getBaseSalary() : 0L;
 
-            /** payrollItem 생성 */
+            // payrollItem 생성
             PayrollItem payItem = PayrollItem.fromTemplate(saved, template, amount);
             payrollItems.add(payItem);
 
-            /** EARNING/DEDUCTION 분류하여 합계 누적 */
+            // EARNING/DEDUCTION 분류하여 합계 누적
             if (template.getItemType() == ItemType.EARNING) {
                 totalPayment += amount;
+                // 과세 항목만 과세 총액에 누적 (비과세 식대, 비과세 교통비 등 제외)
+                if ("Y".equals(template.getIsTaxableYn())) {
+                    totalTaxableEarning += amount;
+                }
             } else {
                 totalDeduction += amount;
             }
         }
 
-        /** saveAll로 배치 저장 (개별 save 대비 INSERT 횟수 최소화) */
-        payrollItemRepository.saveAll(payrollItems);
+        // 6. 근태 데이터 조회 - 정산기간 내 1회 조회, 여러 계산에 재 사용
+        List<DailyAttendance> attendances = dailyAttendanceRepository.findByMemberAndPeriod(
+                reqDto.getMemberId(), companyId, period.from(), period.to());
 
-        /** 5. 합계 자동 계산 (이미 Java에서 계산했으므로 DB 재조회 없음) */
+        // 7. 활성 급여정책 조회 (포괄/비포괄 + OT 인정 단위 + fixed OT 모두 들어있음)
+        SalaryPolicy activePolicy = payrollCalculationService.findActivePolicy(
+                companyId, reqDto.getPayrollYearMonthDay());
+
+        // 7-1. 초과근무수당 자동 계산 (포괄/비포괄 분기 포함)
+        AutoPayrollItem overtimeItem = payrollCalculationService.calculateOvertimePay(
+                attendances,
+                salary.getBaseSalary(),
+                activePolicy);
+
+        if (overtimeItem != null){
+            PayrollItem payItem = buildPayrollItem(saved, overtimeItem);
+            payrollItems.add(payItem);
+            totalPayment += overtimeItem.amount();
+            // 초과근무수당은 과세이므로 → 과세 총액에 누적
+            if ("Y".equals(overtimeItem.isTaxableYn())) {
+                totalTaxableEarning += overtimeItem.amount();
+            }
+        }
+
+        // 8. 공휴일근무수당 자동 계산 */
+        // 유급공휴일 날짜 Set 생성 (CompanyHoliday 조회 -> isPaidYn = 'Y' 필터)
+        List<CompanyHoliday> holidays = companyHolidayRepository.findByCompanyIdAndPeriod(
+                companyId, period.from(), period.to());
+        Set<LocalDate> paidHolidayDates = holidays.stream()
+                .filter(h -> "Y".equals(h.getIsPaidYn()))
+                .map(CompanyHoliday::getHolidayDate)
+                .collect(Collectors.toSet());
+
+        AutoPayrollItem holidayItem = payrollCalculationService.calculateHolidayWorkPay(
+                attendances, paidHolidayDates, salary.getBaseSalary());
+
+        if(holidayItem != null){
+            PayrollItem payrollItem = buildPayrollItem(saved, holidayItem);
+            payrollItems.add(payrollItem);
+            totalPayment += holidayItem.amount();
+            // 공휴일근무수당은 과세이므로 → 과세 총액에 누적
+            if ("Y".equals(holidayItem.isTaxableYn())) {
+                totalTaxableEarning += holidayItem.amount();
+            }
+        }
+
+        // 9. 과세 총지급액 기준 4대보험 + 세금 자동 공제
+        // - totalTaxableEarning: 비과세 제외 → 실제 과세 대상 금액
+        List<AutoPayrollItem> deductionItems = payrollCalculationService.calculateDeductions(
+                totalTaxableEarning, reqDto.getPayrollYearMonthDay());
+
+        for(AutoPayrollItem deduction : deductionItems){
+            PayrollItem payrollItem = buildPayrollItem(saved ,deduction);
+            payrollItems.add(payrollItem);
+            totalDeduction += deduction.amount();
+        }
+
+        // 10. saveAll로 배치 저장
+        payrollItemRepository.saveAll(payrollItems);
         saved.recalculate(totalPayment, totalDeduction);
 
         return PayrollResDto.fromEntity(saved);
+    }
+
+    // ===================== 내부 헬퍼 메서드 =====================
+
+    /**
+     * AutoPayrollItem(값 객체) → PayrollItem(엔티티) 변환
+     */
+    private PayrollItem buildPayrollItem(Payroll payroll, AutoPayrollItem autoItem) {
+        return PayrollItem.builder()
+                .payroll(payroll)
+                .itemName(autoItem.itemName())
+                .itemType(autoItem.itemType())
+                .amount(autoItem.amount())
+                .displayOrder(autoItem.displayOrder())
+                .isTaxableYn(autoItem.isTaxableYn())
+                .build();
     }
 
     /**
@@ -311,14 +420,11 @@ public class PayrollService {
         recalculatePayroll(item.getPayroll());
     }
 
-    // ===================== 내부 헬퍼 메서드 =====================
-
     /**
      * Payroll 합계 재계산 (DB SUM 쿼리 방식)
-     *
-     * - 전체 항목을 Java로 가져와서 stream 합산하는 대신
-     *   DB에서 SUM 쿼리 2번으로 합계 계산 (네트워크 전송량 최소화)
-     * - 삭제되지 않은(delYn="N") PayrollItem만 대상
+     *  전체 항목을 Java로 가져와서 stream 합산하는 대신
+     *  DB에서 SUM 쿼리 2번으로 합계 계산 (네트워크 전송량 최소화)
+     *  삭제되지 않은(delYn="N") PayrollItem만 대상
      */
     private void recalculatePayroll(Payroll payroll) {
         Long totalPayment = payrollItemRepository

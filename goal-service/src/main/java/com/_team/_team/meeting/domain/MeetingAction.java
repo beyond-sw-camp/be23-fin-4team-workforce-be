@@ -26,7 +26,8 @@ public class MeetingAction extends BaseTimeEntity {
     @JoinColumn(name = "meeting_record_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private MeetingRecord meetingRecord;
 
-    @Column(name = "assignee_id")
+    /** [M2] assignee 는 누구에게 할 일인지 명확해야 하므로 NOT NULL. */
+    @Column(name = "assignee_id", nullable = false)
     private UUID assigneeId;
 
     @Column(name = "description", length = 500, nullable = false)
@@ -54,7 +55,14 @@ public class MeetingAction extends BaseTimeEntity {
         this.completedAt = LocalDateTime.now();
     }
 
+    /**
+     * [M4] 실제로 수행되지 않은 액션 아이템에 대해 평가를 매기는 것은 의미가 없으므로,
+     * 완료된 액션에 대해서만 평가가 가능하도록 가드를 추가.
+     */
     public void rate(TlRating tlRating) {
+        if (!this.isCompleted) {
+            throw new IllegalStateException("완료되지 않은 액션 아이템에는 평가를 할 수 없습니다.");
+        }
         this.tlRating = tlRating;
     }
 

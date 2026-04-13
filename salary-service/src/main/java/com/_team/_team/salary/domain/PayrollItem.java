@@ -46,8 +46,13 @@ public class PayrollItem extends BaseTimeEntity {
     /** 표시 순서 */
     private Integer displayOrder;
 
+    /** 과세 여부 */
+    @Column(nullable = false, length = 1)
+    @Builder.Default
+    private String isTaxableYn = "Y";
+
     /** 삭제 여부 */
-    @Column(length = 1)
+    @Column(nullable = false, length = 1)
     @Builder.Default
     private String delYn = "N";
 
@@ -78,6 +83,7 @@ public class PayrollItem extends BaseTimeEntity {
                 .itemType(template.getItemType())
                 .amount(amount)
                 .displayOrder(template.getDisplayOrder())
+                .isTaxableYn(template.getIsTaxableYn())
                 .build();
     }
 }

@@ -8,6 +8,8 @@ import com._team._team.dto.NotificationMessage;
 import com._team._team.event.MemberChangedEvent;
 import com._team._team.event.MemberDeletedEvent;
 import com._team._team.event.MemberSavedEvent;
+import com._team._team.member.domain.enums.MemberStatus;
+import com._team._team.member.dto.resdto.MemberResDto;
 import com._team._team.event.OrganizationSavedEvent;
 import com._team._team.member.auth.JwtTokenProvider;
 import com._team._team.annotation.Action;
@@ -296,11 +298,13 @@ public class MemberService {
         }
         return result;
     }
+
     //이메일 검증
     @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
         return memberRepository.existsByEmail(email);
     }
+
     // 권한 캐싱 메서드 추가
     private void cachePermissions(MemberPosition memberPosition) {
 
@@ -483,6 +487,7 @@ public class MemberService {
                 .memberPositionId(memberPositionId)
                 .build();
     }
+
     // 직원 계정 생성
     public void createMember(UUID memberId, UUID memberPositionId, MemberCreateReqDto reqDto) {
 
@@ -788,6 +793,7 @@ public class MemberService {
         int code = random.nextInt(900000) + 100000;
         return String.valueOf(code);
     }
+
     // 직원 수정 (인사팀)
     public void updateMember(UUID memberId, UUID memberPositionId,
                              UUID targetMemberId, MemberUpdateReqDto reqDto) {
@@ -958,6 +964,7 @@ public class MemberService {
         eventPublisher.publishEvent(
                 new MemberChangedEvent(memberId));
     }
+
     // 직원 삭제
     public void deleteMember(UUID memberId, UUID targetMemberId) {
 
@@ -1054,6 +1061,7 @@ public class MemberService {
                 new MemberChangedEvent(targetMemberId));
 
     }
+
     public void updateMemberRole(UUID memberId, UUID targetMemberId,
                                  UpdateMemberRoleReqDto reqDto) {
 
@@ -1320,6 +1328,7 @@ public class MemberService {
 
         role.delete();
     }
+
     // 계정 잠금 해제
     public void unblockMember(UUID memberId, UUID targetMemberId) {
 
@@ -1353,6 +1362,7 @@ public class MemberService {
         // 5. 잠금 해제
         target.unblock();
     }
+
     // 프로필 이미지 업로드
     public void updateProfileImage(UUID memberId, MultipartFile profileImage) {
 
@@ -1393,6 +1403,7 @@ public class MemberService {
         // profileUrl null로 업데이트
         member.updateProfileUrl(null);
     }
+
     // 휴직 처리
     public void dormantMember(UUID memberId, UUID targetMemberId) {
 
@@ -1617,6 +1628,7 @@ public class MemberService {
             log.error("SearchOutboxEvent 저장 실패: {}", e.getMessage());
         }
     }
+
     private void saveSearchOutboxDeleteEvent(UUID memberId) {
         try {
             MemberDeletedEvent event = MemberDeletedEvent.builder()
@@ -1638,6 +1650,19 @@ public class MemberService {
         } catch (Exception e) {
             log.error("SearchOutboxDeleteEvent 저장 실패: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 회사별 재직 사원 조회 (배치용 내부 API)
+     * → salary-service의 연차 부여 배치에서 호출
+     */
+    @Transactional(readOnly = true)
+    public List<MemberResDto> findAllByCompanyIdForBatch(UUID companyId) {
+        return memberRepository
+                .findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE)
+                .stream()
+                .map(MemberResDto::fromEntity)
+                .toList();
     }
 }
 

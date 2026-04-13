@@ -4,6 +4,7 @@ import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.PeriodEndType;
 import com._team._team.salary.domain.enums.PeriodStartType;
+import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -32,6 +33,20 @@ public class SalaryPolicyCreateReqDto {
     @Max(value=31, message = "지급일은 31이하여야합니다.")
     private Integer payDay;
 
+    @Min(value = 1, message = "초과근무 인정 단위는 1분 이상이어야 합니다.")
+    private Integer overtimeRoundingMinutes;
+
+    @NotNull(message = "임금제 유형은 필수입니다.")
+    private WageSystemType wageSystemType;
+
+    /**
+     * 포괄임금제일 때 포함된 고정 오버타임시간(분)
+     * - COMPREHENSIVE이면 1 이상 필수
+     * - NON_COMPREHENSIVE이면 0
+     */
+    @Min(value = 0, message = "고정 오버타임시간(분)은 0 이상이어야 합니다.")
+    private Integer fixedOvertimeMinutes;
+
     @NotNull(message = "정산 시작 기준은 필수입니다.")
     private PeriodStartType periodStartType;
 
@@ -49,10 +64,17 @@ public class SalaryPolicyCreateReqDto {
                 .policyName(policyName)
                 .payType(payType)
                 .payDay(payDay)
+                .overtimeRoundingMinutes(overtimeRoundingMinutes)
                 .periodStartType(periodStartType)
                 .periodEndType(periodEndType)
                 .effectiveFrom(effectiveFrom)
                 .effectiveTo(effectiveTo)
+                .wageSystemType(wageSystemType)
+                .fixedOvertimeMinutes(
+                        wageSystemType == WageSystemType.NON_COMPREHENSIVE
+                                ? 0
+                                : (fixedOvertimeMinutes == null ? 0 : fixedOvertimeMinutes)
+                )
                 .build();
     }
 }
