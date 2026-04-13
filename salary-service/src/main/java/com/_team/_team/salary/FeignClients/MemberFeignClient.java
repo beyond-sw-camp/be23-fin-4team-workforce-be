@@ -23,4 +23,12 @@ public interface MemberFeignClient {
     ApiResponse<List<MemberResDto>> getMemberList(
             @RequestHeader("X-User-UUID") UUID memberId,
             @RequestHeader("X-User-MemberPositionId") UUID memberPositionId);
+
+    /**
+     * 회사 소속 재직 사원 전체 조회
+     * - 배치 스케줄러에서 호출
+     */
+    @GetMapping("/member/internal/by-company")
+    ApiResponse<List<MemberResDto>> getMembersByCompany(
+            @RequestHeader("X-User-CompanyId") UUID companyId);
 }

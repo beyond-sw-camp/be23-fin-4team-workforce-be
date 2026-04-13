@@ -57,7 +57,7 @@ public class MemberBalanceController {
     @GetMapping
     public ResponseEntity<?> findBalances(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId) {
+            @RequestHeader("X-User-UUID") UUID memberId) {
         List<MemberBalanceResDto> resDtoList = memberBalanceService.findBalances(companyId, memberId);
         return new ResponseEntity<>(
                 ApiResponse.success(resDtoList, "휴가 잔여 조회 성공"),
@@ -69,7 +69,7 @@ public class MemberBalanceController {
     @PostMapping("/use")
     public ResponseEntity<?> useBalance(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody MemberBalanceUseReqDto reqDto) {
         MemberBalanceResDto resDto = memberBalanceService.useBalance(companyId, memberId, reqDto);
         return new ResponseEntity<>(
@@ -82,7 +82,7 @@ public class MemberBalanceController {
     @PostMapping("/restore")
     public ResponseEntity<?> restoreBalance(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-MemberId") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @Valid @RequestBody MemberBalanceUseReqDto reqDto) {
         MemberBalanceResDto resDto = memberBalanceService.restoreBalance(companyId, memberId, reqDto);
         return new ResponseEntity<>(

@@ -34,6 +34,9 @@ public class LeavePolicyCreateReqDto {
     /** 미사용 수당 지급 여부 */
     private String isPayoutYn;
 
+    /** 기본 부여 일수 (회사 커스텀, null이면 15.0) */
+    private Double defaultAnnualDays;
+
     @NotNull(message = "연차 발생 기준은 필수 입니다.")
     private AccrualBase accrualBase;
 
@@ -47,6 +50,7 @@ public class LeavePolicyCreateReqDto {
                 .carryoverDays(this.carryoverDays)
                 .isCarryoverConsentYn(this.isCarryoverConsentYn != null ? this.isCarryoverConsentYn : "N")
                 .isPayoutYn(this.isPayoutYn != null ? this.isPayoutYn : "N")
+                .defaultAnnualDays(this.defaultAnnualDays != null ? this.defaultAnnualDays : 15.0)
                 .accrualBase(this.accrualBase)
                 .build();
     }
