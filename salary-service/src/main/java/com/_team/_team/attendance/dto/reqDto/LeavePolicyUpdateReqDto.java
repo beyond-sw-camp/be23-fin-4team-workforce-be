@@ -35,4 +35,6 @@ public class LeavePolicyUpdateReqDto {
 
     /** 연차 발생 기준 (FISCAL: 회계연도 기준, HIRE_DATE: 입사일 기준) */
     private AccrualBase accrualBase;
+
+    private Double defaultAnnualDays;
 }
