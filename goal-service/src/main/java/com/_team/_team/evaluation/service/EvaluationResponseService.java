@@ -425,17 +425,4 @@ public class EvaluationResponseService {
                 .collect(Collectors.toList());
     }
 
-    // 오류 감지 (비동기 트리거 후 조회)
-    @Transactional(readOnly = true)
-    public List<ResponseResDto> listAnomalies(UUID seasonId, UUID companyId) {
-        return responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> {
-                    if (r.getAnswersJson() == null) return false;
-                    return r.getAnswersJson().contains("\"flagged\":true");
-                })
-                .map(ResponseResDto::from)
-                .collect(Collectors.toList());
-    }
 }
