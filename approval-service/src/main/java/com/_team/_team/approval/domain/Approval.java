@@ -29,6 +29,17 @@ public class Approval extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID approverMemberId;
 
+    // --- 대결 관련 필드 ---
+    @Column
+    private UUID actualApproverMemberId;      // 실제 결재한 사람 (대결자)
+
+    @Column
+    private UUID actualApproverMemberPositionId;  // 실제 결재한 사람의 직위
+
+    @Builder.Default
+    @Column(nullable = false)
+    private String isProxyYn = "N";   // 대리결재 여부
+
     @Column(nullable = false)
     private Integer stepOrder;
 
@@ -54,18 +65,6 @@ public class Approval extends BaseTimeEntity {
     @Column(length = 45)
     private String ipAddress; // 감사 로그용
 
-    public void approve(String comment) {
-        this.approvalStatus = LineStatus.APPROVED;
-        this.comment = comment;
-        this.actedAt = LocalDateTime.now();
-    }
-
-    public void reject(String comment) {
-        this.approvalStatus = LineStatus.REJECTED;
-        this.comment = comment;
-        this.actedAt = LocalDateTime.now();
-    }
-
     public void cancel() {
         this.approvalStatus = LineStatus.CANCELED;
         this.actedAt = LocalDateTime.now();
@@ -82,7 +81,27 @@ public class Approval extends BaseTimeEntity {
         this.approvalStatus = LineStatus.PENDING;
     }
 
+    public void approve(String comment, UUID actualMemberId, UUID actualMemberPositionId) {
+        this.approvalStatus = LineStatus.APPROVED;
+        this.comment = comment;
+        this.actedAt = LocalDateTime.now();
+        this.actualApproverMemberId = actualMemberId;
+        this.actualApproverMemberPositionId = actualMemberPositionId;
+        if (actualMemberId != null) {
+            this.isProxyYn = actualMemberId.equals(this.approverMemberId) ? "N" : "Y";
+        }
+    }
 
+    public void reject(String comment, UUID actualMemberId, UUID actualMemberPositionId) {
+        this.approvalStatus = LineStatus.REJECTED;
+        this.comment = comment;
+        this.actedAt = LocalDateTime.now();
+        this.actualApproverMemberId = actualMemberId;
+        this.actualApproverMemberPositionId = actualMemberPositionId;
+        if (actualMemberId != null) {
+            this.isProxyYn = actualMemberId.equals(this.approverMemberId) ? "N" : "Y";
+        }
+    }
 
 }
 

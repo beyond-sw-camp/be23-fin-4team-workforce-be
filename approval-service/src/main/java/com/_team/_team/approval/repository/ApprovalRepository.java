@@ -60,4 +60,28 @@ public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
             "WHERE a.request.requestId = :requestId")
     Optional<Integer> findMaxStepOrderByRequestId(
             @Param("requestId") UUID requestId);
+
+    // 부재자의 결재 대기건 조회 (대결용 - memberId 기준)
+    @Query("SELECT a FROM Approval a " +
+            "JOIN FETCH a.request r " +
+            "JOIN FETCH r.approvalDocument " +
+            "WHERE a.approverMemberId = :memberId " +
+            "AND a.approvalStatus = :status " +
+            "AND r.delYn = 'N'")
+    List<Approval> findPendingByApproverMemberId(
+            @Param("memberId") UUID memberId,
+            @Param("status") LineStatus status);
+
+    // 대결자가 실제 처리한 결재 이력 (actualApproverMemberId 기준)
+    @Query("SELECT a FROM Approval a " +
+            "JOIN FETCH a.request r " +
+            "JOIN FETCH r.approvalDocument " +
+            "WHERE a.actualApproverMemberId = :memberId " +
+            "AND a.approverMemberId != :memberId " +
+            "AND a.approvalStatus IN :statuses " +
+            "AND r.delYn = 'N' " +
+            "ORDER BY a.actedAt DESC")
+    List<Approval> findActedByActualApproverMemberId(
+            @Param("memberId") UUID memberId,
+            @Param("statuses") List<LineStatus> statuses);
 }

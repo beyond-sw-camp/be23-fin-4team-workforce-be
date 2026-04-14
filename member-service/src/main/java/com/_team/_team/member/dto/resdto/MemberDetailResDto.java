@@ -44,6 +44,7 @@ public class MemberDetailResDto {
     private String profileUrl;
     private String extensionNumber;
     private String telNumber;
+    private UUID memberPositionId;
 
     // 조직 정보
     private String organizationName;
@@ -83,6 +84,7 @@ public class MemberDetailResDto {
                 .memberStatus(member.getMemberStatus())
                 .accountStatus(member.getAccountStatus())
                 .roleName(position.getRole() != null ? position.getRole().getName() : null)
+                .memberPositionId(position.getMemberPositionId())
                 .build();
     }
 
@@ -109,6 +111,7 @@ public class MemberDetailResDto {
                 .jobGradeName(position.getJobGrade().getName())
                 .jobTitleName(position.getJobTitle().getName())
                 .esgScore(member.getEsgScore())
+                .memberPositionId(position.getMemberPositionId())
                 .build();
     }
 }

@@ -25,4 +25,8 @@ public interface MemberServiceClient {
     @GetMapping("/organization/internal/{organizationId}")
     OrganizationResDto getOrganization(
             @PathVariable("organizationId") UUID organizationId);
+
+    @GetMapping("/organization/internal/{organizationId}/descendants")
+    List<UUID> getOrganizationDescendantIds(
+            @PathVariable("organizationId") UUID organizationId);
 }

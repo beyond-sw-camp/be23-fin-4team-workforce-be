@@ -580,4 +580,32 @@ public class OrganizationService {
                 .orElseThrow(() -> new RuntimeException("조직을 찾을 수 없습니다."));
         return OrganizationResDto.fromEntity(organization);
     }
+
+    /**
+     * 주어진 조직 및 모든 하위 조직 ID 목록 반환 (재귀)
+     * - 루트 자신 포함
+     * - 삭제된(delYn != "NO") 조직은 제외 (하위 트리도 함께 잘림)
+     * - approval-service 부서 문서함에서 사용
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> findDescendantIds(UUID organizationId) {
+        Organization root = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 조직입니다."));
+
+        List<UUID> result = new ArrayList<>();
+        collectDescendantIds(root, result);
+        return result;
+    }
+
+    private void collectDescendantIds(Organization organization, List<UUID> result) {
+        // 삭제된 조직은 제외하고, 해당 서브트리도 더 내려가지 않음
+        if (!"NO".equals(organization.getDelYn())) {
+            return;
+        }
+        result.add(organization.getOrganizationId());
+        for (Organization child : organization.getChildren()) {
+            collectDescendantIds(child, result);
+        }
+    }
 }
