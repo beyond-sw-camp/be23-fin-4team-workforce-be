@@ -4,6 +4,7 @@ import com._team._team.dto.BusinessException;
 import com._team._team.evaluation.domain.EvaluationDesign;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationSeason;
+import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.GroupCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.GroupResDto;
@@ -26,15 +27,18 @@ public class EvaluationGroupService {
     private final EvaluationSeasonRepository seasonRepository;
     private final EvaluationDesignRepository designRepository;
     private final ObjectMapper objectMapper;
+    private final EvaluationResponseService evaluationResponseService;
 
     public EvaluationGroupService(EvaluationGroupRepository groupRepository,
                                    EvaluationSeasonRepository seasonRepository,
                                    EvaluationDesignRepository designRepository,
-                                   ObjectMapper objectMapper) {
+                                   ObjectMapper objectMapper,
+                                   EvaluationResponseService evaluationResponseService) {
         this.groupRepository = groupRepository;
         this.seasonRepository = seasonRepository;
         this.designRepository = designRepository;
         this.objectMapper = objectMapper;
+        this.evaluationResponseService = evaluationResponseService;
     }
 
     @Transactional(readOnly = true)
@@ -122,6 +126,10 @@ public class EvaluationGroupService {
     public GroupResDto updateEvaluatorMaps(UUID groupId, UUID companyId, String evaluatorMapsJson) {
         EvaluationGroup group = findGroupOrThrow(groupId, companyId);
         group.updateEvaluatorMaps(evaluatorMapsJson);
+        groupRepository.save(group);
+        if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
+            evaluationResponseService.materializeMissingResponsesForGroup(group);
+        }
         return GroupResDto.from(group);
     }
 

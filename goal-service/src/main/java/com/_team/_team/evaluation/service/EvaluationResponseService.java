@@ -1,9 +1,12 @@
 package com._team._team.evaluation.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.evaluation.domain.CalibrationHistory;
+import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationResponse;
 import com._team._team.evaluation.domain.EvaluationSeason;
+import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
 import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
@@ -14,8 +17,11 @@ import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
 import com._team._team.meeting.service.MeetingRecordService;
+import com._team._team.notification.NotificationType;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -35,23 +43,72 @@ public class EvaluationResponseService {
     private final CalibrationHistoryRepository calibrationHistoryRepository;
     private final ObjectMapper objectMapper;
     private final MeetingRecordService meetingRecordService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
                                       EvaluationSeasonRepository seasonRepository,
                                       CalibrationHistoryRepository calibrationHistoryRepository,
                                       ObjectMapper objectMapper,
-                                      MeetingRecordService meetingRecordService) {
+                                      MeetingRecordService meetingRecordService,
+                                      ApplicationEventPublisher eventPublisher) {
         this.responseRepository = responseRepository;
         this.seasonRepository = seasonRepository;
         this.calibrationHistoryRepository = calibrationHistoryRepository;
         this.objectMapper = objectMapper;
         this.meetingRecordService = meetingRecordService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
     public List<ResponseResDto> listMyResponses(UUID evaluatorId) {
         return responseRepository.findByEvaluatorId(evaluatorId)
                 .stream().map(ResponseResDto::from).collect(Collectors.toList());
+    }
+
+    /**
+     * 시즌 시작 이후에 평가자 매핑이 추가·변경된 경우, 기존에는 JSON만 갱신되고 {@link EvaluationResponse} 행이
+     * 생기지 않아 평가자 목록에 안 보이던 문제를 해소합니다. (startSeason 시점에만 생성되던 동작 보완)
+     */
+    @Transactional
+    public void materializeMissingResponsesForGroup(EvaluationGroup group) {
+        if (group.getEvaluatorMapsJson() == null || group.getEvaluatorMapsJson().isBlank()) {
+            return;
+        }
+        final List<Map<String, String>> maps;
+        try {
+            maps = objectMapper.readValue(group.getEvaluatorMapsJson(), new TypeReference<>() {});
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "평가자 매핑 JSON이 올바르지 않습니다.");
+        }
+        UUID companyId = group.getCompanyId();
+        UUID groupId = group.getGroupId();
+        List<EvaluationResponse> toSave = new ArrayList<>();
+        for (Map<String, String> map : maps) {
+            try {
+                UUID targetMemberId = UUID.fromString(map.get("targetMemberId"));
+                UUID evaluatorId = UUID.fromString(map.get("evaluatorId"));
+                EvalType evalType = EvalType.valueOf(map.get("evaluationType"));
+                if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
+                    continue;
+                }
+                if (responseRepository.existsByGroup_GroupIdAndTargetMemberIdAndEvaluatorIdAndEvaluationType(
+                        groupId, targetMemberId, evaluatorId, evalType)) {
+                    continue;
+                }
+                toSave.add(EvaluationResponse.builder()
+                        .companyId(companyId)
+                        .group(group)
+                        .targetMemberId(targetMemberId)
+                        .evaluatorId(evaluatorId)
+                        .evaluationType(evalType)
+                        .build());
+            } catch (IllegalArgumentException ignored) {
+                // 잘못된 UUID/enum 행은 건너뜀 — startSeason 과 동일
+            }
+        }
+        if (!toSave.isEmpty()) {
+            responseRepository.saveAll(toSave);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -118,20 +175,36 @@ public class EvaluationResponseService {
                     "캘리브레이션 확정/결과 공개 이후에는 응답을 재개방할 수 없습니다.");
         }
         response.reopen();
+        String seasonName = season.getName() != null ? season.getName() : "평가";
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(response.getEvaluatorId())
+                .notificationType(NotificationType.EVALUATION_REOPENED)
+                .content("\"" + seasonName + "\" 평가 응답이 재작성 가능한 상태로 변경되었습니다.")
+                .targetId(responseId)
+                .targetType("EVALUATION_RESPONSE")
+                .build());
         return ResponseResDto.from(response);
     }
 
     // 리마인드
     @Transactional
     public void sendReminder(UUID seasonId, UUID memberId, UUID companyId) {
-        List<EvaluationResponse> responses = responseRepository.findByEvaluatorId(memberId)
+        List<EvaluationResponse> pending = responseRepository.findByGroup_Season_SeasonId(seasonId)
                 .stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getEvaluatorId().equals(memberId))
                 .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
                 .collect(Collectors.toList());
-        for (EvaluationResponse r : responses) {
+        if (pending.isEmpty()) {
+            return;
+        }
+        for (EvaluationResponse r : pending) {
             r.updateRemindedAt();
         }
+        String seasonName = seasonRepository.findById(seasonId)
+                .map(EvaluationSeason::getName)
+                .orElse("평가");
+        publishEvaluationReminder(memberId, seasonId, seasonName, pending.size());
     }
 
     @Transactional
@@ -141,9 +214,32 @@ public class EvaluationResponseService {
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
                 .collect(Collectors.toList());
-        for (EvaluationResponse r : responses) {
-            r.updateRemindedAt();
+        if (responses.isEmpty()) {
+            return;
         }
+        String seasonName = seasonRepository.findById(seasonId)
+                .map(EvaluationSeason::getName)
+                .orElse("평가");
+        Map<UUID, List<EvaluationResponse>> byEvaluator = responses.stream()
+                .collect(Collectors.groupingBy(EvaluationResponse::getEvaluatorId));
+        for (List<EvaluationResponse> list : byEvaluator.values()) {
+            for (EvaluationResponse r : list) {
+                r.updateRemindedAt();
+            }
+        }
+        for (Map.Entry<UUID, List<EvaluationResponse>> e : byEvaluator.entrySet()) {
+            publishEvaluationReminder(e.getKey(), seasonId, seasonName, e.getValue().size());
+        }
+    }
+
+    private void publishEvaluationReminder(UUID receiverId, UUID seasonId, String seasonName, int pendingCount) {
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(receiverId)
+                .notificationType(NotificationType.EVALUATION_REMINDER)
+                .content("\"" + seasonName + "\" 미제출 평가가 " + pendingCount + "건 있습니다.")
+                .targetId(seasonId)
+                .targetType("EVALUATION_SEASON")
+                .build());
     }
 
     /**
@@ -374,17 +470,4 @@ public class EvaluationResponseService {
                 .collect(Collectors.toList());
     }
 
-    // 오류 감지 (비동기 트리거 후 조회)
-    @Transactional(readOnly = true)
-    public List<ResponseResDto> listAnomalies(UUID seasonId, UUID companyId) {
-        return responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> {
-                    if (r.getAnswersJson() == null) return false;
-                    return r.getAnswersJson().contains("\"flagged\":true");
-                })
-                .map(ResponseResDto::from)
-                .collect(Collectors.toList());
-    }
 }
