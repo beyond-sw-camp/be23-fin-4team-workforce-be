@@ -422,9 +422,12 @@ public class ApprovalRequestService {
         List<UUID> targetOrgIds = memberServiceClient
                 .getOrganizationDescendantIds(organizationId);
 
-        // 5. 부서 문서함 조회
+        // 5. 부서 문서함 조회 (승인완료/반려만)
         List<ApprovalRequest> requests = approvalRequestRepository
-                .findDepartmentRequests(companyId, targetOrgIds);
+                .findDepartmentRequests(
+                        companyId,
+                        targetOrgIds,
+                        List.of(RequestStatus.APPROVED, RequestStatus.REJECTED));
 
         return requests.stream()
                 .map(request -> {

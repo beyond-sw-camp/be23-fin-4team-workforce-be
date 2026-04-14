@@ -79,20 +79,39 @@ public class BatchJobConfig {
                 .build();
     }
 
-    /** 일일 근태 마감 Job */
+    /** 일일 근태 마감 DRAFT Job (06:00 알림 단계) */
     @Bean
-    public Job dailyAttendanceCloseJob() {
-        return new JobBuilder("dailyAttendanceCloseJob", jobRepository)
-                .start(dailyAttendanceCloseStep())
+    public Job dailyAttendanceDraftJob() {
+        return new JobBuilder("dailyAttendanceDraftJob", jobRepository)
+                .start(dailyAttendanceDraftStep())
                 .build();
     }
 
-    /** 일일 근태 마감 Step */
+    /** 일일 근태 마감 DRAFT Step */
     @Bean
-    public Step dailyAttendanceCloseStep() {
-        return new StepBuilder("dailyAttendanceCloseStep", jobRepository)
+    public Step dailyAttendanceDraftStep() {
+        return new StepBuilder("dailyAttendanceDraftStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    dailyAttendanceCloseWorker.run();
+                    dailyAttendanceCloseWorker.runDraft();
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 일일 근태 마감 FINAL Job (14:00 자동 마감 단계) */
+    @Bean
+    public Job dailyAttendanceFinalJob() {
+        return new JobBuilder("dailyAttendanceFinalJob", jobRepository)
+                .start(dailyAttendanceFinalStep())
+                .build();
+    }
+
+    /** 일일 근태 마감 FINAL Step */
+    @Bean
+    public Step dailyAttendanceFinalStep() {
+        return new StepBuilder("dailyAttendanceFinalStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    dailyAttendanceCloseWorker.runFinal();
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
