@@ -121,4 +121,47 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
     List<MemberBalance> findMonthlyBalancesByCompany(
             @Param("companyId") UUID companyId);
 
+    /**
+     * [이월 배치용] 특정 회사 + 특정 타입 + 만료일 범위의 활성 잔액 목록
+     * CarryoverLeaveWorker 가 전년도 ANNUAL 을 조회할 때 사용
+     */
+    @Query("SELECT mb FROM MemberBalance mb " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.balanceType = :type " +
+            "AND mb.expirationDate BETWEEN :from AND :to " +
+            "AND mb.isExpireYn = 'N' " +
+            "AND mb.delYn = 'N'")
+    List<MemberBalance> findActiveBalancesByCompanyAndTypeAndExpiration(
+            @Param("companyId") UUID companyId,
+            @Param("type") BalanceType type,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /**
+     * [미사용수당 API 용] 만료 여부 무관하게 조회
+     */
+    @Query("SELECT mb FROM MemberBalance mb " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.balanceType = :type " +
+            "AND mb.expirationDate BETWEEN :from AND :to " +
+            "AND mb.delYn = 'N'")
+    List<MemberBalance> findBalancesByCompanyAndTypeAndExpirationIncludingExpired(
+            @Param("companyId") UUID companyId,
+            @Param("type") BalanceType type,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /** 특정 사원의 특정 타입 활성 잔액 1건*/
+    @Query("SELECT mb FROM MemberBalance mb " +
+            "WHERE mb.companyId = :companyId " +
+            "AND mb.memberId = :memberId " +
+            "AND mb.balanceType = :type " +
+            "AND mb.expirationDate BETWEEN :from AND :to " +
+            "AND mb.delYn = 'N'")
+    Optional<MemberBalance> findBalanceByMemberAndTypeAndExpiration(
+            @Param("companyId") UUID companyId,
+            @Param("memberId") UUID memberId,
+            @Param("type") BalanceType type,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }
