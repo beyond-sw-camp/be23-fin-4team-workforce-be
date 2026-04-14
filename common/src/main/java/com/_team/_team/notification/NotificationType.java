@@ -19,6 +19,10 @@ public enum NotificationType {
     // 목표
     GOAL_EVALUATED,          // 목표 평가 완료
 
+    // 평가
+    EVALUATION_REMINDER,     // 미제출 평가 리마인드
+    EVALUATION_REOPENED,     // 제출된 평가 재작성 허용
+
     // 인사
     MEMBER_DORMANT,          // 휴직 처리
     MEMBER_RETURN,            // 복직 처리

@@ -6,6 +6,7 @@ import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
+import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.SeasonCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
@@ -95,26 +96,37 @@ public class EvaluationSeasonService {
         season.activate();
 
         // 그룹 내 evaluatorMaps 기반으로 EvaluationResponse 일괄 생성
+        // 검증 강화: targetMemberId == evaluatorId 인 경우는 SELF 타입 외에는 건너뛴다.
         List<EvaluationGroup> groups = groupRepository.findBySeason_SeasonId(seasonId);
         List<EvaluationResponse> responses = new ArrayList<>();
         for (EvaluationGroup group : groups) {
-            if (group.getEvaluatorMapsJson() != null) {
+            if (group.getEvaluatorMapsJson() == null) continue;
+            List<Map<String, String>> maps;
+            try {
+                maps = objectMapper.readValue(group.getEvaluatorMapsJson(), new TypeReference<>() {});
+            } catch (Exception e) {
+                // 개별 그룹의 JSON 이상은 400 Bad Request 로 반환 — 클라이언트에 원인 전달
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "평가자 매핑 JSON 이 올바르지 않습니다. 그룹: " + group.getName());
+            }
+            for (Map<String, String> map : maps) {
                 try {
-                    List<Map<String, String>> maps = objectMapper.readValue(
-                            group.getEvaluatorMapsJson(), new TypeReference<>() {});
-                    for (Map<String, String> map : maps) {
-                        EvaluationResponse response = EvaluationResponse.builder()
-                                .companyId(companyId)
-                                .group(group)
-                                .targetMemberId(UUID.fromString(map.get("targetMemberId")))
-                                .evaluatorId(UUID.fromString(map.get("evaluatorId")))
-                                .evaluationType(EvalType.valueOf(map.get("evaluationType")))
-                                .build();
-                        responses.add(response);
+                    UUID targetMemberId = UUID.fromString(map.get("targetMemberId"));
+                    UUID evaluatorId = UUID.fromString(map.get("evaluatorId"));
+                    EvalType evalType = EvalType.valueOf(map.get("evaluationType"));
+                    // SELF 가 아닌데 자기 자신을 평가하는 매핑은 잘못된 것으로 판단하여 제외
+                    if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
+                        continue;
                     }
-                } catch (Exception e) {
-                    throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR,
-                            "평가자 매핑 데이터를 처리할 수 없습니다: " + group.getName());
+                    responses.add(EvaluationResponse.builder()
+                            .companyId(companyId)
+                            .group(group)
+                            .targetMemberId(targetMemberId)
+                            .evaluatorId(evaluatorId)
+                            .evaluationType(evalType)
+                            .build());
+                } catch (IllegalArgumentException ignore) {
+                    // 잘못된 UUID/enum 값은 해당 매핑만 건너뛴다 (다른 그룹까지 막지 않도록)
                 }
             }
         }
@@ -131,8 +143,65 @@ public class EvaluationSeasonService {
         if (season.getStatus() != SeasonStatus.ACTIVE) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "진행 중인 시즌만 종료할 수 있습니다.");
         }
+        // 결과 공개 이전에는 종료할 수 없음 — 피드백 미팅 자동 생성이 제대로 동작하려면
+        // 반드시 PUBLISHED 페이즈까지 도달해야 한다.
+        if (season.getPhase() != SeasonPhase.PUBLISHED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "결과 공개(PUBLISHED) 이전에는 시즌을 종료할 수 없습니다. 현재 phase: " + season.getPhase());
+        }
+        // 안전장치: 미제출 응답이 남아 있으면 종료 차단
+        long notSubmitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
+                .count();
+        if (notSubmitted > 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "제출되지 않은 평가 응답이 " + notSubmitted + "건 있어 시즌을 종료할 수 없습니다.");
+        }
         season.close();
         return SeasonResDto.from(season);
+    }
+
+    /**
+     * Phase 전이: ACTIVE 상태인 시즌에 한해 관리자가 페이즈를 진행시킬 수 있습니다.
+     * 현재 phase에 해당하는 평가 유형의 응답이 모두 제출(SUBMITTED)되었는지 사전 검증합니다.
+     */
+    @Transactional
+    public SeasonResDto transitionPhase(UUID seasonId, UUID companyId, SeasonPhase next) {
+        EvaluationSeason season = findSeasonOrThrow(seasonId, companyId);
+
+        // 현재 phase에 대응하는 평가 유형의 미제출 응답이 있으면 전이 차단
+        EvalType requiredType = mapPhaseToEvalType(season.getPhase());
+        if (requiredType != null) {
+            long notSubmitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                    .filter(r -> r.getCompanyId().equals(companyId))
+                    .filter(r -> r.getEvaluationType() == requiredType)
+                    .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
+                    .count();
+            if (notSubmitted > 0) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        requiredType.name() + " 유형의 미제출 응답이 " + notSubmitted
+                                + "건 있어 phase 를 전이할 수 없습니다.");
+            }
+        }
+
+        season.transitionTo(next);
+        return SeasonResDto.from(season);
+    }
+
+    /**
+     * 평가 phase 에 대응하는 EvalType 을 반환합니다.
+     * 대응 관계가 없는 phase (NOT_STARTED, CALIBRATION 등) 는 null 을 반환합니다.
+     */
+    private static EvalType mapPhaseToEvalType(SeasonPhase phase) {
+        if (phase == null) return null;
+        return switch (phase) {
+            case SELF_EVAL -> EvalType.SELF;
+            case PEER_EVAL -> EvalType.PEER;
+            case UPWARD_EVAL -> EvalType.UPWARD;
+            case DOWNWARD_EVAL -> EvalType.DOWNWARD;
+            default -> null;
+        };
     }
 
     private EvaluationSeason findSeasonOrThrow(UUID seasonId, UUID companyId) {

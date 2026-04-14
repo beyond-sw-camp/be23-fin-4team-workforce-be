@@ -44,11 +44,17 @@ public class MemberDetailResDto {
     private String profileUrl;
     private String extensionNumber;
     private String telNumber;
+    private UUID memberPositionId;
 
     // 조직 정보
     private String organizationName;
     private String jobGradeName;
     private String jobTitleName;
+
+    //인사전용
+    private MemberStatus memberStatus;
+    private AccountStatus accountStatus;
+    private String roleName;
 
     public static MemberDetailResDto fromEntity(Member member, MemberPosition position) {
         return MemberDetailResDto.builder()
@@ -75,6 +81,10 @@ public class MemberDetailResDto {
                 .organizationName(position.getOrganization().getName())
                 .jobGradeName(position.getJobGrade().getName())
                 .jobTitleName(position.getJobTitle().getName())
+                .memberStatus(member.getMemberStatus())
+                .accountStatus(member.getAccountStatus())
+                .roleName(position.getRole() != null ? position.getRole().getName() : null)
+                .memberPositionId(position.getMemberPositionId())
                 .build();
     }
 
@@ -101,6 +111,7 @@ public class MemberDetailResDto {
                 .jobGradeName(position.getJobGrade().getName())
                 .jobTitleName(position.getJobTitle().getName())
                 .esgScore(member.getEsgScore())
+                .memberPositionId(position.getMemberPositionId())
                 .build();
     }
 }

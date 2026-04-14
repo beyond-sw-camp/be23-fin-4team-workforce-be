@@ -113,7 +113,7 @@ public class EvaluationResponseController {
             @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID seasonId,
             @RequestBody CalibrationBaselineReqDto dto) {
-        // TODO: 기준점 기반 점수 재계산 로직
+        responseService.applyBaseline(seasonId, UUID.fromString(companyId), dto.getRange(), dto.getBaselineValue());
         return ResponseEntity.ok(ApiResponse.success(null, "기준점이 적용되었습니다."));
     }
 
@@ -121,9 +121,11 @@ public class EvaluationResponseController {
     @PatchMapping("/seasons/{seasonId}/calibration/adjustments")
     public ResponseEntity<ApiResponse<Void>> adjustCalibrations(
             @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader(value = "X-User-UUID", required = false) String memberId,
             @PathVariable UUID seasonId,
             @RequestBody CalibrationAdjustReqDto dto) {
-        responseService.adjustCalibrations(seasonId, UUID.fromString(companyId), dto);
+        UUID actorMemberId = (memberId != null && !memberId.isBlank()) ? UUID.fromString(memberId) : null;
+        responseService.adjustCalibrations(seasonId, UUID.fromString(companyId), actorMemberId, dto);
         return ResponseEntity.ok(ApiResponse.success(null, "등급 조율이 저장되었습니다."));
     }
 
@@ -136,7 +138,7 @@ public class EvaluationResponseController {
         return ResponseEntity.ok(ApiResponse.success(null, "캘리브레이션이 확정되었습니다."));
     }
 
-    // ── 진행도 / 분석 / 오류감지 ──
+    // ── 진행도 / 분석 ──
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping("/seasons/{seasonId}/progress")
@@ -147,22 +149,4 @@ public class EvaluationResponseController {
         return ResponseEntity.ok(ApiResponse.success(result, "진행도 조회 성공"));
     }
 
-    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
-    @GetMapping("/seasons/{seasonId}/anomalies")
-    public ResponseEntity<ApiResponse<List<ResponseResDto>>> listAnomalies(
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @PathVariable UUID seasonId) {
-        List<ResponseResDto> result = responseService.listAnomalies(seasonId, UUID.fromString(companyId));
-        return ResponseEntity.ok(ApiResponse.success(result, "오류 감지 목록 조회 성공"));
-    }
-
-    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
-    @PostMapping("/seasons/{seasonId}/anomalies/{responseId}/request-review")
-    public ResponseEntity<ApiResponse<ResponseResDto>> requestReview(
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @PathVariable UUID seasonId,
-            @PathVariable UUID responseId) {
-        ResponseResDto result = responseService.reopenResponse(responseId, UUID.fromString(companyId));
-        return ResponseEntity.ok(ApiResponse.success(result, "재검토가 요청되었습니다."));
-    }
 }
