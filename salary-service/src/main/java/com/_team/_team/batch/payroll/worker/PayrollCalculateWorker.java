@@ -94,17 +94,22 @@ public class PayrollCalculateWorker {
                 fail);
     }
 
+    /**
+     * 오늘 이후 가장 가까운 미래 payDay 반환.
+     * 말일 배치 기준: 이번 달 payDay가 미래면 이번 달, 아니면 다음 달 payDay.
+     */
     private static LocalDate resolveSettlementDate(LocalDate today, int payDay) {
         int dayThisMonth = Math.min(payDay, today.lengthOfMonth());
         LocalDate payThisMonth = today.withDayOfMonth(dayThisMonth);
 
-        if (!today.isBefore(payThisMonth)) {
+        // 이번 달 payDay가 아직 안 왔으면 이번 달, 이미 지났으면 다음 달
+        if (today.isBefore(payThisMonth)) {
             return payThisMonth;
         }
 
-        LocalDate prevMonth = today.minusMonths(1);
-        int dayPrevMonth = Math.min(payDay, prevMonth.lengthOfMonth());
-        return prevMonth.withDayOfMonth(dayPrevMonth);
+        LocalDate nextMonth = today.plusMonths(1);
+        int dayNextMonth = Math.min(payDay, nextMonth.lengthOfMonth());
+        return nextMonth.withDayOfMonth(dayNextMonth);
     }
 
     private List<MemberResDto> fetchMembers(UUID companyId) {
