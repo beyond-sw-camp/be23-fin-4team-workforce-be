@@ -31,6 +31,11 @@ public class ApprovalRequestResDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // === 요청자 스냅샷 (작성 시점 정보) ===
+    private String requesterName;
+    private UUID requesterOrganizationId;
+    private String requesterOrganizationName;
+
     private List<ApprovalLineResDto> approvalLines;
     private List<ApprovalViewerResDto> viewers;
 
@@ -48,6 +53,9 @@ public class ApprovalRequestResDto {
                 .cancelReason(entity.getCancelReason())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .requesterName(entity.getRequesterName())
+                .requesterOrganizationId(entity.getRequesterOrganizationId())
+                .requesterOrganizationName(entity.getRequesterOrganizationName())
                 .approvalLines(approvals.stream()
                         .map(ApprovalLineResDto::fromEntity)
                         .collect(Collectors.toList()))
