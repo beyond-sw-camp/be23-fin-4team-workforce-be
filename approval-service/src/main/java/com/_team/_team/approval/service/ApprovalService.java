@@ -10,8 +10,15 @@ import com._team._team.approval.dto.reqdto.ApprovalActionReqDto;
 import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
 import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.approval.repository.ApprovalRepository;
+import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.kafka.event.LeaveApprovalEvent;
+import com._team._team.kafka.event.OvertimeApprovalEvent;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,12 +37,20 @@ public class ApprovalService {
     private final ApprovalRepository approvalRepository;
     private final ApprovalViewerRepository approvalViewerRepository;
     private final AbsenceProxyRepository absenceProxyRepository;
+    private final OvertimeApprovalEventPublisher overtimeApprovalEventPublisher;
+    private final LeaveApprovalEventPublisher leaveApprovalEventPublisher;
+    private final ApprovalRequestRepository approvalRequestRepository;
+    private final ObjectMapper objectMapper;
 
     @Autowired
-    public ApprovalService(ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AbsenceProxyRepository absenceProxyRepository) {
+    public ApprovalService(ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AbsenceProxyRepository absenceProxyRepository, OvertimeApprovalEventPublisher overtimeApprovalEventPublisher, LeaveApprovalEventPublisher leaveApprovalEventPublisher, ApprovalRequestRepository approvalRequestRepository, ObjectMapper objectMapper) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
+        this.overtimeApprovalEventPublisher = overtimeApprovalEventPublisher;
+        this.leaveApprovalEventPublisher = leaveApprovalEventPublisher;
+        this.approvalRequestRepository = approvalRequestRepository;
+        this.objectMapper = objectMapper;
     }
 
 
@@ -132,6 +147,10 @@ public class ApprovalService {
             }
         } else {
             request.updateStatus(RequestStatus.APPROVED);
+
+            // 최종 승인 시 이벤트 발행
+            publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.APPROVE);
+            publishLeaveEventIfApplicable(request, LeaveApprovalEvent.Action.USE);
         }
 
         List<Approval> allApprovals =
@@ -199,6 +218,10 @@ public class ApprovalService {
         // 결재요청 상태 → REJECTED
         request.updateStatus(RequestStatus.REJECTED);
 
+        // 반려 시 이벤트 발행
+        publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.REJECT);
+        // 연차는 승인 전에는 차감되지 않았으므로 RESTORE 필요 없음 → 반려 시 발행 생략
+
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
     }
@@ -248,5 +271,115 @@ public class ApprovalService {
                             approval.getRequest(), allApprovals, viewers);
                 })
                 .toList();
+    }
+
+    // 아래는 승인/반려 직후 Kafka로 이벤트 쏘는 헬퍼들
+
+    // 연장근무신청 문서일 때만 overtime 이벤트 발행
+    // contentJson에서 workType(연장/야간/휴일) 뽑아서 같이 실어 보낸다.
+    private void publishOvertimeEventIfApplicable(ApprovalRequest request, OvertimeApprovalEvent.Action action) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"연장근무신청".equals(docName)) {
+            return;
+        }
+
+        String workType = extractWorkType(request.getContentJson());
+
+        overtimeApprovalEventPublisher.publish(
+                OvertimeApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .workType(workType)
+                        .startAt(request.getStartDateTime())
+                        .endAt(request.getEndDateTime())
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // contentJson에서 workType 한 필드만 뽑기
+    // JSON 파싱 실패하거나 필드 없으면 그냥 null 리턴 (이벤트는 나가되 workType만 비게 됨).
+    private String extractWorkType(String contentJson) {
+        if (contentJson == null) return null;
+        try {
+
+            JsonNode node = objectMapper.readTree(contentJson);
+            JsonNode wt = node.get("workType");
+            return wt != null ? wt.asText() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // 연차신청서 문서일 때만 leave 이벤트 발행
+    // 연차=1일씩 누적, 반차=0.5일. BalanceType은 일단 ANNUAL 고정 (CARRYOVER 우선소진은 salary 쪽에서 처리)
+    private void publishLeaveEventIfApplicable(ApprovalRequest request, LeaveApprovalEvent.Action action) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"연차신청서".equals(docName)) {
+            return;
+        }
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) {
+            return;
+        }
+
+        String vacationType = textOrNull(node, "vacationType");
+        LocalDate startDate = dateOrNull(node, "startDate");
+        LocalDate endDate   = dateOrNull(node, "endDate");
+        if (vacationType == null || startDate == null) {
+            return;
+        }
+
+        double days = calculateLeaveDays(vacationType, startDate, endDate);
+        if (days <= 0) return;
+
+        leaveApprovalEventPublisher.publish(
+                LeaveApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .balanceType("ANNUAL")
+                        .days(days)
+                        .leaveDate(startDate)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // 휴가 일수 계산 - 반차는 무조건 0.5, 연차는 시작/종료일 포함 일수
+    // endDate 비어있으면 당일치기로 보고 startDate만으로 1일 처리
+    private double calculateLeaveDays(String vacationType, LocalDate startDate, LocalDate endDate) {
+        if (vacationType.startsWith("반차")) return 0.5;
+        LocalDate end = (endDate != null) ? endDate : startDate;
+        return end.toEpochDay() - startDate.toEpochDay() + 1.0;
+    }
+
+    // contentJson 통째로 파싱 - 실패하면 null 돌려서 호출한 쪽이 발행 스킵.
+    private JsonNode readContent(String json) {
+        if (json == null) return null;
+        try {
+            return objectMapper.readTree(json);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // 해당 필드가 없거나 명시적 null이면 null 반환하는 얇은 래퍼
+    private String textOrNull(JsonNode node, String field) {
+        JsonNode n = node.get(field);
+        return (n != null && !n.isNull()) ? n.asText() : null;
+    }
+
+    // ISO yyyy-MM-dd 문자열을 LocalDate로 파싱 - 빈 문자열/포맷 이상이면 null
+    private LocalDate dateOrNull(JsonNode node, String field) {
+        String text = textOrNull(node, field);
+        if (text == null || text.isBlank()) return null;
+        try {
+            return LocalDate.parse(text);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
