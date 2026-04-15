@@ -8,6 +8,7 @@ import com._team._team.dto.NotificationMessage;
 import com._team._team.event.MemberChangedEvent;
 import com._team._team.event.MemberDeletedEvent;
 import com._team._team.event.MemberSavedEvent;
+import com._team._team.member.event.MemberHiredInternalEvent;
 import com._team._team.member.domain.enums.MemberStatus;
 import com._team._team.member.dto.resdto.MemberResDto;
 import com._team._team.event.OrganizationSavedEvent;
@@ -36,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -594,6 +596,17 @@ public class MemberService {
 
         // 14. 아웃박스 저장
         eventPublisher.publishEvent(new MemberChangedEvent(savedMember.getMemberId()));
+
+        // 15. 신규 입사 이벤트 발행 → salary-service에서 Salary 자동 생성
+        eventPublisher.publishEvent(new MemberHiredInternalEvent(
+                savedMember.getMemberId(),
+                company.getCompanyId(),
+                jobGrade.getJobGradeId(),
+                jobGrade.getName(),
+                jobTitle.getName(),
+                reqDto.getJoinDate(),
+                reqDto.getBaseSalary()
+        ));
     }
 
     // 직원 목록 조회
@@ -673,6 +686,37 @@ public class MemberService {
             return MemberDetailResDto.fromEntitySelf(target, position);
         }
         return MemberDetailResDto.fromEntity(target, position);
+    }
+
+    // 사원 검색 (QueryDSL 동적쿼리 + 페이징)
+    // 같은 회사로 강제 락, 호출자 회사 ID를 condition에 덮어쓴다
+    // 권한 분기는 일단 회사단위만, 세분화는 추후
+    @Transactional(readOnly = true)
+    public Page<MemberSearchItemResDto> searchMembers(
+            UUID memberId,
+            MemberSearchCondition condition,
+            org.springframework.data.domain.Pageable pageable) {
+
+        // 호출자 조회 → 회사 강제 주입 (다른 회사 못 보게)
+        Member requester = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
+
+        UUID companyId = requester.getCompany().getCompanyId();
+        MemberSearchCondition safeCond = MemberSearchCondition.builder()
+                .keyword(condition.getKeyword())
+                .companyId(companyId)
+                .organizationId(condition.getOrganizationId())
+                .jobTitleId(condition.getJobTitleId())
+                .jobGradeId(condition.getJobGradeId())
+                .memberStatus(condition.getMemberStatus())
+                .employmentType(condition.getEmploymentType())
+                .joinDateFrom(condition.getJoinDateFrom())
+                .joinDateTo(condition.getJoinDateTo())
+                .includeDeleted(condition.isIncludeDeleted())
+                .build();
+
+        return memberRepository.searchMembers(safeCond, pageable);
     }
 
     // 임시 비밀번호 생성

@@ -7,7 +7,11 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.member.dto.reqdto.*;
 import com._team._team.member.dto.resdto.LoginResDto;
 import com._team._team.member.dto.resdto.MemberResDto;
+import com._team._team.member.dto.resdto.MemberSearchItemResDto;
 import com._team._team.member.service.MemberService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -104,6 +108,23 @@ public class MemberController {
             @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
         return new ResponseEntity<>(
                 ApiResponse.success(memberService.getMemberList(memberId, memberPositionId), "직원 목록 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 직원 검색 (QueryDSL 동적쿼리 + 페이징)
+    // 같은 회사 안에서만 검색됨, 회사ID는 서비스가 호출자 기준으로 강제 주입
+    // 쿼리 예: GET /member/search?keyword=홍길&memberStatus=ACTIVE&page=0&size=20&sort=name,asc
+    @CheckPermission(resource = Resource.MEMBER, action = Action.READ)
+    @GetMapping("/search")
+    public ResponseEntity<?> searchMembers(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
+            @ModelAttribute MemberSearchCondition condition,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<MemberSearchItemResDto> result = memberService.searchMembers(memberId, condition, pageable);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "직원 검색 성공"),
                 HttpStatus.OK
         );
     }
