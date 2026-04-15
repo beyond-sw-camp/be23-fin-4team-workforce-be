@@ -187,7 +187,7 @@ public class CalendarController {
             @RequestParam(required = false) EventType eventType) {
         return new ResponseEntity<>(
                 ApiResponse.success(
-                        calendarService.getMonthlyEvents(memberId, year, month, eventType),
+                        calendarService.getMonthlyEvents(memberId, companyId,year, month, eventType),
                         "월별 일정 조회 성공"),
                 HttpStatus.OK
         );
