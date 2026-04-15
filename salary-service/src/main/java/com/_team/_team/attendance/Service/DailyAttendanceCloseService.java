@@ -18,8 +18,7 @@ import java.util.List;
 
 /**
  * 일일 근태 2단계 마감 서비스
- * 새벽에 한번에 닫으면 밤늦게 퇴근 못찍은 사람이 영문도 모르고 결근 처리되니까 두 번에 나눠서 돌린다.
- * DRAFT(06:00)는 데이터 안 건드리고 알림만, FINAL(14:00)은 그때도 안 고쳐졌으면 자동 마감.
+ * DRAFT(06:00)는 데이터 안 건드리고 알림만, FINAL(14:00)은 그때도 안 고쳐졌으면 자동 마감
  */
 @Slf4j
 @Service
@@ -28,19 +27,21 @@ public class DailyAttendanceCloseService {
     private final DailyAttendanceRepository dailyAttendanceRepository;
     private final WorkScheduleRepository workScheduleRepository;
     private final ApprovalServiceClient approvalServiceClient;
+    private final AttendanceAnomalyDetector anomalyDetector;
 
     @Autowired
     public DailyAttendanceCloseService(
             DailyAttendanceRepository dailyAttendanceRepository,
             WorkScheduleRepository workScheduleRepository,
-            ApprovalServiceClient approvalServiceClient) {
+            ApprovalServiceClient approvalServiceClient,
+            AttendanceAnomalyDetector anomalyDetector) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.workScheduleRepository = workScheduleRepository;
         this.approvalServiceClient = approvalServiceClient;
+        this.anomalyDetector = anomalyDetector;
     }
 
-    // DRAFT 단계 - readOnly로 미퇴근/휴가일출근 건수만 집계해서 로그로 남긴다.
-    // 본인이 직접 수정하거나 관리자가 처리할 시간을 버는 용도. 수치는 추후 알림 연동에도 활용 가능.
+    // DRAFT 단계 - readOnly로 미퇴근/휴가일출근 건수만 집계
     @Transactional(readOnly = true)
     public DraftResult processDraft(LocalDate targetDate) {
         List<DailyAttendance> unclosed =
@@ -54,11 +55,13 @@ public class DailyAttendanceCloseService {
         log.info("[DRAFT] targetDate={} 미퇴근={}건, 휴가일출근={}건",
                 targetDate, unclosed.size(), leaveButClockIn.size());
 
+        // 이상감지 - 지각/조퇴/결근의심까지 같이 돌려서 본인한테 알림
+        anomalyDetector.detect(targetDate);
+
         return new DraftResult(unclosed.size(), leaveButClockIn.size());
     }
 
-    // FINAL 단계 - DRAFT 이후에도 안 고쳐진 건을 자동 마감한다.
-    // 한 건 터져도 전체 롤백되면 안되니까 건별로 closeOne 호출하고 예외는 먹어서 카운트만.
+    // FINAL 단계 - DRAFT 이후에도 안 고쳐진 건을 자동 마감
     public FinalResult processFinal(LocalDate targetDate) {
         List<DailyAttendance> unclosed =
                 dailyAttendanceRepository.findCloseCandidates(targetDate);
