@@ -45,7 +45,8 @@ public class JwtAuthFilter implements GlobalFilter {
             "/company/onboarding",
             "/member/reset-password/send-code",
             "/member/reset-password/verify-code",
-            "/member/reset-password"
+            "/member/reset-password",
+            "/mc/**" // 사내 채팅 WS/STOMP — 인증은 STOMP CONNECT 프레임에서 처리
     );
 
     @Override
@@ -53,7 +54,7 @@ public class JwtAuthFilter implements GlobalFilter {
         String urlPath = exchange.getRequest().getURI().getPath();
         String method = exchange.getRequest().getMethod().name();
 
-        // 1. OPTIONS 요청(Preflight)은 무조건 통과 (CorsConfig가 처리하도록 수정)
+        // 1. OPTIONS 요청(Preflight)은 무조건 통과 (Gateway globalcors에서 처리)
         if ("OPTIONS".equalsIgnoreCase(method)) {
             return chain.filter(exchange);
         }
