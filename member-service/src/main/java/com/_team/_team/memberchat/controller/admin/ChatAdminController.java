@@ -13,11 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * HR 관리자 전용 관리 API.
- * Gateway 가 JWT 의 isSystemAdmin 클레임을 X-User-IsSystemAdmin 헤더로 주입한다.
- * (JWT 에 세부 role 클레임이 없으므로 isSystemAdmin=true 를 관리자로 간주한다.)
- */
+// 관리자 채팅 검색·내보내기·보존
 @RestController
 @RequestMapping("/member-chat/admin")
 @RequiredArgsConstructor
@@ -30,6 +26,7 @@ public class ChatAdminController {
         return "true".equalsIgnoreCase(header);
     }
 
+    // 메시지 검색
     @GetMapping("/search")
     public ResponseEntity<?> search(@RequestHeader("X-User-UUID") UUID actor,
                                     @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin,
@@ -49,6 +46,7 @@ public class ChatAdminController {
                 "ok"));
     }
 
+    // 채팅 기록 파일로 받기
     @PostMapping("/export")
     public ResponseEntity<byte[]> export(@RequestHeader("X-User-UUID") UUID actor,
                                          @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin,
@@ -65,6 +63,7 @@ public class ChatAdminController {
                 .body(csv);
     }
 
+    // 법적 보존 적용
     @PostMapping("/legal-hold")
     public ResponseEntity<?> applyHold(@RequestHeader("X-User-UUID") UUID actor,
                                        @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin,
@@ -79,6 +78,7 @@ public class ChatAdminController {
                 legalHoldService.apply(actor, roomId, memberId, reason, caseId), "applied"));
     }
 
+    // 법적 보존 해제
     @DeleteMapping("/legal-hold/{holdId}")
     public ResponseEntity<?> releaseHold(@RequestHeader("X-User-UUID") UUID actor,
                                          @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin,

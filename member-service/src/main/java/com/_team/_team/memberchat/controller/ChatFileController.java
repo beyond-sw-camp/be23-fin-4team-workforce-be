@@ -11,6 +11,7 @@ import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
 
+// 채팅 첨부 업로드·다운로드
 @RestController
 @RequestMapping("/member-chat/files")
 @RequiredArgsConstructor
@@ -18,6 +19,7 @@ public class ChatFileController {
 
     private final FileService fileService;
 
+    // 업로드 주소 발급
     @PostMapping("/presigned")
     public ResponseEntity<?> presigned(@RequestHeader("X-User-UUID") UUID uploader,
                                        @RequestBody Map<String, Object> body) {
@@ -28,6 +30,7 @@ public class ChatFileController {
                 fileService.presignUpload(uploader, name, mime, size), "ok"));
     }
 
+    // 업로드 완료 확인
     @PostMapping("/confirm")
     public ResponseEntity<?> confirm(@RequestHeader("X-User-UUID") UUID uploader,
                                      @RequestBody Map<String, Object> body) {
@@ -37,7 +40,7 @@ public class ChatFileController {
                 fileService.confirmUpload(uploader, key, messageId), "confirmed"));
     }
 
-    /** 프록시 다운로드. 실제 구현에서는 FileMetadataRepository 로 방 참여 확인 후 presign. */
+    // 다운로드로 이동
     @GetMapping("/{key}")
     public ResponseEntity<?> download(@PathVariable String key,
                                       @RequestParam(defaultValue = "CLEAN") String scanStatus) {

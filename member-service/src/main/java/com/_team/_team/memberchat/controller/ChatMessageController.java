@@ -15,11 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * REST 폴백 / 히스토리 / 동기화 엔드포인트.
- * JWT 는 Gateway JwtAuthFilter 가 검증하고 X-User-UUID 헤더로 주입한다고 가정.
- * (member-service 내에서 독립 실행 시엔 별도 필터로 parse 필요)
- */
+// 채팅 메시지 조회·전송·동기화·읽음
 @RestController
 @RequestMapping("/member-chat")
 @RequiredArgsConstructor
@@ -28,6 +24,7 @@ public class ChatMessageController {
     private final ChatMessageService chatMessageService;
     private final ReadReceiptService readReceiptService;
 
+    // 채팅방 메시지 목록
     @GetMapping("/rooms/{roomId}/messages")
     public ResponseEntity<?> history(@RequestHeader("X-User-UUID") UUID memberId,
                                      @PathVariable Long roomId,
@@ -37,9 +34,7 @@ public class ChatMessageController {
         return ResponseEntity.ok(ApiResponse.success(messages, "ok"));
     }
 
-    /**
-     * 웹 클라이언트용 텍스트 전송 폴백. STOMP 와 동일하게 {@link ChatMessageService#saveAndPublish} 를 호출한다.
-     */
+    // 메시지 전송(웹 폴백)
     @PostMapping("/rooms/{roomId}/messages")
     public ResponseEntity<?> send(@RequestHeader("X-User-UUID") UUID memberId,
                                   @PathVariable Long roomId,
@@ -48,6 +43,7 @@ public class ChatMessageController {
         return ResponseEntity.ok(ApiResponse.success(event, "sent"));
     }
 
+    // 미수신 메시지 동기화
     @GetMapping("/sync")
     public ResponseEntity<?> sync(@RequestHeader("X-User-UUID") UUID memberId,
                                   @RequestParam Long roomId,
@@ -57,6 +53,7 @@ public class ChatMessageController {
         return ResponseEntity.ok(ApiResponse.success(messages, "ok"));
     }
 
+    // 메시지 수정
     @PatchMapping("/messages/{messageId}")
     public ResponseEntity<?> edit(@RequestHeader("X-User-UUID") UUID memberId,
                                   @PathVariable Long messageId,
@@ -65,6 +62,7 @@ public class ChatMessageController {
         return ResponseEntity.ok(ApiResponse.success(updated, "updated"));
     }
 
+    // 메시지 삭제
     @DeleteMapping("/messages/{messageId}")
     public ResponseEntity<?> delete(@RequestHeader("X-User-UUID") UUID memberId,
                                     @RequestHeader(value = "X-User-Role", required = false) String role,
@@ -74,6 +72,7 @@ public class ChatMessageController {
         return ResponseEntity.ok(ApiResponse.success(event, "deleted"));
     }
 
+    // 읽음 처리
     @PostMapping("/rooms/{roomId}/read")
     public ResponseEntity<?> read(@RequestHeader("X-User-UUID") UUID memberId,
                                   @PathVariable Long roomId,

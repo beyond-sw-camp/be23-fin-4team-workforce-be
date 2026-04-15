@@ -18,9 +18,7 @@ import org.springframework.stereotype.Controller;
 import java.security.Principal;
 import java.util.Map;
 
-/**
- * 주의: payload 의 sender 정보는 무시한다. 발신자는 Principal 에서 확정된다.
- */
+// 실시간 메시지·읽음
 @Slf4j
 @Controller
 @RequiredArgsConstructor
@@ -29,10 +27,7 @@ public class ChatStompController {
     private final ChatMessageService chatMessageService;
     private final ReadReceiptService readReceiptService;
 
-    /**
-     * STOMP 에서 주입되는 Principal 은 보통 {@link Authentication} 구현체이며,
-     * {@link AuthPrincipal} 로 직접 캐스팅하면 ClassCastException 이 난다.
-     */
+    // STOMP 연결의 Principal에서 사용자 정보 추출
     private static AuthPrincipal requireAuthPrincipal(Principal principal) {
         if (principal instanceof AuthPrincipal ap) {
             return ap;
@@ -43,6 +38,7 @@ public class ChatStompController {
         throw new ChatException(ChatErrorCode.INVALID_JWT, "STOMP 인증 Principal 을 해석할 수 없습니다.");
     }
 
+    // 메시지 전송
     @MessageMapping("/room/{roomId}/send")
     public void send(@DestinationVariable Long roomId,
                      @Payload @Valid ChatSendRequest req,
@@ -51,6 +47,7 @@ public class ChatStompController {
         chatMessageService.saveAndPublish(p.userId(), roomId, req);
     }
 
+    // 메시지 수정
     @MessageMapping("/message/{messageId}/edit")
     public void edit(@DestinationVariable Long messageId,
                      @Payload Map<String, String> payload,
@@ -59,6 +56,7 @@ public class ChatStompController {
         chatMessageService.editMessage(p.userId(), messageId, payload.getOrDefault("content", ""));
     }
 
+    // 메시지 삭제
     @MessageMapping("/message/{messageId}/delete")
     public void delete(@DestinationVariable Long messageId,
                        Principal principal) {
@@ -66,6 +64,7 @@ public class ChatStompController {
         chatMessageService.deleteMessage(p.userId(), messageId, false);
     }
 
+    // 읽음 처리
     @MessageMapping("/room/{roomId}/read")
     public void read(@DestinationVariable Long roomId,
                      @Payload Map<String, Object> payload,
