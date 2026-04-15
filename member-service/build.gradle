@@ -30,6 +30,28 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+
+    // QueryDSL (사원 검색 동적쿼리용)
+    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.0.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+}
+
+// QueryDSL이 자동으로 만들어내는 코드(Q-클래스)를 IntelliJ 같은 IDE가 정상적으로 인식하게 하고, 빌드 충돌을 막기 위한 설정
+def querydslGenerated = "$buildDir/generated/sources/annotationProcessor/java/main"
+sourceSets {
+    main {
+        java {
+            srcDirs += [querydslGenerated]
+        }
+    }
+}
+// ./gradlew clean 할 때 Q클래스 디렉토리도 같이 지움
+tasks.named('clean') {
+    doLast {
+        file(querydslGenerated).deleteDir()
+    }
 }
 
 tasks.named('test') {
