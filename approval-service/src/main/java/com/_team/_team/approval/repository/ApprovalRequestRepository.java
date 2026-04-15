@@ -51,7 +51,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             "JOIN FETCH ar.approvalDocument doc " +
             "WHERE doc.companyId = :companyId " +
             "AND doc.isDeptVisibleYn = 'Y' " +
-            "AND ar.requesterOrganizationId IN :organizationIds " +
+            "AND ar.requesterOrganizationId = :organizationId " +
             "AND ar.requestStatus IN (" +
             "   com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
             "   com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
@@ -60,5 +60,5 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             "ORDER BY ar.createdAt DESC")
     List<ApprovalRequest> findDepartmentRequests(
             @Param("companyId") UUID companyId,
-            @Param("organizationIds") List<UUID> organizationIds);
+            @Param("organizationId") UUID organizationId);
 }
