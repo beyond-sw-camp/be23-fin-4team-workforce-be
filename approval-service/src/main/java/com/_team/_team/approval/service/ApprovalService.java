@@ -30,12 +30,14 @@ public class ApprovalService {
     private final ApprovalRepository approvalRepository;
     private final ApprovalViewerRepository approvalViewerRepository;
     private final AbsenceProxyRepository absenceProxyRepository;
+    private final ApprovalNotificationService approvalNotificationService;
 
     @Autowired
-    public ApprovalService(ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AbsenceProxyRepository absenceProxyRepository) {
+    public ApprovalService(ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AbsenceProxyRepository absenceProxyRepository, ApprovalNotificationService approvalNotificationService) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
+        this.approvalNotificationService = approvalNotificationService;
     }
 
 
@@ -130,6 +132,10 @@ public class ApprovalService {
             if (request.getRequestStatus() == RequestStatus.WAIT) {
                 request.updateStatus(RequestStatus.PENDING);
             }
+
+            //        다음 결재자에게 알림
+            approvalNotificationService.notifyNextApprover(request, nextApproval, actualMemberId);
+
         } else {
             request.updateStatus(RequestStatus.APPROVED);
         }
@@ -138,6 +144,12 @@ public class ApprovalService {
                 approvalRepository.findByRequestIdWithRequest(requestId);
         List<ApprovalViewer> viewers =
                 approvalViewerRepository.findByRequestId(requestId);
+
+        //        최종 승인 완료 시 요청자/참조자/공람자에게 알림
+        if (request.getRequestStatus() == RequestStatus.APPROVED) {
+            approvalNotificationService.notifyApproved(request, viewers, actualMemberId);
+        }
+
 
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
     }
@@ -200,6 +212,11 @@ public class ApprovalService {
         request.updateStatus(RequestStatus.REJECTED);
 
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
+
+        //        요청자/참조자에게 반려 알림
+        approvalNotificationService.notifyRejected(
+                request, viewers, actualMemberId, reqDto.getComment());
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
     }
 
