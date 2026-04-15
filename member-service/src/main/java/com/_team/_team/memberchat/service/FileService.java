@@ -91,7 +91,7 @@ public class FileService {
                         .contentType(mimeType)
                         .contentLength(sizeBytes)
                         .build(),
-                RequestBody.fromInputStream(inputStream, sizeBytes));
+                RequestBody.fromInputStream(inputStream , sizeBytes));
 
         confirmUpload(uploader, key, null);
         return new PresignedUploadResult("", key, mimeType, sizeBytes);
