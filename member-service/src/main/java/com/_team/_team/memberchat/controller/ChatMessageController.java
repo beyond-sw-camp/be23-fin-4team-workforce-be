@@ -5,12 +5,16 @@ import com._team._team.memberchat.dto.req.ChatSendRequest;
 import com._team._team.memberchat.dto.res.ChatMessageEvent;
 import com._team._team.memberchat.dto.res.ChatMessageResponse;
 import com._team._team.memberchat.service.ChatMessageService;
+import com._team._team.memberchat.service.FileService;
 import com._team._team.memberchat.service.ReadReceiptService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,6 +27,26 @@ public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
     private final ReadReceiptService readReceiptService;
+    private final FileService fileService;
+
+    // 첨부 멀티파트 업로드( /files/upload 와 동일 로직 — 경로 단순화·매칭 안정화 )
+    @PostMapping("/file-upload")
+    public ResponseEntity<?> uploadAttachment(@RequestHeader("X-User-UUID") UUID uploader,
+                                              @RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("빈 파일입니다."));
+        }
+        String name = file.getOriginalFilename();
+        if (name == null || name.isBlank()) {
+            name = "upload.bin";
+        }
+        try (InputStream in = file.getInputStream()) {
+            return ResponseEntity.ok(ApiResponse.success(
+                    fileService.uploadViaServer(uploader, name, file.getContentType(), in, file.getSize()), "ok"));
+        } catch (IOException e) {
+            throw new IllegalStateException("파일 읽기 실패", e);
+        }
+    }
 
     // 채팅방 메시지 목록
     @GetMapping("/rooms/{roomId}/messages")

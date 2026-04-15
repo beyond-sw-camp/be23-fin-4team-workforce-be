@@ -15,9 +15,11 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
+import java.io.InputStream;
 import java.net.URL;
 import java.time.Duration;
 import java.util.Map;
@@ -26,9 +28,9 @@ import java.util.UUID;
 /**
  * 파일 업로드 흐름:
  * 1) POST /files/presigned   : 서버가 MIME/확장자/용량 정책을 URL 서명에 고정하여 presigned PUT URL 반환
- * 2) 클라이언트가 S3 로 직접 PUT
+ * 2) 클라이언트가 S3 로 직접 PUT (브라우저 CORS 이슈 가능) 또는 POST /files/upload 로 서버 경유
  * 3) POST /files/confirm     : 서버가 S3 HEAD 로 실제 크기/Content-Type 검증 + metadata 저장 + AV 이벤트 발행
- * 4) GET  /files/{key}       : 프록시 다운로드 — 참여자 권한 검사 + AV 통과 여부 확인 후 1h presigned GET URL 로 302
+ * 4) GET  /files/download    : presigned GET URL 로 302
  */
 @Slf4j
 @Service
@@ -41,10 +43,14 @@ public class FileService {
     private final ApplicationEventPublisher events;
 
     public PresignedUploadResult presignUpload(UUID uploader, String originalFileName, String mimeType, long sizeBytes) {
+        if (mimeType == null || mimeType.isBlank()
+                || "application/octet-stream".equalsIgnoreCase(mimeType)
+                || "null".equalsIgnoreCase(mimeType)) {
+            mimeType = inferMimeFromFileName(originalFileName);
+        }
         validatePolicy(originalFileName, mimeType, sizeBytes);
 
-        String key = "mc/" + uploader + "/" + System.currentTimeMillis() + "_"
-                + UUID.randomUUID().toString().replace("-", "") + extensionOf(originalFileName);
+        String key = buildObjectKey(uploader, originalFileName);
 
         // 서명에 Content-Type/Length 를 포함해 클라이언트가 약속된 조건으로만 업로드 가능하도록 강제
         PutObjectRequest put = PutObjectRequest.builder()
@@ -60,6 +66,40 @@ public class FileService {
                 .url();
 
         return new PresignedUploadResult(url.toString(), key, mimeType, sizeBytes);
+    }
+
+    /**
+     * 브라우저→S3 직접 PUT 대신 API 게이트웨이·동일 출처로만 통신 (CORS 회피).
+     */
+    public PresignedUploadResult uploadViaServer(UUID uploader, String originalFileName, String mimeType,
+                                                 InputStream inputStream, long sizeBytes) {
+        if (originalFileName == null || originalFileName.isBlank()) {
+            originalFileName = "upload.bin";
+        }
+        if (mimeType == null || mimeType.isBlank()
+                || "application/octet-stream".equalsIgnoreCase(mimeType)
+                || "null".equalsIgnoreCase(mimeType)) {
+            mimeType = inferMimeFromFileName(originalFileName);
+        }
+        validatePolicy(originalFileName, mimeType, sizeBytes);
+
+        String key = buildObjectKey(uploader, originalFileName);
+        s3Client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(props.getFiles().getBucket())
+                        .key(key)
+                        .contentType(mimeType)
+                        .contentLength(sizeBytes)
+                        .build(),
+                RequestBody.fromInputStream(inputStream, sizeBytes));
+
+        confirmUpload(uploader, key, null);
+        return new PresignedUploadResult("", key, mimeType, sizeBytes);
+    }
+
+    private String buildObjectKey(UUID uploader, String originalFileName) {
+        return "mc/" + uploader + "/" + System.currentTimeMillis() + "_"
+                + UUID.randomUUID().toString().replace("-", "") + extensionOf(originalFileName);
     }
 
     /** 업로드 확인: HEAD 로 실제 저장된 파일의 크기/타입을 다시 검증. */
@@ -93,6 +133,19 @@ public class FileService {
                 .build()).url();
         events.publishEvent(Map.of("event", AuditAction.FILE_DOWNLOADED.name(), "key", key));
         return url.toString();
+    }
+
+    private String inferMimeFromFileName(String name) {
+        String ext = extensionOf(name).toLowerCase();
+        return switch (ext) {
+            case ".png" -> "image/png";
+            case ".jpg", ".jpeg" -> "image/jpeg";
+            case ".gif" -> "image/gif";
+            case ".webp" -> "image/webp";
+            case ".pdf" -> "application/pdf";
+            default -> throw new ChatException(ChatErrorCode.VALIDATION_ERROR,
+                    "파일 확장자로 MIME 을 판별할 수 없습니다: " + ext);
+        };
     }
 
     private void validatePolicy(String name, String mime, Long size) {
