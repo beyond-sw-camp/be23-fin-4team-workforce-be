@@ -1,5 +1,6 @@
 package com._team._team.member.service;
 
+import com._team._team.calendar.repository.CalendarEventRepository;
 import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.service.MailService;
@@ -79,9 +80,10 @@ public class MemberService {
     private final ApplicationEventPublisher eventPublisher;
     private final SearchOutboxEventRepository searchOutboxEventRepository;
     private final ObjectMapper objectMapper;
+    private final CalendarEventRepository calendarEventRepository;
 
     @Autowired
-    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper) {
+    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper, CalendarEventRepository calendarEventRepository) {
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.roleRepository = roleRepository;
@@ -101,6 +103,7 @@ public class MemberService {
         this.eventPublisher = eventPublisher;
         this.searchOutboxEventRepository = searchOutboxEventRepository;
         this.objectMapper = objectMapper;
+        this.calendarEventRepository = calendarEventRepository;
     }
 
     // 온보딩 시 기본 역할 4개 + 권한 생성
@@ -1663,6 +1666,35 @@ public class MemberService {
                 .stream()
                 .map(MemberResDto::fromEntity)
                 .toList();
+    }
+
+
+    @Transactional(readOnly = true)
+    public DashboardProfileResDto getDashboardProfile(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
+
+        MemberPosition position = memberPositionRepository
+                .findById(member.getDefaultPositionId())
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "직위 정보가 없습니다."));
+
+        // 오늘 일정 count
+        LocalDateTime startAt = LocalDate.now().atStartOfDay();
+        LocalDateTime endAt = LocalDate.now().atTime(23, 59, 59);
+        int todayEventCount = calendarEventRepository
+                .countTodayEvents(memberId, startAt, endAt);
+
+        return DashboardProfileResDto.builder()
+                .memberId(member.getMemberId())
+                .name(member.getName())
+                .profileUrl(member.getProfileUrl())
+                .organizationName(position.getOrganization().getName())
+                .jobGradeName(position.getJobGrade().getName())
+                .jobTitleName(position.getJobTitle().getName())
+                .todayEventCount(todayEventCount)
+                .build();
     }
 }
 
