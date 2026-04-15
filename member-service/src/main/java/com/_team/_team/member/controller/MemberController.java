@@ -375,4 +375,16 @@ public class MemberController {
                 HttpStatus.OK
         );
     }
+
+    // 대시보드용 내 프로필
+    @GetMapping("/dashboard-profile")
+    public ResponseEntity<?> getDashboardProfile(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        memberService.getDashboardProfile(memberId),
+                        "대시보드 프로필 조회 성공"),
+                HttpStatus.OK
+        );
+    }
 }
