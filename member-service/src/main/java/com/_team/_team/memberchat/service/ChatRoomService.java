@@ -7,16 +7,23 @@ import com._team._team.memberchat.domain.enums.ChatRoomRole;
 import com._team._team.memberchat.domain.enums.ChatRoomType;
 import com._team._team.memberchat.dto.req.CreateDirectRoomRequest;
 import com._team._team.memberchat.dto.req.CreateGroupRoomRequest;
+import com._team._team.memberchat.dto.res.ChatParticipantResponse;
 import com._team._team.memberchat.dto.res.ChatRoomResponse;
+import com._team._team.memberchat.dto.res.ChatSenderView;
 import com._team._team.memberchat.error.ChatErrorCode;
 import com._team._team.memberchat.error.ChatException;
+import com._team._team.memberchat.repository.ChatMessageRepository;
 import com._team._team.memberchat.repository.ChatParticipantRepository;
 import com._team._team.memberchat.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -25,7 +32,10 @@ public class ChatRoomService {
 
     private final ChatRoomRepository roomRepo;
     private final ChatParticipantRepository participantRepo;
+    private final ChatMessageRepository messageRepo;
     private final AuditLogService audit;
+    private final ChatAuthPolicy authPolicy;
+    private final ChatMessageSenderEnricher senderEnricher;
 
     @Transactional
     public ChatRoomResponse getOrCreateDirectRoom(UUID me, UUID companyId, CreateDirectRoomRequest req) {
@@ -37,7 +47,7 @@ public class ChatRoomService {
                     // HIDDEN 참여자 → 필요 시 복구 (채팅 재개)
                     participantRepo.findByChatRoomIdAndMemberId(existing.getId(), me)
                             .ifPresent(p -> { if (p.getStatus() == ChatParticipantStatus.HIDDEN) p.restoreFromHidden(null); });
-                    return toResponse(existing);
+                    return toResponse(existing, me);
                 })
                 .orElseGet(() -> {
                     ChatRoom room = roomRepo.save(ChatRoom.builder()
@@ -49,7 +59,7 @@ public class ChatRoomService {
                     persistParticipant(room, me, ChatRoomRole.OWNER);
                     persistParticipant(room, req.otherMemberId(), ChatRoomRole.MEMBER);
                     audit.record(me, AuditAction.ROOM_CREATED, "ROOM", room.getId());
-                    return toResponse(room);
+                    return toResponse(room, me);
                 });
     }
 
@@ -69,17 +79,145 @@ public class ChatRoomService {
                 .forEach(id -> persistParticipant(room, id, ChatRoomRole.MEMBER));
 
         audit.record(me, AuditAction.ROOM_CREATED, "ROOM", room.getId());
-        return toResponse(room);
+        return toResponse(room, me);
     }
 
     @Transactional(readOnly = true)
     public List<ChatRoomResponse> myRooms(UUID me) {
-        return roomRepo.findMyRooms(me).stream().map(this::toResponse).toList();
+        List<ChatRoom> rooms = roomRepo.findMyRooms(me);
+
+        // DIRECT 방의 "상대 멤버" 들을 한 번에 모아 회사별로 batch enrichment.
+        // (room → otherMemberId) 매핑을 만든 뒤, 동일 companyId 로 묶어 loadSenders 1회 호출.
+        Map<Long, UUID> directOtherByRoomId = new java.util.HashMap<>();
+        Map<UUID, Set<UUID>> idsByCompany = new java.util.HashMap<>();
+        for (ChatRoom room : rooms) {
+            if (room.getType() != ChatRoomType.DIRECT) continue;
+            UUID other = participantRepo.findByChatRoomId(room.getId()).stream()
+                    .filter(p -> p.getStatus() == ChatParticipantStatus.JOINED || p.getStatus() == ChatParticipantStatus.HIDDEN)
+                    .map(ChatParticipant::getMemberId)
+                    .filter(id -> !id.equals(me))
+                    .findFirst()
+                    .orElse(null);
+            if (other == null) continue;
+            directOtherByRoomId.put(room.getId(), other);
+            idsByCompany.computeIfAbsent(room.getCompanyId(), k -> new HashSet<>()).add(other);
+        }
+        Map<UUID, ChatSenderView> viewsByMemberId = new java.util.HashMap<>();
+        for (Map.Entry<UUID, Set<UUID>> e : idsByCompany.entrySet()) {
+            viewsByMemberId.putAll(senderEnricher.loadSenders(e.getKey(), e.getValue()));
+        }
+
+        return rooms.stream()
+                .map(r -> toResponse(r, me, directOtherByRoomId.get(r.getId()), viewsByMemberId))
+                .toList();
     }
 
-    private ChatRoomResponse toResponse(ChatRoom room) {
-        long n = participantRepo.countByChatRoom_IdAndStatus(room.getId(), ChatParticipantStatus.JOINED);
-        return ChatRoomResponse.from(room, n);
+    /**
+     * 방 참여자 목록 조회 — 이름·프로필·직급·부서·역할 포함.
+     * 방 참여자(JOINED)만 조회 가능. 현재 방에 남아있는(JOINED) 참여자만 응답에 포함한다.
+     * 정렬: OWNER → MODERATOR → MEMBER, 그다음 이름(가나다) 순.
+     */
+    @Transactional(readOnly = true)
+    public List<ChatParticipantResponse> listParticipants(UUID me, long roomId) {
+        // 인가: 방 활성 참여자만 접근
+        authPolicy.requireActiveParticipant(me, roomId);
+
+        ChatRoom room = roomRepo.findById(roomId)
+                .orElseThrow(() -> new ChatException(ChatErrorCode.ROOM_NOT_FOUND));
+        if (room.isDeleted()) throw new ChatException(ChatErrorCode.ROOM_DELETED);
+
+        List<ChatParticipant> all = participantRepo.findByChatRoomId(roomId);
+        List<ChatParticipant> joined = all.stream()
+                .filter(p -> p.getStatus() == ChatParticipantStatus.JOINED)
+                .toList();
+
+        Set<UUID> memberIds = joined.stream()
+                .map(ChatParticipant::getMemberId)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        Map<UUID, ChatSenderView> views = senderEnricher.loadSenders(room.getCompanyId(), memberIds);
+
+        return joined.stream()
+                .map(p -> ChatParticipantResponse.from(p, views.get(p.getMemberId())))
+                .sorted(
+                        Comparator
+                                .comparingInt((ChatParticipantResponse r) -> roleOrder(r.role()))
+                                .thenComparing(r -> r.name() == null ? "" : r.name())
+                )
+                .toList();
+    }
+
+    private static int roleOrder(ChatRoomRole role) {
+        if (role == ChatRoomRole.OWNER) return 0;
+        if (role == ChatRoomRole.MODERATOR) return 1;
+        return 2;
+    }
+
+    /**
+     * 방 응답 DTO 생성 - 읽음/미리보기 메타데이터 포함.
+     *  - unreadCount: 내가 안 읽은(내가 보낸 건 제외) 메시지 수
+     *  - last message preview/sender/at: 방 목록 UI 의 미리보기
+     *  - myLastReadMessageId: 내 읽음선 (방 진입 시 참조)
+     *  - otherPartyLastReadMessageId: 1:1 방에서 상대 읽음선 (그룹은 null)
+     */
+    private ChatRoomResponse toResponse(ChatRoom room, UUID me) {
+        return toResponse(room, me, null, Map.of());
+    }
+
+    private ChatRoomResponse toResponse(ChatRoom room, UUID me, UUID directOtherMemberId, Map<UUID, ChatSenderView> viewsByMemberId) {
+        long participantCount = participantRepo.countByChatRoom_IdAndStatus(room.getId(), ChatParticipantStatus.JOINED);
+
+        Long myLastRead = participantRepo.findByChatRoomIdAndMemberId(room.getId(), me)
+                .map(ChatParticipant::getLastReadMessageId)
+                .orElse(null);
+
+        long unread = messageRepo.countUnread(room.getId(), me, myLastRead);
+
+        ChatMessage last = messageRepo.findTopByChatRoom_IdOrderByIdDesc(room.getId()).orElse(null);
+        Long lastMessageId = last == null ? null : last.getId();
+        String lastPreview = last == null ? null : (last.isDeleted() ? "삭제된 메시지입니다." : last.getContent());
+        UUID lastSenderId = last == null ? null : last.getSenderId();
+        var lastAt = last == null ? null : last.getCreatedAt();
+
+        Long otherPartyLastRead = null;
+        UUID otherMemberId = null;
+        ChatSenderView otherMemberView = null;
+        if (room.getType() == ChatRoomType.DIRECT) {
+            List<Long> others = participantRepo.findOtherPartyLastRead(room.getId(), me);
+            // 1:1 상대가 아직 lastRead 가 null 이거나 참여 취소된 경우도 고려
+            otherPartyLastRead = others.isEmpty() ? null : others.get(0);
+
+            // 상대 프로필 — myRooms 에서 batch enrichment 로 전달. 단건 호출 시엔 여기서 loadSenders 를 호출.
+            if (directOtherMemberId != null) {
+                otherMemberId = directOtherMemberId;
+                otherMemberView = viewsByMemberId.get(directOtherMemberId);
+            } else {
+                UUID other = participantRepo.findByChatRoomId(room.getId()).stream()
+                        .filter(p -> p.getStatus() == ChatParticipantStatus.JOINED || p.getStatus() == ChatParticipantStatus.HIDDEN)
+                        .map(ChatParticipant::getMemberId)
+                        .filter(id -> !id.equals(me))
+                        .findFirst()
+                        .orElse(null);
+                if (other != null) {
+                    otherMemberId = other;
+                    Map<UUID, ChatSenderView> m = senderEnricher.loadSenders(room.getCompanyId(), Set.of(other));
+                    otherMemberView = m.get(other);
+                }
+            }
+        }
+
+        return ChatRoomResponse.from(
+                room,
+                participantCount,
+                unread,
+                lastMessageId,
+                lastPreview,
+                lastSenderId,
+                lastAt,
+                myLastRead,
+                otherPartyLastRead,
+                otherMemberId,
+                otherMemberView
+        );
     }
 
     @Transactional

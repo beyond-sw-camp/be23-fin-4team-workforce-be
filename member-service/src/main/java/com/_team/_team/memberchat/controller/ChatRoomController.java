@@ -3,6 +3,7 @@ package com._team._team.memberchat.controller;
 import com._team._team.dto.ApiResponse;
 import com._team._team.memberchat.dto.req.CreateDirectRoomRequest;
 import com._team._team.memberchat.dto.req.CreateGroupRoomRequest;
+import com._team._team.memberchat.dto.res.ChatParticipantResponse;
 import com._team._team.memberchat.dto.res.ChatRoomResponse;
 import com._team._team.memberchat.service.ChatRoomService;
 import jakarta.validation.Valid;
@@ -44,6 +45,14 @@ public class ChatRoomController {
     public ResponseEntity<?> myRooms(@RequestHeader("X-User-UUID") UUID me) {
         List<ChatRoomResponse> rooms = chatRoomService.myRooms(me);
         return ResponseEntity.ok(ApiResponse.success(rooms, "ok"));
+    }
+
+    // 방 참여자 목록 (이름·직급·소속·역할) — 방 참여자만 조회 가능
+    @GetMapping("/{roomId}/participants")
+    public ResponseEntity<?> listParticipants(@RequestHeader("X-User-UUID") UUID me,
+                                              @PathVariable Long roomId) {
+        List<ChatParticipantResponse> participants = chatRoomService.listParticipants(me, roomId);
+        return ResponseEntity.ok(ApiResponse.success(participants, "ok"));
     }
 
     // 멤버 초대

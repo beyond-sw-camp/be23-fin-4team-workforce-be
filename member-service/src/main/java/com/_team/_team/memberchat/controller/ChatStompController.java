@@ -64,7 +64,7 @@ public class ChatStompController {
         chatMessageService.deleteMessage(p.userId(), messageId, false);
     }
 
-    // 읽음 처리
+    // 읽음 처리 (특정 메시지까지)
     @MessageMapping("/room/{roomId}/read")
     public void read(@DestinationVariable Long roomId,
                      @Payload Map<String, Object> payload,
@@ -77,5 +77,15 @@ public class ChatStompController {
         long messageId = Long.parseLong(rawMsgId.toString());
         String deviceId = String.valueOf(payload.getOrDefault("deviceId", ""));
         readReceiptService.ack(p.userId(), roomId, messageId, deviceId);
+    }
+
+    // 방 진입 시: 해당 방의 최신 메시지까지 일괄 읽음 처리
+    @MessageMapping("/room/{roomId}/read-latest")
+    public void readLatest(@DestinationVariable Long roomId,
+                           @Payload(required = false) Map<String, Object> payload,
+                           Principal principal) {
+        AuthPrincipal p = requireAuthPrincipal(principal);
+        String deviceId = payload == null ? "" : String.valueOf(payload.getOrDefault("deviceId", ""));
+        readReceiptService.ackLatest(p.userId(), roomId, deviceId);
     }
 }
