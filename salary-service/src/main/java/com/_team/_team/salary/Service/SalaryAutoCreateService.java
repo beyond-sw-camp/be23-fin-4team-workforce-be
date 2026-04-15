@@ -1,6 +1,6 @@
 package com._team._team.salary.Service;
 
-import com._team._team.kafka.event.MemberHiredEvent;
+import com._team._team.event.MemberHiredEvent;
 import com._team._team.salary.Repository.SalaryPolicyRepository;
 import com._team._team.salary.Repository.SalaryRepository;
 import com._team._team.salary.config.SalaryAutoCreateProperties;

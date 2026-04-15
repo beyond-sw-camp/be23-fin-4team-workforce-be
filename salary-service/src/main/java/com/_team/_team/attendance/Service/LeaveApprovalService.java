@@ -3,7 +3,7 @@ package com._team._team.attendance.Service;
 import com._team._team.attendance.Repository.MemberBalanceRepository;
 import com._team._team.attendance.domain.MemberBalance;
 import com._team._team.attendance.domain.enums.BalanceType;
-import com._team._team.kafka.event.LeaveApprovalEvent;
+import com._team._team.event.LeaveApprovalEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

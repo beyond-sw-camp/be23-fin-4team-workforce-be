@@ -1,6 +1,6 @@
 package com._team._team.attendance.Service;
 
-import com._team._team.kafka.event.OvertimeApprovalEvent;
+import com._team._team.event.OvertimeApprovalEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

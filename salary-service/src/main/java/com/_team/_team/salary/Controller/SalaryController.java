@@ -1,7 +1,7 @@
 package com._team._team.salary.Controller;
 
 import com._team._team.dto.ApiResponse;
-import com._team._team.kafka.event.MemberHiredEvent;
+import com._team._team.event.MemberHiredEvent;
 import com._team._team.salary.Service.SalaryAutoCreateService;
 import com._team._team.salary.Service.SalaryService;
 import com._team._team.salary.dto.reqdto.SalaryCreateReqDto;

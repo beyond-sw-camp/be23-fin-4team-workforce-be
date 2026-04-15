@@ -1,4 +1,4 @@
-package com._team._team.kafka.event;
+package com._team._team.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * 초과근무(연장/야간/휴일) 결재 이벤트 — approval-service → salary-service
+ * 초과근무(연장/야간/휴일) 결재 이벤트
  * - 승인 시: APPROVE 이벤트 발행
  * - 반려/취소 시: REJECT / CANCEL 이벤트 발행
  * 토픽: "overtime-approval"

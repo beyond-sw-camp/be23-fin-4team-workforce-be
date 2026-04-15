@@ -1,6 +1,6 @@
 package com._team._team.member.publisher;
 
-import com._team._team.kafka.event.MemberHiredEvent;
+import com._team._team.event.MemberHiredEvent;
 import com._team._team.member.event.MemberHiredInternalEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

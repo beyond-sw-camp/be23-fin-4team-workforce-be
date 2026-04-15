@@ -1,4 +1,4 @@
-package com._team._team.kafka.event;
+package com._team._team.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

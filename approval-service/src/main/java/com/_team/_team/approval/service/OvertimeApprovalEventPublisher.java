@@ -1,6 +1,6 @@
 package com._team._team.approval.service;
 
-import com._team._team.kafka.event.OvertimeApprovalEvent;
+import com._team._team.event.OvertimeApprovalEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;

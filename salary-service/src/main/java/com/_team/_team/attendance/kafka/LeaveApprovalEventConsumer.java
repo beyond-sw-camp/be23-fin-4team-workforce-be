@@ -1,7 +1,7 @@
 package com._team._team.attendance.kafka;
 
 import com._team._team.attendance.Service.LeaveApprovalService;
-import com._team._team.kafka.event.LeaveApprovalEvent;
+import com._team._team.event.LeaveApprovalEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -30,7 +30,7 @@ public class LeaveApprovalEventConsumer {
             groupId = "salary-service",
             properties = {
                     JsonDeserializer.VALUE_DEFAULT_TYPE +
-                            "=com._team._team.kafka.event.LeaveApprovalEvent"
+                            "=com._team._team.event.LeaveApprovalEvent"
             }
     )
     public void consume(LeaveApprovalEvent event) {

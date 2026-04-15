@@ -1,7 +1,7 @@
 package com._team._team.attendance.kafka;
 
 import com._team._team.attendance.Service.OvertimeApprovalService;
-import com._team._team.kafka.event.OvertimeApprovalEvent;
+import com._team._team.event.OvertimeApprovalEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -24,7 +24,7 @@ public class OvertimeApprovalEventConsumer {
             groupId = "salary-service",
             properties = {
                     JsonDeserializer.VALUE_DEFAULT_TYPE +
-                            "=com._team._team.kafka.event.OvertimeApprovalEvent"
+                            "=com._team._team.event.OvertimeApprovalEvent"
             }
     )
     public void consume(OvertimeApprovalEvent event) {

@@ -1,6 +1,6 @@
 package com._team._team.salary.kafka;
 
-import com._team._team.kafka.event.MemberHiredEvent;
+import com._team._team.event.MemberHiredEvent;
 import com._team._team.salary.Service.SalaryAutoCreateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ public class MemberHiredEventConsumer {
             groupId = "salary-service",
             properties = {
                     JsonDeserializer.VALUE_DEFAULT_TYPE +
-                            "=com._team._team.kafka.event.MemberHiredEvent"
+                            "=com._team._team.event.MemberHiredEvent"
             }
     )
     public void consume(MemberHiredEvent event) {

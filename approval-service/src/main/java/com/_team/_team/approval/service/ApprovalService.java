@@ -13,8 +13,8 @@ import com._team._team.approval.repository.ApprovalRepository;
 import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
 import com._team._team.dto.BusinessException;
-import com._team._team.kafka.event.LeaveApprovalEvent;
-import com._team._team.kafka.event.OvertimeApprovalEvent;
+import com._team._team.event.LeaveApprovalEvent;
+import com._team._team.event.OvertimeApprovalEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
