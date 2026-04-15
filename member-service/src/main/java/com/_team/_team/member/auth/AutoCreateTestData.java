@@ -18,7 +18,6 @@ import com._team._team.organization.repository.OrganizationRepository;
 import com._team._team.organization.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,7 +32,6 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.seed.auto-create-test-data", havingValue = "true", matchIfMissing = false)
 public class AutoCreateTestData implements ApplicationRunner {
 
     private final MemberRepository memberRepository;
