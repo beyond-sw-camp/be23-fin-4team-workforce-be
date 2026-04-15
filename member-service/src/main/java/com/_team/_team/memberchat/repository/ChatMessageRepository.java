@@ -65,4 +65,23 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
               and m.createdAt < :threshold
             """)
     int purgeOlderThan(@Param("threshold") LocalDateTime threshold);
+
+    /** 방의 최신(최대 id) 메시지. */
+    Optional<ChatMessage> findTopByChatRoom_IdOrderByIdDesc(Long roomId);
+
+    /**
+     * unreadCount = 내가 아직 안 읽은(자기 자신이 보낸 건 제외) 메시지 수.
+     *  - lastReadMessageId 가 null 이면 0L 로 취급해 전부 카운트
+     *  - 삭제된 메시지는 제외
+     */
+    @Query("""
+            select count(m) from ChatMessage m
+            where m.chatRoom.id = :roomId
+              and m.senderId <> :memberId
+              and m.deleted = false
+              and m.id > coalesce(:lastReadMessageId, 0)
+            """)
+    long countUnread(@Param("roomId") Long roomId,
+                     @Param("memberId") java.util.UUID memberId,
+                     @Param("lastReadMessageId") Long lastReadMessageId);
 }

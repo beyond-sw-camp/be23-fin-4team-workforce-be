@@ -2,6 +2,7 @@ package com._team._team.memberchat.service;
 
 import com._team._team.memberchat.domain.*;
 import com._team._team.memberchat.domain.enums.AuditAction;
+import com._team._team.memberchat.domain.enums.ChatParticipantStatus;
 import com._team._team.memberchat.dto.req.ChatSendRequest;
 import com._team._team.memberchat.dto.res.ChatMessageEvent;
 import com._team._team.memberchat.dto.res.ChatMessageResponse;
@@ -10,6 +11,7 @@ import com._team._team.memberchat.error.ChatErrorCode;
 import com._team._team.memberchat.error.ChatException;
 import com._team._team.memberchat.repository.ChatMessageRepository;
 import com._team._team.memberchat.repository.ChatMessageRevisionRepository;
+import com._team._team.memberchat.repository.ChatParticipantRepository;
 import com._team._team.memberchat.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -31,6 +33,7 @@ public class ChatMessageService {
     private final ChatRoomRepository roomRepo;
     private final ChatMessageRepository messageRepo;
     private final ChatMessageRevisionRepository revisionRepo;
+    private final ChatParticipantRepository participantRepo;
     private final ChatAuthPolicy authPolicy;
     private final AuditLogService audit;
     private final RedisChatPubSubService pubsub;
@@ -138,10 +141,34 @@ public class ChatMessageService {
         if (list.isEmpty()) {
             return List.of();
         }
+        // 1) 보낸이 표시정보 벌크 로드
         Set<UUID> senderIds = list.stream().map(ChatMessage::getSenderId).collect(Collectors.toCollection(HashSet::new));
         Map<UUID, ChatSenderView> views = senderEnricher.loadSenders(companyId, senderIds);
-        return list.stream()
-                .map(m -> ChatMessageResponse.from(m, roomId, views.get(m.getSenderId())))
+
+        // 2) 방 참여자 lastReadMessageId 벌크 로드 → 각 메시지의 readerCount 계산 (N+1 방지)
+        List<ChatParticipant> joined = participantRepo.findByChatRoomId(roomId).stream()
+                .filter(p -> p.getStatus() == ChatParticipantStatus.JOINED)
                 .toList();
+
+        return list.stream()
+                .map(m -> ChatMessageResponse.from(m, roomId,
+                        views.get(m.getSenderId()),
+                        computeReaderCount(joined, m)))
+                .toList();
+    }
+
+    /**
+     * "이 메시지를 읽은 다른 참여자 수".
+     *  - 보낸 사람 본인은 제외 (자기 메시지는 자동 읽음으로 간주하되 카운트에 포함하지 않는다)
+     *  - JOINED 참여자 중 lastReadMessageId ≥ m.id 인 사람 수
+     */
+    private long computeReaderCount(List<ChatParticipant> joined, ChatMessage m) {
+        long count = 0L;
+        for (ChatParticipant p : joined) {
+            if (p.getMemberId().equals(m.getSenderId())) continue;
+            Long lr = p.getLastReadMessageId();
+            if (lr != null && lr >= m.getId()) count++;
+        }
+        return count;
     }
 }

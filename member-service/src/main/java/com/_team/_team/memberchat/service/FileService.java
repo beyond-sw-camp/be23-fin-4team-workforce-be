@@ -65,7 +65,7 @@ public class FileService {
                         .putObjectRequest(put).build())
                 .url();
 
-        return new PresignedUploadResult(url.toString(), key, mimeType, sizeBytes);
+        return new PresignedUploadResult(url.toString(), key, mimeType, sizeBytes, originalFileName);
     }
 
     /**
@@ -94,7 +94,7 @@ public class FileService {
                 RequestBody.fromInputStream(inputStream , sizeBytes));
 
         confirmUpload(uploader, key, null);
-        return new PresignedUploadResult("", key, mimeType, sizeBytes);
+        return new PresignedUploadResult("", key, mimeType, sizeBytes, originalFileName);
     }
 
     private String buildObjectKey(UUID uploader, String originalFileName) {
@@ -167,6 +167,6 @@ public class FileService {
         return name.substring(name.lastIndexOf('.'));
     }
 
-    public record PresignedUploadResult(String url, String key, String mimeType, long sizeBytes) {}
+    public record PresignedUploadResult(String url, String key, String mimeType, long sizeBytes, String fileName) {}
     public record FileUploadedEvent(UUID uploader, String key, String mime, long size) {}
 }

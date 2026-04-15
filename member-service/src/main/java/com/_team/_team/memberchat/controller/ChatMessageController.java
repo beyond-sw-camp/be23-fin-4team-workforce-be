@@ -96,7 +96,7 @@ public class ChatMessageController {
         return ResponseEntity.ok(ApiResponse.success(event, "deleted"));
     }
 
-    // 읽음 처리
+    // 읽음 처리 (특정 메시지까지)
     @PostMapping("/rooms/{roomId}/read")
     public ResponseEntity<?> read(@RequestHeader("X-User-UUID") UUID memberId,
                                   @PathVariable Long roomId,
@@ -104,5 +104,16 @@ public class ChatMessageController {
                                   @RequestParam(required = false, defaultValue = "") String deviceId) {
         readReceiptService.ack(memberId, roomId, messageId, deviceId);
         return ResponseEntity.ok(ApiResponse.success(Map.of("ok", true), "ack"));
+    }
+
+    // 방 진입 시: 방의 최신 메시지까지 일괄 읽음 처리 (카톡식 자동 ack)
+    @PostMapping("/rooms/{roomId}/read-latest")
+    public ResponseEntity<?> readLatest(@RequestHeader("X-User-UUID") UUID memberId,
+                                        @PathVariable Long roomId,
+                                        @RequestParam(required = false, defaultValue = "") String deviceId) {
+        Long lastReadMessageId = readReceiptService.ackLatest(memberId, roomId, deviceId);
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("ok", true, "lastReadMessageId", lastReadMessageId == null ? 0L : lastReadMessageId),
+                "ack"));
     }
 }

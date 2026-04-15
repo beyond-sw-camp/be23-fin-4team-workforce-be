@@ -80,4 +80,16 @@ public class ChatFileController {
         String url = fileService.presignDownload(key, scanStatus);
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
     }
+
+    /**
+     * 브라우저에서 <img src> 로 직접 로드하려면 Authorization 헤더를 붙일 수 없으므로,
+     * JWT 로 인증된 XHR 로 먼저 presigned S3 URL 을 JSON 으로 받아 사용한다.
+     * S3 presigned URL 은 서명이 포함되어 있어 인증 없이도 접근 가능하다.
+     */
+    @GetMapping("/signed-url")
+    public ResponseEntity<?> signedUrl(@RequestParam("key") String key,
+                                       @RequestParam(defaultValue = "CLEAN") String scanStatus) {
+        String url = fileService.presignDownload(key, scanStatus);
+        return ResponseEntity.ok(ApiResponse.success(Map.of("url", url, "key", key), "ok"));
+    }
 }
