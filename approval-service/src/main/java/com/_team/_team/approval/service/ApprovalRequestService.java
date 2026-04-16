@@ -1,20 +1,16 @@
 package com._team._team.approval.service;
 
-import com._team._team.approval.domain.Approval;
-import com._team._team.approval.domain.ApprovalDocument;
-import com._team._team.approval.domain.ApprovalRequest;
-import com._team._team.approval.domain.ApprovalViewer;
+import com._team._team.approval.domain.*;
 import com._team._team.approval.domain.enums.LineStatus;
 import com._team._team.approval.domain.enums.RequestStatus;
+import com._team._team.approval.domain.enums.RequestType;
 import com._team._team.approval.domain.enums.ViewerReadStatus;
 import com._team._team.approval.dto.reqdto.ApprovalRequestCreateReqDto;
 import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
+import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
 import com._team._team.approval.feignclients.MemberServiceClient;
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
-import com._team._team.approval.repository.ApprovalDocumentRepository;
-import com._team._team.approval.repository.ApprovalRepository;
-import com._team._team.approval.repository.ApprovalRequestRepository;
-import com._team._team.approval.repository.ApprovalViewerRepository;
+import com._team._team.approval.repository.*;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,9 +32,11 @@ public class ApprovalRequestService {
     private final AttachmentService attachmentService;
     private final MemberServiceClient memberServiceClient;
     private final ApprovalNotificationService approvalNotificationService;
+    private final OfficialRecipientRepository officialRecipientRepository;
+
 
     @Autowired
-    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService) {
+    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService, OfficialRecipientRepository officialRecipientRepository) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.approvalRepository = approvalRepository;
@@ -46,6 +44,7 @@ public class ApprovalRequestService {
         this.attachmentService = attachmentService;
         this.memberServiceClient = memberServiceClient;
         this.approvalNotificationService = approvalNotificationService;
+        this.officialRecipientRepository = officialRecipientRepository;
     }
 
 //    결재요청 생성(결재라인 + 참조/공람자 포함)
@@ -68,6 +67,24 @@ public class ApprovalRequestService {
         if (reqDto.getRequestStatus() == RequestStatus.WAIT && "N".equals(document.getAutoApproveYn())) {
             if (reqDto.getApprovalLines() == null || reqDto.getApprovalLines().isEmpty()) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "결재 제출 시 결재자는 최소 1명 이상이어야 합니다.");
+            }
+        }
+
+        // === OFFICIAL 타입 검증: 수신 부서 최소 1개 ===
+        if (document.getRequestType() == RequestType.OFFICIAL) {
+            if (reqDto.getRecipients() == null || reqDto.getRecipients().isEmpty()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "공문은 수신 부서가 최소 1개 필요합니다.");
+            }
+
+            // 수신 부서 중복 검증
+            long distinctRecipients = reqDto.getRecipients().stream()
+                    .map(ApprovalRequestCreateReqDto.OfficialRecipientItem::getRecipientOrganizationId)
+                    .distinct()
+                    .count();
+            if (distinctRecipients != reqDto.getRecipients().size()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "동일한 수신 부서를 중복 지정할 수 없습니다.");
             }
         }
 
@@ -166,6 +183,19 @@ public class ApprovalRequestService {
             savedViewers = approvalViewerRepository.saveAll(viewers);
         }
 
+        // === OFFICIAL 이면 수신 부서 저장 ===
+        List<OfficialRecipient> savedRecipients = new ArrayList<>();
+        if (document.getRequestType() == RequestType.OFFICIAL) {
+            List<OfficialRecipient> recipients = reqDto.getRecipients().stream()
+                    .map(item -> OfficialRecipient.builder()
+                            .approvalRequest(savedRequest)
+                            .recipientOrganizationId(item.getRecipientOrganizationId())
+                            .recipientOrganizationName(item.getRecipientOrganizationName())
+                            .build())
+                    .toList();
+            savedRecipients = officialRecipientRepository.saveAll(recipients);
+        }
+
         // 알림 발행 - WAIT 제출 시에만
         if (savedRequest.getRequestStatus() == RequestStatus.WAIT) {
             if ("Y".equals(document.getAutoApproveYn())) {
@@ -182,13 +212,18 @@ public class ApprovalRequestService {
             }
         }
 
-        return ApprovalRequestResDto.fromEntity(savedRequest, savedApprovals, savedViewers);
+        // === [수정] fromEntity 호출 — recipients 인자 추가 ===
+        List<OfficialRecipientResDto> recipientDtos = savedRecipients.stream()
+                .map(OfficialRecipientResDto::fromEntity)
+                .toList();
+        return ApprovalRequestResDto.fromEntity(savedRequest, savedApprovals, savedViewers, recipientDtos);
+
 
     }
 
     // 결재요청 상세 조회 (결재라인 + 참조/공람자 포함)
     @Transactional(readOnly = true)
-    public ApprovalRequestResDto findById(UUID companyId, UUID requestId) {
+    public ApprovalRequestResDto findById(UUID companyId, UUID memberId, UUID memberPositionId, UUID requestId) {
         // 결재요청 조회 (양식 정보 fetch join)
         ApprovalRequest request = approvalRequestRepository.findByIdWithDocument(requestId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
@@ -202,8 +237,54 @@ public class ApprovalRequestService {
         List<Approval> approvals = approvalRepository.findByRequestIdWithRequest(requestId);
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 
-        return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
+        // === [추가] OFFICIAL 접근 권한 체크 + recipients 로드 ===
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL) {
+            List<OfficialRecipient> recipients = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId);
+
+            // 현재 로그인 유저의 조직 ID 조회 (기존 Feign 재활용)
+            MemberPositionResDto me = memberServiceClient.getMemberPosition(memberPositionId);
+            UUID myOrgId = (me != null) ? me.getOrganizationId() : null;
+
+            if (!canAccessOfficial(memberId, myOrgId, request, approvals, viewers, recipients)) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, "열람 권한이 없습니다.");
+            }
+
+            recipientDtos = recipients.stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+
+        return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
     }
+
+    private boolean canAccessOfficial(UUID memberId,
+                                      UUID myOrgId,
+                                      ApprovalRequest request,
+                                      List<Approval> approvals,
+                                      List<ApprovalViewer> viewers,
+                                      List<OfficialRecipient> recipients) {
+
+        // 1. 기안자
+        if (request.getMemberId().equals(memberId)) return true;
+
+        // 2. 결재자
+        boolean isApprover = approvals.stream()
+                .anyMatch(a -> a.getApproverMemberId().equals(memberId));
+        if (isApprover) return true;
+
+        // 3. 참조/공람자
+        boolean isViewer = viewers.stream()
+                .anyMatch(v -> v.getViewerMemberId().equals(memberId));
+        if (isViewer) return true;
+
+        // 4. 수신 부서 소속원
+        if (myOrgId == null) return false;
+        return recipients.stream()
+                .anyMatch(r -> r.getRecipientOrganizationId().equals(myOrgId));
+    }
+
 
     // 내가 올린 결재 목록
     @Transactional(readOnly = true)
@@ -217,7 +298,16 @@ public class ApprovalRequestService {
                             approvalRepository.findByRequestIdWithRequest(request.getRequestId());
                     List<ApprovalViewer> viewers =
                             approvalViewerRepository.findByRequestId(request.getRequestId());
-                    return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
+
+                    List<OfficialRecipientResDto> recipientDtos = null;
+                    if (request.getRequestType() == RequestType.OFFICIAL) {
+                        recipientDtos = officialRecipientRepository
+                                .findByApprovalRequest_RequestId(request.getRequestId())
+                                .stream()
+                                .map(OfficialRecipientResDto::fromEntity)
+                                .toList();
+                    }
+                    return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
                 })
                 .toList();
     }
@@ -236,7 +326,16 @@ public class ApprovalRequestService {
                             approvalRepository.findByRequestIdWithRequest(request.getRequestId());
                     List<ApprovalViewer> viewers =
                             approvalViewerRepository.findByRequestId(request.getRequestId());
-                    return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
+
+                    List<OfficialRecipientResDto> recipientDtos = null;
+                    if (request.getRequestType() == RequestType.OFFICIAL) {
+                        recipientDtos = officialRecipientRepository
+                                .findByApprovalRequest_RequestId(request.getRequestId())
+                                .stream()
+                                .map(OfficialRecipientResDto::fromEntity)
+                                .toList();
+                    }
+                    return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
                 })
                 .toList();
     }
@@ -303,6 +402,22 @@ public class ApprovalRequestService {
             }
         }
 
+        // === OFFICIAL 검증 ===
+        if (document.getRequestType() == RequestType.OFFICIAL) {
+            if (reqDto.getRecipients() == null || reqDto.getRecipients().isEmpty()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "공문은 수신 부서가 최소 1개 필요합니다.");
+            }
+            long distinctRecipients = reqDto.getRecipients().stream()
+                    .map(ApprovalRequestCreateReqDto.OfficialRecipientItem::getRecipientOrganizationId)
+                    .distinct()
+                    .count();
+            if (distinctRecipients != reqDto.getRecipients().size()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "동일한 수신 부서를 중복 지정할 수 없습니다.");
+            }
+        }
+
         // stepOrder 연속성 검증
         if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
             List<Integer> orders = reqDto.getApprovalLines().stream()
@@ -351,6 +466,21 @@ public class ApprovalRequestService {
         // 기존 첨부파일 전체 삭제 (S3 + DB)
         attachmentService.deleteAllByRequestId(requestId);
 
+        // === OFFICIAL 이면 수신 부서 전체 교체 ===
+        List<OfficialRecipient> savedRecipients = new ArrayList<>();
+        if (document.getRequestType() == RequestType.OFFICIAL) {
+            officialRecipientRepository.deleteByApprovalRequest_RequestId(requestId);
+
+            List<OfficialRecipient> newRecipients = reqDto.getRecipients().stream()
+                    .map(item -> OfficialRecipient.builder()
+                            .approvalRequest(request)
+                            .recipientOrganizationId(item.getRecipientOrganizationId())
+                            .recipientOrganizationName(item.getRecipientOrganizationName())
+                            .build())
+                    .toList();
+            savedRecipients = officialRecipientRepository.saveAll(newRecipients);
+        }
+
         List<ApprovalViewer> savedViewers = new ArrayList<>();
         if (reqDto.getViewers() != null && !reqDto.getViewers().isEmpty()) {
             List<ApprovalViewer> newViewers = reqDto.getViewers().stream()
@@ -366,7 +496,10 @@ public class ApprovalRequestService {
             savedViewers = approvalViewerRepository.saveAll(newViewers);
         }
 
-        return ApprovalRequestResDto.fromEntity(request, savedApprovals, savedViewers);
+        List<OfficialRecipientResDto> recipientDtos = savedRecipients.stream()
+                .map(OfficialRecipientResDto::fromEntity)
+                .toList();
+        return ApprovalRequestResDto.fromEntity(request, savedApprovals, savedViewers, recipientDtos);
 
     }
 
@@ -422,14 +555,21 @@ public class ApprovalRequestService {
             approvalNotificationService.notifyCanceled(request, firstApproval, viewers);
         }
 
-        return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
-
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL) {
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId)
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
     }
 
     // 부서 문서함 조회 (본인 부서 + 하위 조직의 결재 요청, 작성 시점 부서 기준)
     @Transactional(readOnly = true)
     public List<ApprovalRequestResDto> findDepartmentRequests(
-            UUID companyId, UUID memberPositionId, UUID organizationId) {
+            UUID companyId, UUID memberPositionId, UUID organizationId, RequestType requestType) {
 
         // 1. 요청자 본인 정보 조회
         MemberPositionResDto requester = memberServiceClient.getMemberPosition(memberPositionId);
@@ -443,19 +583,67 @@ public class ApprovalRequestService {
                     "본인이 속한 부서의 문서함만 조회할 수 있습니다.");
         }
 
-        // 3. 본인 부서 단일 ID로 조회
-        List<ApprovalRequest> requests = approvalRequestRepository
-                .findDepartmentRequests(companyId, organizationId);
+        List<ApprovalRequest> requests = (requestType == null)
+                ? approvalRequestRepository.findDepartmentRequests(companyId, organizationId)
+                : approvalRequestRepository.findDepartmentRequestsByType(companyId, organizationId, requestType);
 
         return requests.stream()
-                .map(request -> {
-                    List<Approval> approvals =
-                            approvalRepository.findByRequestIdWithRequest(request.getRequestId());
-                    List<ApprovalViewer> viewers =
-                            approvalViewerRepository.findByRequestId(request.getRequestId());
-                    return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
-                })
+                .map(this::toResDtoWithRecipients)
                 .toList();
 
+    }
+
+    // 공통 헬퍼 — recipients 자동 포함
+    private ApprovalRequestResDto toResDtoWithRecipients(ApprovalRequest request) {
+        List<Approval> approvals = approvalRepository.findByRequestIdWithRequest(request.getRequestId());
+        List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(request.getRequestId());
+
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL) {
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(request.getRequestId())
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestResDto> findReceivedOfficials(
+            UUID companyId, UUID memberPositionId) {
+
+        MemberPositionResDto me = memberServiceClient.getMemberPosition(memberPositionId);
+        if (me == null || me.getOrganizationId() == null) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
+        }
+
+        // 1. 우리 부서가 수신한 공문 requestId 목록
+        List<UUID> requestIds = officialRecipientRepository
+                .findRequestIdsByRecipientOrganizationId(me.getOrganizationId());
+
+        if (requestIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. APPROVED 상태인 공문만, 같은 회사 것만
+        List<ApprovalRequest> requests = approvalRequestRepository
+                .findApprovedOfficialsByIdsAndCompany(requestIds, companyId);
+
+        return requests.stream()
+                .map(this::toResDtoWithRecipients)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestResDto> findMyRequests(
+            UUID memberId, RequestStatus status, RequestType requestType) {
+
+        List<ApprovalRequest> requests = approvalRequestRepository
+                .findMyRequests(memberId, status, requestType);
+
+        return requests.stream()
+                .map(this::toResDtoWithRecipients)
+                .toList();
     }
 }

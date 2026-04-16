@@ -61,4 +61,46 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     List<ApprovalRequest> findDepartmentRequests(
             @Param("companyId") UUID companyId,
             @Param("organizationId") UUID organizationId);
+
+    @Query("SELECT COUNT(r) FROM ApprovalRequest r " +
+            "WHERE r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
+            "  AND r.requesterOrganizationId = :organizationId " +
+            "  AND r.requestStatus = com._team._team.approval.domain.enums.RequestStatus.APPROVED " +
+            "  AND FUNCTION('YEAR', r.createdAt) = :year " +
+            "  AND r.delYn = 'N'")
+    long countOfficialApprovedInYear(@Param("organizationId") UUID organizationId,
+                                     @Param("year") int year);
+
+    @Query("SELECT r FROM ApprovalRequest r " +
+            "WHERE r.approvalDocument.companyId = :companyId " +
+            "  AND r.requesterOrganizationId = :organizationId " +
+            "  AND r.requestType = :requestType " +
+            "  AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<ApprovalRequest> findDepartmentRequestsByType(
+            @Param("companyId") UUID companyId,
+            @Param("organizationId") UUID organizationId,
+            @Param("requestType") RequestType requestType);
+
+    @Query("SELECT r FROM ApprovalRequest r " +
+            "WHERE r.requestId IN :requestIds " +
+            "  AND r.approvalDocument.companyId = :companyId " +
+            "  AND r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
+            "  AND r.requestStatus = com._team._team.approval.domain.enums.RequestStatus.APPROVED " +
+            "  AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<ApprovalRequest> findApprovedOfficialsByIdsAndCompany(
+            @Param("requestIds") List<UUID> requestIds,
+            @Param("companyId") UUID companyId);
+
+    @Query("SELECT r FROM ApprovalRequest r " +
+            "WHERE r.memberId = :memberId " +
+            "  AND (:status IS NULL OR r.requestStatus = :status) " +
+            "  AND (:requestType IS NULL OR r.requestType = :requestType) " +
+            "  AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<ApprovalRequest> findMyRequests(
+            @Param("memberId") UUID memberId,
+            @Param("status") RequestStatus status,
+            @Param("requestType") RequestType requestType);
 }

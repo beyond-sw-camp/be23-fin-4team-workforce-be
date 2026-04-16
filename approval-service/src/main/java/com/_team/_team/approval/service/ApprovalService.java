@@ -6,11 +6,14 @@ import com._team._team.approval.domain.ApprovalRequest;
 import com._team._team.approval.domain.ApprovalViewer;
 import com._team._team.approval.domain.enums.LineStatus;
 import com._team._team.approval.domain.enums.RequestStatus;
+import com._team._team.approval.domain.enums.RequestType;
 import com._team._team.approval.dto.reqdto.ApprovalActionReqDto;
 import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
+import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
 import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.approval.repository.ApprovalRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
+import com._team._team.approval.repository.OfficialRecipientRepository;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,13 +34,17 @@ public class ApprovalService {
     private final ApprovalViewerRepository approvalViewerRepository;
     private final AbsenceProxyRepository absenceProxyRepository;
     private final ApprovalNotificationService approvalNotificationService;
+    private final OfficialNumberService officialNumberService;
+    private final OfficialRecipientRepository officialRecipientRepository;
 
     @Autowired
-    public ApprovalService(ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AbsenceProxyRepository absenceProxyRepository, ApprovalNotificationService approvalNotificationService) {
+    public ApprovalService(ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AbsenceProxyRepository absenceProxyRepository, ApprovalNotificationService approvalNotificationService, OfficialNumberService officialNumberService, OfficialRecipientRepository officialRecipientRepository) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
         this.approvalNotificationService = approvalNotificationService;
+        this.officialNumberService = officialNumberService;
+        this.officialRecipientRepository = officialRecipientRepository;
     }
 
 
@@ -72,7 +79,7 @@ public class ApprovalService {
                     List<ApprovalViewer> viewers =
                             approvalViewerRepository.findByRequestId(requestId);
                     return ApprovalRequestResDto.fromEntity(
-                            approval.getRequest(), allApprovals, viewers);
+                            approval.getRequest(), allApprovals, viewers, null);
                 })
                 .toList();
     }
@@ -138,6 +145,11 @@ public class ApprovalService {
 
         } else {
             request.updateStatus(RequestStatus.APPROVED);
+
+            // 공문이면 최종 승인 시점에 번호 발번
+            if (request.getRequestType() == RequestType.OFFICIAL) {
+                officialNumberService.generate(request);
+            }
         }
 
         List<Approval> allApprovals =
@@ -150,8 +162,16 @@ public class ApprovalService {
             approvalNotificationService.notifyApproved(request, viewers, actualMemberId);
         }
 
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL) {
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId)
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
 
-        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
     }
 
 
@@ -217,7 +237,7 @@ public class ApprovalService {
         approvalNotificationService.notifyRejected(
                 request, viewers, actualMemberId, reqDto.getComment());
 
-        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
+        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, null);
     }
 
     // 결재 대기함 (내 건 + 대결 건)
@@ -262,7 +282,7 @@ public class ApprovalService {
                     List<ApprovalViewer> viewers =
                             approvalViewerRepository.findByRequestId(requestId);
                     return ApprovalRequestResDto.fromEntity(
-                            approval.getRequest(), allApprovals, viewers);
+                            approval.getRequest(), allApprovals, viewers, null);
                 })
                 .toList();
     }

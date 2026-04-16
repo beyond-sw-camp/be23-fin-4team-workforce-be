@@ -321,7 +321,23 @@ public class ApprovalDocumentService {
                         + "{\"name\":\"cashFee\",\"label\":\"현금\",\"type\":\"number\"}"
                         + "]}")
                 .build());
+
+        // ========== 공문 카테고리 ==========
+
+// 공문
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("공문")
+                .requestType(RequestType.OFFICIAL)
+                .formSchema("{\"fields\":["
+                        + "{\"name\":\"title\",\"label\":\"제목\",\"type\":\"text\"},"
+                        + "{\"name\":\"content\",\"label\":\"본문\",\"type\":\"textarea\"},"
+                        + "{\"name\":\"note\",\"label\":\"비고\",\"type\":\"textarea\"}"
+                        + "]}")
+                .build());
     }
+
+
 
 
 
