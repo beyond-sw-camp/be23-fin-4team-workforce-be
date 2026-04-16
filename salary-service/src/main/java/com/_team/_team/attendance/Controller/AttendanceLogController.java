@@ -1,11 +1,13 @@
 package com._team._team.attendance.Controller;
 
+import com._team._team.attendance.Service.AttendanceContextResolver;
 import com._team._team.attendance.Service.AttendanceLogService;
 import com._team._team.attendance.Service.DailyAttendanceService;
 import com._team._team.attendance.dto.reqDto.AttendanceLogCreateReqDto;
 import com._team._team.attendance.dto.resDto.AttendanceLogResDto;
 import com._team._team.attendance.dto.resDto.DailyAttendanceResDto;
 import com._team._team.dto.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -44,19 +46,25 @@ import java.util.UUID;
 public class AttendanceLogController {
     private final AttendanceLogService attendanceLogService;
     private final DailyAttendanceService dailyAttendanceService;
+    private final AttendanceContextResolver attendanceContextResolver;
 
     @Autowired
-    public AttendanceLogController(AttendanceLogService attendanceLogService, DailyAttendanceService dailyAttendanceService) {
+    public AttendanceLogController(AttendanceLogService attendanceLogService,
+                                   DailyAttendanceService dailyAttendanceService,
+                                   AttendanceContextResolver attendanceContextResolver) {
         this.attendanceLogService = attendanceLogService;
         this.dailyAttendanceService = dailyAttendanceService;
+        this.attendanceContextResolver = attendanceContextResolver;
     }
 
-    // 출근 처리
+    // 출근 처리 - IP/UA/좌표→주소 태그 붙여서 서비스로 넘긴다
     @PostMapping("/clock-in")
     public ResponseEntity<?> clockIn(
             @RequestHeader("X-User-CompanyId")UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
-            @Valid @RequestBody AttendanceLogCreateReqDto reqDto){
+            @Valid @RequestBody AttendanceLogCreateReqDto reqDto,
+            HttpServletRequest httpRequest){
+        tagContext("CLOCK_IN", memberId, reqDto, httpRequest);
         DailyAttendanceResDto resDto = attendanceLogService.clockIn(companyId, memberId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "출근 처리되었습니다."),
@@ -69,7 +77,9 @@ public class AttendanceLogController {
     public ResponseEntity<?> clockOut(
             @RequestHeader("X-User-CompanyId")UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
-            @Valid @RequestBody AttendanceLogCreateReqDto reqDto) {
+            @Valid @RequestBody AttendanceLogCreateReqDto reqDto,
+            HttpServletRequest httpRequest) {
+        tagContext("CLOCK_OUT", memberId, reqDto, httpRequest);
         DailyAttendanceResDto resDto = attendanceLogService.clockOut(companyId, memberId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "퇴근 처리되었습니다."),
@@ -82,7 +92,9 @@ public class AttendanceLogController {
     public ResponseEntity<?> breakStart(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
-            @Valid @RequestBody AttendanceLogCreateReqDto reqDto){
+            @Valid @RequestBody AttendanceLogCreateReqDto reqDto,
+            HttpServletRequest httpRequest){
+        tagContext("BREAK_START", memberId, reqDto, httpRequest);
         AttendanceLogResDto resDto = attendanceLogService.breakStart(companyId, memberId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "휴게가 시작되었습니다."),
@@ -95,12 +107,29 @@ public class AttendanceLogController {
     public ResponseEntity<?> breakEnd(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
-            @Valid @RequestBody AttendanceLogCreateReqDto reqDto) {
+            @Valid @RequestBody AttendanceLogCreateReqDto reqDto,
+            HttpServletRequest httpRequest) {
+        tagContext("BREAK_END", memberId, reqDto, httpRequest);
         AttendanceLogResDto resDto = attendanceLogService.breakEnd(companyId, memberId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "휴게가 종료되었습니다."),
                 HttpStatus.CREATED
         );
+    }
+
+    // 컨텍스트 해석 → reqDto.deviceId 덮어쓰기 + 감사 로그 한 줄.
+    // 스키마 건드리지 않으려고 IP/UA는 deviceId 안에 패킹해서 저장한다.
+    private void tagContext(String eventType,
+                            UUID memberId,
+                            AttendanceLogCreateReqDto reqDto,
+                            HttpServletRequest httpRequest) {
+        AttendanceContextResolver.Context ctx = attendanceContextResolver.resolve(
+                httpRequest,
+                reqDto.getDeviceId(),
+                reqDto.getLatitude(),
+                reqDto.getLongitude());
+        reqDto.setDeviceId(ctx.packedDeviceId());
+        attendanceContextResolver.writeAuditLog(eventType, memberId, ctx);
     }
 
     // ==================== 개인 조회 ====================
