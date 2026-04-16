@@ -12,6 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.quartz.QuartzJobBean;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 /**
@@ -20,6 +23,9 @@ import java.util.Date;
 @Slf4j
 @Component
 public class BatchScheduledJob extends QuartzJobBean {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final DateTimeFormatter YEAR_MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final JobLocator jobLocator;
     private final JobLauncher jobLauncher;
@@ -42,9 +48,9 @@ public class BatchScheduledJob extends QuartzJobBean {
         try {
             Job job = jobLocator.getJob(jobName);
 
-            JobParameters jobParameters = new JobParametersBuilder()
-                    .addDate("time", new Date())
-                    .toJobParameters();
+            // BATCH_JOB_INSTANCE 추적성 확보용으로 의미있는 비즈니스 키 추가
+            // time 은 매번 다른 인스턴스 보장, yearMonth/date 는 운영 가시성용
+            JobParameters jobParameters = buildJobParameters(jobName);
 
             jobLauncher.run(job, jobParameters);
 
@@ -54,5 +60,31 @@ public class BatchScheduledJob extends QuartzJobBean {
             log.error("Failed to execute Spring Batch Job: {}", jobName, e);
             throw new JobExecutionException("Batch Job Execution Failed: " + jobName, e);
         }
+    }
+
+    // jobName 별로 의미있는 파라미터 부여 - SELECT * FROM BATCH_JOB_EXECUTION_PARAMS 로 추적
+    private JobParameters buildJobParameters(String jobName) {
+        JobParametersBuilder builder = new JobParametersBuilder()
+                .addDate("time", new Date());
+
+        LocalDate today = LocalDate.now(KST);
+        switch (jobName) {
+            case "payrollCalculateJob":
+            case "severancePayJob":
+            case "payslipSendJob":
+                builder.addString("yearMonth", today.format(YEAR_MONTH_FMT));
+                break;
+            case "leaveGrantJob":
+            case "carryoverLeaveJob":
+            case "leaveExpireJob":
+            case "dailyAttendanceDraftJob":
+            case "dailyAttendanceFinalJob":
+                builder.addString("date", today.toString());
+                break;
+            default:
+                // time 만
+                break;
+        }
+        return builder.toJobParameters();
     }
 }

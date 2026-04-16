@@ -32,6 +32,9 @@ public class BatchScheduler {
 
     @PostConstruct
     public void scheduleJobs() {
+        log.info("[BATCH-SCHED] PostConstruct 호출됨 enabled={} jobsSize={}",
+                schedulerProperties.isEnabled(),
+                schedulerProperties.getJobs() == null ? -1 : schedulerProperties.getJobs().size());
         try {
             if (!schedulerProperties.isEnabled()) {
                 log.info("Quartz batch scheduler disabled (batch.scheduler.enabled=false). No triggers registered.");

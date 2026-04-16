@@ -456,6 +456,5 @@ public class ApprovalRequestService {
                     return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
                 })
                 .toList();
-
     }
 }

@@ -1,5 +1,6 @@
 package com._team._team.batch.config;
 
+import com._team._team.batch.leave.worker.CarryoverLeaveWorker;
 import com._team._team.batch.leave.worker.DailyAttendanceCloseWorker;
 import com._team._team.batch.leave.worker.LeaveExpireWorker;
 import com._team._team.batch.leave.worker.LeaveGrantWorker;
@@ -13,6 +14,7 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.batch.support.transaction.ResourcelessTransactionManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,6 +38,7 @@ public class BatchJobConfig {
     private final PayrollCalculateWorker payrollCalculateWorker;
     private final SeverancePayWorker severancePayWorker;
     private final PayslipSendWorker payslipSendWorker;
+    private final CarryoverLeaveWorker carryoverLeaveWorker;
 
     @Autowired
     public BatchJobConfig(
@@ -46,7 +49,7 @@ public class BatchJobConfig {
             LeaveExpireWorker leaveExpireWorker,
             PayrollCalculateWorker payrollCalculateWorker,
             SeverancePayWorker severancePayWorker,
-            PayslipSendWorker payslipSendWorker) {
+            PayslipSendWorker payslipSendWorker, CarryoverLeaveWorker carryoverLeaveWorker) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.leaveGrantWorker = leaveGrantWorker;
@@ -55,8 +58,10 @@ public class BatchJobConfig {
         this.payrollCalculateWorker = payrollCalculateWorker;
         this.severancePayWorker = severancePayWorker;
         this.payslipSendWorker = payslipSendWorker;
+        this.carryoverLeaveWorker = carryoverLeaveWorker;
     }
 
+    /** 휴가 부여 Job */
     @Bean
     public Job leaveGrantJob() {
         return new JobBuilder("leaveGrantJob", jobRepository)
@@ -64,6 +69,7 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 휴가 부여 Step */
     @Bean
     public Step leaveGrantStep() {
         return new StepBuilder("leaveGrantStep", jobRepository)
@@ -74,23 +80,45 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 일일 근태 마감 DRAFT Job (06:00 알림 단계) */
     @Bean
-    public Job dailyAttendanceCloseJob() {
-        return new JobBuilder("dailyAttendanceCloseJob", jobRepository)
-                .start(dailyAttendanceCloseStep())
+    public Job dailyAttendanceDraftJob() {
+        return new JobBuilder("dailyAttendanceDraftJob", jobRepository)
+                .start(dailyAttendanceDraftStep())
                 .build();
     }
 
+    /** 일일 근태 마감 DRAFT Step */
     @Bean
-    public Step dailyAttendanceCloseStep() {
-        return new StepBuilder("dailyAttendanceCloseStep", jobRepository)
+    public Step dailyAttendanceDraftStep() {
+        return new StepBuilder("dailyAttendanceDraftStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    dailyAttendanceCloseWorker.run();
+                    dailyAttendanceCloseWorker.runDraft();
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
     }
 
+    /** 일일 근태 마감 FINAL Job (14:00 자동 마감 단계) */
+    @Bean
+    public Job dailyAttendanceFinalJob() {
+        return new JobBuilder("dailyAttendanceFinalJob", jobRepository)
+                .start(dailyAttendanceFinalStep())
+                .build();
+    }
+
+    /** 일일 근태 마감 FINAL Step */
+    @Bean
+    public Step dailyAttendanceFinalStep() {
+        return new StepBuilder("dailyAttendanceFinalStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    dailyAttendanceCloseWorker.runFinal();
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 휴가 만료 Job */
     @Bean
     public Job leaveExpireJob() {
         return new JobBuilder("leaveExpireJob", jobRepository)
@@ -98,6 +126,7 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 휴가 만료 Step */
     @Bean
     public Step leaveExpireStep() {
         return new StepBuilder("leaveExpireStep", jobRepository)
@@ -108,6 +137,7 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 급여 계산 Job */
     @Bean
     public Job payrollCalculateJob() {
         return new JobBuilder("payrollCalculateJob", jobRepository)
@@ -115,16 +145,18 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 급여 계산 Step */
     @Bean
     public Step payrollCalculateStep() {
         return new StepBuilder("payrollCalculateStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
                     payrollCalculateWorker.run();
                     return RepeatStatus.FINISHED;
-                }, transactionManager)
+                }, new ResourcelessTransactionManager())
                 .build();
     }
 
+    /** 퇴직금 계산 Job */
     @Bean
     public Job severancePayJob() {
         return new JobBuilder("severancePayJob", jobRepository)
@@ -132,6 +164,7 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 퇴직금 계산 Step */
     @Bean
     public Step severancePayStep() {
         return new StepBuilder("severancePayStep", jobRepository)
@@ -142,6 +175,7 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 급여명세서 발송 Job */
     @Bean
     public Job payslipSendJob() {
         return new JobBuilder("payslipSendJob", jobRepository)
@@ -149,11 +183,31 @@ public class BatchJobConfig {
                 .build();
     }
 
+    /** 급여명세서 발송 Step */
     @Bean
     public Step payslipSendStep() {
         return new StepBuilder("payslipSendStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
                     payslipSendWorker.run();
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 연차 초과 부여 Job */
+    @Bean
+    public Job carryoverLeaveJob() {
+        return new JobBuilder("carryoverLeaveJob", jobRepository)
+                .start(carryoverLeaveStep())
+                .build();
+    }
+
+    /** 연차 초과 부여 Step */
+    @Bean
+    public Step carryoverLeaveStep() {
+        return new StepBuilder("carryoverLeaveStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    carryoverLeaveWorker.run(LocalDate.now());
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();

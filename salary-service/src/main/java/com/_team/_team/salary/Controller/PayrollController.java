@@ -1,11 +1,14 @@
 package com._team._team.salary.Controller;
 
+import com._team._team.batch.payroll.worker.PayrollCalculateWorker;
 import com._team._team.dto.ApiResponse;
 import com._team._team.salary.Service.PayrollService;
 import com._team._team.salary.dto.reqdto.PayrollCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemUpdateReqDto;
+import com._team._team.salary.dto.reqdto.PayrollRecalculateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollUpdateReqDto;
+import com._team._team.salary.dto.resdto.PayrollRecalculateResDto;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -19,10 +22,13 @@ import java.util.UUID;
 public class PayrollController {
 
     private final PayrollService payrollService;
+    private final PayrollCalculateWorker payrollCalculateWorker;
 
     @Autowired
-    public PayrollController(PayrollService payrollService){
+    public PayrollController(PayrollService payrollService,
+                             PayrollCalculateWorker payrollCalculateWorker){
         this.payrollService = payrollService;
+        this.payrollCalculateWorker = payrollCalculateWorker;
     }
 
     // ===================== 급여대장 =====================
@@ -102,6 +108,20 @@ public class PayrollController {
             @PathVariable UUID payrollId) {
         return new ResponseEntity<>(
                 ApiResponse.success(payrollService.payPayroll(companyId, payrollId), "급여가 지급 완료되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    // 회사 단위 급여대장 재계산
+    // 자동 배치 누락 / 마스터 데이터 늦게 등록한 경우 관리자가 직접 호출
+    @PostMapping("/recalculate")
+    public ResponseEntity<?> recalculate(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @Valid @RequestBody PayrollRecalculateReqDto reqDto) {
+        PayrollCalculateWorker.Counter c =
+                payrollCalculateWorker.runForCompany(companyId, reqDto.getSettlementDate());
+        return new ResponseEntity<>(
+                ApiResponse.success(PayrollRecalculateResDto.from(c), "급여대장 재계산이 완료되었습니다."),
                 HttpStatus.OK
         );
     }
