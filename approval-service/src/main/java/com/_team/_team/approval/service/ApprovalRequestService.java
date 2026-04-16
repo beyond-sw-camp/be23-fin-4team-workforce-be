@@ -35,15 +35,17 @@ public class ApprovalRequestService {
     private final ApprovalViewerRepository approvalViewerRepository;
     private final AttachmentService attachmentService;
     private final MemberServiceClient memberServiceClient;
+    private final ApprovalNotificationService approvalNotificationService;
 
     @Autowired
-    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient) {
+    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.attachmentService = attachmentService;
         this.memberServiceClient = memberServiceClient;
+        this.approvalNotificationService = approvalNotificationService;
     }
 
 //    결재요청 생성(결재라인 + 참조/공람자 포함)
@@ -162,6 +164,22 @@ public class ApprovalRequestService {
                     .toList();
 
             savedViewers = approvalViewerRepository.saveAll(viewers);
+        }
+
+        // 알림 발행 - WAIT 제출 시에만
+        if (savedRequest.getRequestStatus() == RequestStatus.WAIT) {
+            if ("Y".equals(document.getAutoApproveYn())) {
+                // 자동승인 문서 → 요청자/참조자 APPROVED + 공람자 CIRCULATED
+                approvalNotificationService.notifyAutoApproved(savedRequest, savedViewers);
+            } else {
+                // 일반 → 첫 결재자 REQUESTED + 참조자 REFERENCED
+                Approval firstApproval = savedApprovals.stream()
+                        .filter(a -> a.getStepOrder() == 1)
+                        .findFirst()
+                        .orElseThrow(() -> new BusinessException(
+                                HttpStatus.INTERNAL_SERVER_ERROR, "첫 결재자를 찾을 수 없습니다."));
+                approvalNotificationService.notifyApprovalRequested(savedRequest, firstApproval, savedViewers);
+            }
         }
 
         return ApprovalRequestResDto.fromEntity(savedRequest, savedApprovals, savedViewers);
@@ -360,6 +378,8 @@ public class ApprovalRequestService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "결재 요청을 찾을 수 없습니다."));
 
+        RequestStatus prevStatus = request.getRequestStatus();
+
         if (!request.getApprovalDocument().getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
         }
@@ -393,6 +413,15 @@ public class ApprovalRequestService {
         List<ApprovalViewer> viewers =
                 approvalViewerRepository.findByRequestId(requestId);
 
+        // 알림 발행 - WAIT 상태에서 취소된 경우만 (DRAFT 는 알림 미발행)
+        if (prevStatus == RequestStatus.WAIT) {
+            Approval firstApproval = approvals.stream()
+                    .filter(a -> a.getStepOrder() == 1)
+                    .findFirst()
+                    .orElse(null);
+            approvalNotificationService.notifyCanceled(request, firstApproval, viewers);
+        }
+
         return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
 
     }
@@ -408,23 +437,15 @@ public class ApprovalRequestService {
             throw new BusinessException(HttpStatus.NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
         }
 
-        // 2. 본인 접근 가능 범위 (본인 부서 + 하위 조직 전체)
-        List<UUID> accessibleOrgIds = memberServiceClient
-                .getOrganizationDescendantIds(requester.getOrganizationId());
-
-        // 3. 요청된 organizationId가 본인 접근 범위 안에 있는지 검증
-        if (!accessibleOrgIds.contains(organizationId)) {
+        // 2. 요청된 organizationId가 본인 소속 부서와 일치하는지 검증
+        if (!requester.getOrganizationId().equals(organizationId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN,
-                    "해당 부서의 문서함에 접근할 권한이 없습니다.");
+                    "본인이 속한 부서의 문서함만 조회할 수 있습니다.");
         }
 
-        // 4. 조회 대상 부서의 descendants (자기 자신 포함)
-        List<UUID> targetOrgIds = memberServiceClient
-                .getOrganizationDescendantIds(organizationId);
-
-        // 5. 부서 문서함 조회
+        // 3. 본인 부서 단일 ID로 조회
         List<ApprovalRequest> requests = approvalRequestRepository
-                .findDepartmentRequests(companyId, targetOrgIds);
+                .findDepartmentRequests(companyId, organizationId);
 
         return requests.stream()
                 .map(request -> {
@@ -435,5 +456,6 @@ public class ApprovalRequestService {
                     return ApprovalRequestResDto.fromEntity(request, approvals, viewers);
                 })
                 .toList();
+
     }
 }

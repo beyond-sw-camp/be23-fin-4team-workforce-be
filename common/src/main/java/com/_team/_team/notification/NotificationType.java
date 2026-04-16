@@ -12,6 +12,9 @@ public enum NotificationType {
     APPROVAL_REQUESTED,      // 결재 요청
     APPROVAL_APPROVED,       // 결재 승인
     APPROVAL_REJECTED,       // 결재 반려
+    APPROVAL_CANCELED,      // 결재 회수됨
+    APPROVAL_REFERENCED,     // 결재 참조자
+    APPROVAL_CIRCULATED,     // 결재 공람자
 
     // 급여
     SALARY_PUBLISHED,        // 급여 명세서 발행

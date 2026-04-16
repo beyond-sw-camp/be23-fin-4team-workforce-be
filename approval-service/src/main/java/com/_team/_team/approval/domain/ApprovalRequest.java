@@ -23,6 +23,10 @@ public class ApprovalRequest extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID requestId;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id", nullable = false)
     private ApprovalDocument approvalDocument;
