@@ -48,6 +48,13 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, UU
     // 단건 조회
     Optional<CalendarEvent> findByCalendarEventIdAndDelYn(
             UUID calendarEventId, String delYn);
-
+    @Query("SELECT COUNT(e) FROM CalendarEvent e " +
+            "WHERE e.member.memberId = :memberId " +
+            "AND e.startAt >= :startAt " +
+            "AND e.startAt <= :endAt " +
+            "AND e.delYn = 'NO'")
+    int countTodayEvents(@Param("memberId") UUID memberId,
+                         @Param("startAt") LocalDateTime startAt,
+                         @Param("endAt") LocalDateTime endAt);
 
 }

@@ -52,13 +52,15 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             "WHERE doc.companyId = :companyId " +
             "AND doc.isDeptVisibleYn = 'Y' " +
             "AND ar.requesterOrganizationId IN :organizationIds " +
-            "AND ar.requestStatus IN :statuses " +
+            "AND ar.requestStatus IN (" +
+            "   com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+            "   com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+            ") " +
             "AND ar.delYn = 'N' " +
             "ORDER BY ar.createdAt DESC")
     List<ApprovalRequest> findDepartmentRequests(
             @Param("companyId") UUID companyId,
-            @Param("organizationIds") List<UUID> organizationIds,
-            @Param("statuses") List<RequestStatus> statuses);
+            @Param("organizationIds") UUID organizationIds);
 
     // 특정 직원이 특정 날짜에 승인받은 연장근무 종료시각 중 가장 늦은 값
     // 같은 날 여러 건 연장한 경우도 MAX로 잡기 위해 ar.startDateTime 기준 범위 조회

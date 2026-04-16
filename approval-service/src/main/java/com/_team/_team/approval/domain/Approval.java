@@ -37,7 +37,7 @@ public class Approval extends BaseTimeEntity {
     private UUID actualApproverMemberPositionId;  // 실제 결재한 사람의 직위
 
     @Builder.Default
-    @Column(nullable = false)
+    @Column(columnDefinition = "varchar(1) default 'N'")
     private String isProxyYn = "N";   // 대리결재 여부
 
     @Column(nullable = false)

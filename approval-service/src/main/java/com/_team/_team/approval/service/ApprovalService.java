@@ -37,16 +37,25 @@ public class ApprovalService {
     private final ApprovalRepository approvalRepository;
     private final ApprovalViewerRepository approvalViewerRepository;
     private final AbsenceProxyRepository absenceProxyRepository;
+    private final ApprovalNotificationService approvalNotificationService;
     private final OvertimeApprovalEventPublisher overtimeApprovalEventPublisher;
     private final LeaveApprovalEventPublisher leaveApprovalEventPublisher;
     private final ApprovalRequestRepository approvalRequestRepository;
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public ApprovalService(ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AbsenceProxyRepository absenceProxyRepository, OvertimeApprovalEventPublisher overtimeApprovalEventPublisher, LeaveApprovalEventPublisher leaveApprovalEventPublisher, ApprovalRequestRepository approvalRequestRepository, ObjectMapper objectMapper) {
+    public ApprovalService(ApprovalRepository approvalRepository,
+                           ApprovalViewerRepository approvalViewerRepository,
+                           AbsenceProxyRepository absenceProxyRepository,
+                           ApprovalNotificationService approvalNotificationService,
+                           OvertimeApprovalEventPublisher overtimeApprovalEventPublisher,
+                           LeaveApprovalEventPublisher leaveApprovalEventPublisher,
+                           ApprovalRequestRepository approvalRequestRepository,
+                           ObjectMapper objectMapper) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
+        this.approvalNotificationService = approvalNotificationService;
         this.overtimeApprovalEventPublisher = overtimeApprovalEventPublisher;
         this.leaveApprovalEventPublisher = leaveApprovalEventPublisher;
         this.approvalRequestRepository = approvalRequestRepository;
@@ -145,6 +154,10 @@ public class ApprovalService {
             if (request.getRequestStatus() == RequestStatus.WAIT) {
                 request.updateStatus(RequestStatus.PENDING);
             }
+
+            //        다음 결재자에게 알림
+            approvalNotificationService.notifyNextApprover(request, nextApproval, actualMemberId);
+
         } else {
             request.updateStatus(RequestStatus.APPROVED);
 
@@ -157,6 +170,12 @@ public class ApprovalService {
                 approvalRepository.findByRequestIdWithRequest(requestId);
         List<ApprovalViewer> viewers =
                 approvalViewerRepository.findByRequestId(requestId);
+
+        //        최종 승인 완료 시 요청자/참조자/공람자에게 알림
+        if (request.getRequestStatus() == RequestStatus.APPROVED) {
+            approvalNotificationService.notifyApproved(request, viewers, actualMemberId);
+        }
+
 
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
     }
@@ -223,6 +242,11 @@ public class ApprovalService {
         // 연차는 승인 전에는 차감되지 않았으므로 RESTORE 필요 없음 → 반려 시 발행 생략
 
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
+
+        //        요청자/참조자에게 반려 알림
+        approvalNotificationService.notifyRejected(
+                request, viewers, actualMemberId, reqDto.getComment());
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
     }
 

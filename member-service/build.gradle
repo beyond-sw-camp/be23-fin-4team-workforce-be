@@ -52,6 +52,15 @@ tasks.named('clean') {
     doLast {
         file(querydslGenerated).deleteDir()
     }
+
+    // --- member-chat (human chat) ---
+    // WebSocket / STOMP (기존 챗봇은 REST 기반이라 충돌 없음)
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // STOMP over SockJS / JSON 직렬화용
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    // 멱등성/rate-limit/권한 테스트용
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.awaitility:awaitility:4.2.0'
 }
 
 tasks.named('test') {

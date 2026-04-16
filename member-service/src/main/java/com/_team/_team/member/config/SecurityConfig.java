@@ -21,6 +21,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/mc/connect/**").permitAll()
+                        .requestMatchers("/member-chat/**").permitAll()
                         .anyRequest().permitAll()
                 );
         return http.build();
