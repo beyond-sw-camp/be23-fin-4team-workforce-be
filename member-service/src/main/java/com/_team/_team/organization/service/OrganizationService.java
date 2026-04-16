@@ -212,22 +212,24 @@ public class OrganizationService {
     // 직급 생성
     public UUID createJobGrade(UUID memberId, JobGradeReqDto reqDto) {
 
-
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         Company company = member.getCompany();
 
-        // 동시성 해결 - 비관적 락
-        int displayOrder = jobGradeRepository
-                .findByCompanyIdAndDelYnWithLock(
-                        company.getCompanyId(), "NO").size();
+        // 동일 순서 중복 체크
+        boolean exists = jobGradeRepository
+                .existsByCompany_CompanyIdAndDisplayOrderAndDelYn(
+                        company.getCompanyId(), reqDto.getDisplayOrder(), "NO");
+        if (exists) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이미 사용 중인 순서입니다.");
+        }
 
         JobGrade jobGrade = JobGrade.builder()
                 .company(company)
                 .name(reqDto.getName())
-                .displayOrder(displayOrder)
+                .displayOrder(reqDto.getDisplayOrder())
                 .build();
 
         return jobGradeRepository.save(jobGrade).getJobGradeId();
@@ -304,19 +306,22 @@ public class OrganizationService {
 
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         Company company = member.getCompany();
 
-        // 동시성 해결 - 비관적 락
-        int displayOrder = jobTitleRepository
-                .findByCompanyIdAndDelYnWithLock(
-                        company.getCompanyId(), "NO").size();
+        // 동일 순서 중복 체크
+        boolean exists = jobTitleRepository
+                .existsByCompany_CompanyIdAndDisplayOrderAndDelYn(
+                        company.getCompanyId(), reqDto.getDisplayOrder(), "NO");
+        if (exists) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이미 사용 중인 순서입니다.");
+        }
 
         JobTitle jobTitle = JobTitle.builder()
                 .company(company)
                 .name(reqDto.getName())
-                .displayOrder(displayOrder)
+                .displayOrder(reqDto.getDisplayOrder())
                 .build();
 
         return jobTitleRepository.save(jobTitle).getJobTitleId();
