@@ -25,7 +25,6 @@ public record ChatRoomResponse(
         UUID companyId,
         String imageUrl,
         boolean deleted,
-        boolean legalHold,
         LocalDateTime createdAt,
         long participantCount,
         long unreadCount,
@@ -56,7 +55,7 @@ public record ChatRoomResponse(
                                         ChatSenderView otherMemberView) {
         return new ChatRoomResponse(
                 r.getId(), r.getName(), r.getType(), r.getCompanyId(),
-                r.getImageUrl(), r.isDeleted(), r.isLegalHold(),
+                r.getImageUrl(), r.isDeleted(),
                 r.getCreatedAt(), participantCount,
                 unreadCount,
                 lastMessageId, lastMessagePreview, lastMessageSenderId, lastMessageAt,

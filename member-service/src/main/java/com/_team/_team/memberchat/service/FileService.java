@@ -1,7 +1,6 @@
 package com._team._team.memberchat.service;
 
 import com._team._team.memberchat.MemberChatProperties;
-import com._team._team.memberchat.domain.enums.AuditAction;
 import com._team._team.memberchat.domain.ChatMessageImage;
 import com._team._team.memberchat.error.ChatErrorCode;
 import com._team._team.memberchat.error.ChatException;
@@ -22,7 +21,6 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.io.InputStream;
 import java.net.URL;
 import java.time.Duration;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -131,7 +129,6 @@ public class FileService {
                 .getObjectRequest(GetObjectRequest.builder()
                         .bucket(props.getFiles().getBucket()).key(key).build())
                 .build()).url();
-        events.publishEvent(Map.of("event", AuditAction.FILE_DOWNLOADED.name(), "key", key));
         return url.toString();
     }
 
