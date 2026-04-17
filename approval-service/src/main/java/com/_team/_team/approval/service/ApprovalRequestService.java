@@ -10,6 +10,7 @@ import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
 import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
 import com._team._team.approval.feignclients.MemberServiceClient;
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
+import com._team._team.approval.feignclients.dto.OrganizationResDto;
 import com._team._team.approval.repository.*;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,10 +34,11 @@ public class ApprovalRequestService {
     private final MemberServiceClient memberServiceClient;
     private final ApprovalNotificationService approvalNotificationService;
     private final OfficialRecipientRepository officialRecipientRepository;
+    private final OfficialNumberService officialNumberService;
 
 
     @Autowired
-    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService, OfficialRecipientRepository officialRecipientRepository) {
+    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService, OfficialRecipientRepository officialRecipientRepository, OfficialNumberService officialNumberService) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.approvalRepository = approvalRepository;
@@ -45,6 +47,7 @@ public class ApprovalRequestService {
         this.memberServiceClient = memberServiceClient;
         this.approvalNotificationService = approvalNotificationService;
         this.officialRecipientRepository = officialRecipientRepository;
+        this.officialNumberService = officialNumberService;
     }
 
 //    결재요청 생성(결재라인 + 참조/공람자 포함)
@@ -199,10 +202,17 @@ public class ApprovalRequestService {
         // 알림 발행 - WAIT 제출 시에만
         if (savedRequest.getRequestStatus() == RequestStatus.WAIT) {
             if ("Y".equals(document.getAutoApproveYn())) {
-                // 자동승인 문서 → 요청자/참조자 APPROVED + 공람자 CIRCULATED
+                savedRequest.updateStatus(RequestStatus.APPROVED);
+
+                // 공문이면 번호 생성
+                if (document.getRequestType() == RequestType.OFFICIAL) {
+                    String docNumber = officialNumberService.generate(savedRequest.getRequestId());
+                    savedRequest.updateDocumentNumber(docNumber);
+                }
+
                 approvalNotificationService.notifyAutoApproved(savedRequest, savedViewers);
             } else {
-                // 일반 → 첫 결재자 REQUESTED + 참조자 REFERENCED
+                // 일반 → 첫 결재자에게 알림
                 Approval firstApproval = savedApprovals.stream()
                         .filter(a -> a.getStepOrder() == 1)
                         .findFirst()
@@ -548,11 +558,15 @@ public class ApprovalRequestService {
 
         // 알림 발행 - WAIT 상태에서 취소된 경우만 (DRAFT 는 알림 미발행)
         if (prevStatus == RequestStatus.WAIT) {
-            Approval firstApproval = approvals.stream()
-                    .filter(a -> a.getStepOrder() == 1)
+            // 현재 PENDING 또는 첫 단계 결재자에게 알림
+            Approval activeApproval = approvals.stream()
+                    .filter(a -> a.getApprovalStatus() == LineStatus.PENDING)
                     .findFirst()
-                    .orElse(null);
-            approvalNotificationService.notifyCanceled(request, firstApproval, viewers);
+                    .orElseGet(() -> approvals.stream()
+                            .filter(a -> a.getStepOrder() == 1)
+                            .findFirst()
+                            .orElse(null));
+            approvalNotificationService.notifyCanceled(request, activeApproval, viewers);
         }
 
         List<OfficialRecipientResDto> recipientDtos = null;
@@ -618,21 +632,39 @@ public class ApprovalRequestService {
             throw new BusinessException(HttpStatus.NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
         }
 
-        // 1. 우리 부서가 수신한 공문 requestId 목록
+        // 내 조직 + 상위 조직 계열의 ID 목록 수집
+        List<UUID> orgIds = collectAncestorOrgIds(me.getOrganizationId());
+
+        // 이 조직들 중 하나라도 수신 부서인 공문 requestId 수집
         List<UUID> requestIds = officialRecipientRepository
-                .findRequestIdsByRecipientOrganizationId(me.getOrganizationId());
+                .findRequestIdsByRecipientOrganizationIds(orgIds);
 
         if (requestIds.isEmpty()) {
             return List.of();
         }
 
-        // 2. APPROVED 상태인 공문만, 같은 회사 것만
         List<ApprovalRequest> requests = approvalRequestRepository
                 .findApprovedOfficialsByIdsAndCompany(requestIds, companyId);
 
         return requests.stream()
                 .map(this::toResDtoWithRecipients)
                 .toList();
+    }
+
+    // 내 조직부터 루트까지 상위 조직 ID 수집
+    private List<UUID> collectAncestorOrgIds(UUID startOrgId) {
+        List<UUID> orgIds = new ArrayList<>();
+        UUID currentId = startOrgId;
+        int maxDepth = 10;
+
+        for (int i = 0; i < maxDepth && currentId != null; i++) {
+            orgIds.add(currentId);
+            OrganizationResDto org = memberServiceClient.getOrganization(currentId);
+            if (org == null || org.getParentId() == null) break;
+            currentId = org.getParentId();
+        }
+
+        return orgIds;
     }
 
     @Transactional(readOnly = true)

@@ -72,9 +72,15 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
                                      @Param("year") int year);
 
     @Query("SELECT r FROM ApprovalRequest r " +
-            "WHERE r.approvalDocument.companyId = :companyId " +
+            "JOIN FETCH r.approvalDocument doc " +
+            "WHERE doc.companyId = :companyId " +
+            "  AND doc.isDeptVisibleYn = 'Y' " +
             "  AND r.requesterOrganizationId = :organizationId " +
             "  AND r.requestType = :requestType " +
+            "  AND r.requestStatus IN (" +
+            "    com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+            "    com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+            "  ) " +
             "  AND r.delYn = 'N' " +
             "ORDER BY r.createdAt DESC")
     List<ApprovalRequest> findDepartmentRequestsByType(

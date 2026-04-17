@@ -2,9 +2,11 @@ package com._team._team.approval.service;
 
 import com._team._team.approval.domain.ApprovalRequest;
 import com._team._team.approval.repository.ApprovalRequestRepository;
+import com._team._team.dto.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -38,7 +41,12 @@ public class OfficialNumberService {
             backoff = @Backoff(delay = 50, multiplier = 1.5)
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public String generate(ApprovalRequest request) {
+    public String generate(UUID requestId) {
+        // REQUIRES_NEW 트랜잭션에서 독립적으로 조회
+        ApprovalRequest request = approvalRequestRepository.findById(requestId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "결재 요청을 찾을 수 없습니다."));
+
         int year = LocalDate.now().getYear();
         String prefix = resolvePrefix(request.getRequesterOrganizationName());
 
@@ -51,7 +59,7 @@ public class OfficialNumberService {
         request.updateDocumentNumber(number);
         approvalRequestRepository.save(request);
 
-        log.info("공문 번호 생성: requestId={}, number={}", request.getRequestId(), number);
+        log.info("공문 번호 생성: requestId={}, number={}", requestId, number);
         return number;
     }
 

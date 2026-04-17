@@ -72,15 +72,7 @@ public class ApprovalService {
         }
 
         return mergedMap.values().stream()
-                .map(approval -> {
-                    UUID requestId = approval.getRequest().getRequestId();
-                    List<Approval> allApprovals =
-                            approvalRepository.findByRequestIdWithRequest(requestId);
-                    List<ApprovalViewer> viewers =
-                            approvalViewerRepository.findByRequestId(requestId);
-                    return ApprovalRequestResDto.fromEntity(
-                            approval.getRequest(), allApprovals, viewers, null);
-                })
+                .map(approval -> toResDtoWithRecipients(approval.getRequest()))
                 .toList();
     }
 
@@ -148,7 +140,9 @@ public class ApprovalService {
 
             // 공문이면 최종 승인 시점에 번호 발번
             if (request.getRequestType() == RequestType.OFFICIAL) {
-                officialNumberService.generate(request);
+                String docNumber = officialNumberService.generate(request.getRequestId());
+                request.updateDocumentNumber(docNumber);
+                approvalNotificationService.publishOfficialApprovedEvent(request);
             }
         }
 
@@ -237,7 +231,15 @@ public class ApprovalService {
         approvalNotificationService.notifyRejected(
                 request, viewers, actualMemberId, reqDto.getComment());
 
-        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, null);
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL){
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId)
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
     }
 
     // 결재 대기함 (내 건 + 대결 건)
@@ -275,15 +277,26 @@ public class ApprovalService {
         }
 
         return mergedMap.values().stream()
-                .map(approval -> {
-                    UUID requestId = approval.getRequest().getRequestId();
-                    List<Approval> allApprovals =
-                            approvalRepository.findByRequestIdWithRequest(requestId);
-                    List<ApprovalViewer> viewers =
-                            approvalViewerRepository.findByRequestId(requestId);
-                    return ApprovalRequestResDto.fromEntity(
-                            approval.getRequest(), allApprovals, viewers, null);
-                })
+                .map(approval -> toResDtoWithRecipients(approval.getRequest()))
                 .toList();
     }
+
+    private ApprovalRequestResDto toResDtoWithRecipients(ApprovalRequest request) {
+        UUID requestId = request.getRequestId();
+        List<Approval> allApprovals =
+                approvalRepository.findByRequestIdWithRequest(requestId);
+        List<ApprovalViewer> viewers =
+                approvalViewerRepository.findByRequestId(requestId);
+
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL) {
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId)
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
+    }
+
 }

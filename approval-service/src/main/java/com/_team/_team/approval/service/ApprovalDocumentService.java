@@ -31,14 +31,6 @@ public class ApprovalDocumentService {
             return;
         }
 
-        // 1. 연차신청서
-        approvalDocumentRepository.save(ApprovalDocument.builder()
-                .companyId(companyId)
-                .documentName("연차신청서")
-                .requestType(RequestType.VACATION)
-                .formSchema("{\"fields\":[{\"name\":\"vacationType\",\"label\":\"휴가 종류\",\"type\":\"select\",\"options\":[\"연차\",\"반차(오전)\",\"반차(오후)\"]},{\"name\":\"startDate\",\"label\":\"시작일\",\"type\":\"date\"},{\"name\":\"endDate\",\"label\":\"종료일\",\"type\":\"date\"},{\"name\":\"reason\",\"label\":\"사유\",\"type\":\"textarea\"}]}")
-                .build());
-
         // 2. 지출결의서
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)
@@ -202,7 +194,7 @@ public class ApprovalDocumentService {
 // 휴가신청
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)
-                .documentName("휴가신청")
+                .documentName("연차신청서")
                 .requestType(RequestType.VACATION)
                 .formSchema("{\"fields\":["
                         + "{\"name\":\"vacationType\",\"label\":\"휴가 종류\",\"type\":\"select\","

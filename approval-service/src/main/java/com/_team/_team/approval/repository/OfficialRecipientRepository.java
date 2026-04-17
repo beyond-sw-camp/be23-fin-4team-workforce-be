@@ -18,4 +18,11 @@ public interface OfficialRecipientRepository extends JpaRepository<OfficialRecip
     @Query("SELECT o.approvalRequest.requestId FROM OfficialRecipient o " +
             "WHERE o.recipientOrganizationId = :organizationId")
     List<UUID> findRequestIdsByRecipientOrganizationId(@Param("organizationId") UUID organizationId);
+
+    @Query("SELECT DISTINCT r.approvalRequest.requestId FROM OfficialRecipient r " +
+            "WHERE r.recipientOrganizationId IN :organizationIds")
+    List<UUID> findRequestIdsByRecipientOrganizationIds(
+            @Param("organizationIds") List<UUID> organizationIds);
+
+
 }
