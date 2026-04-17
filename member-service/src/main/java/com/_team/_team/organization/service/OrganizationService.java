@@ -534,29 +534,12 @@ public class OrganizationService {
                     List<MemberPosition> positions = memberPositionRepository
                             .findByOrganizationAndDelYn(org, "NO");
 
-                    // 직급별 그룹핑 (직급 displayOrder 기준 정렬)
-                    Map<String, List<OrgChartMemberResDto>> groupedByJobGrade = positions.stream()
+                    // 직원 목록 (직급 displayOrder 기준 정렬)
+                    List<OrgChartMemberResDto> members = positions.stream()
                             .filter(p -> "NO".equals(p.getMember().getDelYn()))
                             .sorted(Comparator.comparingInt(
                                     p -> p.getJobGrade().getDisplayOrder()))
-                            .collect(Collectors.groupingBy(
-                                    p -> p.getJobGrade().getName(),
-                                    LinkedHashMap::new,
-                                    Collectors.mapping(
-                                            p -> OrgChartMemberResDto.fromEntity(
-                                                    p.getMember(), p),
-                                            Collectors.toList()
-                                    )
-                            ));
-
-                    // 직급별 DTO 변환
-                    List<OrgChartJobGradeResDto> jobGrades = groupedByJobGrade
-                            .entrySet()
-                            .stream()
-                            .map(entry -> OrgChartJobGradeResDto.builder()
-                                    .jobGradeName(entry.getKey())
-                                    .members(entry.getValue())
-                                    .build())
+                            .map(p -> OrgChartMemberResDto.fromEntity(p.getMember(), p))
                             .collect(Collectors.toList());
 
                     // 재귀로 자식 조직 조회
@@ -567,7 +550,7 @@ public class OrganizationService {
                     return OrgChartResDto.builder()
                             .organizationId(org.getOrganizationId())
                             .name(org.getName())
-                            .jobGrades(jobGrades)
+                            .members(members)
                             .children(children)
                             .build();
                 })
