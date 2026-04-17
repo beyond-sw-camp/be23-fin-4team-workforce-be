@@ -159,11 +159,12 @@
 </div>
 <hr>
 
+
 ## API 명세서
 
-- [POSTMAN 보기]()
+- 🔗 [POSTMAN 보기](https://documenter.getpostman.com/view/51059789/2sBXqDrNZT)
 
-<img width="1302" alt="WORKFORCE ERD" src="" />
+<img width="1302" alt="WORKFORCE ERD" src="여기에_이미지_URL_넣기" />
 
 <br>
 <div align="right">
