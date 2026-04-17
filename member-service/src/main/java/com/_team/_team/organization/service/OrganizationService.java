@@ -212,22 +212,24 @@ public class OrganizationService {
     // 직급 생성
     public UUID createJobGrade(UUID memberId, JobGradeReqDto reqDto) {
 
-
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         Company company = member.getCompany();
 
-        // 동시성 해결 - 비관적 락
-        int displayOrder = jobGradeRepository
-                .findByCompanyIdAndDelYnWithLock(
-                        company.getCompanyId(), "NO").size();
+        // 동일 순서 중복 체크
+        boolean exists = jobGradeRepository
+                .existsByCompany_CompanyIdAndDisplayOrderAndDelYn(
+                        company.getCompanyId(), reqDto.getDisplayOrder(), "NO");
+        if (exists) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이미 사용 중인 순서입니다.");
+        }
 
         JobGrade jobGrade = JobGrade.builder()
                 .company(company)
                 .name(reqDto.getName())
-                .displayOrder(displayOrder)
+                .displayOrder(reqDto.getDisplayOrder())
                 .build();
 
         return jobGradeRepository.save(jobGrade).getJobGradeId();
@@ -304,19 +306,22 @@ public class OrganizationService {
 
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         Company company = member.getCompany();
 
-        // 동시성 해결 - 비관적 락
-        int displayOrder = jobTitleRepository
-                .findByCompanyIdAndDelYnWithLock(
-                        company.getCompanyId(), "NO").size();
+        // 동일 순서 중복 체크
+        boolean exists = jobTitleRepository
+                .existsByCompany_CompanyIdAndDisplayOrderAndDelYn(
+                        company.getCompanyId(), reqDto.getDisplayOrder(), "NO");
+        if (exists) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "이미 사용 중인 순서입니다.");
+        }
 
         JobTitle jobTitle = JobTitle.builder()
                 .company(company)
                 .name(reqDto.getName())
-                .displayOrder(displayOrder)
+                .displayOrder(reqDto.getDisplayOrder())
                 .build();
 
         return jobTitleRepository.save(jobTitle).getJobTitleId();
@@ -529,29 +534,12 @@ public class OrganizationService {
                     List<MemberPosition> positions = memberPositionRepository
                             .findByOrganizationAndDelYn(org, "NO");
 
-                    // 직급별 그룹핑 (직급 displayOrder 기준 정렬)
-                    Map<String, List<OrgChartMemberResDto>> groupedByJobGrade = positions.stream()
+                    // 직원 목록 (직급 displayOrder 기준 정렬)
+                    List<OrgChartMemberResDto> members = positions.stream()
                             .filter(p -> "NO".equals(p.getMember().getDelYn()))
                             .sorted(Comparator.comparingInt(
                                     p -> p.getJobGrade().getDisplayOrder()))
-                            .collect(Collectors.groupingBy(
-                                    p -> p.getJobGrade().getName(),
-                                    LinkedHashMap::new,
-                                    Collectors.mapping(
-                                            p -> OrgChartMemberResDto.fromEntity(
-                                                    p.getMember(), p),
-                                            Collectors.toList()
-                                    )
-                            ));
-
-                    // 직급별 DTO 변환
-                    List<OrgChartJobGradeResDto> jobGrades = groupedByJobGrade
-                            .entrySet()
-                            .stream()
-                            .map(entry -> OrgChartJobGradeResDto.builder()
-                                    .jobGradeName(entry.getKey())
-                                    .members(entry.getValue())
-                                    .build())
+                            .map(p -> OrgChartMemberResDto.fromEntity(p.getMember(), p))
                             .collect(Collectors.toList());
 
                     // 재귀로 자식 조직 조회
@@ -562,7 +550,7 @@ public class OrganizationService {
                     return OrgChartResDto.builder()
                             .organizationId(org.getOrganizationId())
                             .name(org.getName())
-                            .jobGrades(jobGrades)
+                            .members(members)
                             .children(children)
                             .build();
                 })

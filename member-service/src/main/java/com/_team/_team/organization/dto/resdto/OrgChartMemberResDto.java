@@ -17,13 +17,13 @@ public class OrgChartMemberResDto {
 
     private UUID memberId;
     private String name;
-    private String jobTitleName;
+    private String jobGradeName;
 
     public static OrgChartMemberResDto fromEntity(Member member, MemberPosition position) {
         return OrgChartMemberResDto.builder()
                 .memberId(member.getMemberId())
                 .name(member.getName())
-                .jobTitleName(position.getJobTitle().getName())
+                .jobGradeName(position.getJobGrade().getName())
                 .build();
     }
 }
