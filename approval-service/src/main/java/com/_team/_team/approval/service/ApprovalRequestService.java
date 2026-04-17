@@ -116,7 +116,7 @@ public class ApprovalRequestService {
             }
         }
 
-        // stepOrder 연속성 검증
+        // stepOrder 연속성 검증dfdfd
         if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
             List<Integer> orders = reqDto.getApprovalLines().stream()
                     .map(ApprovalRequestCreateReqDto.ApprovalLineItem::getStepOrder)
