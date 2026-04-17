@@ -1,7 +1,6 @@
 package com._team._team.memberchat.service;
 
 import com._team._team.memberchat.domain.*;
-import com._team._team.memberchat.domain.enums.AuditAction;
 import com._team._team.memberchat.domain.enums.ChatParticipantStatus;
 import com._team._team.memberchat.dto.req.ChatSendRequest;
 import com._team._team.memberchat.dto.res.ChatMessageEvent;
@@ -10,7 +9,6 @@ import com._team._team.memberchat.dto.res.ChatSenderView;
 import com._team._team.memberchat.error.ChatErrorCode;
 import com._team._team.memberchat.error.ChatException;
 import com._team._team.memberchat.repository.ChatMessageRepository;
-import com._team._team.memberchat.repository.ChatMessageRevisionRepository;
 import com._team._team.memberchat.repository.ChatParticipantRepository;
 import com._team._team.memberchat.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,10 +30,8 @@ public class ChatMessageService {
 
     private final ChatRoomRepository roomRepo;
     private final ChatMessageRepository messageRepo;
-    private final ChatMessageRevisionRepository revisionRepo;
     private final ChatParticipantRepository participantRepo;
     private final ChatAuthPolicy authPolicy;
-    private final AuditLogService audit;
     private final RedisChatPubSubService pubsub;
     private final ChatMessageSenderEnricher senderEnricher;
 
@@ -61,8 +57,6 @@ public class ChatMessageService {
                 .replyToId(req.replyToId())
                 .build());
 
-        audit.record(senderId, AuditAction.MESSAGE_SENT, "MESSAGE", saved.getId());
-
         ChatMessageEvent event = ChatMessageEvent.created(saved);
         pubsub.publish(roomId, event);
         return event;
@@ -76,15 +70,7 @@ public class ChatMessageService {
         if (!m.getSenderId().equals(actorId)) throw new ChatException(ChatErrorCode.EDIT_FORBIDDEN);
         if (m.isOlderThan(Duration.ofHours(24))) throw new ChatException(ChatErrorCode.EDIT_WINDOW_EXPIRED);
 
-        revisionRepo.save(ChatMessageRevision.builder()
-                .messageId(messageId)
-                .action(ChatMessageRevision.RevisionAction.EDIT)
-                .previousContent(m.getContent())
-                .actorId(actorId)
-                .build());
-
         m.updateContent(newContent);
-        audit.record(actorId, AuditAction.MESSAGE_EDITED, "MESSAGE", messageId);
 
         ChatMessageEvent event = ChatMessageEvent.edited(m);
         pubsub.publish(m.getChatRoom().getId(), event);
@@ -99,19 +85,8 @@ public class ChatMessageService {
         if (!adminOverride && !m.getSenderId().equals(actorId)) {
             throw new ChatException(ChatErrorCode.EDIT_FORBIDDEN);
         }
-        if (m.getChatRoom().isLegalHold()) {
-            throw new ChatException(ChatErrorCode.LEGAL_HOLD_LOCKED);
-        }
-
-        revisionRepo.save(ChatMessageRevision.builder()
-                .messageId(messageId)
-                .action(ChatMessageRevision.RevisionAction.DELETE)
-                .previousContent(m.getContent())
-                .actorId(actorId)
-                .build());
 
         m.softDelete();
-        audit.record(actorId, AuditAction.MESSAGE_DELETED, "MESSAGE", messageId);
 
         ChatMessageEvent event = ChatMessageEvent.deleted(m);
         pubsub.publish(m.getChatRoom().getId(), event);

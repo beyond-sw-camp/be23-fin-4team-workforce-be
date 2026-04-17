@@ -44,16 +44,11 @@ public class ChatRoom extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean deleted = false;
 
-    @Builder.Default
-    @Column(nullable = false)
-    private boolean legalHold = false;
-
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ChatParticipant> participants = new ArrayList<>();
 
     public void softDelete() { this.deleted = true; }
-    public void applyLegalHold(boolean on) { this.legalHold = on; }
     public void rename(String newName) { this.name = newName; }
     public void updateImageUrl(String url) { this.imageUrl = url; }
 }
