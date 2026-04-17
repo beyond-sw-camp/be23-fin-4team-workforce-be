@@ -1,7 +1,6 @@
 package com._team._team.memberchat.service;
 
 import com._team._team.memberchat.domain.*;
-import com._team._team.memberchat.domain.enums.AuditAction;
 import com._team._team.memberchat.domain.enums.ChatParticipantStatus;
 import com._team._team.memberchat.domain.enums.ChatRoomRole;
 import com._team._team.memberchat.domain.enums.ChatRoomType;
@@ -33,7 +32,6 @@ public class ChatRoomService {
     private final ChatRoomRepository roomRepo;
     private final ChatParticipantRepository participantRepo;
     private final ChatMessageRepository messageRepo;
-    private final AuditLogService audit;
     private final ChatAuthPolicy authPolicy;
     private final ChatMessageSenderEnricher senderEnricher;
 
@@ -58,7 +56,6 @@ public class ChatRoomService {
                             .build());
                     persistParticipant(room, me, ChatRoomRole.OWNER);
                     persistParticipant(room, req.otherMemberId(), ChatRoomRole.MEMBER);
-                    audit.record(me, AuditAction.ROOM_CREATED, "ROOM", room.getId());
                     return toResponse(room, me);
                 });
     }
@@ -78,7 +75,6 @@ public class ChatRoomService {
                 .filter(id -> !id.equals(me))
                 .forEach(id -> persistParticipant(room, id, ChatRoomRole.MEMBER));
 
-        audit.record(me, AuditAction.ROOM_CREATED, "ROOM", room.getId());
         return toResponse(room, me);
     }
 
@@ -230,7 +226,6 @@ public class ChatRoomService {
         ChatRoom room = roomRepo.findById(roomId).orElseThrow(() -> new ChatException(ChatErrorCode.ROOM_NOT_FOUND));
         if (room.isDeleted()) throw new ChatException(ChatErrorCode.ROOM_DELETED);
         persistParticipant(room, target, ChatRoomRole.MEMBER);
-        audit.record(actor, AuditAction.ROOM_MEMBER_ADDED, "ROOM", roomId);
     }
 
     @Transactional
@@ -240,14 +235,12 @@ public class ChatRoomService {
         // 1:1 방은 HIDDEN(soft leave), 그룹은 LEFT
         if (p.getChatRoom().getType() == ChatRoomType.DIRECT) p.hide();
         else p.leave();
-        audit.record(me, AuditAction.ROOM_MEMBER_REMOVED, "ROOM", roomId);
     }
 
     @Transactional
     public void deleteRoom(UUID actor, long roomId, boolean adminOverride) {
         ChatRoom room = roomRepo.findById(roomId)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.ROOM_NOT_FOUND));
-        if (room.isLegalHold()) throw new ChatException(ChatErrorCode.LEGAL_HOLD_LOCKED);
 
         if (!adminOverride) {
             ChatParticipant p = participantRepo.findByChatRoomIdAndMemberId(roomId, actor)
@@ -255,7 +248,6 @@ public class ChatRoomService {
             if (p.getRole() != ChatRoomRole.OWNER) throw new ChatException(ChatErrorCode.ROLE_FORBIDDEN);
         }
         room.softDelete();
-        audit.record(actor, AuditAction.ROOM_DELETED, "ROOM", roomId);
     }
 
     private void persistParticipant(ChatRoom room, UUID memberId, ChatRoomRole role) {

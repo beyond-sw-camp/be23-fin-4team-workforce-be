@@ -21,7 +21,6 @@ public class MemberChatProperties {
     private final Stomp stomp = new Stomp();
     private final Redis redis = new Redis();
     private final Files files = new Files();
-    private final Retention retention = new Retention();
     private final RateLimit rateLimit = new RateLimit();
 
     @Getter @Setter
@@ -48,12 +47,6 @@ public class MemberChatProperties {
         private long maxSizeMb;
         private List<String> allowedMimes;
         private int presignedTtlSeconds;
-    }
-
-    @Getter @Setter
-    public static class Retention {
-        private int defaultDays;
-        private String batchCron;
     }
 
     @Getter @Setter
