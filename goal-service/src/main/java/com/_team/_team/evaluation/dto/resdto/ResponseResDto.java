@@ -24,6 +24,9 @@ public class ResponseResDto {
     private LocalDateTime lastRemindedAt;
     private String answersJson;
     private String calibrationJson;
+    /** 평가 시즌 시작 시점에 캡처된 타깃 목표 스냅샷 (List&lt;GoalSnapshotDto&gt; 직렬화). */
+    private String goalSnapshotJson;
+    private String targetGoalIdsJson;
 
     public static ResponseResDto from(EvaluationResponse e) {
         return ResponseResDto.builder()
@@ -40,6 +43,8 @@ public class ResponseResDto {
                 .lastRemindedAt(e.getLastRemindedAt())
                 .answersJson(e.getAnswersJson())
                 .calibrationJson(e.getCalibrationJson())
+                .goalSnapshotJson(e.getGoalSnapshotJson())
+                .targetGoalIdsJson(e.getTargetGoalIdsJson())
                 .build();
     }
 }

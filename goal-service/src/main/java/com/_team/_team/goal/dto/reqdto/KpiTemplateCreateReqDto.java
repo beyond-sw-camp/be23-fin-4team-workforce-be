@@ -1,5 +1,6 @@
 package com._team._team.goal.dto.reqdto;
 
+import com._team._team.goal.domain.enums.GoalApprovalPolicy;
 import com._team._team.goal.domain.enums.KpiSpecCycleType;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.domain.enums.MeasureType;
@@ -54,4 +55,10 @@ public class KpiTemplateCreateReqDto {
     private UUID targetTeamId;
 
     private Boolean requireApproval;
+
+    /**
+     * 세분화된 승인 정책 (NONE / ACTIVATION_ONLY / COMPLETION_ONLY / BOTH).
+     * 생략하면 requireApproval 플래그로부터 자동 유도된다 (true → BOTH, false → NONE).
+     */
+    private GoalApprovalPolicy goalApprovalPolicy;
 }

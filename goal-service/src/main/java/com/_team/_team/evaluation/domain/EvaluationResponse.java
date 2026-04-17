@@ -70,6 +70,17 @@ public class EvaluationResponse extends BaseTimeEntity {
     @Column(name = "normalized_score", precision = 7, scale = 2)
     private java.math.BigDecimal normalizedScore;
 
+    /**
+     * 평가 시즌 시작 시점(혹은 응답 materialize 시점)에 캡처된 타깃 목표들의 스냅샷.
+     * 목표가 나중에 수정·종료되더라도 "그 때 그 목표"를 기준으로 평가 맥락을 재현하기 위한
+     * 읽기 전용 스냅샷이며, {@code List<GoalSnapshotDto>} 를 직렬화한 JSON 배열이다.
+     *
+     * 별도 엔티티를 추가하지 않고 기존 EvaluationResponse 에 JSON 컬럼으로만 붙여
+     * 목표 이력 추적을 가능하게 한다.
+     */
+    @Column(name = "goal_snapshot_json", columnDefinition = "TEXT")
+    private String goalSnapshotJson;
+
     public void startProgress() {
         if (this.status == EvaluationStatus.NOT_STARTED) {
             this.status = EvaluationStatus.IN_PROGRESS;
@@ -107,5 +118,9 @@ public class EvaluationResponse extends BaseTimeEntity {
 
     public void updateNormalizedScore(java.math.BigDecimal score) {
         this.normalizedScore = score;
+    }
+
+    public void updateGoalSnapshot(String goalSnapshotJson) {
+        this.goalSnapshotJson = goalSnapshotJson;
     }
 }

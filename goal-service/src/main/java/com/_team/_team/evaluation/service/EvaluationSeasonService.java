@@ -10,17 +10,24 @@ import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.SeasonCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
+import com._team._team.evaluation.dto.resdto.GoalSnapshotDto;
 import com._team._team.evaluation.dto.resdto.SeasonResDto;
 import com._team._team.evaluation.repository.EvaluationGroupRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
+import com._team._team.goal.domain.Goal;
+import com._team._team.goal.domain.enums.GoalStatus;
+import com._team._team.goal.repository.GoalRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,15 +39,18 @@ public class EvaluationSeasonService {
     private final EvaluationSeasonRepository seasonRepository;
     private final EvaluationGroupRepository groupRepository;
     private final EvaluationResponseRepository responseRepository;
+    private final GoalRepository goalRepository;
     private final ObjectMapper objectMapper;
 
     public EvaluationSeasonService(EvaluationSeasonRepository seasonRepository,
                                     EvaluationGroupRepository groupRepository,
                                     EvaluationResponseRepository responseRepository,
+                                    GoalRepository goalRepository,
                                     ObjectMapper objectMapper) {
         this.seasonRepository = seasonRepository;
         this.groupRepository = groupRepository;
         this.responseRepository = responseRepository;
+        this.goalRepository = goalRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -99,6 +109,11 @@ public class EvaluationSeasonService {
         // 검증 강화: targetMemberId == evaluatorId 인 경우는 SELF 타입 외에는 건너뛴다.
         List<EvaluationGroup> groups = groupRepository.findBySeason_SeasonId(seasonId);
         List<EvaluationResponse> responses = new ArrayList<>();
+        // 같은 시즌 시작 시점에는 대상자당 스냅샷을 한 번만 계산해서 재사용한다.
+        Map<UUID, String> snapshotCache = new HashMap<>();
+        Map<UUID, String> targetIdsCache = new HashMap<>();
+        String takenAtIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+
         for (EvaluationGroup group : groups) {
             if (group.getEvaluatorMapsJson() == null) continue;
             List<Map<String, String>> maps;
@@ -118,12 +133,23 @@ public class EvaluationSeasonService {
                     if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
                         continue;
                     }
+
+                    // 평가 대상자의 "평가 가능한" 목표들을 시즌 시작 시점 스냅샷으로 캡처
+                    // - ACTIVE/COMPLETED 만 대상 (DRAFT/CANCELLED 는 제외)
+                    // - 별도 엔티티 없이 JSON 컬럼으로만 기록
+                    String goalSnapshotJson = snapshotCache.computeIfAbsent(targetMemberId,
+                            tid -> buildGoalSnapshotJson(companyId, tid, takenAtIso));
+                    String targetGoalIdsJson = targetIdsCache.computeIfAbsent(targetMemberId,
+                            tid -> buildTargetGoalIdsJson(companyId, tid));
+
                     responses.add(EvaluationResponse.builder()
                             .companyId(companyId)
                             .group(group)
                             .targetMemberId(targetMemberId)
                             .evaluatorId(evaluatorId)
                             .evaluationType(evalType)
+                            .goalSnapshotJson(goalSnapshotJson)
+                            .targetGoalIdsJson(targetGoalIdsJson)
                             .build());
                 } catch (IllegalArgumentException ignore) {
                     // 잘못된 UUID/enum 값은 해당 매핑만 건너뛴다 (다른 그룹까지 막지 않도록)
@@ -135,6 +161,42 @@ public class EvaluationSeasonService {
         }
 
         return SeasonResDto.from(season);
+    }
+
+    /**
+     * 평가 대상자의 평가 가능 목표를 시즌 시작 시점 스냅샷으로 직렬화한다.
+     * 별도 엔티티 없이 JSON 컬럼만으로 이력 추적이 가능하도록 만든 핵심 로직.
+     */
+    private String buildGoalSnapshotJson(UUID companyId, UUID targetMemberId, String takenAtIso) {
+        try {
+            List<Goal> goals = goalRepository.findByCompanyIdAndOwnerId(companyId, targetMemberId);
+            List<GoalSnapshotDto> snapshots = goals.stream()
+                    .filter(g -> g.getStatus() == GoalStatus.ACTIVE || g.getStatus() == GoalStatus.COMPLETED)
+                    .map(g -> GoalSnapshotDto.from(g, takenAtIso))
+                    .collect(Collectors.toList());
+            if (snapshots.isEmpty()) {
+                return null;
+            }
+            return objectMapper.writeValueAsString(snapshots);
+        } catch (Exception e) {
+            // 스냅샷 실패는 치명적이지 않음 — 응답 생성 자체는 계속 진행
+            return null;
+        }
+    }
+
+    private String buildTargetGoalIdsJson(UUID companyId, UUID targetMemberId) {
+        try {
+            List<UUID> goalIds = goalRepository.findByCompanyIdAndOwnerId(companyId, targetMemberId).stream()
+                    .filter(g -> g.getStatus() == GoalStatus.ACTIVE || g.getStatus() == GoalStatus.COMPLETED)
+                    .map(Goal::getGoalId)
+                    .collect(Collectors.toList());
+            if (goalIds.isEmpty()) {
+                return null;
+            }
+            return objectMapper.writeValueAsString(goalIds);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Transactional

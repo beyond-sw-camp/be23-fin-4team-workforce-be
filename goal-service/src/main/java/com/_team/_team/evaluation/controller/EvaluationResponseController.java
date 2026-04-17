@@ -7,6 +7,7 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.evaluation.dto.reqdto.CalibrationAdjustReqDto;
 import com._team._team.evaluation.dto.reqdto.CalibrationBaselineReqDto;
 import com._team._team.evaluation.dto.reqdto.ResponseSaveReqDto;
+import com._team._team.evaluation.dto.resdto.GoalSummaryCardResDto;
 import com._team._team.evaluation.dto.resdto.ResponseResDto;
 import com._team._team.evaluation.service.EvaluationResponseService;
 import org.springframework.http.ResponseEntity;
@@ -136,6 +137,22 @@ public class EvaluationResponseController {
             @PathVariable UUID seasonId) {
         responseService.confirmCalibration(seasonId, UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(null, "캘리브레이션이 확정되었습니다."));
+    }
+
+    // ── 목표 요약 카드 (스냅샷 vs 현재) ──
+
+    /**
+     * 평가 응답에 포함된 타깃 목표 스냅샷과 현재 값을 비교하여 요약 카드 목록을 반환한다.
+     * 평가 작성 화면(EvaluationWritePage)에서 평가자가 피평가자의 목표 현황을 확인할 때 사용한다.
+     */
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/{responseId}/goal-summaries")
+    public ResponseEntity<ApiResponse<List<GoalSummaryCardResDto>>> getGoalSummaries(
+            @RequestHeader("X-User-UUID") String memberId,
+            @PathVariable UUID responseId) {
+        List<GoalSummaryCardResDto> result =
+                responseService.listGoalSummaries(responseId, UUID.fromString(memberId));
+        return ResponseEntity.ok(ApiResponse.success(result, "목표 요약 카드 조회 성공"));
     }
 
     // ── 진행도 / 분석 ──

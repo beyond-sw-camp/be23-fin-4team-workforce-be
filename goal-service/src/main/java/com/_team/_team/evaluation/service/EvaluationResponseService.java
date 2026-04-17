@@ -12,10 +12,14 @@ import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.CalibrationAdjustReqDto;
 import com._team._team.evaluation.dto.reqdto.ResponseSaveReqDto;
+import com._team._team.evaluation.dto.resdto.GoalSnapshotDto;
+import com._team._team.evaluation.dto.resdto.GoalSummaryCardResDto;
 import com._team._team.evaluation.dto.resdto.ResponseResDto;
 import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
+import com._team._team.goal.domain.Goal;
+import com._team._team.goal.repository.GoalRepository;
 import com._team._team.meeting.service.MeetingRecordService;
 import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -32,7 +36,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +47,7 @@ public class EvaluationResponseService {
     private final EvaluationResponseRepository responseRepository;
     private final EvaluationSeasonRepository seasonRepository;
     private final CalibrationHistoryRepository calibrationHistoryRepository;
+    private final GoalRepository goalRepository;
     private final ObjectMapper objectMapper;
     private final MeetingRecordService meetingRecordService;
     private final ApplicationEventPublisher eventPublisher;
@@ -48,12 +55,14 @@ public class EvaluationResponseService {
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
                                       EvaluationSeasonRepository seasonRepository,
                                       CalibrationHistoryRepository calibrationHistoryRepository,
+                                      GoalRepository goalRepository,
                                       ObjectMapper objectMapper,
                                       MeetingRecordService meetingRecordService,
                                       ApplicationEventPublisher eventPublisher) {
         this.responseRepository = responseRepository;
         this.seasonRepository = seasonRepository;
         this.calibrationHistoryRepository = calibrationHistoryRepository;
+        this.goalRepository = goalRepository;
         this.objectMapper = objectMapper;
         this.meetingRecordService = meetingRecordService;
         this.eventPublisher = eventPublisher;
@@ -468,6 +477,100 @@ public class EvaluationResponseService {
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .map(ResponseResDto::from)
                 .collect(Collectors.toList());
+    }
+
+    // ── 목표 요약 카드 ──
+
+    /**
+     * 평가 응답에 캡처된 목표 스냅샷과 현재 DB 상의 목표 최신 값을 비교하여
+     * 요약 카드 목록을 반환한다.
+     *
+     * 요청자(requesterId)가 해당 응답의 evaluator 가 아니면 접근 차단한다.
+     */
+    @Transactional(readOnly = true)
+    public List<GoalSummaryCardResDto> listGoalSummaries(UUID responseId, UUID requesterId) {
+        EvaluationResponse response = responseRepository.findById(responseId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
+        if (!response.getEvaluatorId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 조회할 수 있습니다.");
+        }
+
+        // 1) 스냅샷 복원
+        List<GoalSnapshotDto> snapshots = parseSnapshots(response.getGoalSnapshotJson());
+        if (snapshots.isEmpty()) {
+            return List.of();
+        }
+
+        // 2) 현재 목표 실시간 조회
+        List<UUID> goalIds = snapshots.stream().map(GoalSnapshotDto::getGoalId).toList();
+        Map<UUID, Goal> currentGoals = goalRepository.findAllById(goalIds).stream()
+                .collect(Collectors.toMap(Goal::getGoalId, Function.identity()));
+
+        // 3) 카드 구성 — 스냅샷 대비 변경 여부 판정
+        List<GoalSummaryCardResDto> cards = new ArrayList<>();
+        for (GoalSnapshotDto snap : snapshots) {
+            Goal current = currentGoals.get(snap.getGoalId());
+            GoalSummaryCardResDto.CurrentGoalView currentView = null;
+            boolean changed = false;
+            List<String> changeSummary = new ArrayList<>();
+
+            if (current != null) {
+                currentView = GoalSummaryCardResDto.CurrentGoalView.builder()
+                        .title(current.getTitle())
+                        .status(current.getStatus().name())
+                        .targetValue(current.getTargetValue())
+                        .actualValue(current.getActualValue())
+                        .achievementPct(current.getAchievementPct())
+                        .rolledAchievementPct(current.getRolledAchievementPct())
+                        .weightPct(current.getWeightPct())
+                        .unitLabel(current.getUnitLabel())
+                        .build();
+
+                // 변경점 감지
+                if (!Objects.equals(snap.getTitle(), current.getTitle())) {
+                    changeSummary.add("TITLE");
+                }
+                if (snap.getTargetValue() != null && current.getTargetValue() != null
+                        && snap.getTargetValue().compareTo(current.getTargetValue()) != 0) {
+                    changeSummary.add("TARGET_VALUE");
+                }
+                if (!Objects.equals(snap.getStatusAtSnapshot(), current.getStatus())) {
+                    changeSummary.add("STATUS");
+                }
+                if (!Objects.equals(snap.getEndDate(), current.getEndDate())) {
+                    changeSummary.add("PERIOD");
+                }
+                // actualValue 변경은 자연스러운 진행이므로 별도 표시
+                if (snap.getActualValueAtSnapshot() != null && current.getActualValue() != null
+                        && snap.getActualValueAtSnapshot().compareTo(current.getActualValue()) != 0) {
+                    changeSummary.add("PROGRESS");
+                }
+                changed = !changeSummary.isEmpty();
+            } else {
+                changeSummary.add("DELETED_OR_HIDDEN");
+                changed = true;
+            }
+
+            cards.add(GoalSummaryCardResDto.builder()
+                    .goalId(snap.getGoalId())
+                    .snapshot(snap)
+                    .current(currentView)
+                    .changedSinceSnapshot(changed)
+                    .changeSummary(changeSummary)
+                    .build());
+        }
+        return cards;
+    }
+
+    private List<GoalSnapshotDto> parseSnapshots(String goalSnapshotJson) {
+        if (goalSnapshotJson == null || goalSnapshotJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(goalSnapshotJson, new TypeReference<List<GoalSnapshotDto>>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
 }
