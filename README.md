@@ -162,7 +162,7 @@
 
 ## API 명세서
 
-- 🔗 [POSTMAN 보기](https://documenter.getpostman.com/view/51059789/2sBXqDrNZT)
+- 🔗 [프로그램 사양서 및 단위테스트결과서](https://documenter.getpostman.com/view/51059789/2sBXqDrNZT)
 
 <img width="1302" alt="WORKFORCE ERD" src="여기에_이미지_URL_넣기" />
 
