@@ -5,8 +5,7 @@
 <hr>
 
 ## 목차
-- [팀 소개](#팀-소개)
-- [프로젝트 소개](#프로젝트-소개) 
+- [팀 소개 및 프로젝트 소개](#팀-소개-및-프로젝트-소개)
 - [주요 기능](#주요-모듈-기능-요약)
 - [기획서](#기획서)
 - [기술 스택](#기술-스택)
@@ -14,7 +13,7 @@
 - [요구사항 명세서](#요구사항-명세서)
 - [WBS](#wbs)
 - [ERD](#erd)
-- [와이어 프레임](#와이어-프레임)
+- [화면설계서](#화면설계서)
 - [API 명세서](#api-명세서)
 - [단위 테스트](#단위-테스트)
 - [UI / UX 테스트](#ui--ux-단위-테스트)
@@ -23,7 +22,7 @@
 
 ---
 
-## 팀 소개
+## 팀 소개 및 프로젝트 소개
 
 <div align="center">
 
@@ -33,9 +32,6 @@
 
 </div>
 
-<hr>
-
-## 프로젝트 소개
 "기록하는 HR → 예측하는 HR" 비전의 **데이터 기반 All-in-One 스마트 HRMS**입니다. 중소기업 HR 담당자의 **'Second Brain'** 역할을 수행하며, 인사 데이터를 중앙화하고 AI로 선제적 인사이트를 제공합니다.
 
 <br>
@@ -144,6 +140,30 @@
 - [ERD 전체 보기](https://www.erdcloud.com/d/Er4amBY2KpweBcKTk)
 
 <img width="1302" alt="WORKFORCE ERD" src="./docs/WORKFORCE_ERD.png" />
+
+<br>
+<div align="right">
+  <a href="#목차">🔝 맨 위로</a>
+</div>
+<hr>
+
+## 화면설계서
+
+- [Figma 전체 보기](https://www.figma.com/design/FftNc7FU8cuQZS2VnKm3NR/be23-fin-team4-workforce?node-id=0-1&t=AZ9PaJjekutgn9fR-1)
+
+<img width="1302" alt="WORKFORCE ERD" src="" />
+
+<br>
+<div align="right">
+  <a href="#목차">🔝 맨 위로</a>
+</div>
+<hr>
+
+## API 명세서
+
+- [POSTMAN 보기]()
+
+<img width="1302" alt="WORKFORCE ERD" src="" />
 
 <br>
 <div align="right">
