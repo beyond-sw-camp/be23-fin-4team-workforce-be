@@ -56,7 +56,7 @@ public class ApprovalViewerService {
             List<ApprovalViewer> allViewers = approvalViewerRepository
                     .findByRequestId(request.getRequestId());
 
-            result.add(ApprovalRequestResDto.fromEntity(request, approvals, allViewers));
+            result.add(ApprovalRequestResDto.fromEntity(request, approvals, allViewers, null));
         }
         return result;
     }
@@ -81,7 +81,7 @@ public class ApprovalViewerService {
             List<ApprovalViewer> allViewers = approvalViewerRepository
                     .findByRequestId(request.getRequestId());
 
-            result.add(ApprovalRequestResDto.fromEntity(request, approvals, allViewers));
+            result.add(ApprovalRequestResDto.fromEntity(request, approvals, allViewers, null));
         }
         return result;
     }

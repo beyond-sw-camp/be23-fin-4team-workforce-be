@@ -9,6 +9,7 @@ import com._team._team.notification.NotificationType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +21,34 @@ import java.util.*;
 public class ApprovalNotificationService {
 
     private static final String TARGET_TYPE = "APPROVAL";
+    private static final String OFFICIAL_TOPIC = "official-approved";
     private final ApplicationEventPublisher eventPublisher;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
 
     @Autowired
-    public ApprovalNotificationService(ApplicationEventPublisher eventPublisher) {
+    public ApprovalNotificationService(ApplicationEventPublisher eventPublisher, KafkaTemplate<String, Object> kafkaTemplate) {
         this.eventPublisher = eventPublisher;
+        this.kafkaTemplate = kafkaTemplate;
+    }
+
+    // 공문 최종 승인 도메인 이벤트 (별도 토픽)
+    // 기존 알림은 eventPublisher 경로(AFTER_COMMIT) 로 나가고,
+    // 이 메서드는 official-approved 토픽에만 추가로 발행한다.
+    public void publishOfficialApprovedEvent(ApprovalRequest request) {
+        if (request == null) return;
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("requestId", request.getRequestId());
+        payload.put("documentNumber", request.getDocumentNumber());
+        payload.put("requesterId", request.getMemberId());
+        payload.put("requesterOrgId", request.getRequesterOrganizationId());
+        payload.put("requesterOrgName", request.getRequesterOrganizationName());
+        payload.put("approvedAt", request.getUpdatedAt());
+
+        kafkaTemplate.send(OFFICIAL_TOPIC, payload);
+        log.info("공문 승인 이벤트 발행 requestId={}, docNumber={}",
+                request.getRequestId(), request.getDocumentNumber());
     }
 
     //    결재 요청 (WAIT 진입)

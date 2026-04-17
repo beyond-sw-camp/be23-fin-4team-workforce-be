@@ -31,6 +31,9 @@ public class ApprovalRequest extends BaseTimeEntity {
     @JoinColumn(name = "document_id", nullable = false)
     private ApprovalDocument approvalDocument;
 
+    @Column(length = 30, unique = true)
+    private String documentNumber; // 공문 번호 (예: 인사-2026-0147). OFFICIAL 타입에서만 사용
+
     @Column(nullable = false)
     private UUID memberId; // 요청자ID
 
@@ -87,6 +90,10 @@ public class ApprovalRequest extends BaseTimeEntity {
 
     public void updateEndDateTime(LocalDateTime endDateTime) {
         this.endDateTime = endDateTime;
+    }
+
+    public void updateDocumentNumber(String documentNumber) {
+        this.documentNumber = documentNumber;
     }
 
 }
