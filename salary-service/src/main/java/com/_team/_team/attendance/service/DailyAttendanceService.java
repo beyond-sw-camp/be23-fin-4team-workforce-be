@@ -1,7 +1,7 @@
-package com._team._team.attendance.Service;
+package com._team._team.attendance.service;
 
-import com._team._team.attendance.Repository.DailyAttendanceRepository;
-import com._team._team.attendance.Repository.WorkScheduleRepository;
+import com._team._team.attendance.repository.DailyAttendanceRepository;
+import com._team._team.attendance.repository.WorkScheduleRepository;
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.WorkSchedule;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
@@ -35,10 +35,6 @@ public class DailyAttendanceService {
     /**
      * 해당 날짜의 DailyAttendance 조회, 없으면 새로 생성
      * - 출근(clockIn) 시 호출되어 당일 근태 레코드를 보장
-     *
-     * [성능]
-     * - (member_id, attendance_date) UNIQUE 인덱스 → SELECT 1회
-     * - 최초 출근 시에만 INSERT 발생 (대부분 조회로 끝남)
      */
     public DailyAttendance findOrCreateDaily(UUID companyId, UUID memberId, LocalDate date){
         // 1. 당일 근태 기록이 이미 있으면 그대로 반환
@@ -56,8 +52,7 @@ public class DailyAttendanceService {
         /**
         * 2-2. DailyAttendance 생성
         * status = ABSENT: 아직 출근 로그가 안 찍힌 상태
-        * → 이후 clockIn()에서 NORMAL로 즉시 변경됨
-        * totalBreakMinutes = 0: 휴게시간은 BREAK_END 이벤트 시 누적됨
+        * -> 이후 clockIn()에서 NORMAL로 즉시 변경됨
         * workScheduleId: 이 사원에게 적용되는 스케줄 (overtime 계산 기준)
         */
         DailyAttendance dailyAttendance = DailyAttendance.builder()
@@ -66,7 +61,6 @@ public class DailyAttendanceService {
                 .attendanceDate(date)
                 .status(AttendanceStatus.ABSENT)
                 .workScheduleId(scheduleId)        // 개인 스케줄 우선, 없으면 회사 기본
-                .totalBreakMinutes(0)
                 .build();
 
         return dailyAttendanceRepository.save(dailyAttendance);
@@ -74,8 +68,8 @@ public class DailyAttendanceService {
 
     /**
      * 해당 날짜의 DailyAttendance 조회 (없으면 예외)
-     * 퇴근, 휴게 시작/종료시 사용 (clockOut, breakStart, breakEnd에서 호출)
-     * 출근 기록 없이 호출되면 400 에러 (퇴근/휴게 시작/휴게 종료는 "출근한 상태"에서만 가능)
+     * 퇴근시 사용 (clockOut에서 호출)
+     * 출근 기록 없이 호출되면 에러 (퇴근은 "출근한 상태"에서만 가능)
      */
     @Transactional(readOnly = true)
     public DailyAttendance findDaily(UUID companyId, UUID memberId, LocalDate date){
@@ -101,8 +95,6 @@ public class DailyAttendanceService {
     /**
      * 개인 월간 근태 조회 (페이징)
      * - 사원 본인이 한 달 근태 내역 확인
-     * - daily_attendance만 조회 (attendance_log JOIN 없음)
-     * - 페이징 적용으로 한 번에 최대 31건 (한 달 근무일)
      */
     @Transactional(readOnly = true)
     public Page<DailyAttendanceResDto> findMonthlyByMember(UUID companyId, UUID memberId, LocalDate from, LocalDate to, Pageable pageable) {
@@ -112,10 +104,8 @@ public class DailyAttendanceService {
     }
 
     /**
-     * 회사 전체 특정일 근태 조회 — 관리자 대시보드 (페이징)
+     * 회사 전체 특정일 근태 조회 - 관리자 대시보드 (페이징)
      * - 오늘 출근 현황, 결근자 파악
-     * - (company_id, attendance_date) 인덱스 활용
-     * - 직원 500명이어도 한 페이지 20~50건 단위로 조회
      */
     @Transactional(readOnly = true)
     public Page<DailyAttendanceResDto> findDailyByCompany(UUID companyId, LocalDate date, Pageable pageable) {
@@ -125,7 +115,7 @@ public class DailyAttendanceService {
     }
 
     /**
-     * 회사 전체 월간 근태 조회 — (관리자가 월간 리포트 확인)
+     * 회사 전체 월간 근태 조회 (관리자가 월간 리포트 확인)
      * - 100명 × 22일 = 2,200건/월 → 페이징 필수
      * - daily_attendance만 조회
      */
@@ -174,9 +164,6 @@ public class DailyAttendanceService {
      * 출근 시점에 유효한 WorkScheduleID 결정
      * DailyAttendance를 생성할 때 workScheduleId를 넣어두면,
      * 나중에 퇴근 시 getScheduleWorkMinutes()에서 또 스케줄 조회 안 해도 됨.
-     *
-     * ===== 호출 시점 =====
-     * findOrCreateDaily() → 신규 DailyAttendance 생성 시에만 호출됨
      */
     private UUID resolveWorkScheduleId(UUID companyId, UUID memberId, LocalDate date) {
         List<WorkSchedule> schedules = workScheduleRepository

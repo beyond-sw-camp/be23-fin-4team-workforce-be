@@ -1,4 +1,4 @@
-package com._team._team.attendance.Repository;
+package com._team._team.attendance.repository;
 
 import com._team._team.attendance.domain.AttendanceLog;
 import com._team._team.attendance.domain.DailyAttendance;
@@ -30,13 +30,6 @@ public interface AttendanceLogRepository extends JpaRepository<AttendanceLog, UU
      * - 출근/퇴근은 하루 1회이므로 첫 행 발견 즉시 true 리턴
      */
     boolean existsByDailyAttendanceAndEventType(
-            DailyAttendance dailyAttendance, EventType eventType);
-
-    /**
-     * 특정 이벤트 타입 개수 (BREAK_START/END 매칭 검증)
-     * - BREAK_START 수 > BREAK_END 수 → 현재 휴게 중
-     */
-    long countByDailyAttendanceAndEventType(
             DailyAttendance dailyAttendance, EventType eventType);
 
     /**

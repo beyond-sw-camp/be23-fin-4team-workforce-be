@@ -1,4 +1,4 @@
-package com._team._team.attendance.Repository;
+package com._team._team.attendance.repository;
 
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.enums.AttendanceStatus;

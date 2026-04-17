@@ -1,8 +1,8 @@
-package com._team._team.attendance.Service;
+package com._team._team.attendance.service;
 
-import com._team._team.attendance.FeignClients.ApprovalServiceClient;
-import com._team._team.attendance.Repository.DailyAttendanceRepository;
-import com._team._team.attendance.Repository.WorkScheduleRepository;
+import com._team._team.attendance.feignClients.ApprovalServiceClient;
+import com._team._team.attendance.repository.DailyAttendanceRepository;
+import com._team._team.attendance.repository.WorkScheduleRepository;
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.WorkSchedule;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
