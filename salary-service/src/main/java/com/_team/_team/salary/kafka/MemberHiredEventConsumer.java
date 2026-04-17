@@ -1,7 +1,7 @@
 package com._team._team.salary.kafka;
 
 import com._team._team.event.MemberHiredEvent;
-import com._team._team.salary.Service.SalaryAutoCreateService;
+import com._team._team.salary.service.SalaryAutoCreateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;

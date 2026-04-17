@@ -1,7 +1,7 @@
 package com._team._team.batch.leave.worker;
 
-import com._team._team.attendance.Repository.LeavePolicyRepository;
-import com._team._team.attendance.Repository.MemberBalanceRepository;
+import com._team._team.attendance.repository.LeavePolicyRepository;
+import com._team._team.attendance.repository.MemberBalanceRepository;
 import com._team._team.attendance.domain.LeavePolicy;
 import com._team._team.attendance.domain.MemberBalance;
 import com._team._team.attendance.domain.enums.BalanceType;
