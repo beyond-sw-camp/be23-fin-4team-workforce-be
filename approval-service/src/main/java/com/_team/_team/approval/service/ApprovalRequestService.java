@@ -604,7 +604,6 @@ public class ApprovalRequestService {
         return requests.stream()
                 .map(this::toResDtoWithRecipients)
                 .toList();
-
     }
 
     // 공통 헬퍼 — recipients 자동 포함

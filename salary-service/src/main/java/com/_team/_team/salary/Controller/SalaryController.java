@@ -1,6 +1,8 @@
 package com._team._team.salary.Controller;
 
 import com._team._team.dto.ApiResponse;
+import com._team._team.event.MemberHiredEvent;
+import com._team._team.salary.Service.SalaryAutoCreateService;
 import com._team._team.salary.Service.SalaryService;
 import com._team._team.salary.dto.reqdto.SalaryCreateReqDto;
 import com._team._team.salary.dto.reqdto.SalaryUpdateReqDto;
@@ -10,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @RestController
@@ -17,10 +20,13 @@ import java.util.UUID;
 public class SalaryController {
 
     private final SalaryService salaryService;
+    private final SalaryAutoCreateService salaryAutoCreateService;
 
     @Autowired
-    public SalaryController(SalaryService salaryService){
+    public SalaryController(SalaryService salaryService,
+                            SalaryAutoCreateService salaryAutoCreateService){
         this.salaryService = salaryService;
+        this.salaryAutoCreateService = salaryAutoCreateService;
     }
 
     /** 급여 생성 */
@@ -31,6 +37,28 @@ public class SalaryController {
         return new ResponseEntity<>(
                 ApiResponse.success(salaryService.save(companyId, reqDto), "급여가 생성되었습니다."),
                 HttpStatus.CREATED
+        );
+    }
+
+    // 복구용 수동 bootstrap - Kafka 실패 or 기존 직원 백필 시 사용
+    // 회사 기본값(base-salary)로 Salary 1건 생성 이후 관리자가 PATCH로 수정
+    @PostMapping("/bootstrap")
+    public ResponseEntity<?> bootstrap(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestBody MemberHiredEvent body) {
+        MemberHiredEvent e = MemberHiredEvent.builder()
+                .memberId(body.getMemberId())
+                .companyId(companyId)
+                .jobGradeId(body.getJobGradeId())
+                .jobGradeName(body.getJobGradeName())
+                .jobTitleName(body.getJobTitleName())
+                .hireDate(body.getHireDate())
+                .eventTime(Instant.now())
+                .build();
+        salaryAutoCreateService.bootstrapSalary(e);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "Salary bootstrap 요청 처리됨"),
+                HttpStatus.OK
         );
     }
 

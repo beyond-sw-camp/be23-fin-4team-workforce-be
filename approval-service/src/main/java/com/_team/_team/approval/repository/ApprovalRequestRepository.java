@@ -109,4 +109,22 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("memberId") UUID memberId,
             @Param("status") RequestStatus status,
             @Param("requestType") RequestType requestType);
+
+    // 특정 직원이 특정 날짜에 승인받은 연장근무 종료시각 중 가장 늦은 값
+    // 같은 날 여러 건 연장한 경우도 MAX로 잡기 위해 ar.startDateTime 기준 범위 조회
+    // 근태 자동 마감(DailyAttendanceCloseService) 때 이 값으로 퇴근시각을 채워 넣는다
+    @Query("SELECT MAX(ar.endDateTime) " +
+            "FROM ApprovalRequest ar " +
+            "JOIN ar.approvalDocument doc " +
+            "WHERE ar.memberId = :memberId " +
+            "AND doc.documentName = '연장근무신청' " +
+            "AND ar.requestStatus = :status " +
+            "AND ar.delYn = 'N' " +
+            "AND ar.startDateTime >= :startOfDay " +
+            "AND ar.startDateTime < :startOfNextDay")
+    Optional<LocalDateTime> findLatestApprovedOvertimeEnd(
+            @Param("memberId") UUID memberId,
+            @Param("status") RequestStatus status,
+            @Param("startOfDay") LocalDateTime startOfDay,
+            @Param("startOfNextDay") LocalDateTime startOfNextDay);
 }

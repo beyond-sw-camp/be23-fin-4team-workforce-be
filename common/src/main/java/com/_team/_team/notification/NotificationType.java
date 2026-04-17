@@ -3,7 +3,12 @@ package com._team._team.notification;
 public enum NotificationType {
 
     // 근태
-    ATTENDANCE_MODIFIED,     // 근태 수정
+    ATTENDANCE_MODIFIED,         // 근태 수정
+    ATTENDANCE_LATE,             // 지각 의심
+    ATTENDANCE_EARLY_LEAVE,      // 조퇴 의심
+    ATTENDANCE_MISSING_CLOCK_OUT,// 미퇴근
+    ATTENDANCE_ABSENT_SUSPECT,   // 결근 의심
+    ATTENDANCE_LEAVE_CLOCKIN,    // 휴가일 출근
     LEAVE_REQUESTED,         // 연차 신청
     LEAVE_APPROVED,          // 연차 승인
     LEAVE_REJECTED,          // 연차 반려

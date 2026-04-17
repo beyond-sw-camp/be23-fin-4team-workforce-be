@@ -25,4 +25,7 @@ public interface JobTitleRepository extends JpaRepository<JobTitle, UUID> {
     List<JobTitle> findByCompanyIdAndDelYnWithLock(
             @Param("companyId") UUID companyId,
             @Param("delYn") String delYn);
+
+    boolean existsByCompany_CompanyIdAndDisplayOrderAndDelYn(
+            UUID companyId, int displayOrder, String delYn);
 }
