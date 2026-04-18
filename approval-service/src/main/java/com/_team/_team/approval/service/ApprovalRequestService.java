@@ -139,6 +139,11 @@ public class ApprovalRequestService {
         }
 
         // ApprovalRequest 생성
+        // 공문은 강제 공개
+        String deptVisible = (document.getRequestType() == RequestType.OFFICIAL)
+                ? "Y"
+                : (reqDto.getIsDeptVisibleYn() != null ? reqDto.getIsDeptVisibleYn() : "Y");
+
         ApprovalRequest request = ApprovalRequest.builder()
                 .approvalDocument(document)
                 .memberId(memberId)
@@ -148,6 +153,7 @@ public class ApprovalRequestService {
                 .requesterName(requester.getMemberName())
                 .requesterOrganizationId(requester.getOrganizationId())
                 .requesterOrganizationName(requester.getOrganizationName())
+                .isDeptVisibleYn(deptVisible)
                 .build();
 
         ApprovalRequest savedRequest = approvalRequestRepository.save(request);
@@ -583,7 +589,7 @@ public class ApprovalRequestService {
     // 부서 문서함 조회 (본인 부서 + 하위 조직의 결재 요청, 작성 시점 부서 기준)
     @Transactional(readOnly = true)
     public List<ApprovalRequestResDto> findDepartmentRequests(
-            UUID companyId, UUID memberPositionId, UUID organizationId, RequestType requestType) {
+            UUID companyId, UUID memberPositionId, UUID memberId, UUID organizationId, RequestType requestType) {
 
         // 1. 요청자 본인 정보 조회
         MemberPositionResDto requester = memberServiceClient.getMemberPosition(memberPositionId);
@@ -602,7 +608,14 @@ public class ApprovalRequestService {
                 : approvalRequestRepository.findDepartmentRequestsByType(companyId, organizationId, requestType);
 
         return requests.stream()
-                .map(this::toResDtoWithRecipients)
+                .map(request -> {
+                    // 비공개 문서 + 작성자 본인이 아닌 경우 → 마스킹
+                    if ("N".equals(request.getIsDeptVisibleYn())
+                            && !request.getMemberId().equals(memberId)) {
+                        return ApprovalRequestResDto.maskedFromEntity(request);
+                    }
+                    return toResDtoWithRecipients(request);
+                })
                 .toList();
     }
 

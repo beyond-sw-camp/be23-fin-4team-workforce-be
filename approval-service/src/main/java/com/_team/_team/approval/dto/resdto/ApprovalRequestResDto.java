@@ -30,10 +30,11 @@ public class ApprovalRequestResDto {
     private String cancelReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private String documentNumber;                      // 공문 번호 (OFFICIAL만)
-    private List<OfficialRecipientResDto> recipients;   // 수신 부서 목록 (OFFICIAL만)
+    private String documentNumber;
+    private List<OfficialRecipientResDto> recipients;
+    private String isDeptVisibleYn;
 
-    // === 요청자 스냅샷 (작성 시점 정보) ===
+    // === 요청자 스냅샷 ===
     private String requesterName;
     private UUID requesterOrganizationId;
     private String requesterOrganizationName;
@@ -68,6 +69,32 @@ public class ApprovalRequestResDto {
                         .collect(Collectors.toList()))
                 .documentNumber(entity.getDocumentNumber())
                 .recipients(recipients)
+                .isDeptVisibleYn(entity.getIsDeptVisibleYn())
+                .build();
+    }
+
+    // === 비공개 마스킹 메서드 추가 ===
+    public static ApprovalRequestResDto maskedFromEntity(ApprovalRequest entity) {
+        return ApprovalRequestResDto.builder()
+                .requestId(entity.getRequestId())
+                .memberId(entity.getMemberId())
+                .requestStatus(entity.getRequestStatus())
+                .createdAt(entity.getCreatedAt())
+                .requesterName(entity.getRequesterName())
+                .isDeptVisibleYn("N")
+                // 나머지는 전부 마스킹
+                .documentId(null)
+                .documentName("비공개 문서입니다")
+                .requestType(null)
+                .contentJson(null)
+                .cancelReason(null)
+                .updatedAt(null)
+                .documentNumber(null)
+                .requesterOrganizationId(null)
+                .requesterOrganizationName(null)
+                .approvalLines(List.of())
+                .viewers(List.of())
+                .recipients(null)
                 .build();
     }
 }

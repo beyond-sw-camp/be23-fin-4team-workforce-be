@@ -60,6 +60,10 @@ public class ApprovalRequest extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String cancelReason;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private String isDeptVisibleYn = "Y"; // 부서 문서함 공개 여부 (작성자 선택, 건별)
+
     // === 요청자 스냅샷 (작성 시점 정보) ===
     @Column(nullable = false)
     private String requesterName; // 요청자 이름 (작성 시점)

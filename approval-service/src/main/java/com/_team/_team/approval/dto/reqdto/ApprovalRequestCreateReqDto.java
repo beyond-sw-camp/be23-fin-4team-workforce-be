@@ -32,6 +32,8 @@ public class ApprovalRequestCreateReqDto {
 
     private List<OfficialRecipientItem> recipients; // OFFICIAL 타입일 때만 사용 (최소 1개)
 
+    private String isDeptVisibleYn; // 부서 문서함 공개 여부 ("Y" or "N", 기본 "Y")
+
     @AllArgsConstructor
     @NoArgsConstructor
     @Data
