@@ -54,7 +54,7 @@ public class AttendanceLogController {
         this.attendanceContextResolver = attendanceContextResolver;
     }
 
-    // 출근 처리 - IP/UA/좌표→주소 태그 붙여서 서비스로 넘긴다
+    // 출근 처리 - IP/UA/좌표 → 주소 태그 붙여서 서비스 넘김
     @PostMapping("/clock-in")
     public ResponseEntity<?> clockIn(
             @RequestHeader("X-User-CompanyId")UUID companyId,
@@ -84,9 +84,7 @@ public class AttendanceLogController {
         );
     }
 
-
-    // 컨텍스트 해석 reqDto.deviceId 덮어쓰기 + 감사 로그 한 줄
-    // 스키마 건드리지 않으려고 IP/UA는 deviceId 안에 패킹해서 저장
+    // 이벤트의 부가 정보(IP, User-Agent, 위치 주소 등)를 수집·가공
     private void tagContext(String eventType,
                             UUID memberId,
                             AttendanceLogCreateReqDto reqDto,

@@ -42,7 +42,7 @@ public class LeaveApprovalService {
     }
 
     // 반려/취소 시 복구
-    // 승인 전 차감이 없는 구조라서 현재는 실제로 호출될 일 거의 없음 (추후 확장 대비).
+    // 승인 전 차감이 없는 구조라서 현재는 실제로 호출될 일 거의 없음 (추후 확장 대비)
     @Transactional
     public void applyRestore(LeaveApprovalEvent event) {
         MemberBalance balance = loadBalanceWithLock(event);

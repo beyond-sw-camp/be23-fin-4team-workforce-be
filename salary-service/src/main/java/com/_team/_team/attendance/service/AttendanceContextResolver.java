@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-// 출퇴근 이벤트 부가정보 조립기
+// 출퇴근 이벤트 부가정보 조립기 (DB는 최소, 로그는 풍부 하기위한 핵심)
 // - IP, UA, Kakao 주소를 감사 로그로 남김
 @Slf4j
 @Component
@@ -32,7 +32,9 @@ public class AttendanceContextResolver {
                            String clientDeviceId,
                            Double latitude,
                            Double longitude) {
+        // IP 추출
         String ip = requestInfoExtractor.extractIp(request);
+        // userAgent : 요청 보낸 쪽이 어떤 종류의 클라이언트인지
         String ua = requestInfoExtractor.extractUserAgent(request);
         String address = (reverseGeocodeEnabled && latitude != null && longitude != null)
                 ? kakaoMapClient.reverseGeocode(latitude, longitude) : null;
@@ -41,13 +43,13 @@ public class AttendanceContextResolver {
         return new Context(ip, ua, address, packedDeviceId);
     }
 
-    // 감사 로그 한 줄 - memberId + 이벤트 타입 + 컨텍스트 정리
+    // 감사 로그 한- memberId + 이벤트 타입 + 컨텍스트 정리
     public void writeAuditLog(String eventType, java.util.UUID memberId, Context ctx) {
         log.info("[ATTENDANCE-AUDIT] event={} memberId={} ip={} address={} device={}",
                 eventType, memberId, ctx.ip(), ctx.address(), ctx.packedDeviceId());
     }
 
-    // deviceId 컬럼 100자 제한 안에서 "dev|ip=x.x.x.x|ua=Mozilla..." 로 잘라 담는다
+    // deviceId 컬럼 100자 제한 안에서 "dev|ip=x.x.x.x|ua=Mozilla..." 로 잘라서 담음
     private String packDeviceId(String clientDeviceId, String ip, String ua) {
         String dev = StringUtils.hasText(clientDeviceId) ? clientDeviceId : "n/a";
         String ipPart = StringUtils.hasText(ip) ? "|ip=" + ip : "";

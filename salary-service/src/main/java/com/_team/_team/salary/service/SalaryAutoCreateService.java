@@ -33,6 +33,7 @@ public class SalaryAutoCreateService {
     // 멱등성: 같은 날짜 기준 Active Salary 이미 있으면 스킵
     @Transactional
     public void bootstrapSalary(MemberHiredEvent e) {
+
         // 1. 중복 방지 재시도/재기동 대비
         if (salaryRepository.findActiveSalary(e.getMemberId(), e.getCompanyId(), e.getHireDate()).isPresent()) {
             log.warn("[SALARY-BOOTSTRAP] 이미 Active Salary 존재 memberId={} date={}",

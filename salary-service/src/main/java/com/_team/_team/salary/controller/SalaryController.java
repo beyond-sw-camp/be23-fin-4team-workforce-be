@@ -40,8 +40,7 @@ public class SalaryController {
         );
     }
 
-    // 복구용 수동 bootstrap - Kafka 실패 or 기존 직원 백필 시 사용
-    // 회사 기본값(base-salary)로 Salary 1건 생성 이후 관리자가 PATCH로 수정
+    // 새 직원이 입사하면 자동으로 급여가 만들어지는 시스템이 오류날 때, 관리자가 수동으로 급여 생성
     @PostMapping("/bootstrap")
     public ResponseEntity<?> bootstrap(
             @RequestHeader("X-User-CompanyId") UUID companyId,

@@ -18,15 +18,13 @@ import java.util.UUID;
 /**
  * 휴가 잔여 Controller
  *
- * ===== 엔드포인트 목록 =====
- *
  * [관리자용]
  * POST /member-balance/grant         사원에게 휴가 부여
  *
  * [사원용]
  * GET  /member-balance               내 휴가 잔여 조회
  *
- * [시스템 연동 — approval-service → Kafka → 이 서비스]
+ * [시스템 연동] approval-service → Kafka
  * POST /member-balance/use           휴가 차감 (승인 시)
  * POST /member-balance/restore       휴가 복구 (취소/반려 시)
  */

@@ -88,10 +88,8 @@ public class MemberBalanceService {
     /**
      * 휴가 복구 (반려/취소 시)
      *
-     * ===== 시나리오 =====
      * 승인된 연차 1일이 취소됨 (사원 취소 or 관리자 반려)
-     * → Kafka 이벤트: "memberId=abc, ANNUAL, 1.0일 복구"
-     * → 이 메서드 호출 (내부 시스템 API)
+     * Kafka 이벤트: "memberId = abc, ANNUAL, 1.0일 복구"
      *
      * ===== 차감과 동일하게 비관적 락 사용 =====
      * 복구도 remaining을 변경하는 작업이므로 동시성 보호 필요
@@ -108,7 +106,7 @@ public class MemberBalanceService {
         // 복구
         memberBalance.restore(reqDto.getDays());
 
-        // 연차 취소 → (DailyAttendance.status 원복)
+        // 연차 취소 -> (DailyAttendance.status 원복)
         restoreLeaveStatus(companyId, memberId, reqDto);
 
         return MemberBalanceResDto.fromEntity(memberBalance);
@@ -125,6 +123,7 @@ public class MemberBalanceService {
      * - 하나라도 실패하면 전체 롤백 → 정합성 보장
      */
     private void syncLeaveStatus(UUID companyId, UUID memberId, MemberBalanceUseReqDto reqDto) {
+
         // leaveDate가 null이면 연동 스킵 (하위 호환)
         if (reqDto.getLeaveDate() == null) {
             return;
@@ -154,12 +153,12 @@ public class MemberBalanceService {
 
     /**
      * 연차-근태 연동: 휴가 취소/반려 시 DailyAttendance.status 원복
-     * - leaveDate가 null이면 → 연동 스킵
      * - DailyAttendance가 있으면 → status = ABSENT로 원복
      * - DailyAttendance가 없으면 → 이미 삭제된 상태이므로 무시
      */
     private void restoreLeaveStatus(UUID companyId, UUID memberId, MemberBalanceUseReqDto reqDto) {
-        // leaveDate가 null이면 연동 스킵 (하위 호환)
+
+        // leaveDate가 null이면 연동 스킵
         if (reqDto.getLeaveDate() == null) {
             return;
         }
