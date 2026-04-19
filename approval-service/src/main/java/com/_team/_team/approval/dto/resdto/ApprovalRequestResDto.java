@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
@@ -33,19 +32,22 @@ public class ApprovalRequestResDto {
     private String documentNumber;
     private List<OfficialRecipientResDto> recipients;
     private String isDeptVisibleYn;
+    private List<ApprovalLineResDto> approvalLines;
+    private List<ApprovalViewerResDto> viewers;
+
 
     // === 요청자 스냅샷 ===
     private String requesterName;
     private UUID requesterOrganizationId;
     private String requesterOrganizationName;
 
-    private List<ApprovalLineResDto> approvalLines;
-    private List<ApprovalViewerResDto> viewers;
+    private String formSchemaSnapshot;
 
+    // 기존 메서드 그대로
     public static ApprovalRequestResDto fromEntity(ApprovalRequest entity,
-                                                   List<Approval> approvals,
-                                                   List<ApprovalViewer> viewers,
-                                                   List<OfficialRecipientResDto> recipients) {
+                                                                                        List<Approval> approvals,
+                                                                                        List<ApprovalViewer> viewers,
+                                                                                        List<OfficialRecipientResDto> recipients) {
 
         return ApprovalRequestResDto.builder()
                 .requestId(entity.getRequestId())
@@ -70,6 +72,7 @@ public class ApprovalRequestResDto {
                 .documentNumber(entity.getDocumentNumber())
                 .recipients(recipients)
                 .isDeptVisibleYn(entity.getIsDeptVisibleYn())
+                .formSchemaSnapshot(entity.getFormSchemaSnapshot())
                 .build();
     }
 

@@ -74,6 +74,10 @@ public class ApprovalRequest extends BaseTimeEntity {
     @Column
     private String requesterOrganizationName; // 요청자 조직명 (작성 시점)
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json")
+    private String formSchemaSnapshot; // 결재 작성 시점의 양식 스키마 스냅샷
+
 
     public void updateStatus(RequestStatus status) {
         this.requestStatus = status;
