@@ -40,9 +40,11 @@ public class AttachmentController {
     // 첨부파일 목록 조회
     @GetMapping("/{requestId}")
     public ResponseEntity<?> findByRequestId(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable UUID requestId) {
 
-        List<AttachmentResDto> result = attachmentService.findByRequestId(requestId);
+        List<AttachmentResDto> result = attachmentService.findByRequestId(companyId, memberId, requestId);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "첨부파일 목록 조회 성공"),
                 HttpStatus.OK

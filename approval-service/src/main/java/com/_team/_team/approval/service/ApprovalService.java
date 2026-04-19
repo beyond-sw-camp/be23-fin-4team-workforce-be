@@ -28,10 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Transactional
@@ -311,6 +308,40 @@ public class ApprovalService {
         return mergedMap.values().stream()
                 .map(approval -> toResDtoWithRecipients(approval.getRequest()))
                 .toList();
+    }
+
+    // 결재 예정함 (아직 내 차례가 아닌 문서)
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestResDto> findWaiting(UUID memberPositionId) {
+
+        List<Approval> waitingApprovals =
+                approvalRepository.findWaitingByMemberPositionId(memberPositionId, LineStatus.WAITING);
+
+        return waitingApprovals.stream()
+                .map(approval -> toResDtoWithRecipients(approval.getRequest()))
+                .toList();
+    }
+
+    // 결재함 전체 (PENDING + WAITING 통합)
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestResDto> findAllInbox(UUID companyId, UUID memberId, UUID memberPositionId) {
+
+        // 1) PENDING (내 차례 + 대결)
+        List<ApprovalRequestResDto> pendingList = findPending(companyId, memberId, memberPositionId);
+
+        // 2) WAITING (예정)
+        List<ApprovalRequestResDto> waitingList = findWaiting(memberPositionId);
+
+        // 3) 합산 (중복 제거 — requestId 기준, PENDING 우선)
+        Map<UUID, ApprovalRequestResDto> mergedMap = new LinkedHashMap<>();
+        for (ApprovalRequestResDto dto : pendingList) {
+            mergedMap.putIfAbsent(dto.getRequestId(), dto);
+        }
+        for (ApprovalRequestResDto dto : waitingList) {
+            mergedMap.putIfAbsent(dto.getRequestId(), dto);
+        }
+
+        return new ArrayList<>(mergedMap.values());
     }
 
     private ApprovalRequestResDto toResDtoWithRecipients(ApprovalRequest request) {
