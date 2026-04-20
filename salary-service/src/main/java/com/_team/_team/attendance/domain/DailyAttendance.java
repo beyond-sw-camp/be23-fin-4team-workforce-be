@@ -1,6 +1,7 @@
 package com._team._team.attendance.domain;
 
 import com._team._team.attendance.domain.enums.AttendanceStatus;
+import com._team._team.attendance.domain.enums.ClosureStatus;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -18,7 +19,6 @@ import java.util.UUID;
 /**
  * 일별 근태 집계
  * - attendance_log의 부모 테이블 (1:N)
- * - 출퇴근 이벤트 발생 시 Write-Through로 즉시 갱신
  * - 월간 근태 조회 시 이 테이블만 조회 (성능 최적화)
  */
 @AllArgsConstructor
@@ -27,6 +27,9 @@ import java.util.UUID;
 @Getter
 @Builder
 public class DailyAttendance extends BaseTimeEntity {
+
+    /** 점심시간(분) - 회사마다 실제 점심시간은 다를 수 있으나 우리 방식은 1시간으로 고정 */
+    private static final int LUNCH_BREAK_MINUTES = 60;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -48,6 +51,12 @@ public class DailyAttendance extends BaseTimeEntity {
     @Builder.Default
     private AttendanceStatus status = AttendanceStatus.NORMAL;
 
+    /** 일 근태 마감 단계 (OPEN → DRAFT → UNDER_REVIEW → FINALIZED → LOCKED) */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ClosureStatus closureStatus = ClosureStatus.OPEN;
+
     /** 적용된 근무 스케줄(overtime 계산 기준) */
     private UUID workScheduleId;
 
@@ -57,18 +66,11 @@ public class DailyAttendance extends BaseTimeEntity {
     /** 퇴근 시각 (하루 1회) */
     private LocalDateTime lastClockOut;
 
-    /** 고정 휴식 시간(분) - 점심시간 등 */
-    private Integer breakMinutes;
-
-    /** 실 근무 시간(분) - (퇴근-출근) - 총휴식 */
+    /** 실 근무 시간(분) - (퇴근-출근) - 점심시간(1시간) */
     private Integer workedMinutes;
 
     /** 초과 근무 시간(분) - workMinutes가 스케줄 workMinutes 초과 시 */
     private Integer overtimeMinutes;
-
-    /** BREAK_START/BREAK_END 이벤트 기반 집계 휴식(분) */
-    @Builder.Default
-    private Integer totalBreakMinutes = 0;
 
     /** 출퇴근 이벤트 로그 (상세 조회 시에만 LAZY 로딩) */
     @OneToMany(mappedBy = "dailyAttendance", fetch = FetchType.LAZY)
@@ -80,7 +82,7 @@ public class DailyAttendance extends BaseTimeEntity {
     @Builder.Default
     private List<WorkTripDetail> trips = new ArrayList<>();
 
-    // === 집계 메서드 ===
+    //  집계 메서드
 
     /** 출근 기록 (하루 1회) */
     public void updateClockIn(LocalDateTime time) {
@@ -93,14 +95,14 @@ public class DailyAttendance extends BaseTimeEntity {
     }
 
     /** 근무/초과 시간 재계산
-     * 근무시간 = (퇴근 - 출근) - 고정휴식 - BREAK 집계
+     * 근무시간 = (퇴근 - 출근) - 점심시간(1시간 고정)
+     * 체류시간이 점심시간보다 짧은 경우(조퇴 등) 0으로 처리
      */
     public void recalculateMinutes(int scheduleWorkMinutes){
         if(firstClockIn == null || lastClockOut == null) return;
 
         long totalMinutes = Duration.between(firstClockIn, lastClockOut).toMinutes();
-        int breakTotal = (breakMinutes != null ? breakMinutes : 0) + totalBreakMinutes;
-        this.workedMinutes = (int)totalMinutes - breakTotal;
+        this.workedMinutes = (int) Math.max(0, totalMinutes - LUNCH_BREAK_MINUTES);
 
         if(this.workedMinutes > scheduleWorkMinutes){
             this.overtimeMinutes = this.workedMinutes - scheduleWorkMinutes;
@@ -109,13 +111,24 @@ public class DailyAttendance extends BaseTimeEntity {
         }
     }
 
-    /** BREAK_END 이벤트 시 휴식시간 누적 */
-    public void addBreakMinutes(int minutes){
-        this.totalBreakMinutes += minutes;
-    }
-
     /** 근태 상태 변경 (휴가 승인, 수동 수정 등) */
     public void updateStatus(AttendanceStatus status){
         this.status = status;
+    }
+
+    /** 일마감 단계 전이 */
+    public void transitionClosure(ClosureStatus next){
+        if (this.closureStatus == ClosureStatus.LOCKED) {
+            throw new IllegalStateException("처리된 근태는 변경할 수 없습니다.");
+        }
+        this.closureStatus = next;
+    }
+
+    /**
+     * WorkTimeClassifier 결과를 엔티티에 반영
+     */
+    public void applyWorkResult(int workedMinutes, int overtimeMinutes) {
+        this.workedMinutes = workedMinutes;
+        this.overtimeMinutes = overtimeMinutes;
     }
 }

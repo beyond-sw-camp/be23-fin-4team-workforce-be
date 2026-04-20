@@ -12,7 +12,6 @@ import java.util.UUID;
  * 초과근무(연장/야간/휴일) 결재 이벤트
  * - 승인 시: APPROVE 이벤트 발행
  * - 반려/취소 시: REJECT / CANCEL 이벤트 발행
- * 토픽: "overtime-approval"
  */
 @AllArgsConstructor
 @NoArgsConstructor

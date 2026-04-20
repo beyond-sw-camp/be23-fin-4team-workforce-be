@@ -57,6 +57,20 @@ public class WorkSchedule extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer workMinutes;
 
+    /** 휴게시간(분) - 점심 등 근무에서 제외되는 시간 */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer breakMinutes = 60;
+
+    /**
+     * 슬롯 선택 마감일 (매월 며칠까지 다음 달 슬롯을 선택해야 하는지)
+     * FLEXIBLE 스케줄에만 적용
+     * 예: 25 이면 전월 25일까지 다음 달 슬롯 선택 마감
+     * 이 날짜가 지나면 배치가 기본 슬롯으로 자동 할당 (ScheduleApprovalStatus=AUTO)
+     */
+    @Column
+    private Integer selectionDeadlineDay;
+
     /** 스케줄 시작일 */
     @Column(nullable = false)
     private LocalDate effectiveFrom;
@@ -74,6 +88,8 @@ public class WorkSchedule extends BaseTimeEntity {
         if (dto.getStartTime() != null) this.startTime = dto.getStartTime();
         if (dto.getEndTime() != null) this.endTime = dto.getEndTime();
         if (dto.getWorkMinutes() != null) this.workMinutes = dto.getWorkMinutes();
+        if (dto.getBreakMinutes() != null) this.breakMinutes = dto.getBreakMinutes();
+        if (dto.getSelectionDeadlineDay() != null) this.selectionDeadlineDay = dto.getSelectionDeadlineDay();
         if (dto.getEffectiveFrom() != null) this.effectiveFrom = dto.getEffectiveFrom();
         if (dto.getEffectiveTo() != null) this.effectiveTo = dto.getEffectiveTo();
     }

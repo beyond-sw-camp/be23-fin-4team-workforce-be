@@ -1,6 +1,6 @@
 package com._team._team.batch.leave.worker;
 
-import com._team._team.attendance.Repository.MemberBalanceRepository;
+import com._team._team.attendance.repository.MemberBalanceRepository;
 import com._team._team.attendance.domain.MemberBalance;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

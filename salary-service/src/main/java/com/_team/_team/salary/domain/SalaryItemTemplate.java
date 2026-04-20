@@ -2,6 +2,7 @@ package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.salary.domain.enums.ItemType;
+import com._team._team.salary.domain.enums.TaxCategory;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateUpdateReqDto;
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,6 +39,11 @@ public class SalaryItemTemplate extends BaseTimeEntity {
     @Column(nullable = false)
     private ItemType itemType;
 
+    // 세법 카테고리, 카탈로그 기반이면 자동 복사, 커스텀이면 관리자가 선택
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private TaxCategory taxCategory;
+
     /** 표시 순서 */
     @Column(nullable = false)
     private Integer displayOrder;
@@ -53,7 +59,6 @@ public class SalaryItemTemplate extends BaseTimeEntity {
 
     /**
      * 급여 항목 템플릿 정보 수정
-     * - @Transactional 내에서 더티체킹으로 자동 UPDATE
      */
     public void update(SalaryItemTemplateUpdateReqDto reqDto) {
         this.itemName = reqDto.getItemName();

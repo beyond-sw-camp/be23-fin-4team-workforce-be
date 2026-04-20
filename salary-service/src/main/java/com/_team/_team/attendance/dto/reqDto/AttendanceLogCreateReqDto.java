@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 출퇴근/휴게 이벤트 생성 요청 DTO
- * - CLOCK_IN, CLOCK_OUT, BREAK_START, BREAK_END 공통 사용
+ * 출퇴근 이벤트 생성 요청 DTO
+ * - CLOCK_IN, CLOCK_OUT 공통 사용
  * - EventType은 서비스 메서드에서 직접 지정
  */
 @AllArgsConstructor

@@ -1,6 +1,6 @@
 package com._team._team.attendance.kafka;
 
-import com._team._team.attendance.Service.LeaveApprovalService;
+import com._team._team.attendance.service.LeaveApprovalService;
 import com._team._team.event.LeaveApprovalEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
