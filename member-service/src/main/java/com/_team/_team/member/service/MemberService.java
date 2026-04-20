@@ -510,7 +510,7 @@ public class MemberService {
 
         String companyEmail = sabun.toLowerCase()
                 + "." + reqDto.getEnglishInitial().toUpperCase()
-                + "@" + companyDomain + ".company";
+                + "@" + companyDomain + ".com";
 
         // 3. 중복 체크
         if (memberRepository.existsByEmail(companyEmail)) {

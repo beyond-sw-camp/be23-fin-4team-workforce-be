@@ -9,8 +9,5 @@ import lombok.*;
 public class EsgConfigUpdateReqDto {
 
     private String esgEnabledYn;
-    private String rewardEnabledYn;
-    private String campaignEnabledYn;
-    private String shopEnabledYn;
     private int monthlyPointLimit;
 }

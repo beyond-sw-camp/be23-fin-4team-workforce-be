@@ -10,17 +10,11 @@ import lombok.*;
 public class EsgConfigResDto {
 
     private String esgEnabledYn;
-    private String rewardEnabledYn;
-    private String campaignEnabledYn;
-    private String shopEnabledYn;
     private int monthlyPointLimit;
 
     public static EsgConfigResDto fromEntity(EsgCompanyConfig config) {
         return EsgConfigResDto.builder()
                 .esgEnabledYn(config.getEsgEnabledYn())
-                .rewardEnabledYn(config.getRewardEnabledYn())
-                .campaignEnabledYn(config.getCampaignEnabledYn())
-                .shopEnabledYn(config.getShopEnabledYn())
                 .monthlyPointLimit(config.getMonthlyPointLimit())
                 .build();
     }
