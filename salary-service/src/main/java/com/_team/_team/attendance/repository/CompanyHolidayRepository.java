@@ -43,4 +43,21 @@ public interface CompanyHolidayRepository extends JpaRepository<CompanyHoliday, 
             @Param("companyId") UUID companyId,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    /**
+     * 월 단위 공휴일 목록
+     */
+    @Query("""
+       SELECT h FROM CompanyHoliday h
+       WHERE h.companyId = :companyId
+         AND h.holidayDate BETWEEN :from AND :to
+       """)
+    List<CompanyHoliday> findAllInRange(@Param("companyId") UUID companyId,
+                                        @Param("from") LocalDate from,
+                                        @Param("to") LocalDate to);
+
+    /** 삭제되지 않은 공휴일 여부 */
+    default boolean existsByCompanyIdAndHolidayDate(UUID companyId, LocalDate date) {
+        return existsByCompanyIdAndHolidayDateAndDelYn(companyId, date, "N");
+    }
 }
