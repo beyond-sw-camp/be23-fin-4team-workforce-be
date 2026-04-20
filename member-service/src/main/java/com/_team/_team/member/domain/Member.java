@@ -88,7 +88,6 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private EmploymentType employmentType;
 
-    // 추가
     @Column(nullable = false)
     @Builder.Default
     private Integer loginFailCount = 0;
@@ -96,6 +95,10 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     @Builder.Default
     private String isFirstLoginYn = "YES";
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String isOnboardingYn = "YES";
 
     @Column(nullable = false)
     @Builder.Default
@@ -198,5 +201,8 @@ public class Member extends BaseTimeEntity {
         this.signatureUrl = null;
     }
 
+    public void completeOnboarding() {
+        this.isOnboardingYn = "NO";
+    }
 
 }

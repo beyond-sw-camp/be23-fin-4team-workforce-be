@@ -450,4 +450,13 @@ public class MemberController {
         String signatureUrl = memberService.getSignatureUrl(memberId);
         return new SignatureResDto(signatureUrl);
     }
+    @PatchMapping("/onboarding/complete")
+    public ResponseEntity<?> completeOnboarding(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        memberService.completeOnboarding(memberId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "온보딩 완료"),
+                HttpStatus.OK
+        );
+    }
 }
