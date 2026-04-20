@@ -210,19 +210,30 @@ public class GoalService {
         return goalTreeService.decorate(visible);
     }
 
+    /**
+     * 동일 회사이며 목표 가시성 규칙을 만족할 때만 Goal 엔티티를 반환합니다.
+     * 댓글·활동·진행 이력 등 하위 리소스 조회 시 공통으로 사용합니다.
+     */
     @Transactional(readOnly = true)
-    public GoalResDto getGoal(UUID goalId, UUID requesterId, UUID requesterCompanyId) {
+    public Goal requireReadableGoal(UUID goalId, UUID requesterId, UUID requesterCompanyId) {
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "목표를 찾을 수 없습니다. id=" + goalId));
-
         validateSameCompany(goal.getCompanyId(), requesterCompanyId);
-
         if (!isVisible(goal, requesterId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "해당 목표에 대한 접근 권한이 없습니다.");
         }
+        return goal;
+    }
 
-        return GoalResDto.from(goal);
+    /** 승인자·요청자·워처 등 가시성 외 규칙에서 사용 */
+    public boolean isVisibleToMember(Goal goal, UUID memberId) {
+        return isVisible(goal, memberId);
+    }
+
+    @Transactional(readOnly = true)
+    public GoalResDto getGoal(UUID goalId, UUID requesterId, UUID requesterCompanyId) {
+        return GoalResDto.from(requireReadableGoal(goalId, requesterId, requesterCompanyId));
     }
 
     @Transactional
