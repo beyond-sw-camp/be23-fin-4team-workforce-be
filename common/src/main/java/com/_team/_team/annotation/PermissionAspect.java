@@ -57,25 +57,9 @@ public class PermissionAspect {
         Action action = checkPermission.action();
         String requiredPermission = resource.name() + ":" + action.name();
 
-        List<String> grantedTokens = List.of(permissionStr.split(",")).stream()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-
-        boolean hasPermission = grantedTokens.stream()
+        boolean hasPermission = List.of(permissionStr.split(","))
+                .stream()
                 .anyMatch(p -> p.startsWith(requiredPermission));
-
-        /*
-         * READ 요청은 동일 리소스에 대한 CREATE / UPDATE / DELETE 가 있으면 통과시킨다.
-         * (예: EVALUATION:UPDATE 만 부여된 HR이 시즌·설계 목록 조회 API 를 쓸 수 있게 함)
-         */
-        if (!hasPermission && action == Action.READ) {
-            String resPrefix = resource.name() + ":";
-            hasPermission = grantedTokens.stream().anyMatch(p ->
-                    p.startsWith(resPrefix + Action.CREATE.name())
-                            || p.startsWith(resPrefix + Action.UPDATE.name())
-                            || p.startsWith(resPrefix + Action.DELETE.name()));
-        }
 
         if (!hasPermission) {
             throw new BusinessException(
