@@ -60,8 +60,8 @@ public class ApprovalNotificationService {
         }
     }
 
-    //    자동승인 문서 (즉시 APPROVED)
-    //    요청자/참조자: APPROVAL_APPROVED / 공람자: APPROVAL_CIRCULATED
+    // 자동승인 문서 (즉시 APPROVED)
+    // 요청자/참조자: APPROVAL_APPROVED / 공람자: APPROVAL_CIRCULATED
     public void notifyAutoApproved(ApprovalRequest request,
                                    List<ApprovalViewer> viewers) {
         String title = title(request);
