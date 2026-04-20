@@ -22,14 +22,17 @@ public class GoalCommentService {
     private final GoalRepository goalRepository;
     private final GoalCommentRepository goalCommentRepository;
     private final GoalActivityService goalActivityService;
+    private final GoalService goalService;
 
     public GoalCommentService(
             GoalRepository goalRepository,
             GoalCommentRepository goalCommentRepository,
-            GoalActivityService goalActivityService) {
+            GoalActivityService goalActivityService,
+            GoalService goalService) {
         this.goalRepository = goalRepository;
         this.goalCommentRepository = goalCommentRepository;
         this.goalActivityService = goalActivityService;
+        this.goalService = goalService;
     }
 
     @Transactional
@@ -46,8 +49,8 @@ public class GoalCommentService {
     }
 
     @Transactional(readOnly = true)
-    public List<GoalCommentResDto> list(UUID goalId, UUID companyId) {
-        loadGoal(goalId, companyId);
+    public List<GoalCommentResDto> list(UUID goalId, UUID requesterId, UUID companyId) {
+        goalService.requireReadableGoal(goalId, requesterId, companyId);
         return goalCommentRepository.findByGoal_GoalIdOrderByCreatedAtAsc(goalId).stream()
                 .map(GoalCommentResDto::from)
                 .toList();

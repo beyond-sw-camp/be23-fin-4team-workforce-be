@@ -15,6 +15,7 @@ import com._team._team.dto.NotificationMessage;
 import com._team._team.goal.repository.*;
 import com._team._team.notification.NotificationType;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class GoalApprovalService {
     private final GoalActivityService goalActivityService;
     private final GoalRollupService goalRollupService;
     private final ApplicationEventPublisher eventPublisher;
+    private final GoalService goalService;
 
     public GoalApprovalService(
             GoalRepository goalRepository,
@@ -39,13 +41,15 @@ public class GoalApprovalService {
             GoalApprovalBundleGoalRepository bundleGoalRepository,
             GoalActivityService goalActivityService,
             GoalRollupService goalRollupService,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            @Lazy GoalService goalService) {
         this.goalRepository = goalRepository;
         this.bundleRepository = bundleRepository;
         this.bundleGoalRepository = bundleGoalRepository;
         this.goalActivityService = goalActivityService;
         this.goalRollupService = goalRollupService;
         this.eventPublisher = eventPublisher;
+        this.goalService = goalService;
     }
 
     @Transactional
@@ -140,13 +144,23 @@ public class GoalApprovalService {
                 .targetId(bundle.getBundleId())
                 .targetType("GOAL_APPROVAL_BUNDLE")
                 .build());
-        return get(goalIds.get(0), companyId);
+        return get(goalIds.get(0), companyId, requesterId);
     }
 
     @Transactional(readOnly = true)
-    public GoalApprovalResDto get(UUID goalId, UUID companyId) {
+    public GoalApprovalResDto get(UUID goalId, UUID companyId, UUID readerId) {
         Goal goal = getGoal(goalId, companyId);
-        return bundleGoalRepository.findFirstByGoal_GoalIdOrderByBundle_RequestedAtDesc(goalId)
+        var linkOpt = bundleGoalRepository.findFirstByGoal_GoalIdOrderByBundle_RequestedAtDesc(goalId);
+        GoalApprovalBundle bundle = linkOpt.map(GoalApprovalBundleGoal::getBundle).orElse(null);
+        if (!goalService.isVisibleToMember(goal, readerId)) {
+            boolean allowed = bundle != null && (readerId.equals(bundle.getApproverId())
+                    || readerId.equals(bundle.getRequestedBy())
+                    || bundle.getWatcherIds().contains(readerId));
+            if (!allowed) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, "해당 목표 승인 정보에 대한 접근 권한이 없습니다.");
+            }
+        }
+        return linkOpt
                 .map(link -> toResDto(goalId, link.getBundle()))
                 .orElseGet(() -> GoalApprovalResDto.builder()
                         .goalId(goalId)
