@@ -1,5 +1,9 @@
 package com._team._team.batch.config;
 
+import com._team._team.batch.attendance.worker.MonthlyAttendanceCloseWorker;
+import com._team._team.batch.attendance.worker.OvertimeExpirationWorker;
+import com._team._team.batch.attendance.worker.SlotDeadlineAutoAssignWorker;
+import com._team._team.batch.attendance.worker.WeeklyLimitCheckWorker;
 import com._team._team.batch.leave.worker.CarryoverLeaveWorker;
 import com._team._team.batch.leave.worker.DailyAttendanceCloseWorker;
 import com._team._team.batch.leave.worker.LeaveExpireWorker;
@@ -31,7 +35,6 @@ public class BatchJobConfig {
 
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
-
     private final LeaveGrantWorker leaveGrantWorker;
     private final DailyAttendanceCloseWorker dailyAttendanceCloseWorker;
     private final LeaveExpireWorker leaveExpireWorker;
@@ -39,6 +42,10 @@ public class BatchJobConfig {
     private final SeverancePayWorker severancePayWorker;
     private final PayslipSendWorker payslipSendWorker;
     private final CarryoverLeaveWorker carryoverLeaveWorker;
+    private final WeeklyLimitCheckWorker weeklyLimitCheckWorker;
+    private final OvertimeExpirationWorker overtimeExpirationWorker;
+    private final SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker;
+    private final MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker;
 
     @Autowired
     public BatchJobConfig(
@@ -49,7 +56,11 @@ public class BatchJobConfig {
             LeaveExpireWorker leaveExpireWorker,
             PayrollCalculateWorker payrollCalculateWorker,
             SeverancePayWorker severancePayWorker,
-            PayslipSendWorker payslipSendWorker, CarryoverLeaveWorker carryoverLeaveWorker) {
+            PayslipSendWorker payslipSendWorker,
+            CarryoverLeaveWorker carryoverLeaveWorker,
+            WeeklyLimitCheckWorker weeklyLimitCheckWorker
+            , OvertimeExpirationWorker overtimeExpirationWorker
+            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.leaveGrantWorker = leaveGrantWorker;
@@ -59,6 +70,10 @@ public class BatchJobConfig {
         this.severancePayWorker = severancePayWorker;
         this.payslipSendWorker = payslipSendWorker;
         this.carryoverLeaveWorker = carryoverLeaveWorker;
+        this.weeklyLimitCheckWorker = weeklyLimitCheckWorker;
+        this.overtimeExpirationWorker = overtimeExpirationWorker;
+        this.slotDeadlineAutoAssignWorker = slotDeadlineAutoAssignWorker;
+        this.monthlyAttendanceCloseWorker = monthlyAttendanceCloseWorker;
     }
 
     /** 휴가 부여 Job */
@@ -208,6 +223,82 @@ public class BatchJobConfig {
         return new StepBuilder("carryoverLeaveStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
                     carryoverLeaveWorker.run(LocalDate.now());
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 주 52시간 초과 감지 Job */
+    @Bean
+    public Job weeklyLimitCheckJob() {
+        return new JobBuilder("weeklyLimitCheckJob", jobRepository)
+                .start(weeklyLimitCheckStep())
+                .build();
+    }
+
+    /** 주 52시간 초과 감지 Step */
+    @Bean
+    public Step weeklyLimitCheckStep() {
+        return new StepBuilder("weeklyLimitCheckStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    weeklyLimitCheckWorker.run();
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 사후 초과근무 신청 72시간 만료 Job */
+    @Bean
+    public Job overtimeExpirationJob() {
+        return new JobBuilder("overtimeExpirationJob", jobRepository)
+                .start(overtimeExpirationStep())
+                .build();
+    }
+
+    /** 사후 초과근무 신청 72시간 만료 Step */
+    @Bean
+    public Step overtimeExpirationStep() {
+        return new StepBuilder("overtimeExpirationStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    overtimeExpirationWorker.run();
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 슬롯 선택 마감일 경과 자동 할당 Job */
+    @Bean
+    public Job slotDeadlineAutoAssignJob() {
+        return new JobBuilder("slotDeadlineAutoAssignJob", jobRepository)
+                .start(slotDeadlineAutoAssignStep())
+                .build();
+    }
+
+    /** 슬롯 선택 마감일 경과 자동 할당 Step */
+    @Bean
+    public Step slotDeadlineAutoAssignStep() {
+        return new StepBuilder("slotDeadlineAutoAssignStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    slotDeadlineAutoAssignWorker.run();
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 월 장부 마감 Job */
+    @Bean
+    public Job monthlyAttendanceCloseJob() {
+        return new JobBuilder("monthlyAttendanceCloseJob", jobRepository)
+                .start(monthlyAttendanceCloseStep())
+                .build();
+    }
+
+    /** 월 장부 마감 Step */
+    @Bean
+    public Step monthlyAttendanceCloseStep() {
+        return new StepBuilder("monthlyAttendanceCloseStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    monthlyAttendanceCloseWorker.run();
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();

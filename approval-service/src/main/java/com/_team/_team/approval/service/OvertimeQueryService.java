@@ -21,8 +21,8 @@ public class OvertimeQueryService {
         this.approvalRequestRepository = approvalRequestRepository;
     }
 
-    // 해당 날짜에 승인받은 연장근무 중 가장 늦은 종료시각 반환, 없으면 null.
-    // salary-service가 근태 자동 마감할 때 FeignClient 통해 호출한다.
+    // 해당 날짜에 승인받은 연장근무 중 가장 늦은 종료시각 반환, 없으면 null
+    // salary-service가 근태 자동 마감할 때 FeignClient 통해 호출
     public LocalDateTime findLatestApprovedEndAt(UUID memberId, LocalDate date) {
         LocalDateTime startOfDay = date.atStartOfDay();
         LocalDateTime startOfNextDay = date.plusDays(1).atStartOfDay();

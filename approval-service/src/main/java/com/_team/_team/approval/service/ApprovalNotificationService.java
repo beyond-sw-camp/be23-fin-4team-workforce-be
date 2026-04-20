@@ -27,7 +27,8 @@ public class ApprovalNotificationService {
 
 
     @Autowired
-    public ApprovalNotificationService(ApplicationEventPublisher eventPublisher, KafkaTemplate<String, Object> kafkaTemplate) {
+    public ApprovalNotificationService(ApplicationEventPublisher eventPublisher,
+                                       KafkaTemplate<String, Object> kafkaTemplate) {
         this.eventPublisher = eventPublisher;
         this.kafkaTemplate = kafkaTemplate;
     }

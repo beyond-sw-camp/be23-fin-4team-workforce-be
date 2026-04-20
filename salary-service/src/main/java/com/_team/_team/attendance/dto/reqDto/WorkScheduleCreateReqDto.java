@@ -37,6 +37,8 @@ public class WorkScheduleCreateReqDto {
     @NotNull(message = "근무시간(분)은 필수입니다.")
     private Integer workMinutes;
 
+    private Integer breakMinutes;
+
     @NotNull(message = "시작일은 필수입니다.")
     private LocalDate effectiveFrom;
 
@@ -52,6 +54,7 @@ public class WorkScheduleCreateReqDto {
                 .startTime(this.startTime)
                 .endTime(this.endTime)
                 .workMinutes(this.workMinutes)
+                .breakMinutes(this.breakMinutes)
                 .effectiveFrom(this.effectiveFrom)
                 .effectiveTo(this.effectiveTo)
                 .build();
