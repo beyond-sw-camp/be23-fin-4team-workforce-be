@@ -1,8 +1,11 @@
 package com._team._team.attendance.service;
 
+import com._team._team.attendance.domain.OvertimePolicy;
+import com._team._team.attendance.domain.enums.ClosureStatus;
+import com._team._team.attendance.dto.vo.ResolvedSchedule;
+import com._team._team.attendance.dto.vo.WorkTimeBreakdown;
 import com._team._team.attendance.feignClients.ApprovalServiceClient;
-import com._team._team.attendance.repository.DailyAttendanceRepository;
-import com._team._team.attendance.repository.WorkScheduleRepository;
+import com._team._team.attendance.repository.*;
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.WorkSchedule;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
@@ -15,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 일일 근태 2단계 마감 서비스
@@ -28,108 +32,215 @@ public class DailyAttendanceCloseService {
     private final WorkScheduleRepository workScheduleRepository;
     private final ApprovalServiceClient approvalServiceClient;
     private final AttendanceAnomalyDetector anomalyDetector;
+    private final ScheduleResolver scheduleResolver;
+    private final WorkTimeClassifier workTimeClassifier;
+    private final CompanyHolidayRepository companyHolidayRepository;
+    private final OvertimeRequestRepository overtimeRequestRepository;
+    private final OvertimePolicyRepository overtimePolicyRepository;
 
     @Autowired
     public DailyAttendanceCloseService(
             DailyAttendanceRepository dailyAttendanceRepository,
             WorkScheduleRepository workScheduleRepository,
             ApprovalServiceClient approvalServiceClient,
-            AttendanceAnomalyDetector anomalyDetector) {
+            AttendanceAnomalyDetector anomalyDetector, ScheduleResolver scheduleResolver, WorkTimeClassifier workTimeClassifier, CompanyHolidayRepository companyHolidayRepository, OvertimeRequestRepository overtimeRequestRepository, OvertimePolicyRepository overtimePolicyRepository) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.workScheduleRepository = workScheduleRepository;
         this.approvalServiceClient = approvalServiceClient;
         this.anomalyDetector = anomalyDetector;
+        this.scheduleResolver = scheduleResolver;
+        this.workTimeClassifier = workTimeClassifier;
+        this.companyHolidayRepository = companyHolidayRepository;
+        this.overtimeRequestRepository = overtimeRequestRepository;
+        this.overtimePolicyRepository = overtimePolicyRepository;
     }
 
-    // DRAFT 단계 - readOnly로 미퇴근/휴가일출근 건수만 집계
-    @Transactional(readOnly = true)
+    // OPEN 상태 근태를 DRAFT 로 일괄 전이 + 재계산 + 이상 감지
     public DraftResult processDraft(LocalDate targetDate) {
-        List<DailyAttendance> unclosed =
-                dailyAttendanceRepository.findCloseCandidates(targetDate);
 
+        // 전일 OPEN 상태 근태 전체 조회
+        List<DailyAttendance> openList = dailyAttendanceRepository
+                .findAllByAttendanceDateAndClosureStatus(targetDate, ClosureStatus.OPEN);
+
+        int drafted = 0;
+        int failed = 0;
+
+        for (DailyAttendance da : openList) {
+            try {
+                draftOne(da.getDailyAttendanceId());
+                drafted++;
+            } catch (Exception e) {
+                log.error("[DRAFT] 처리 실패 dailyId={}, msg={}",
+                        da.getDailyAttendanceId(), e.getMessage(), e);
+                failed++;
+            }
+        }
+
+        // 휴가일 출근 건 감지
         List<DailyAttendance> leaveButClockIn =
                 dailyAttendanceRepository.findLeaveDateWithClockIn(
                         targetDate,
                         List.of(AttendanceStatus.LEAVE, AttendanceStatus.HALF));
 
-        log.info("[DRAFT] targetDate={} 미퇴근={}건, 휴가일출근={}건",
-                targetDate, unclosed.size(), leaveButClockIn.size());
-
-        // 이상감지 - 지각/조퇴/결근의심까지 같이 돌려서 본인한테 알림
+        // 기존 이상 감지 + 알림 발송 로직 유지
         anomalyDetector.detect(targetDate);
 
-        return new DraftResult(unclosed.size(), leaveButClockIn.size());
+        log.info("[DRAFT] targetDate={} 전이성공={} 실패={} 휴가출근={}",
+                targetDate, drafted, failed, leaveButClockIn.size());
+
+        return new DraftResult(drafted, failed, leaveButClockIn.size());
     }
 
-    // FINAL 단계 - DRAFT 이후에도 안 고쳐진 건을 자동 마감
-    public FinalResult processFinal(LocalDate targetDate) {
-        List<DailyAttendance> unclosed =
-                dailyAttendanceRepository.findCloseCandidates(targetDate);
-
-        int closed = 0;
-        int failed = 0;
-        for (DailyAttendance da : unclosed) {
-            try {
-                closeOne(da.getDailyAttendanceId(), targetDate);
-                closed++;
-            } catch (Exception e) {
-                failed++;
-                log.error("[FINAL] close 실패 dailyAttendanceId={}, msg={}",
-                        da.getDailyAttendanceId(), e.getMessage(), e);
-            }
-        }
-        log.info("[FINAL] targetDate={} 마감 성공={}건, 실패={}건", targetDate, closed, failed);
-        return new FinalResult(closed, failed);
-    }
-
-    // 레코드 한 건 마감 - REQUIRES_NEW로 건별 독립 트랜잭션.
-    // 그 사이에 본인이 직접 퇴근 찍었을 수도 있으니 한 번 더 확인하고 진행.
+    // 단건 DRAFT 처리
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void closeOne(java.util.UUID dailyAttendanceId, LocalDate targetDate) {
+    public void draftOne(UUID dailyAttendanceId) {
         DailyAttendance da = dailyAttendanceRepository.findById(dailyAttendanceId)
                 .orElseThrow(() -> new IllegalStateException(
-                        "DailyAttendance not found: " + dailyAttendanceId));
+                        "출근 기록이 없습니다 : " + dailyAttendanceId));
 
-        if (da.getLastClockOut() != null) return;
+        // 이미 전이된 건은 skip
+        if (da.getClosureStatus() != ClosureStatus.OPEN) {
+            return;
+        }
 
-        LocalDateTime clockOut = resolveClockOut(da, targetDate);
+    // 스케줄 해석 + 재계산
+        ResolvedSchedule schedule = scheduleResolver.resolve(
+                da.getMemberId(), da.getCompanyId(), da.getAttendanceDate());
 
-        da.updateClockOut(clockOut);
+        // 공휴일 여부
+        boolean isHoliday = companyHolidayRepository.existsByCompanyIdAndHolidayDate(
+                da.getCompanyId(), da.getAttendanceDate());
 
-        WorkSchedule schedule = findSchedule(da.getCompanyId(), da.getMemberId(), targetDate);
-        int scheduleWorkMinutes = (schedule != null && schedule.getWorkMinutes() != null)
-                ? schedule.getWorkMinutes() : 480; // 기본 8시간
-        da.recalculateMinutes(scheduleWorkMinutes);
+        // 승인된 연장근무 시간 조회
+        Integer approvedOt = overtimeRequestRepository.sumApprovedMinutes(
+                da.getMemberId(), da.getAttendanceDate());
+        int approvedMinutes = approvedOt == null ? 0 : approvedOt;
+
+        // 연장근로 정책 조회 (라운딩 단위 사용)
+        OvertimePolicy otPolicy = overtimePolicyRepository
+                .findEffective(da.getCompanyId(), da.getAttendanceDate())
+                .orElseThrow(() -> new IllegalStateException(
+                        "OvertimePolicy not found. companyId=" + da.getCompanyId()));
+
+        // 근무 시간 분류
+        WorkTimeBreakdown breakdown = workTimeClassifier.classify(
+                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeRoundingMinutes());
+
+        // 지급 대상 총 분, 연장 분 저장
+        da.applyWorkResult(
+                breakdown.totalPayableMinutes(),
+                breakdown.overtimeMinutes());
+
+        da.transitionClosure(ClosureStatus.DRAFT);
     }
 
-    // 자동 마감 시 퇴근시각 결정
-    // 우선순위: 승인된 연장근무 종료시각 - 근무일정 endTime - 출근+8시간 (최후수단)
+    // DRAFT 전체를 FINALIZED 로 전이, 미퇴근은 자동 퇴근 세팅
+    public FinalResult processFinal(LocalDate targetDate) {
+        List<DailyAttendance> draftList = dailyAttendanceRepository
+                .findAllByAttendanceDateAndClosureStatus(targetDate, ClosureStatus.DRAFT);
+
+        int finalized = 0;
+        int autoClockOut = 0;
+        int failed = 0;
+
+        for (DailyAttendance da : draftList) {
+            try {
+                boolean auto = finalizeOne(da.getDailyAttendanceId(), targetDate);
+                finalized++;
+                if (auto) autoClockOut++;
+            } catch (Exception e) {
+                log.error("[FINAL] 처리 실패 dailyId={}, msg={}",
+                        da.getDailyAttendanceId(), e.getMessage(), e);
+                failed++;
+            }
+        }
+
+        log.info("[FINAL] targetDate={} 마감={} 자동퇴근={} 실패={}",
+                targetDate, finalized, autoClockOut, failed);
+
+        return new FinalResult(finalized, autoClockOut, failed);
+    }
+
+    // 단건 FINAL 처리, 자동 퇴근 발생 여부 반환
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean finalizeOne(UUID dailyAttendanceId, LocalDate targetDate) {
+        DailyAttendance da = dailyAttendanceRepository.findById(dailyAttendanceId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "출근 기록이 없습니다 : " + dailyAttendanceId));
+
+        // DRAFT 아니면 skip
+        if (da.getClosureStatus() != ClosureStatus.DRAFT) {
+            return false;
+        }
+
+        // 퇴근 누락이면 자동 세팅
+        boolean autoClockOutApplied = false;
+        if (da.getLastClockOut() == null) {
+            LocalDateTime clockOut = resolveClockOut(da, targetDate);
+            da.updateClockOut(clockOut);
+            autoClockOutApplied = true;
+        }
+
+        // 퇴근시각 변경됐을 수 있으니 재계산
+        ResolvedSchedule schedule = scheduleResolver.resolve(
+                da.getMemberId(), da.getCompanyId(), targetDate);
+
+        // 공휴일 여부
+        boolean isHoliday = companyHolidayRepository.existsByCompanyIdAndHolidayDate(
+                da.getCompanyId(), targetDate);
+
+        // 승인된 연장근무 시간 조회
+        Integer approvedOt = overtimeRequestRepository.sumApprovedMinutes(
+                da.getMemberId(), targetDate);
+        int approvedMinutes = approvedOt == null ? 0 : approvedOt;
+
+        // 연장근로 정책 조회 (라운딩 단위 사용)
+        OvertimePolicy otPolicy = overtimePolicyRepository
+                .findEffective(da.getCompanyId(), da.getAttendanceDate())
+                .orElseThrow(() -> new IllegalStateException(
+                        "OvertimePolicy not found. companyId=" + da.getCompanyId()));
+
+        // 근무 시간 분류
+        WorkTimeBreakdown breakdown = workTimeClassifier.classify(
+                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeRoundingMinutes());
+
+        da.applyWorkResult(
+                breakdown.totalPayableMinutes(),
+                breakdown.overtimeMinutes());
+
+        // 최종 확정
+        da.transitionClosure(ClosureStatus.FINALIZED);
+
+        return autoClockOutApplied;
+    }
+
+    // 자동 퇴근시각 결정 (승인된 OT > 스케줄 end > 출근+8h)
     private LocalDateTime resolveClockOut(DailyAttendance da, LocalDate targetDate) {
         try {
             LocalDateTime approvedEnd = approvalServiceClient
                     .findLatestApprovedEndAt(da.getMemberId(), targetDate);
             if (approvedEnd != null) return approvedEnd;
         } catch (Exception e) {
-            log.warn("[FINAL] approval-service 조회 실패 memberId={} date={} → schedule fallback",
-                    da.getMemberId(), targetDate);
+            log.warn("[FINAL] approval-service 조회 실패 memberId={} → schedule fallback",
+                    da.getMemberId());
         }
 
         WorkSchedule schedule = findSchedule(da.getCompanyId(), da.getMemberId(), targetDate);
-        if (schedule != null) {
+        if (schedule != null && schedule.getEndTime() != null) {
             return targetDate.atTime(schedule.getEndTime());
         }
 
         return da.getFirstClockIn().plusHours(8);
     }
 
-    // 해당 날짜에 유효한 근무일정 1건 꺼내기 (없으면 null)
-    private WorkSchedule findSchedule(java.util.UUID companyId, java.util.UUID memberId, LocalDate date) {
+    // 해당 일자 유효 스케줄 1건, 없으면 null
+    private WorkSchedule findSchedule(UUID companyId, UUID memberId, LocalDate date) {
         List<WorkSchedule> schedules = workScheduleRepository
                 .findActiveSchedules(companyId, memberId, date);
         return schedules.isEmpty() ? null : schedules.get(0);
     }
 
-    // processDraft/processFinal 결과 집계용 간이 record (로그/모니터링에서 재사용)
-    public record DraftResult(int unclosedCount, int leaveButClockInCount) {}
-    public record FinalResult(int closedCount, int failedCount) {}
+    // 결과 요약 record
+    public record DraftResult(int drafted, int failed, int leaveButClockIn) {}
+    public record FinalResult(int finalized, int autoClockOut, int failed) {}
 }

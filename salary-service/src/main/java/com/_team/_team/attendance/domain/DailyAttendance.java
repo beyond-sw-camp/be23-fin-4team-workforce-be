@@ -1,6 +1,7 @@
 package com._team._team.attendance.domain;
 
 import com._team._team.attendance.domain.enums.AttendanceStatus;
+import com._team._team.attendance.domain.enums.ClosureStatus;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -49,6 +50,12 @@ public class DailyAttendance extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private AttendanceStatus status = AttendanceStatus.NORMAL;
+
+    /** 일 근태 마감 단계 (OPEN → DRAFT → UNDER_REVIEW → FINALIZED → LOCKED) */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ClosureStatus closureStatus = ClosureStatus.OPEN;
 
     /** 적용된 근무 스케줄(overtime 계산 기준) */
     private UUID workScheduleId;
@@ -107,5 +114,21 @@ public class DailyAttendance extends BaseTimeEntity {
     /** 근태 상태 변경 (휴가 승인, 수동 수정 등) */
     public void updateStatus(AttendanceStatus status){
         this.status = status;
+    }
+
+    /** 일마감 단계 전이 */
+    public void transitionClosure(ClosureStatus next){
+        if (this.closureStatus == ClosureStatus.LOCKED) {
+            throw new IllegalStateException("처리된 근태는 변경할 수 없습니다.");
+        }
+        this.closureStatus = next;
+    }
+
+    /**
+     * WorkTimeClassifier 결과를 엔티티에 반영
+     */
+    public void applyWorkResult(int workedMinutes, int overtimeMinutes) {
+        this.workedMinutes = workedMinutes;
+        this.overtimeMinutes = overtimeMinutes;
     }
 }

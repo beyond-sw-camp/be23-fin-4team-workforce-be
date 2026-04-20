@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import com._team._team.attendance.domain.enums.ClosureStatus;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,12 +21,12 @@ import java.util.UUID;
 @Repository
 public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance, UUID> {
 
-    /** 특정 직원의 특정일 근태 (출퇴근 처리 시 조회/생성용) */
+    // 개인 특정일 근태 1건 조회
     Optional<DailyAttendance> findByCompanyIdAndMemberIdAndAttendanceDate(
             UUID companyId, UUID memberId, LocalDate attendanceDate);
 
     /**
-     * 개인 월간 근태 (직원 본인 조회)
+     * 개인 월간 근태 페이징 조회, 직원 본인 근태 이력 화면용
      */
     @Query("SELECT da FROM DailyAttendance da " +
             "WHERE da.memberId = :memberId " +
@@ -38,8 +39,7 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
             Pageable pageable);
 
     /**
-     * 회사 전체 특정일 근태 (관리자 대시보드)
-     * - 오늘 출근 현황, 결근자 파악 등
+     * 관리자 대시보드(오늘 출근/미출근), 현장 출근 현황, 일별 집계의 입력 데이터
      */
     @Query("SELECT da FROM DailyAttendance da " +
             "WHERE da.companyId = :companyId " +
@@ -51,9 +51,7 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
             Pageable pageable);
 
     /**
-     * 회사 전체 월간 근태 (관리자 리포트)
-     * - 직원 수 × 근무일 수만큼 데이터 → 페이징 사용
-     * - 100명 × 22일 = 2,200건/월
+     * 회사 월간 근태 페이징, 관리자 월별 근태 리포트 화면용
      */
     @Query("SELECT da FROM DailyAttendance da " +
             "WHERE da.companyId = :companyId " +
@@ -66,10 +64,7 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
             Pageable pageable);
 
     /**
-     * 급여 계산용: 직원 1명의 정산기간 내 근태 전체 조회
-     * - 1명 × 최대 31일 = 최대 31건
-     * - 급여 계산은 전체 기간을 한 번에 봐야 하므로 페이징 부적절
-     * - PayrollService.createPayroll() → 초과근무수당/공휴일근무수당 계산 데이터
+     * 개인 기간 근태 , 집계용
      */
     @Query("SELECT da FROM DailyAttendance da " +
             "WHERE da.memberId = :memberId " +
@@ -82,15 +77,14 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    // 근태 마감 대상 조회 - 출근은 찍혔는데 퇴근이 없는 레코드
+    // 자동 마감 후보 조회, 출근 찍었는데 퇴근 안 찍힌 건
     @Query("SELECT da FROM DailyAttendance da " +
             "WHERE da.attendanceDate = :date " +
             "AND da.firstClockIn IS NOT NULL " +
             "AND da.lastClockOut IS NULL")
     List<DailyAttendance> findCloseCandidates(@Param("date") LocalDate date);
 
-    // 휴가(연차/반차)인데 출근 찍힌 케이스 - 관리자 점검/알림용
-    // statuses는 보통 LEAVE, HALF 두 개 넘김
+    // 휴가일 출근 감지, LEAVE/HALF 상태인데 출근 찍힌 건 조회
     @Query("SELECT da FROM DailyAttendance da " +
             "WHERE da.attendanceDate = :date " +
             "AND da.status IN :statuses " +
@@ -99,8 +93,69 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
             @Param("date") LocalDate date,
             @Param("statuses") List<AttendanceStatus> statuses);
 
-    // 이상감지용 - 해당일 전체 근태 레코드 스캔
-    // 회사수 × 인원수 수준이라 페이지 없이 바로 훑음
+    // 특정일 전사 근태 전체
     @Query("SELECT da FROM DailyAttendance da WHERE da.attendanceDate = :date")
     List<DailyAttendance> findAllByAttendanceDate(@Param("date") LocalDate date);
+
+    /**
+     * 월마감 배치에서 “확정된 일자만” 월별 집계 테이블이나 급여 입력으로 넘길 때 사용, 미확정 행은 제외
+     */
+    @Query("""
+       SELECT d FROM DailyAttendance d
+       WHERE d.companyId = :companyId
+         AND d.attendanceDate BETWEEN :from AND :to
+         AND d.closureStatus = 'FINALIZED'
+       """)
+    List<DailyAttendance> findFinalizedInMonth(@Param("companyId") UUID companyId,
+                                               @Param("from") LocalDate from,
+                                               @Param("to") LocalDate to);
+
+    /**
+     * 월마감 가능 여부 사전 검사: 미해결 건 수
+     */
+    @Query("""
+       SELECT COUNT(d) FROM DailyAttendance d
+       WHERE d.companyId = :companyId
+         AND d.attendanceDate BETWEEN :from AND :to
+         AND d.closureStatus IN ('DRAFT', 'UNDER_REVIEW', 'OPEN')
+       """)
+    long countUnresolvedInMonth(@Param("companyId") UUID companyId,
+                                @Param("from") LocalDate from,
+                                @Param("to") LocalDate to);
+
+    /**
+     * 일마감 Draft 배치 대상
+     * 특정 날짜의 OPEN 상태 근태 (배치가 DRAFT로 전이)
+     */
+    List<DailyAttendance> findAllByCompanyIdAndAttendanceDateAndClosureStatus(
+            UUID companyId, LocalDate attendanceDate, ClosureStatus closureStatus);
+
+    /**
+     * 개인 월간 근태 (기간 정해서)
+     */
+    @Query("""
+       SELECT d FROM DailyAttendance d
+       WHERE d.memberId = :memberId
+         AND d.attendanceDate BETWEEN :from AND :to
+       ORDER BY d.attendanceDate
+       """)
+    List<DailyAttendance> findAllByMemberInRange(@Param("memberId") UUID memberId,
+                                                 @Param("from") LocalDate from,
+                                                 @Param("to") LocalDate to);
+
+    /**
+     * 특정 일자의 특정 closureStatus 인 근태 전체 (전사)
+     * Draft 배치 OPEN 조회, Final 배치 DRAFT 조회에 사용
+     */
+    List<DailyAttendance> findAllByAttendanceDateAndClosureStatus(
+            LocalDate attendanceDate,
+            ClosureStatus closureStatus);
+
+    /** 전월 근태가 있는 회사 ID 목록 (배치 대상 회사 선별) */
+    @Query("""
+       SELECT DISTINCT d.companyId FROM DailyAttendance d
+       WHERE d.attendanceDate BETWEEN :from AND :to
+       """)
+    List<UUID> findDistinctCompanyIdsInRange(@Param("from") LocalDate from,
+                                             @Param("to") LocalDate to);
 }
