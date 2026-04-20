@@ -1,0 +1,47 @@
+package com._team._team.attendance.dto.reqDto;
+
+import com._team._team.attendance.domain.enums.ApprovalMode;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Positive;
+import lombok.*;
+
+import java.time.LocalTime;
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@Getter
+public class OvertimePolicyUpdateReqDto {
+
+    @Positive
+    private Integer overtimeRoundingMinutes;
+
+    private ApprovalMode approvalMode;
+
+    @Positive
+    private Integer postApprovalDeadlineHours;
+
+    @Positive
+    private Integer weeklyOvertimeLimitMinutes;
+
+    @Positive
+    private Integer weeklyTotalLimitMinutes;
+
+    @Positive
+    private Integer dailyOvertimeLimitMinutes;
+
+    @Positive
+    private Integer monthlyOvertimeLimitMinutes;
+
+    private LocalTime nightStartTime;
+    private LocalTime nightEndTime;
+
+    private Boolean holidayWorkRequiresApproval;
+
+    /** overtimeRoundingMinutes 가 15분 또는 30분 만 허용 */
+    @AssertTrue(message = "연장근로 인정 단위는 15분 또는 30분만 가능합니다.")
+    public boolean isValidOvertimeRounding() {
+        return overtimeRoundingMinutes != null
+                && (overtimeRoundingMinutes == 15 || overtimeRoundingMinutes == 30);
+    }
+}

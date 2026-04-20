@@ -33,4 +33,7 @@ public interface MemberServiceClient {
 
     @GetMapping("/member/internal/{memberId}/signature")
     SignatureResDto getSignatureUrl(@PathVariable("memberId") UUID memberId);
+
+    @GetMapping("/members/active")
+    List<UUID> findActiveMemberIds(@RequestParam("companyId") UUID companyId);
 }

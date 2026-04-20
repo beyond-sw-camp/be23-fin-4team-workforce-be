@@ -18,8 +18,10 @@ import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
 import com._team._team.approval.repository.OfficialRecipientRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.event.AllowanceApprovalEvent;
 import com._team._team.event.LeaveApprovalEvent;
 import com._team._team.event.OvertimeApprovalEvent;
+import com._team._team.event.ScheduleApprovalEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -42,6 +44,9 @@ public class ApprovalService {
     private final ApprovalNotificationService approvalNotificationService;
     private final OvertimeApprovalEventPublisher overtimeApprovalEventPublisher;
     private final LeaveApprovalEventPublisher leaveApprovalEventPublisher;
+    private final AllowanceApprovalEventPublisher allowanceApprovalEventPublisher;
+    private final ScheduleApprovalEventPublisher scheduleApprovalEventPublisher;
+    private final ApprovalRequestRepository approvalRequestRepository;
     private final ObjectMapper objectMapper;
     private final OfficialNumberService officialNumberService;
     private final OfficialRecipientRepository officialRecipientRepository;
@@ -54,18 +59,25 @@ public class ApprovalService {
                            ApprovalNotificationService approvalNotificationService,
                            OvertimeApprovalEventPublisher overtimeApprovalEventPublisher,
                            LeaveApprovalEventPublisher leaveApprovalEventPublisher,
+                           AllowanceApprovalEventPublisher allowanceApprovalEventPublisher,
+                           ScheduleApprovalEventPublisher scheduleApprovalEventPublisher,
+                           ApprovalRequestRepository approvalRequestRepository,
+                           ObjectMapper objectMapper,
                            OfficialNumberService officialNumberService,
                            OfficialRecipientRepository officialRecipientRepository,
-                           ObjectMapper objectMapper, MemberServiceClient memberServiceClient) {
+                           MemberServiceClient memberServiceClient) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
         this.approvalNotificationService = approvalNotificationService;
-        this.officialNumberService = officialNumberService;
-        this.officialRecipientRepository = officialRecipientRepository;
         this.overtimeApprovalEventPublisher = overtimeApprovalEventPublisher;
         this.leaveApprovalEventPublisher = leaveApprovalEventPublisher;
+        this.allowanceApprovalEventPublisher = allowanceApprovalEventPublisher;
+        this.scheduleApprovalEventPublisher = scheduleApprovalEventPublisher;
+        this.approvalRequestRepository = approvalRequestRepository;
         this.objectMapper = objectMapper;
+        this.officialNumberService = officialNumberService;
+        this.officialRecipientRepository = officialRecipientRepository;
         this.memberServiceClient = memberServiceClient;
     }
 
@@ -180,6 +192,8 @@ public class ApprovalService {
             // 최종 승인 시 이벤트 발행
             publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.APPROVE);
             publishLeaveEventIfApplicable(request, LeaveApprovalEvent.Action.USE);
+            publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.APPROVE, reqDto.getComment());
+            publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.APPROVE);  // 추가
         }
 
         List<Approval> allApprovals =
@@ -258,13 +272,14 @@ public class ApprovalService {
             }
         }
 
-        // 결재요청 상태 → REJECTED
+        // 결재요청 상태 -> REJECTED
         request.updateStatus(RequestStatus.REJECTED);
 
         // 반려 시 이벤트 발행
         publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.REJECT);
-        // 연차는 승인 전에는 차감되지 않았으므로 RESTORE 필요 없음 → 반려 시 발행 생략
+        publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.REJECT, reqDto.getComment());
 
+        // 연차는 승인 전에는 차감되지 않았으므로 RESTORE 필요 없음 -> 반려 시 발행 생략
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 
         //        요청자/참조자에게 반려 알림
@@ -400,7 +415,7 @@ public class ApprovalService {
     }
 
     // contentJson에서 workType 한 필드만 뽑기
-    // JSON 파싱 실패하거나 필드 없으면 그냥 null 리턴 (이벤트는 나가되 workType만 비게 됨).
+    // JSON 파싱 실패하거나 필드 없으면 그냥 null 리턴 (이벤트는 나가되 workType만 비게 됨)
     private String extractWorkType(String contentJson) {
         if (contentJson == null) return null;
         try {
@@ -479,6 +494,86 @@ public class ApprovalService {
         if (text == null || text.isBlank()) return null;
         try {
             return LocalDate.parse(text);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 시차출퇴근 슬롯 선택 문서일 때만 schedule 이벤트 발행
+     */
+    private void publishScheduleEventIfApplicable(ApprovalRequest request,
+                                                  ScheduleApprovalEvent.Action action) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"출퇴근시간 변경 신청서".equals(docName)) {
+            return;
+        }
+
+        UUID selectionId = extractSelectionId(request.getContentJson());
+        if (selectionId == null) {
+            return;
+        }
+
+        scheduleApprovalEventPublisher.publish(
+                ScheduleApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .selectionId(selectionId)
+                        .approverId(request.getMemberId())
+                        .decidedAt(java.time.LocalDateTime.now())
+                        .note(null)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // contentJson 에서 selectionId 추출
+    private UUID extractSelectionId(String contentJson) {
+        JsonNode node = readContent(contentJson);
+        if (node == null) return null;
+        try {
+            String raw = node.path("selectionId").asText(null);
+            return raw == null ? null : UUID.fromString(raw);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 수당 변경 신청 문서일 때만 allowance 이벤트 발행
+     */
+    private void publishAllowanceEventIfApplicable(ApprovalRequest request,
+                                                   UUID approverId,
+                                                   AllowanceApprovalEvent.Action action,
+                                                   String note) {
+
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"수당 변경 신청".equals(docName)) {
+            return;
+        }
+
+        UUID memberAllowanceId = extractMemberAllowanceId(request.getContentJson());
+        if (memberAllowanceId == null) return;
+
+        allowanceApprovalEventPublisher.publish(AllowanceApprovalEvent.builder()
+                .companyId(request.getApprovalDocument().getCompanyId())
+                .memberId(request.getMemberId())
+                .requestId(request.getRequestId())
+                .approverId(approverId)
+                .decidedAt(LocalDateTime.now())
+                .note(note)
+                .action(action)
+                .build());
+    }
+
+    // contentJson 에서 memberAllowanceId 추출
+    private UUID extractMemberAllowanceId(String contentJson) {
+        JsonNode node = readContent(contentJson);
+        if (node == null) return null;
+        try {
+            String raw = node.path("memberAllowanceId").asText(null);
+            return raw == null ? null : UUID.fromString(raw);
         } catch (Exception e) {
             return null;
         }

@@ -1,6 +1,6 @@
 package com._team._team.batch.payroll.worker;
 
-import com._team._team.salary.Repository.PayrollRepository;
+import com._team._team.salary.repository.PayrollRepository;
 import com._team._team.salary.domain.Payroll;
 import com._team._team.salary.domain.enums.PayrollStatus;
 import lombok.extern.slf4j.Slf4j;

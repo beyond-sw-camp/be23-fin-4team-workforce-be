@@ -29,8 +29,6 @@ public class DailyAttendanceResDto {
     private UUID workScheduleId;
     private LocalDateTime firstClockIn;
     private LocalDateTime lastClockOut;
-    private Integer breakMinutes;
-    private Integer totalBreakMinutes;
     private Integer workedMinutes;
     private Integer overtimeMinutes;
 
@@ -44,8 +42,6 @@ public class DailyAttendanceResDto {
                 .workScheduleId(daily.getWorkScheduleId())
                 .firstClockIn(daily.getFirstClockIn())
                 .lastClockOut(daily.getLastClockOut())
-                .breakMinutes(daily.getBreakMinutes())
-                .totalBreakMinutes(daily.getTotalBreakMinutes())
                 .workedMinutes(daily.getWorkedMinutes())
                 .overtimeMinutes(daily.getOvertimeMinutes())
                 .build();

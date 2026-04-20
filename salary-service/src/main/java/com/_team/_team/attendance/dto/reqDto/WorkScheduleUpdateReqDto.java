@@ -17,6 +17,8 @@ public class WorkScheduleUpdateReqDto {
     private LocalTime startTime;
     private LocalTime endTime;
     private Integer workMinutes;
+    private Integer breakMinutes;
+    private Integer selectionDeadlineDay;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
 }

@@ -1,13 +1,13 @@
 package com._team._team.batch.leave.worker;
 
-import com._team._team.attendance.Repository.MemberBalanceRepository;
-import com._team._team.attendance.Service.AnnualLeaveGrantService;
+import com._team._team.attendance.repository.MemberBalanceRepository;
+import com._team._team.attendance.service.AnnualLeaveGrantService;
 import com._team._team.attendance.domain.LeavePolicy;
 import com._team._team.attendance.domain.MemberBalance;
 import com._team._team.attendance.domain.enums.BalanceType;
 import com._team._team.dto.ApiResponse;
-import com._team._team.salary.FeignClients.MemberFeignClient;
-import com._team._team.salary.FeignClients.dto.MemberResDto;
+import com._team._team.salary.feignClients.MemberFeignClient;
+import com._team._team.salary.feignClients.dto.MemberResDto;
 import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
