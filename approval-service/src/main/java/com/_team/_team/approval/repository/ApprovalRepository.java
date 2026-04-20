@@ -84,4 +84,16 @@ public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
     List<Approval> findActedByActualApproverMemberId(
             @Param("memberId") UUID memberId,
             @Param("statuses") List<LineStatus> statuses);
+
+    // 결재 예정함 (내가 결재라인에 있지만 아직 내 차례가 아닌 건)
+    @Query("SELECT a FROM Approval a " +
+            "JOIN FETCH a.request r " +
+            "JOIN FETCH r.approvalDocument " +
+            "WHERE a.approverMemberPositionId = :memberPositionId " +
+            "AND a.approvalStatus = :status " +
+            "AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<Approval> findWaitingByMemberPositionId(
+            @Param("memberPositionId") UUID memberPositionId,
+            @Param("status") LineStatus status);
 }

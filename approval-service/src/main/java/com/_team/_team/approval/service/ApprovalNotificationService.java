@@ -83,33 +83,6 @@ public class ApprovalNotificationService {
         }
     }
 
-    //    자동승인 문서 (즉시 APPROVED)
-    //    요청자/참조자: APPROVAL_APPROVED / 공람자: APPROVAL_CIRCULATED
-    public void notifyAutoApproved(ApprovalRequest request,
-                                   List<ApprovalViewer> viewers) {
-        String title = title(request);
-        UUID requesterId = request.getMemberId();
-        UUID requestId = request.getRequestId();
-
-        List<Receiver> receivers = resolveCompletionReceivers(requesterId, viewers);
-
-        for (Receiver r : receivers) {
-            if (r.role == Role.VIEWER) {
-                publish(r.memberId, requesterId,
-                        NotificationType.APPROVAL_CIRCULATED,
-                        title + " 결재 문서가 공람 대상으로 도착했습니다.",
-                        requestId);
-            } else {
-                String content = (r.role == Role.REQUESTER)
-                        ? title + " 결재가 자동 승인되었습니다."
-                        : title + " 결재가 승인되었습니다.";
-                publish(r.memberId, requesterId,
-                        NotificationType.APPROVAL_APPROVED,
-                        content, requestId);
-            }
-        }
-    }
-
 //    다음 결재자 활성화
 //    다음 결재자: APPROVAL_REQUESTED
     public void notifyNextApprover(ApprovalRequest request, Approval nextApproval, UUID senderId){

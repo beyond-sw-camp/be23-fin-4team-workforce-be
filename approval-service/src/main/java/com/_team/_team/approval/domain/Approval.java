@@ -55,26 +55,18 @@ public class Approval extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String signatureImageUrl;
 
-    @Column(length = 64)
-    private String documentHash;
-
     @Builder.Default
     @Column(nullable = false)
     private String isSignedYn = "N";
-
-    @Column(length = 45)
-    private String ipAddress; // 감사 로그용
 
     public void cancel() {
         this.approvalStatus = LineStatus.CANCELED;
         this.actedAt = LocalDateTime.now();
     }
 
-    public void sign(String signatureImageUrl, String documentHash, String ipAddress) {
+    public void sign(String signatureImageUrl) {
         this.isSignedYn = "Y";
         this.signatureImageUrl = signatureImageUrl;
-        this.documentHash = documentHash;
-        this.ipAddress = ipAddress;
     }
 
     public void activate() {

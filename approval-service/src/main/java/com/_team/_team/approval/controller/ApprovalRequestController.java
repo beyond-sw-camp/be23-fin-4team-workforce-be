@@ -104,11 +104,12 @@ public class ApprovalRequestController {
     @GetMapping("/department")
     public ResponseEntity<?> findDepartmentRequests(
             @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
             @RequestParam UUID organizationId,
             @RequestParam(required = false) RequestType requestType) {
         List<ApprovalRequestResDto> result = approvalRequestService
-                .findDepartmentRequests(companyId, memberPositionId, organizationId, requestType);
+                .findDepartmentRequests(companyId, memberPositionId, memberId, organizationId, requestType);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "부서 문서함 조회 성공"),
                 HttpStatus.OK

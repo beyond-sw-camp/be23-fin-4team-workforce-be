@@ -8,6 +8,7 @@ import com._team._team.member.dto.reqdto.*;
 import com._team._team.member.dto.resdto.LoginResDto;
 import com._team._team.member.dto.resdto.MemberResDto;
 import com._team._team.member.dto.resdto.MemberSearchItemResDto;
+import com._team._team.member.dto.resdto.SignatureResDto;
 import com._team._team.member.service.MemberService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -407,5 +408,46 @@ public class MemberController {
                         "대시보드 프로필 조회 성공"),
                 HttpStatus.OK
         );
+    }
+
+    // 서명 이미지 업로드
+    @PatchMapping("/signature")
+    public ResponseEntity<?> uploadSignature(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestParam("signatureImage") MultipartFile signatureImage) {
+        memberService.uploadSignature(memberId, signatureImage);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "서명 이미지 업로드 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 서명 이미지 조회
+    @GetMapping("/signature")
+    public ResponseEntity<?> getSignature(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        String signatureUrl = memberService.getSignatureUrl(memberId);
+        return new ResponseEntity<>(
+                ApiResponse.success(signatureUrl, "서명 이미지 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 서명 이미지 삭제
+    @DeleteMapping("/signature")
+    public ResponseEntity<?> deleteSignature(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        memberService.deleteSignature(memberId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "서명 이미지 삭제 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 내부용: 서명 URL 조회 (Feign 호출용)
+    @GetMapping("/internal/{memberId}/signature")
+    public SignatureResDto getSignatureInternal(@PathVariable UUID memberId) {
+        String signatureUrl = memberService.getSignatureUrl(memberId);
+        return new SignatureResDto(signatureUrl);
     }
 }
