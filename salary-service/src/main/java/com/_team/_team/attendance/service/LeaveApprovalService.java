@@ -11,8 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 휴가 결재 이벤트 처리 서비스
- * approval-service에서 날라오는 Kafka 이벤트를 받아서 MemberBalance를 차감/복구한다.
- * USE는 승인 시 차감, RESTORE는 반려/취소 시 원복.
+ * USE는 승인 시 차감, RESTORE는 반려/취소 시 원복
  */
 @Slf4j
 @Service

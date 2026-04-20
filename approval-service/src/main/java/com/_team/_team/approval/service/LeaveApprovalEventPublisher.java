@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * 휴가 결재 이벤트 발행
- * approval-service에서 승인/반려 시점에 salary-service로 쏘는 Kafka publisher.
- * 토픽은 leave-approval, key는 requestId 문자열 (같은 건은 같은 파티션으로 순서 보장).
+ * approval-service에서 승인/반려 시점에 salary-service로 쏘는 Kafka publisher
+ * 토픽은 leave-approval, key는 requestId 문자열 (같은 건은 같은 파티션으로 순서 보장)
  */
 @Slf4j
 @Component
