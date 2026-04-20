@@ -11,25 +11,28 @@ import java.util.UUID;
 
 public interface MonthlyAttendanceLedgerRepository extends JpaRepository<MonthlyAttendanceLedger, UUID>{
 
+
     // 급여 서비스 조회 (월별 개인 장부)
-    Optional<MonthlyAttendanceLedger> findByMemberIdAndYearMonth(UUID memberId, String yearMonth);
+    Optional<MonthlyAttendanceLedger> findByMemberIdAndLedgerYearMonth(
+            UUID memberId, String ledgerYearMonth);
 
     // 중복 생성 방지 (월마감 배치 사전 체크)
-    boolean existsByMemberIdAndYearMonth(UUID memberId, String yearMonth);
+    boolean existsByMemberIdAndLedgerYearMonth(
+            UUID memberId, String ledgerYearMonth);
 
     // 회사 월별 전체 장부 (관리자 리포트)
-    Page<MonthlyAttendanceLedger> findAllByCompanyIdAndYearMonth(
-            UUID companyId, String yearMonth, Pageable pageable);
+    Page<MonthlyAttendanceLedger> findAllByCompanyIdAndLedgerYearMonth(
+            UUID companyId, String ledgerYearMonth, Pageable pageable);
 
     // 재마감 대상 (isLocked=false 인 것만 수정 가능)
-    List<MonthlyAttendanceLedger> findAllByCompanyIdAndYearMonthAndIsLocked(
-            UUID companyId, String yearMonth, Boolean isLocked);
+    List<MonthlyAttendanceLedger> findAllByCompanyIdAndLedgerYearMonthAndIsLocked(
+            UUID companyId, String ledgerYearMonth, Boolean isLocked);
 
     // 급여 지급 완료된 잠금 장부
-    Optional<MonthlyAttendanceLedger> findByMemberIdAndYearMonthAndIsLocked(
-            UUID memberId, String yearMonth, Boolean isLocked);
+    Optional<MonthlyAttendanceLedger> findByMemberIdAndLedgerYearMonthAndIsLocked(
+            UUID memberId, String ledgerYearMonth, Boolean isLocked);
 
     // 개인 월별 이력
-    List<MonthlyAttendanceLedger> findAllByMemberIdOrderByYearMonthDesc(UUID memberId);
+    List<MonthlyAttendanceLedger> findAllByMemberIdOrderByLedgerYearMonthDesc(UUID memberId);
 
 }

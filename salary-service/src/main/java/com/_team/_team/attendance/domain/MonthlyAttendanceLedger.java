@@ -19,16 +19,16 @@ import java.util.UUID;
         uniqueConstraints = {
                 // 한 직원 한 달 한 건 (재생성 방지)
                 @UniqueConstraint(name = "uk_ledger_member_month",
-                        columnNames = {"memberId", "yearMonth"})
+                        columnNames = {"memberId", "ledger_year_month"})
         },
         indexes = {
                 // 회사 월 마감 현황 조회 (관리자 대시보드)
                 @Index(name = "idx_ledger_company_month",
-                        columnList = "companyId, yearMonth"),
+                        columnList = "companyId, ledger_year_month"),
 
                 // 잠금 여부 필터 (급여 서비스 조회)
                 @Index(name = "idx_ledger_month_locked",
-                        columnList = "yearMonth, isLocked")
+                        columnList = "ledger_year_month, isLocked")
         }
 )
 public class MonthlyAttendanceLedger extends BaseTimeEntity {
@@ -45,7 +45,7 @@ public class MonthlyAttendanceLedger extends BaseTimeEntity {
 
     /** 대상 월, "YYYY-MM" 형식 */
     @Column(name = "ledger_year_month", nullable = false, length = 7)
-    private String yearMonth;
+    private String ledgerYearMonth;
 
     /** 총 순 근무 시간(분) 휴게 제외, 휴가 차감 반영 */
     @Column(nullable = false)

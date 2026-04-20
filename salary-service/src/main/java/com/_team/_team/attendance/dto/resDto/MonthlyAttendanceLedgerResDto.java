@@ -43,7 +43,7 @@ public class MonthlyAttendanceLedgerResDto {
         return MonthlyAttendanceLedgerResDto.builder()
                 .ledgerId(l.getLedgerId())
                 .memberId(l.getMemberId())
-                .yearMonth(l.getYearMonth())
+                .yearMonth(l.getLedgerYearMonth())
                 .totalWorkedMinutes(l.getTotalWorkedMinutes())
                 .regularMinutes(l.getRegularMinutes())
                 .overtimeMinutes(l.getOvertimeMinutes())

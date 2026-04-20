@@ -97,7 +97,7 @@ public class PayrollCalculationService {
     // 3. 월 장부 조회, 마감 안됐거나 잠금 해제 상태면 예외
     public MonthlyAttendanceLedger findLedger(UUID memberId, YearMonth yearMonth) {
         return monthlyAttendanceLedgerRepository
-                .findByMemberIdAndYearMonth(memberId, yearMonth.toString())
+                .findByMemberIdAndLedgerYearMonth(memberId, yearMonth.toString())
                 .orElseThrow(() -> new IllegalStateException(
                         "월 장부가 없습니다. memberId=" + memberId + " yearMonth=" + yearMonth));
     }

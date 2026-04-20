@@ -149,15 +149,15 @@ public class MonthlyAttendanceCloseService {
                                          YearMonth targetMonth,
                                          List<DailyAttendance> dailyList) {
 
-        String yearMonth = targetMonth.toString();
+        String ledgerYearMonth = targetMonth.toString();
 
         // LOCKED 된 기존 장부는 수정 불가
         MonthlyAttendanceLedger existing = ledgerRepository
-                .findByMemberIdAndYearMonth(memberId, yearMonth)
+                .findByMemberIdAndLedgerYearMonth(memberId, ledgerYearMonth)
                 .orElse(null);
         if (existing != null && Boolean.TRUE.equals(existing.getIsLocked())) {
             log.info("[MonthlyClose] 잠긴 장부 skip memberId={} yearMonth={}",
-                    memberId, yearMonth);
+                    memberId, ledgerYearMonth);
             return false;
         }
 
@@ -169,7 +169,7 @@ public class MonthlyAttendanceCloseService {
             MonthlyAttendanceLedger ledger = MonthlyAttendanceLedger.builder()
                     .memberId(memberId)
                     .companyId(companyId)
-                    .yearMonth(yearMonth)
+                    .ledgerYearMonth(ledgerYearMonth)
                     .totalWorkedMinutes(totals.totalWorkedMinutes())
                     .regularMinutes(totals.regularMinutes())
                     .overtimeMinutes(totals.overtimeMinutes())
