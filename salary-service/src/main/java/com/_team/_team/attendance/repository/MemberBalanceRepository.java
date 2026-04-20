@@ -151,7 +151,7 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    /** 특정 사원의 특정 타입 활성 잔액 1건*/
+    /** 특정 사원의 특정 타입 활성 잔액 1건 */
     @Query("SELECT mb FROM MemberBalance mb " +
             "WHERE mb.companyId = :companyId " +
             "AND mb.memberId = :memberId " +
@@ -164,4 +164,14 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
             @Param("type") BalanceType type,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    /**
+     * 만료 대상 연차 조회
+     */
+    @Query("""
+       SELECT b FROM MemberBalance b
+       WHERE b.expirationDate < :today
+         AND b.isExpireYn = 'N'
+       """)
+    List<MemberBalance> findAllToExpire(@Param("today") LocalDate today);
 }
