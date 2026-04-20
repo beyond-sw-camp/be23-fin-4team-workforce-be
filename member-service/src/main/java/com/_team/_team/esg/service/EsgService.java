@@ -37,29 +37,28 @@ public class EsgService {
     private final EsgActivityRepository activityRepository;
     private final EsgPointHistoryRepository pointHistoryRepository;
     private final EsgScoreRepository scoreRepository;
-    private final EsgCampaignRepository campaignRepository;
-    private final EsgCampaignMemberRepository campaignMemberRepository;
     private final EsgShopItemRepository shopItemRepository;
     private final EsgShopOrderRepository shopOrderRepository;
     private final S3Uploader s3Uploader;
     private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public EsgService(MemberRepository memberRepository, EsgCompanyConfigRepository configRepository, EsgActivitySubjectRepository subjectRepository, EsgActivityRepository activityRepository, EsgPointHistoryRepository pointHistoryRepository, EsgScoreRepository scoreRepository, EsgCampaignRepository campaignRepository, EsgCampaignMemberRepository campaignMemberRepository, EsgShopItemRepository shopItemRepository, EsgShopOrderRepository shopOrderRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher) {
+    public EsgService(MemberRepository memberRepository, EsgCompanyConfigRepository configRepository, EsgActivitySubjectRepository subjectRepository, EsgActivityRepository activityRepository, EsgPointHistoryRepository pointHistoryRepository, EsgScoreRepository scoreRepository, EsgShopItemRepository shopItemRepository, EsgShopOrderRepository shopOrderRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher) {
         this.memberRepository = memberRepository;
         this.configRepository = configRepository;
         this.subjectRepository = subjectRepository;
         this.activityRepository = activityRepository;
         this.pointHistoryRepository = pointHistoryRepository;
         this.scoreRepository = scoreRepository;
-        this.campaignRepository = campaignRepository;
-        this.campaignMemberRepository = campaignMemberRepository;
         this.shopItemRepository = shopItemRepository;
         this.shopOrderRepository = shopOrderRepository;
         this.s3Uploader = s3Uploader;
         this.eventPublisher = eventPublisher;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // 설정
+    // ═══════════════════════════════════════════════════════════
 
     public void createDefaultConfig(Company company) {
         if (configRepository.existsByCompany(company)) return;
@@ -79,13 +78,13 @@ public class EsgService {
         EsgCompanyConfig config = getConfig(member.getCompany());
         config.update(
                 reqDto.getEsgEnabledYn(),
-                reqDto.getRewardEnabledYn(),
-                reqDto.getCampaignEnabledYn(),
-                reqDto.getShopEnabledYn(),
                 reqDto.getMonthlyPointLimit()
         );
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // 활동 양식
+    // ═══════════════════════════════════════════════════════════
 
     public UUID createSubject(UUID memberId, EsgSubjectCreateReqDto reqDto) {
         Member member = getMember(memberId);
@@ -130,7 +129,9 @@ public class EsgService {
         getSubject(subjectId, member.getCompany()).delete();
     }
 
-
+    // ═══════════════════════════════════════════════════════════
+    // 활동 인증
+    // ═══════════════════════════════════════════════════════════
 
     public UUID submitActivity(UUID memberId, UUID subjectId,
                                String verificationContent, MultipartFile file) {
@@ -139,10 +140,10 @@ public class EsgService {
 
         EsgActivitySubject subject = getSubject(subjectId, member.getCompany());
 
-        // 텍스트와 파일 둘 다 없으면 예외
         if ((verificationContent == null || verificationContent.isBlank())
                 && (file == null || file.isEmpty())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "활동 내용 또는 첨부 파일을 입력해주세요.");
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "활동 내용 또는 첨부 파일을 입력해주세요.");
         }
 
         String fileUrl = null;
@@ -167,8 +168,10 @@ public class EsgService {
         validateEsgEnabled(member.getCompany());
 
         List<EsgActivity> activities = (status != null)
-                ? activityRepository.findAllByCompanyIdAndStatus(member.getCompany().getCompanyId(), status)
-                : activityRepository.findAllByCompanyId(member.getCompany().getCompanyId());
+                ? activityRepository.findAllByCompanyIdAndStatus(
+                member.getCompany().getCompanyId(), status)
+                : activityRepository.findAllByCompanyId(
+                member.getCompany().getCompanyId());
 
         return activities.stream().map(EsgActivityResDto::fromEntity).toList();
     }
@@ -187,7 +190,6 @@ public class EsgService {
 
     public void approveActivity(UUID memberId, UUID activityId) {
         Member approver = getMember(memberId);
-        EsgCompanyConfig config = getConfig(approver.getCompany());
         validateEsgEnabled(approver.getCompany());
 
         EsgActivity activity = getActivity(activityId, approver.getCompany());
@@ -199,21 +201,21 @@ public class EsgService {
         int points = activity.getSubject().getDefaultPoints();
         activity.approve(approver.getMemberId(), points);
 
-        if (config.isRewardEnabled()) {
-            earnPoint(
-                    activity.getMember(),
-                    ReferenceType.ACTIVITY,
-                    activity.getEsgActivityId(),
-                    points,
-                    activity.getSubject().getTitle() + " 활동 승인"
-            );
-        }
-        // 알림 발행
+        // ESG ON 이면 포인트 자동 적립
+        earnPoint(
+                activity.getMember(),
+                ReferenceType.ACTIVITY,
+                activity.getEsgActivityId(),
+                points,
+                activity.getSubject().getTitle() + " 활동 승인"
+        );
+
         eventPublisher.publishEvent(NotificationMessage.builder()
                 .receiverId(activity.getMember().getMemberId())
                 .senderId(approver.getMemberId())
                 .notificationType(NotificationType.ESG_ACTIVITY_APPROVED)
-                .content(activity.getSubject().getTitle() + " 활동이 승인됐습니다. +" + points + "P")
+                .content(activity.getSubject().getTitle()
+                        + " 활동이 승인됐습니다. +" + points + "P")
                 .targetId(activity.getEsgActivityId())
                 .targetType("ESG_ACTIVITY")
                 .build());
@@ -231,17 +233,20 @@ public class EsgService {
 
         activity.reject(approver.getMemberId(), reqDto.getReason());
 
-        // 알림 발행
         eventPublisher.publishEvent(NotificationMessage.builder()
                 .receiverId(activity.getMember().getMemberId())
                 .senderId(approver.getMemberId())
                 .notificationType(NotificationType.ESG_ACTIVITY_REJECTED)
-                .content(activity.getSubject().getTitle() + " 활동이 반려됐습니다. 사유: " + reqDto.getReason())
+                .content(activity.getSubject().getTitle()
+                        + " 활동이 반려됐습니다. 사유: " + reqDto.getReason())
                 .targetId(activity.getEsgActivityId())
                 .targetType("ESG_ACTIVITY")
                 .build());
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // 포인트
+    // ═══════════════════════════════════════════════════════════
 
     @Transactional(readOnly = true)
     public int getCurrentBalance(UUID memberId) {
@@ -260,118 +265,14 @@ public class EsgService {
                 .toList();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // 포인트샵
+    // ═══════════════════════════════════════════════════════════
 
-    public UUID createCampaign(UUID memberId, EsgCampaignCreateReqDto reqDto) {
-        Member member = getMember(memberId);
-        EsgCompanyConfig config = getConfig(member.getCompany());
-
-        if (!config.isCampaignEnabled()) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "캠페인 기능이 활성화되지 않은 회사입니다.");
-        }
-
-        EsgCampaign campaign = EsgCampaign.builder()
-                .company(member.getCompany())
-                .title(reqDto.getTitle())
-                .description(reqDto.getDescription())
-                .category(reqDto.getCategory())
-                .startDate(reqDto.getStartDate())
-                .endDate(reqDto.getEndDate())
-                .rewardPoints(reqDto.getRewardPoints())
-                .maxParticipants(reqDto.getMaxParticipants())
-                .createdBy(memberId)
-                .build();
-
-        return campaignRepository.save(campaign).getEsgCampaignId();
-    }
-
-    @Transactional(readOnly = true)
-    public List<EsgCampaignResDto> getCampaignList(UUID memberId, CampaignStatus status) {
+    public UUID createShopItem(UUID memberId, EsgShopItemCreateReqDto reqDto,
+                               MultipartFile image) {
         Member member = getMember(memberId);
         validateEsgEnabled(member.getCompany());
-
-        List<EsgCampaign> campaigns = (status != null)
-                ? campaignRepository.findByCompanyAndStatusOrderByCreatedAtDesc(member.getCompany(), status)
-                : campaignRepository.findByCompanyOrderByCreatedAtDesc(member.getCompany());
-
-        return campaigns.stream().map(EsgCampaignResDto::fromEntity).toList();
-    }
-
-    public void joinCampaign(UUID memberId, UUID campaignId) {
-        Member member = getMember(memberId);
-        EsgCampaign campaign = getCampaign(campaignId, member.getCompany());
-
-        if (!campaign.isJoinable()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "참여할 수 없는 캠페인입니다.");
-        }
-        if (campaignMemberRepository.existsByCampaignAndMember(campaign, member)) {
-            throw new BusinessException(HttpStatus.CONFLICT, "이미 참여한 캠페인입니다.");
-        }
-        if (campaign.getMaxParticipants() != null) {
-            int currentCount = campaignMemberRepository.countByCampaign(campaign);
-            if (currentCount >= campaign.getMaxParticipants()) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, "캠페인 정원이 초과됐습니다.");
-            }
-        }
-
-        campaignMemberRepository.save(EsgCampaignMember.builder()
-                .campaign(campaign)
-                .member(member)
-                .build());
-    }
-
-    public void completeCampaign(UUID memberId, UUID campaignId, UUID targetMemberId) {
-        Member manager = getMember(memberId);
-        EsgCompanyConfig config = getConfig(manager.getCompany());
-        EsgCampaign campaign = getCampaign(campaignId, manager.getCompany());
-
-        Member target = memberRepository.findById(targetMemberId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."));
-
-        EsgCampaignMember campaignMember = campaignMemberRepository
-                .findByCampaignAndMember(campaign, target)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "캠페인에 참여하지 않은 직원입니다."));
-
-        if (campaignMember.isCompleted()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 완료 처리된 직원입니다.");
-        }
-
-        campaignMember.complete(campaign.getRewardPoints());
-
-        if (config.isRewardEnabled()) {
-            earnPoint(
-                    target,
-                    ReferenceType.CAMPAIGN,
-                    campaignMember.getEsgCampaignMemberId(),
-                    campaign.getRewardPoints(),
-                    campaign.getTitle() + " 캠페인 완료"
-            );
-        }
-
-        // 알림 발행
-        eventPublisher.publishEvent(NotificationMessage.builder()
-                .receiverId(target.getMemberId())
-                .senderId(manager.getMemberId())
-                .notificationType(NotificationType.ESG_CAMPAIGN_CLOSED)
-                .content(campaign.getTitle() + " 캠페인이 완료 처리됐습니다.")
-                .targetId(campaign.getEsgCampaignId())
-                .targetType("ESG_CAMPAIGN")
-                .build());
-    }
-
-    public void closeCampaign(UUID memberId, UUID campaignId) {
-        Member member = getMember(memberId);
-        getCampaign(campaignId, member.getCompany()).close();
-    }
-
-
-
-    public UUID createShopItem(UUID memberId, EsgShopItemCreateReqDto reqDto, MultipartFile image) {
-        Member member = getMember(memberId);
-        EsgCompanyConfig config = getConfig(member.getCompany());
-
-        if (!config.isShopEnabled()) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "사내 물품 구매 기능이 활성화되지 않은 회사입니다.");
-        }
 
         String imageUrl = null;
         if (image != null && !image.isEmpty()) {
@@ -429,14 +330,7 @@ public class EsgService {
 
     public UUID orderShopItem(UUID memberId, UUID itemId) {
         Member member = getMember(memberId);
-        EsgCompanyConfig config = getConfig(member.getCompany());
-
-        if (!config.isShopEnabled()) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "사내 물품 구매 기능이 활성화되지 않은 회사입니다.");
-        }
-        if (!config.isRewardEnabled()) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "포인트 기능이 활성화되지 않은 회사입니다.");
-        }
+        validateEsgEnabled(member.getCompany());
 
         EsgShopItem item = getShopItem(itemId, member.getCompany());
 
@@ -447,7 +341,8 @@ public class EsgService {
         int currentBalance = getCurrentBalance(memberId);
         if (currentBalance < item.getRequiredPoints()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "포인트가 부족합니다. 현재 잔액: " + currentBalance + "P, 필요: " + item.getRequiredPoints() + "P");
+                    "포인트가 부족합니다. 현재 잔액: " + currentBalance
+                            + "P, 필요: " + item.getRequiredPoints() + "P");
         }
 
         item.decreaseStock();
@@ -468,11 +363,11 @@ public class EsgService {
                 item.getTitle() + " 구매"
         );
 
-        // 알림 발행
         eventPublisher.publishEvent(NotificationMessage.builder()
                 .receiverId(member.getMemberId())
                 .notificationType(NotificationType.ESG_SHOP_ORDER_COMPLETE)
-                .content(item.getTitle() + " 구매가 완료됐습니다. -" + item.getRequiredPoints() + "P")
+                .content(item.getTitle() + " 구매가 완료됐습니다. -"
+                        + item.getRequiredPoints() + "P")
                 .targetId(order.getEsgShopOrderId())
                 .targetType("ESG_SHOP_ORDER")
                 .build());
@@ -498,11 +393,13 @@ public class EsgService {
                 .toList();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // 점수
+    // ═══════════════════════════════════════════════════════════
 
     public EsgScoreResDto calculateMyMonthlyScore(UUID memberId, String yearMonth) {
         Member member = getMember(memberId);
         validateEsgEnabled(member.getCompany());
-        EsgCompanyConfig config = getConfig(member.getCompany());
 
         List<EsgActivity> activities = activityRepository
                 .findApprovedByMemberAndYearMonth(member, yearMonth);
@@ -515,13 +412,13 @@ public class EsgService {
                 .findByMemberAndYearMonth(member, yearMonth)
                 .map(existing -> {
                     scoreRepository.delete(existing);
-                    return EsgScore.snapshot(member.getCompany().getCompanyId(), member, yearMonth, e, s, g);
+                    return EsgScore.snapshot(
+                            member.getCompany().getCompanyId(), member, yearMonth, e, s, g);
                 })
-                .orElse(EsgScore.snapshot(member.getCompany().getCompanyId(), member, yearMonth, e, s, g));
+                .orElse(EsgScore.snapshot(
+                        member.getCompany().getCompanyId(), member, yearMonth, e, s, g));
 
         EsgScore saved = scoreRepository.save(score);
-
-        // Member 에 ESG 점수 반영
         member.updateEsgScore(saved.getTotalScore());
 
         return EsgScoreResDto.fromEntity(saved);
@@ -536,6 +433,9 @@ public class EsgService {
                 .toList();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // Private 헬퍼
+    // ═══════════════════════════════════════════════════════════
 
     private void earnPoint(Member member, ReferenceType referenceType,
                            UUID referenceId, int points, String description) {
@@ -549,11 +449,12 @@ public class EsgService {
                 EsgPointHistory.earn(member, referenceType, referenceId,
                         points, currentBalance + points, description)
         );
-        // 알림 발행
+
         eventPublisher.publishEvent(NotificationMessage.builder()
                 .receiverId(member.getMemberId())
                 .notificationType(NotificationType.ESG_POINT_EARNED)
-                .content(description + " +" + points + "P 적립됐습니다. 잔액: " + (currentBalance + points) + "P")
+                .content(description + " +" + points + "P 적립됐습니다. 잔액: "
+                        + (currentBalance + points) + "P")
                 .targetId(referenceId)
                 .targetType(referenceType.name())
                 .build());
@@ -581,7 +482,6 @@ public class EsgService {
         String currentYearMonth = YearMonth.now()
                 .format(DateTimeFormatter.ofPattern("yyyy-MM"));
 
-        // 활동 + 캠페인 전체 적립 포인트 합산
         int monthlyEarned = pointHistoryRepository
                 .findMonthlyEarnedByMember(member, currentYearMonth);
 
@@ -592,30 +492,30 @@ public class EsgService {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // Private - 공통 조회 헬퍼
-    // ═══════════════════════════════════════════════════════════
-
     private Member getMember(UUID memberId) {
         return memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
     }
 
     private EsgCompanyConfig getConfig(Company company) {
         return configRepository.findByCompany(company)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ESG 설정 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "ESG 설정 정보를 찾을 수 없습니다."));
     }
 
     private void validateEsgEnabled(Company company) {
         if (!getConfig(company).isEsgEnabled()) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "ESG 기능이 활성화되지 않은 회사입니다.");
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "ESG 그린장터가 활성화되지 않은 회사입니다.");
         }
     }
 
     private EsgActivitySubject getSubject(UUID subjectId, Company company) {
         EsgActivitySubject subject = subjectRepository
                 .findByEsgActivitySubjectIdAndDelYn(subjectId, "NO")
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 활동 양식입니다."));
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 활동 양식입니다."));
 
         if (!subject.getCompany().getCompanyId().equals(company.getCompanyId())) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 활동 양식입니다.");
@@ -625,22 +525,21 @@ public class EsgService {
 
     private EsgActivity getActivity(UUID activityId, Company company) {
         EsgActivity activity = activityRepository.findById(activityId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 활동입니다."));
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 활동입니다."));
 
-        if (!activity.getMember().getCompany().getCompanyId().equals(company.getCompanyId())) {
+        if (!activity.getMember().getCompany().getCompanyId()
+                .equals(company.getCompanyId())) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 활동입니다.");
         }
         return activity;
     }
 
-    private EsgCampaign getCampaign(UUID campaignId, Company company) {
-        return campaignRepository.findByEsgCampaignIdAndCompany(campaignId, company)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 캠페인입니다."));
-    }
-
     private EsgShopItem getShopItem(UUID itemId, Company company) {
-        EsgShopItem item = shopItemRepository.findByEsgShopItemIdAndDelYn(itemId, "NO")
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 물품입니다."));
+        EsgShopItem item = shopItemRepository
+                .findByEsgShopItemIdAndDelYn(itemId, "NO")
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 물품입니다."));
 
         if (!item.getCompany().getCompanyId().equals(company.getCompanyId())) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 물품입니다.");
