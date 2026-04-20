@@ -174,8 +174,8 @@ public class ApprovalPolicyLineService {
         List<PolicyLineCandidateResDto> result = new ArrayList<>();
 
         for (ApprovalPolicyLine policyLine : policyLines) {
-            // 요청자 직책 이하의 stepOrder는 건너뛰기
-            if (requesterStepOrder != null && policyLine.getStepOrder() <= requesterStepOrder) {
+            // 본인 직급도 포함
+            if (requesterStepOrder != null && policyLine.getStepOrder() < requesterStepOrder) {
                 continue;
             }
 

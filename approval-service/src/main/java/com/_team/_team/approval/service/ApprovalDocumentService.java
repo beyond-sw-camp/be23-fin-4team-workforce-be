@@ -525,5 +525,31 @@ public class ApprovalDocumentService {
         return ApprovalDocumentResDto.fromEntity(document);
     }
 
+    public ApprovalDocumentResDto enableDeptVisible(UUID companyId, UUID documentId) {
+        ApprovalDocument document = approvalDocumentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "결재 양식을 찾을 수 없습니다."));
+
+        if (!document.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
+
+        document.enableDeptVisible();
+        return ApprovalDocumentResDto.fromEntity(document);
+    }
+
+    public ApprovalDocumentResDto disableDeptVisible(UUID companyId, UUID documentId) {
+        ApprovalDocument document = approvalDocumentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "결재 양식을 찾을 수 없습니다."));
+
+        if (!document.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
+
+        document.disableDeptVisible();
+        return ApprovalDocumentResDto.fromEntity(document);
+    }
+
 
 }

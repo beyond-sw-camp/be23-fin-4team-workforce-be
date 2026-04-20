@@ -10,6 +10,8 @@ import com._team._team.approval.domain.enums.RequestType;
 import com._team._team.approval.dto.reqdto.ApprovalActionReqDto;
 import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
 import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
+import com._team._team.approval.feignclients.MemberServiceClient;
+import com._team._team.approval.feignclients.dto.SignatureResDto;
 import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.approval.repository.ApprovalRepository;
 import com._team._team.approval.repository.ApprovalRequestRepository;
@@ -40,10 +42,10 @@ public class ApprovalService {
     private final ApprovalNotificationService approvalNotificationService;
     private final OvertimeApprovalEventPublisher overtimeApprovalEventPublisher;
     private final LeaveApprovalEventPublisher leaveApprovalEventPublisher;
-    private final ApprovalRequestRepository approvalRequestRepository;
     private final ObjectMapper objectMapper;
     private final OfficialNumberService officialNumberService;
     private final OfficialRecipientRepository officialRecipientRepository;
+    private final MemberServiceClient memberServiceClient;
 
     @Autowired
     public ApprovalService(ApprovalRepository approvalRepository,
@@ -52,10 +54,9 @@ public class ApprovalService {
                            ApprovalNotificationService approvalNotificationService,
                            OvertimeApprovalEventPublisher overtimeApprovalEventPublisher,
                            LeaveApprovalEventPublisher leaveApprovalEventPublisher,
-                           ApprovalRequestRepository approvalRequestRepository,
                            OfficialNumberService officialNumberService,
                            OfficialRecipientRepository officialRecipientRepository,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper, MemberServiceClient memberServiceClient) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
@@ -64,8 +65,8 @@ public class ApprovalService {
         this.officialRecipientRepository = officialRecipientRepository;
         this.overtimeApprovalEventPublisher = overtimeApprovalEventPublisher;
         this.leaveApprovalEventPublisher = leaveApprovalEventPublisher;
-        this.approvalRequestRepository = approvalRequestRepository;
         this.objectMapper = objectMapper;
+        this.memberServiceClient = memberServiceClient;
     }
 
 
@@ -136,6 +137,16 @@ public class ApprovalService {
 
 //        현재 단계 승인 처리
         approval.approve(reqDto.getComment(), actualMemberId, actualMemberPositionId);
+
+        // 서명 이미지 복사
+        try {
+            SignatureResDto signatureRes = memberServiceClient.getSignatureUrl(actualMemberId);
+            if (signatureRes != null && signatureRes.getSignatureUrl() != null) {
+                approval.sign(signatureRes.getSignatureUrl());
+            }
+        } catch (Exception e) {
+            // 서명 조회 실패해도 승인은 진행
+        }
 
         ApprovalRequest request = approval.getRequest();
         UUID requestId = request.getRequestId();
