@@ -12,6 +12,7 @@ public enum NotificationType {
     LEAVE_REQUESTED,         // 연차 신청
     LEAVE_APPROVED,          // 연차 승인
     LEAVE_REJECTED,          // 연차 반려
+    LABOR_LAW_WEEKLY_VIOLATION,  // 주간 (52시간) 초과근로 시간 위반
 
     // 결재
     APPROVAL_REQUESTED,      // 결재 요청
