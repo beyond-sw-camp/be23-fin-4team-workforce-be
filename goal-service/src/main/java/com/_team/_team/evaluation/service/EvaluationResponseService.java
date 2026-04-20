@@ -124,6 +124,10 @@ public class EvaluationResponseService {
     public ResponseResDto getResponse(UUID responseId, UUID requesterId) {
         EvaluationResponse response = responseRepository.findById(responseId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
+        // 컨트롤러의 @CheckPermission 을 제거한 대신, 서비스에서 본인(평가자) 여부를 검증해 타인 응답 열람을 차단한다.
+        if (!response.getEvaluatorId().equals(requesterId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 조회할 수 있습니다.");
+        }
         return ResponseResDto.from(response);
     }
 
