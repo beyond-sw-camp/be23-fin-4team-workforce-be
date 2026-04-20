@@ -40,7 +40,7 @@ public class AttendanceAnomalyDetector {
         this.eventPublisher = eventPublisher;
     }
 
-    // 대상일 근태를 훑어서 이상 건마다 NotificationMessage 이벤트 발행
+    // 대상일 근태를 확인해서 이상 건마다 NotificationMessage 이벤트 발행
     @Transactional(readOnly = true)
     public AnomalyResult detect(LocalDate targetDate) {
         List<DailyAttendance> all = dailyAttendanceRepository.findAllByAttendanceDate(targetDate);
