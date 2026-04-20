@@ -30,6 +30,8 @@ public class ApprovalRequestResDto {
     private String cancelReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String documentNumber;                      // 공문 번호 (OFFICIAL만)
+    private List<OfficialRecipientResDto> recipients;   // 수신 부서 목록 (OFFICIAL만)
 
     // === 요청자 스냅샷 (작성 시점 정보) ===
     private String requesterName;
@@ -41,7 +43,9 @@ public class ApprovalRequestResDto {
 
     public static ApprovalRequestResDto fromEntity(ApprovalRequest entity,
                                                    List<Approval> approvals,
-                                                   List<ApprovalViewer> viewers) {
+                                                   List<ApprovalViewer> viewers,
+                                                   List<OfficialRecipientResDto> recipients) {
+
         return ApprovalRequestResDto.builder()
                 .requestId(entity.getRequestId())
                 .documentId(entity.getApprovalDocument().getDocumentId())
@@ -62,6 +66,8 @@ public class ApprovalRequestResDto {
                 .viewers(viewers.stream()
                         .map(ApprovalViewerResDto::fromEntity)
                         .collect(Collectors.toList()))
+                .documentNumber(entity.getDocumentNumber())
+                .recipients(recipients)
                 .build();
     }
 }

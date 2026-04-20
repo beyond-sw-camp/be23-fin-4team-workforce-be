@@ -30,6 +30,8 @@ public class ApprovalRequestCreateReqDto {
 
     private List<ViewerItem> viewers;
 
+    private List<OfficialRecipientItem> recipients; // OFFICIAL 타입일 때만 사용 (최소 1개)
+
     @AllArgsConstructor
     @NoArgsConstructor
     @Data
@@ -60,6 +62,19 @@ public class ApprovalRequestCreateReqDto {
 
         @NotNull(message = "참조/공람 구분은 필수입니다.")
         private ViewerType viewerType; // CC or CIRCULATION
+    }
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Data
+    @Builder
+    public static class OfficialRecipientItem {
+
+        @NotNull(message = "수신 부서 ID는 필수입니다.")
+        private UUID recipientOrganizationId;
+
+        @NotNull(message = "수신 부서명은 필수입니다.")
+        private String recipientOrganizationName;
     }
 
 }

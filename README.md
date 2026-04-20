@@ -14,7 +14,7 @@
 - [WBS](#wbs)
 - [ERD](#erd)
 - [화면설계서](#화면설계서)
-- [API 명세서](#api-명세서)
+- [프로그램 사양서 및 단위테스트결과서](#프로그램-사양서-및-단위테스트결과서)
 - [단위 테스트](#단위-테스트)
 - [UI / UX 테스트](#ui--ux-단위-테스트)
 - [CI / CD 계획서](#ci--cd-계획서)
@@ -159,11 +159,12 @@
 </div>
 <hr>
 
-## API 명세서
 
-- [POSTMAN 보기]()
+## 프로그램 사양서 및 단위테스트결과서
 
-<img width="1302" alt="WORKFORCE ERD" src="" />
+- 🔗 [프로그램 사양서 및 단위테스트결과서](https://documenter.getpostman.com/view/51059789/2sBXqDrNZT)
+
+<img width="1302" alt="WORKFORCE ERD" src="여기에_이미지_URL_넣기" />
 
 <br>
 <div align="right">
