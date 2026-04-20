@@ -1,7 +1,9 @@
 package com._team._team.salary.service;
 
 import com._team._team.attendance.domain.DailyAttendance;
+import com._team._team.attendance.domain.MonthlyAttendanceLedger;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
+import com._team._team.attendance.repository.MonthlyAttendanceLedgerRepository;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.repository.TaxRateRepository;
 import com._team._team.salary.domain.SalaryPolicy;
@@ -14,20 +16,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 급여 자동 계산 서비스
+ * 월 장부 MonthlyAttendanceLedger 의 집계값을 읽어 수당, 공제 항목 생성
+ */
 @Service
 @Transactional
 public class PayrollCalculationService {
 
     private final SalaryPolicyRepository salaryPolicyRepository;
     private final TaxRateRepository taxRateRepository;
+    private final MonthlyAttendanceLedgerRepository monthlyAttendanceLedgerRepository;
 
     @Autowired
-    public PayrollCalculationService(SalaryPolicyRepository salaryPolicyRepository, TaxRateRepository taxRateRepository) {
+    public PayrollCalculationService(SalaryPolicyRepository salaryPolicyRepository, TaxRateRepository taxRateRepository, MonthlyAttendanceLedgerRepository monthlyAttendanceLedgerRepository) {
         this.salaryPolicyRepository = salaryPolicyRepository;
         this.taxRateRepository = taxRateRepository;
+        this.monthlyAttendanceLedgerRepository = monthlyAttendanceLedgerRepository;
     }
 
     // 1. 정산기간 산출
@@ -79,44 +88,33 @@ public class PayrollCalculationService {
         return new SettlementPeriod(from, to);
     }
 
-    // 2. 초과근무 인정 시간 계산 - FLOOR(내림) 방식
-    private int calculateRecognizedOvertime(int rawMinutes, Integer unitMinutes){
-        // unitMinutes가 null 또는 1이하면 절사 없음 (1분 단위)
-        if(unitMinutes == null || unitMinutes <= 1){
-            return rawMinutes;
-        }
-        // 정수 나눗셈 = 자동 내림
-        return (rawMinutes / unitMinutes) * unitMinutes;
-    }
-
-    // 3. 활성 급여정책 단건 조회
+    // 2. 활성 급여정책 단건 조회
     public SalaryPolicy findActivePolicy(UUID companyId, LocalDate payrollDate) {
         List<SalaryPolicy> policies = salaryPolicyRepository.findActivePolicies(companyId, payrollDate);
         return policies.isEmpty() ? null : policies.get(0);
     }
 
-    // 4. 초과근무수당 계산 (포괄임금제와 비포괄임금제 분기처리)
-    /**
-     * 정산기간 내 초과근무수당 자동 계산
-     * [통상시급 산출] == (한주 소정근로시간(40) + 주휴시간(8)) / 7 × 365 / 12
-     * 한국 근로기준법: 월 소정근로시간 = 209시간
-     * 시급 = baseSalary / 209
-     * 근로기준법 제56조: 연장근로에 대해서는 통상임금의 50% 이상을 가산
+    // 3. 월 장부 조회, 마감 안됐거나 잠금 해제 상태면 예외
+    public MonthlyAttendanceLedger findLedger(UUID memberId, YearMonth yearMonth) {
+        return monthlyAttendanceLedgerRepository
+                .findByMemberIdAndYearMonth(memberId, yearMonth.toString())
+                .orElseThrow(() -> new IllegalStateException(
+                        "월 장부가 없습니다. memberId=" + memberId + " yearMonth=" + yearMonth));
+    }
+
+
+    /** 2. 초과근무 인정 시간 계산 (포괄/비포괄 분기)
+     * 통상시급 = baseSalary / 209 (한국 근로기준법 월 소정근로시간)
+     * 근로기준법 제56조: 연장근로 통상임금의 50% 이상 가산
      */
     public AutoPayrollItem calculateOvertimePay(
-            List<DailyAttendance> attendances,
+            MonthlyAttendanceLedger ledger,
             Long baseSalary,
             SalaryPolicy policy){
 
-        // 1) 인정 시간 합산
-        Integer roundingUnit = policy != null ? policy.getOvertimeRoundingMinutes() : null;
-        int totalApprovedOvertimeMinutes = 0;
-        for(DailyAttendance da : attendances){
-            if(da.getOvertimeMinutes() != null && da.getOvertimeMinutes() > 0){
-                totalApprovedOvertimeMinutes += calculateRecognizedOvertime(
-                        da.getOvertimeMinutes(), roundingUnit);
-            }
-        }
+        // 1) Ledger 의 월 합산 초과근무 (분)
+        int totalApprovedOvertimeMinutes = ledger.getOvertimeMinutes() == null
+                ? 0 : ledger.getOvertimeMinutes();
 
         // 초과근무가 없으면 항목 생성 안함
         if (totalApprovedOvertimeMinutes == 0){
@@ -142,7 +140,7 @@ public class PayrollCalculationService {
             return null;
         }
 
-        // 4) 통상시급 × 추가지급분 × 1.5배 , 통상시급 : 기본급 / 209시간 (한국 근로기준법 소정근로시간)
+        // 4) 통상시급 × 추가지급분 × 1.5배
         double hourlyRate = baseSalary / 209.0;
 
         // 초과근무수당 : 초과시간 x 시급 x 1.5 (50% 가산)
@@ -159,27 +157,11 @@ public class PayrollCalculationService {
 
     // 5. 공휴일근무수당 계산 (통상시급 × 공휴일 근무시간 × 1.5배)
     public AutoPayrollItem calculateHolidayWorkPay(
-            List<DailyAttendance> attendances,
-            Set<LocalDate> paidHolidayDates,
+            MonthlyAttendanceLedger ledger,
             Long baseSalary){
 
-        // 유급공휴일이 없으면 계산 불필요
-        if(paidHolidayDates == null || paidHolidayDates.isEmpty()){
-            return null;
-        }
-
-        int holidayWorkedMinutes = 0;
-
-        for(DailyAttendance da : attendances){
-            // 해당일이 유급공휴일이고, 정상 출근해서 근무한 경우만 수당 발생
-            if(paidHolidayDates.contains(da.getAttendanceDate())){
-                if(da.getStatus() == AttendanceStatus.NORMAL
-                        && da.getWorkedMinutes() != null
-                        && da.getWorkedMinutes() > 0){
-                    holidayWorkedMinutes += da.getWorkedMinutes();
-                }
-            }
-        }
+        int holidayWorkedMinutes = ledger.getHolidayMinutes() == null
+                ? 0 : ledger.getHolidayMinutes();
 
         // 공휴일 출근 실적 없으면 항목 생성 안함
         if(holidayWorkedMinutes == 0){
@@ -199,7 +181,37 @@ public class PayrollCalculationService {
         );
     }
 
-    // 6. 세율 기반 공제 계산
+    // 6. 야간근무수당 계산
+    /**
+     * 월 장부의 nightMinutes 를 소스로 야간근무수당 계산
+     * nightMinutes 는 22:00-06:00 교차분으로 regular/overtime 과 중복 가능
+     * 근로기준법 제56조: 야간근로는 통상임금의 50% 이상 가산
+     */
+    public AutoPayrollItem calculateNightWorkPay(
+            MonthlyAttendanceLedger ledger,
+            Long baseSalary){
+
+        int nightMinutes = ledger.getNightMinutes() == null
+                ? 0 : ledger.getNightMinutes();
+
+        if(nightMinutes == 0){
+            return null;
+        }
+
+        // 야간 가산수당: 시간 x 시급 x 0.5 (50% 가산분만)
+        double hourlyRate = baseSalary / 209.0;
+        double nightPay = (nightMinutes / 60.0) * hourlyRate * 0.5;
+
+        return new AutoPayrollItem(
+                "야간근무수당",
+                ItemType.EARNING,
+                (long) Math.floor(nightPay), // 원 미만 절사
+                92, //  displayOrder: 공휴일근무수당(91) 다음
+                "Y"  // 야간근무수당도 과세
+        );
+    }
+
+    // 7. 세율 기반 공제 계산
     /**
      * 4대보험 + 소득세 + 지방소득세 자동 계산
      */
@@ -257,7 +269,7 @@ public class PayrollCalculationService {
 
         // 지방소득세 : 소득세 기준
         long localIncomeTax = calculateSingleDeduction(
-                rateMap, TaxType.LOCAL_INCOME_TAX, incomeTax);  // ← 소득세 기준!
+                rateMap, TaxType.LOCAL_INCOME_TAX, incomeTax);  // 소득세 기준
         if (localIncomeTax > 0) {
             deductions.add(new AutoPayrollItem("지방소득세", ItemType.DEDUCTION, localIncomeTax, displayOrder++, "Y"));
         }
