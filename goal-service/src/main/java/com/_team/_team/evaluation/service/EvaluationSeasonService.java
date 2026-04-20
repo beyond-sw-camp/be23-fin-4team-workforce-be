@@ -199,6 +199,21 @@ public class EvaluationSeasonService {
         }
     }
 
+    /**
+     * 시즌 시작 시점이 아닌, 호출 시점 기준으로 대상자 목표 스냅샷을 만든다.
+     * {@code materializeMissingResponsesForGroup} 등 늦게 생성되는 {@link EvaluationResponse}에 부착할 때 사용한다.
+     * 규칙은 {@link #startSeason} 과 동일하게 ACTIVE/COMPLETED 목표만 포함한다.
+     */
+    public record MemberGoalSnapshots(String goalSnapshotJson, String targetGoalIdsJson) {}
+
+    @Transactional(readOnly = true)
+    public MemberGoalSnapshots captureMemberGoalSnapshotsAtNow(UUID companyId, UUID targetMemberId) {
+        String takenAtIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        return new MemberGoalSnapshots(
+                buildGoalSnapshotJson(companyId, targetMemberId, takenAtIso),
+                buildTargetGoalIdsJson(companyId, targetMemberId));
+    }
+
     @Transactional
     public SeasonResDto closeSeason(UUID seasonId, UUID companyId) {
         EvaluationSeason season = findSeasonOrThrow(seasonId, companyId);

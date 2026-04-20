@@ -19,6 +19,7 @@ import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
 import com._team._team.goal.domain.Goal;
+import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.repository.GoalRepository;
 import com._team._team.meeting.service.MeetingRecordService;
 import com._team._team.notification.NotificationType;
@@ -32,11 +33,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -51,6 +54,7 @@ public class EvaluationResponseService {
     private final ObjectMapper objectMapper;
     private final MeetingRecordService meetingRecordService;
     private final ApplicationEventPublisher eventPublisher;
+    private final EvaluationSeasonService evaluationSeasonService;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
                                       EvaluationSeasonRepository seasonRepository,
@@ -58,7 +62,8 @@ public class EvaluationResponseService {
                                       GoalRepository goalRepository,
                                       ObjectMapper objectMapper,
                                       MeetingRecordService meetingRecordService,
-                                      ApplicationEventPublisher eventPublisher) {
+                                      ApplicationEventPublisher eventPublisher,
+                                      EvaluationSeasonService evaluationSeasonService) {
         this.responseRepository = responseRepository;
         this.seasonRepository = seasonRepository;
         this.calibrationHistoryRepository = calibrationHistoryRepository;
@@ -66,6 +71,7 @@ public class EvaluationResponseService {
         this.objectMapper = objectMapper;
         this.meetingRecordService = meetingRecordService;
         this.eventPublisher = eventPublisher;
+        this.evaluationSeasonService = evaluationSeasonService;
     }
 
     @Transactional(readOnly = true)
@@ -104,12 +110,16 @@ public class EvaluationResponseService {
                         groupId, targetMemberId, evaluatorId, evalType)) {
                     continue;
                 }
+                EvaluationSeasonService.MemberGoalSnapshots snaps =
+                        evaluationSeasonService.captureMemberGoalSnapshotsAtNow(companyId, targetMemberId);
                 toSave.add(EvaluationResponse.builder()
                         .companyId(companyId)
                         .group(group)
                         .targetMemberId(targetMemberId)
                         .evaluatorId(evaluatorId)
                         .evaluationType(evalType)
+                        .goalSnapshotJson(snaps.goalSnapshotJson())
+                        .targetGoalIdsJson(snaps.targetGoalIdsJson())
                         .build());
             } catch (IllegalArgumentException ignored) {
                 // 잘못된 UUID/enum 행은 건너뜀 — startSeason 과 동일
@@ -499,18 +509,56 @@ public class EvaluationResponseService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 조회할 수 있습니다.");
         }
 
-        // 1) 스냅샷 복원
         List<GoalSnapshotDto> snapshots = parseSnapshots(response.getGoalSnapshotJson());
         if (snapshots.isEmpty()) {
             return List.of();
         }
+        return buildGoalSummaryCardsFromSnapshots(snapshots);
+    }
 
-        // 2) 현재 목표 실시간 조회
+    /**
+     * 본인이 피평가자인 자기평가(SELF) 응답의 목표 스냅샷을 기준으로 요약 카드를 만든다.
+     * 자기평가 응답이 없거나 스냅샷이 비어 있으면, 시즌 기간과 겹치는 본인 목표를 현재값만으로 반환한다(폴백).
+     *
+     * @param completedOnly true 이면 현재 DB 기준 완료(COMPLETED) 목표만 남긴다.
+     */
+    @Transactional(readOnly = true)
+    public List<GoalSummaryCardResDto> listMyGoalSummariesForSeason(
+            UUID seasonId, UUID requesterMemberId, UUID companyId, boolean completedOnly) {
+        EvaluationSeason season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다."));
+        if (!season.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다.");
+        }
+
+        Optional<EvaluationResponse> selfEval = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getEvaluatorId().equals(requesterMemberId))
+                .filter(r -> r.getTargetMemberId().equals(requesterMemberId))
+                .filter(r -> r.getEvaluationType() == EvalType.SELF)
+                .findFirst();
+
+        if (selfEval.isPresent()) {
+            List<GoalSnapshotDto> snapshots = parseSnapshots(selfEval.get().getGoalSnapshotJson());
+            if (!snapshots.isEmpty()) {
+                List<GoalSummaryCardResDto> cards = buildGoalSummaryCardsFromSnapshots(snapshots);
+                if (completedOnly) {
+                    return cards.stream()
+                            .filter(this::goalCardRepresentsCompleted)
+                            .collect(Collectors.toList());
+                }
+                return cards;
+            }
+        }
+
+        return buildFallbackGoalCardsForSeason(companyId, requesterMemberId, season, completedOnly);
+    }
+
+    private List<GoalSummaryCardResDto> buildGoalSummaryCardsFromSnapshots(List<GoalSnapshotDto> snapshots) {
         List<UUID> goalIds = snapshots.stream().map(GoalSnapshotDto::getGoalId).toList();
         Map<UUID, Goal> currentGoals = goalRepository.findAllById(goalIds).stream()
                 .collect(Collectors.toMap(Goal::getGoalId, Function.identity()));
 
-        // 3) 카드 구성 — 스냅샷 대비 변경 여부 판정
         List<GoalSummaryCardResDto> cards = new ArrayList<>();
         for (GoalSnapshotDto snap : snapshots) {
             Goal current = currentGoals.get(snap.getGoalId());
@@ -519,18 +567,8 @@ public class EvaluationResponseService {
             List<String> changeSummary = new ArrayList<>();
 
             if (current != null) {
-                currentView = GoalSummaryCardResDto.CurrentGoalView.builder()
-                        .title(current.getTitle())
-                        .status(current.getStatus().name())
-                        .targetValue(current.getTargetValue())
-                        .actualValue(current.getActualValue())
-                        .achievementPct(current.getAchievementPct())
-                        .rolledAchievementPct(current.getRolledAchievementPct())
-                        .weightPct(current.getWeightPct())
-                        .unitLabel(current.getUnitLabel())
-                        .build();
+                currentView = toCurrentGoalView(current);
 
-                // 변경점 감지
                 if (!Objects.equals(snap.getTitle(), current.getTitle())) {
                     changeSummary.add("TITLE");
                 }
@@ -544,7 +582,6 @@ public class EvaluationResponseService {
                 if (!Objects.equals(snap.getEndDate(), current.getEndDate())) {
                     changeSummary.add("PERIOD");
                 }
-                // actualValue 변경은 자연스러운 진행이므로 별도 표시
                 if (snap.getActualValueAtSnapshot() != null && current.getActualValue() != null
                         && snap.getActualValueAtSnapshot().compareTo(current.getActualValue()) != 0) {
                     changeSummary.add("PROGRESS");
@@ -561,6 +598,54 @@ public class EvaluationResponseService {
                     .current(currentView)
                     .changedSinceSnapshot(changed)
                     .changeSummary(changeSummary)
+                    .build());
+        }
+        return cards;
+    }
+
+    private static GoalSummaryCardResDto.CurrentGoalView toCurrentGoalView(Goal current) {
+        return GoalSummaryCardResDto.CurrentGoalView.builder()
+                .title(current.getTitle())
+                .status(current.getStatus().name())
+                .targetValue(current.getTargetValue())
+                .actualValue(current.getActualValue())
+                .achievementPct(current.getAchievementPct())
+                .rolledAchievementPct(current.getRolledAchievementPct())
+                .weightPct(current.getWeightPct())
+                .unitLabel(current.getUnitLabel())
+                .build();
+    }
+
+    private boolean goalCardRepresentsCompleted(GoalSummaryCardResDto card) {
+        if (card.getCurrent() != null && card.getCurrent().getStatus() != null) {
+            return GoalStatus.COMPLETED.name().equals(card.getCurrent().getStatus());
+        }
+        if (card.getSnapshot() != null && card.getSnapshot().getStatusAtSnapshot() != null) {
+            return card.getSnapshot().getStatusAtSnapshot() == GoalStatus.COMPLETED;
+        }
+        return false;
+    }
+
+    private static boolean goalPeriodOverlapsSeason(Goal goal, EvaluationSeason season) {
+        LocalDate sStart = season.getStartDate();
+        LocalDate sEnd = season.getEndDate();
+        return !goal.getEndDate().isBefore(sStart) && !goal.getStartDate().isAfter(sEnd);
+    }
+
+    private List<GoalSummaryCardResDto> buildFallbackGoalCardsForSeason(
+            UUID companyId, UUID memberId, EvaluationSeason season, boolean completedOnly) {
+        List<Goal> goals = goalRepository.findByCompanyIdAndOwnerId(companyId, memberId).stream()
+                .filter(g -> goalPeriodOverlapsSeason(g, season))
+                .filter(g -> !completedOnly || g.getStatus() == GoalStatus.COMPLETED)
+                .collect(Collectors.toList());
+        List<GoalSummaryCardResDto> cards = new ArrayList<>();
+        for (Goal g : goals) {
+            cards.add(GoalSummaryCardResDto.builder()
+                    .goalId(g.getGoalId())
+                    .snapshot(null)
+                    .current(toCurrentGoalView(g))
+                    .changedSinceSnapshot(false)
+                    .changeSummary(List.of())
                     .build());
         }
         return cards;

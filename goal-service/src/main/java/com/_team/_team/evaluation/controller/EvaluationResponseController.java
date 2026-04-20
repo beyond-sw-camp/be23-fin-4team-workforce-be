@@ -154,6 +154,25 @@ public class EvaluationResponseController {
         return ResponseEntity.ok(ApiResponse.success(result, "목표 요약 카드 조회 성공"));
     }
 
+    /**
+     * 본인(피평가자) 기준, 특정 시즌의 목표 요약 카드(스냅샷 vs 현재).
+     * 자기평가(SELF) 응답이 있으면 그 스냅샷을 사용하고, 없거나 비어 있으면 시즌 기간과 겹치는 본인 목표로 폴백한다.
+     * 일반 사원도 접근 가능하도록 별도 권한 어노테이션 없음 — 서비스에서 회사·본인 검증.
+     */
+    @GetMapping("/seasons/{seasonId}/my-goal-summaries")
+    public ResponseEntity<ApiResponse<List<GoalSummaryCardResDto>>> listMyGoalSummariesForSeason(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID seasonId,
+            @RequestParam(value = "completedOnly", defaultValue = "false") boolean completedOnly) {
+        List<GoalSummaryCardResDto> result = responseService.listMyGoalSummariesForSeason(
+                seasonId,
+                UUID.fromString(memberId),
+                UUID.fromString(companyId),
+                completedOnly);
+        return ResponseEntity.ok(ApiResponse.success(result, "내 목표 요약 카드 조회 성공"));
+    }
+
     // ── 진행도 / 분석 ──
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
