@@ -212,6 +212,7 @@ public class MemberService {
                 .joinDate(LocalDate.now())
                 .isEmailVerifiedYn("YES")  // 이미 인증 완료
                 .isFirstLoginYn("NO")      // 비밀번호 직접 설정
+                .isOnboardingYn("YES")
                 .build();
 
         Member savedAdmin = memberRepository.save(admin);
@@ -418,6 +419,7 @@ public class MemberService {
                 .memberPositionId(memberPosition.getMemberPositionId())
                 .isFirstLoginYn(member.getIsFirstLoginYn())
                 .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
+                .isOnboardingYn(member.getIsOnboardingYn())
                 .permissions(permissions)
                 .build();
     }
@@ -1781,6 +1783,12 @@ public class MemberService {
             s3Uploader.delete(member.getSignatureUrl());
         }
         member.deleteSignatureUrl();
+    }
+    public void completeOnboarding(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
+        member.completeOnboarding();
     }
 }
 
