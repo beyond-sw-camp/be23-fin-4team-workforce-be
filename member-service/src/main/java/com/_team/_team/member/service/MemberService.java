@@ -402,13 +402,23 @@ public class MemberService {
 
         cachePermissions(memberPosition);
 
+        // 권한 목록 조회
+        List<String> permissions = rolePermissionRepository
+                .findByRole(memberPosition.getRole())
+                .stream()
+                .map(rp -> rp.getPermission().getResource().name()
+                        + ":" + rp.getPermission().getAction().name()
+                        + ":" + rp.getPermissionRange().name())
+                .collect(Collectors.toList());
+
         return LoginResDto.builder()
                 .accessToken(accessToken)
                 .name(member.getName())
                 .memberId(member.getMemberId())
                 .memberPositionId(memberPosition.getMemberPositionId())
-                .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
                 .isFirstLoginYn(member.getIsFirstLoginYn())
+                .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
+                .permissions(permissions)
                 .build();
     }
 

@@ -17,5 +17,5 @@ public interface RolePermissionRepository extends JpaRepository<RolePermission, 
     // 역할별 권한 목록
     List<RolePermission> findByRole_RoleId(UUID roleId);
     void deleteByRole(Role role);
-
+    List<RolePermission> findByRole(Role role);
 }
