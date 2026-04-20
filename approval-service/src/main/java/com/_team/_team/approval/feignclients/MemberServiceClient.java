@@ -29,4 +29,7 @@ public interface MemberServiceClient {
     @GetMapping("/organization/internal/{organizationId}/descendants")
     List<UUID> getOrganizationDescendantIds(
             @PathVariable("organizationId") UUID organizationId);
+
+    @GetMapping("/members/active")
+    List<UUID> findActiveMemberIds(@RequestParam("companyId") UUID companyId);
 }
