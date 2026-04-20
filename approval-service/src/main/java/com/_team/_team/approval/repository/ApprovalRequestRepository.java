@@ -64,7 +64,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     @Query("SELECT COUNT(r) FROM ApprovalRequest r " +
             "WHERE r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
             "  AND r.requesterOrganizationId = :organizationId " +
-            "  AND r.requestStatus = com._team._team.approval.domain.enums.RequestStatus.APPROVED " +
+            "  AND r.documentNumber IS NOT NULL " +
             "  AND FUNCTION('YEAR', r.createdAt) = :year " +
             "  AND r.delYn = 'N'")
     long countOfficialApprovedInYear(@Param("organizationId") UUID organizationId,

@@ -170,10 +170,8 @@ public class ApprovalService {
         } else {
             request.updateStatus(RequestStatus.APPROVED);
 
-            // 공문이면 최종 승인 시점에 번호 발번
+            // 공문
             if (request.getRequestType() == RequestType.OFFICIAL) {
-                String docNumber = officialNumberService.generate(request.getRequestId());
-                request.updateDocumentNumber(docNumber);
                 approvalNotificationService.publishOfficialApprovedEvent(request);
             }
 

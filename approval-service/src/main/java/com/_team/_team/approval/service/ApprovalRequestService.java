@@ -211,7 +211,9 @@ public class ApprovalRequestService {
 
             // 공문이면 번호 생성
             if (document.getRequestType() == RequestType.OFFICIAL) {
-                String docNumber = officialNumberService.generate(savedRequest.getRequestId());
+                String docNumber = officialNumberService.generate(
+                        requester.getOrganizationId(),
+                        requester.getOrganizationName());
                 savedRequest.updateDocumentNumber(docNumber);
             }
             // 일반 → 첫 결재자에게 알림
