@@ -22,6 +22,8 @@ public class WorkScheduleResDto {
     private LocalTime startTime;
     private LocalTime endTime;
     private Integer workMinutes;
+    private Integer breakMinutes;
+    private Integer selectionDeadlineDay;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
 
@@ -35,6 +37,8 @@ public class WorkScheduleResDto {
                 .startTime(workSchedule.getStartTime())
                 .endTime(workSchedule.getEndTime())
                 .workMinutes(workSchedule.getWorkMinutes())
+                .breakMinutes(workSchedule.getBreakMinutes())
+                .selectionDeadlineDay(workSchedule.getSelectionDeadlineDay())
                 .effectiveFrom(workSchedule.getEffectiveFrom())
                 .effectiveTo(workSchedule.getEffectiveTo())
                 .build();
