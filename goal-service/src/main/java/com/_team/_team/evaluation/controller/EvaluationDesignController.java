@@ -42,12 +42,17 @@ public class EvaluationDesignController {
         return ResponseEntity.ok(ApiResponse.success(result, "평가 설계가 생성되었습니다."));
     }
 
-    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    /**
+     * 단건 설계 조회 — 목록과 달리 평가자 본인도 작성 화면에서 필요하므로 {@code @CheckPermission} 을 쓰지 않는다.
+     * 서비스에서 동일 회사 소속 + 해당 설계를 쓰는 평가에 평가자로 배정된 경우에만 허용한다.
+     */
     @GetMapping("/{designId}")
     public ResponseEntity<ApiResponse<DesignResDto>> getDesign(
             @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-UUID") String memberId,
             @PathVariable UUID designId) {
-        DesignResDto result = designService.getDesign(designId, UUID.fromString(companyId));
+        DesignResDto result = designService.getDesign(
+                designId, UUID.fromString(companyId), UUID.fromString(memberId));
         return ResponseEntity.ok(ApiResponse.success(result, "평가 설계 조회 성공"));
     }
 
