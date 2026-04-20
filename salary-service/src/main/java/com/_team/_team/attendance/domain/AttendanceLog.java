@@ -1,6 +1,7 @@
 package com._team._team.attendance.domain;
 
 import com._team._team.attendance.domain.enums.EventType;
+import com._team._team.attendance.domain.enums.SourceType;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -61,6 +62,12 @@ public class AttendanceLog extends BaseTimeEntity {
     @Column(length = 100)
     private String deviceId;
 
+    /** 이벤트 발생 채널 */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private SourceType sourceType = SourceType.WEB;
+
     /** 수정 여부 (N: 원본 / Y: 결재 통해 수정됨) */
     @Column(length = 1, nullable = false)
     @Builder.Default
@@ -69,4 +76,19 @@ public class AttendanceLog extends BaseTimeEntity {
     /** 수정 사유 (isCorrectedYn = 'Y' 일 때만 값 존재) */
     @Column(length = 100)
     private String correctionReason;
+
+    /** 수정한 관리자 UUID (수기 수정, 대리 입력 시) */
+    private UUID correctedBy;
+
+    /** 수정 시각 */
+    private LocalDateTime correctedAt;
+
+    /** 관리자 수정 기록 */
+    public void markCorrected(UUID adminId, String reason){
+        this.isCorrectedYn = "Y";
+        this.correctionReason = reason;
+        this.correctedBy = adminId;
+        this.correctedAt = LocalDateTime.now();
+    }
+
 }
