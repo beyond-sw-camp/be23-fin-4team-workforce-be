@@ -402,13 +402,23 @@ public class MemberService {
 
         cachePermissions(memberPosition);
 
+        // 권한 목록 조회
+        List<String> permissions = rolePermissionRepository
+                .findByRole(memberPosition.getRole())
+                .stream()
+                .map(rp -> rp.getPermission().getResource().name()
+                        + ":" + rp.getPermission().getAction().name()
+                        + ":" + rp.getPermissionRange().name())
+                .collect(Collectors.toList());
+
         return LoginResDto.builder()
                 .accessToken(accessToken)
                 .name(member.getName())
                 .memberId(member.getMemberId())
                 .memberPositionId(memberPosition.getMemberPositionId())
-                .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
                 .isFirstLoginYn(member.getIsFirstLoginYn())
+                .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
+                .permissions(permissions)
                 .build();
     }
 
@@ -1739,6 +1749,38 @@ public class MemberService {
                 .jobTitleName(position.getJobTitle().getName())
                 .todayEventCount(todayEventCount)
                 .build();
+    }
+
+    // 서명 업로드
+    public void uploadSignature(UUID memberId, MultipartFile signatureImage) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
+
+        // 기존 서명 있으면 S3 삭제
+        if (member.getSignatureUrl() != null) {
+            s3Uploader.delete(member.getSignatureUrl());
+        }
+
+        String url = s3Uploader.upload(signatureImage, "signature");
+        member.updateSignatureUrl(url);
+    }
+
+    // 서명 조회
+    public String getSignatureUrl(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        return member.getSignatureUrl();
+    }
+
+    // 서명 삭제
+    public void deleteSignature(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
+
+        if (member.getSignatureUrl() != null) {
+            s3Uploader.delete(member.getSignatureUrl());
+        }
+        member.deleteSignatureUrl();
     }
 }
 

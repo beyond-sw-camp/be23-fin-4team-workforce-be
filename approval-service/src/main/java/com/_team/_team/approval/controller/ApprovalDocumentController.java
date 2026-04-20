@@ -4,6 +4,7 @@ import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.approval.dto.reqdto.ApprovalDocumentCreateReqDto;
+import com._team._team.approval.dto.reqdto.ApprovalDocumentUpdateReqDto;
 import com._team._team.approval.dto.resdto.ApprovalDocumentResDto;
 import com._team._team.approval.service.ApprovalDocumentService;
 import com._team._team.dto.ApiResponse;
@@ -37,6 +38,20 @@ public class ApprovalDocumentController {
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "결재 양식이 생성되었습니다."),
                 HttpStatus.CREATED
+        );
+    }
+
+    // 결재 양식 수정
+    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
+    @PutMapping("/{documentId}")
+    public ResponseEntity<?> update(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID documentId,
+            @Valid @RequestBody ApprovalDocumentUpdateReqDto reqDto) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.update(companyId, documentId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 양식이 수정되었습니다."),
+                HttpStatus.OK
         );
     }
 
@@ -104,30 +119,6 @@ public class ApprovalDocumentController {
         ApprovalDocumentResDto resDto = approvalDocumentService.deactivate(companyId, documentId);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "결재 양식이 비활성화되었습니다."),
-                HttpStatus.OK
-        );
-    }
-
-    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
-    @PatchMapping("/{documentId}/auto-approve/enable")
-    public ResponseEntity<?> enableAutoApprove(
-            @RequestHeader("X-User-CompanyId") UUID companyId,
-            @PathVariable UUID documentId) {
-        ApprovalDocumentResDto resDto = approvalDocumentService.enableAutoApprove(companyId, documentId);
-        return new ResponseEntity<>(
-                ApiResponse.success(resDto, "자동승인이 활성화되었습니다."),
-                HttpStatus.OK
-        );
-    }
-
-    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
-    @PatchMapping("/{documentId}/auto-approve/disable")
-    public ResponseEntity<?> disableAutoApprove(
-            @RequestHeader("X-User-CompanyId") UUID companyId,
-            @PathVariable UUID documentId) {
-        ApprovalDocumentResDto resDto = approvalDocumentService.disableAutoApprove(companyId, documentId);
-        return new ResponseEntity<>(
-                ApiResponse.success(resDto, "자동승인이 비활성화되었습니다."),
                 HttpStatus.OK
         );
     }

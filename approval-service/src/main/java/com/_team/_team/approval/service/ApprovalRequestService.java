@@ -66,8 +66,8 @@ public class ApprovalRequestService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "요청 상태는 DRAFT 또는 WAIT만 가능합니다.");
         }
 
-        // WAIT(제출)일 때 결재자 최소 1명 검증 (자동승인 제외)
-        if (reqDto.getRequestStatus() == RequestStatus.WAIT && "N".equals(document.getAutoApproveYn())) {
+        // WAIT(제출)일 때 결재자 최소 1명 검증
+        if (reqDto.getRequestStatus() == RequestStatus.WAIT) {
             if (reqDto.getApprovalLines() == null || reqDto.getApprovalLines().isEmpty()) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "결재 제출 시 결재자는 최소 1명 이상이어야 합니다.");
             }
@@ -139,6 +139,11 @@ public class ApprovalRequestService {
         }
 
         // ApprovalRequest 생성
+        // 공문은 강제 공개
+        String deptVisible = (document.getRequestType() == RequestType.OFFICIAL)
+                ? "Y"
+                : (reqDto.getIsDeptVisibleYn() != null ? reqDto.getIsDeptVisibleYn() : "Y");
+
         ApprovalRequest request = ApprovalRequest.builder()
                 .approvalDocument(document)
                 .memberId(memberId)
@@ -148,6 +153,8 @@ public class ApprovalRequestService {
                 .requesterName(requester.getMemberName())
                 .requesterOrganizationId(requester.getOrganizationId())
                 .requesterOrganizationName(requester.getOrganizationName())
+                .isDeptVisibleYn(deptVisible)
+                .formSchemaSnapshot(document.getFormSchema())
                 .build();
 
         ApprovalRequest savedRequest = approvalRequestRepository.save(request);
@@ -201,25 +208,19 @@ public class ApprovalRequestService {
 
         // 알림 발행 - WAIT 제출 시에만
         if (savedRequest.getRequestStatus() == RequestStatus.WAIT) {
-            if ("Y".equals(document.getAutoApproveYn())) {
-                savedRequest.updateStatus(RequestStatus.APPROVED);
 
-                // 공문이면 번호 생성
-                if (document.getRequestType() == RequestType.OFFICIAL) {
-                    String docNumber = officialNumberService.generate(savedRequest.getRequestId());
-                    savedRequest.updateDocumentNumber(docNumber);
-                }
-
-                approvalNotificationService.notifyAutoApproved(savedRequest, savedViewers);
-            } else {
-                // 일반 → 첫 결재자에게 알림
-                Approval firstApproval = savedApprovals.stream()
-                        .filter(a -> a.getStepOrder() == 1)
-                        .findFirst()
-                        .orElseThrow(() -> new BusinessException(
-                                HttpStatus.INTERNAL_SERVER_ERROR, "첫 결재자를 찾을 수 없습니다."));
-                approvalNotificationService.notifyApprovalRequested(savedRequest, firstApproval, savedViewers);
+            // 공문이면 번호 생성
+            if (document.getRequestType() == RequestType.OFFICIAL) {
+                String docNumber = officialNumberService.generate(savedRequest.getRequestId());
+                savedRequest.updateDocumentNumber(docNumber);
             }
+            // 일반 → 첫 결재자에게 알림
+            Approval firstApproval = savedApprovals.stream()
+                    .filter(a -> a.getStepOrder() == 1)
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.INTERNAL_SERVER_ERROR, "첫 결재자를 찾을 수 없습니다."));
+            approvalNotificationService.notifyApprovalRequested(savedRequest, firstApproval, savedViewers);
         }
 
         // === [수정] fromEntity 호출 — recipients 인자 추가 ===
@@ -380,7 +381,7 @@ public class ApprovalRequestService {
         }
 
         // WAIT(제출)일 때 결재자 최소 1명 검증
-        if (reqDto.getRequestStatus() == RequestStatus.WAIT && !"Y".equals(document.getAutoApproveYn())) {
+        if (reqDto.getRequestStatus() == RequestStatus.WAIT) {
             if (reqDto.getApprovalLines() == null || reqDto.getApprovalLines().isEmpty()) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST,
                         "결재 제출 시 결재자는 최소 1명 이상이어야 합니다.");
@@ -583,7 +584,7 @@ public class ApprovalRequestService {
     // 부서 문서함 조회 (본인 부서 + 하위 조직의 결재 요청, 작성 시점 부서 기준)
     @Transactional(readOnly = true)
     public List<ApprovalRequestResDto> findDepartmentRequests(
-            UUID companyId, UUID memberPositionId, UUID organizationId, RequestType requestType) {
+            UUID companyId, UUID memberPositionId, UUID memberId, UUID organizationId, RequestType requestType) {
 
         // 1. 요청자 본인 정보 조회
         MemberPositionResDto requester = memberServiceClient.getMemberPosition(memberPositionId);
@@ -602,7 +603,14 @@ public class ApprovalRequestService {
                 : approvalRequestRepository.findDepartmentRequestsByType(companyId, organizationId, requestType);
 
         return requests.stream()
-                .map(this::toResDtoWithRecipients)
+                .map(request -> {
+                    // 비공개 문서 + 작성자 본인이 아닌 경우 → 마스킹
+                    if ("N".equals(request.getIsDeptVisibleYn())
+                            && !request.getMemberId().equals(memberId)) {
+                        return ApprovalRequestResDto.maskedFromEntity(request);
+                    }
+                    return toResDtoWithRecipients(request);
+                })
                 .toList();
     }
 
