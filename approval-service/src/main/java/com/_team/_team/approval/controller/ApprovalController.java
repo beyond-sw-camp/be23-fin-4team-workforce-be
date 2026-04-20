@@ -49,6 +49,31 @@ public class ApprovalController {
         );
     }
 
+    // 결재 예정함 (아직 내 차례가 아닌 문서)
+    @GetMapping("/waiting")
+    public ResponseEntity<?> findWaiting(
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
+        List<ApprovalRequestResDto> result = approvalService.findWaiting(memberPositionId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "결재 예정 목록 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 결재함 전체 (대기 + 예정 통합)
+    @GetMapping("/inbox")
+    public ResponseEntity<?> findAllInbox(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
+        List<ApprovalRequestResDto> result =
+                approvalService.findAllInbox(companyId, memberId, memberPositionId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "결재함 전체 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
     // 승인 처리
     @PatchMapping("/{approvalId}/approve")
     public ResponseEntity<?> approve(

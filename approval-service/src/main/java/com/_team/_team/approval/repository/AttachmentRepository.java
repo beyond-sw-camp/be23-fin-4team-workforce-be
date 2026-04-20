@@ -17,4 +17,9 @@ public interface AttachmentRepository extends JpaRepository<Attachment, UUID> {
             "WHERE a.request.requestId = :requestId")
     List<Attachment> findByRequestId(
             @Param("requestId") UUID requestId);
+
+    @Query("SELECT COUNT(a) FROM Attachment a WHERE a.request.requestId = :requestId")
+    long countByRequestId(@Param("requestId") UUID requestId);
+
+
 }

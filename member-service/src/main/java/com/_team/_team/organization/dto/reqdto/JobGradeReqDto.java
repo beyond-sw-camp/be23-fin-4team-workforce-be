@@ -1,6 +1,7 @@
 package com._team._team.organization.dto.reqdto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,4 +15,7 @@ public class JobGradeReqDto {
 
     @NotBlank(message = "직급명은 필수입니다.")
     private String name;
+
+    @NotNull
+    private int displayOrder;
 }

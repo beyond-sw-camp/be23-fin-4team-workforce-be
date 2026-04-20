@@ -72,6 +72,9 @@ public class Member extends BaseTimeEntity {
 
     private String telNumber;
 
+    private String signatureUrl; //
+
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MemberStatus memberStatus;
@@ -186,4 +189,14 @@ public class Member extends BaseTimeEntity {
     public void updateEsgScore(int score) {
         this.esgScore = score;
     }
+
+    public void updateSignatureUrl(String signatureUrl) {
+        this.signatureUrl = signatureUrl;
+    }
+
+    public void deleteSignatureUrl() {
+        this.signatureUrl = null;
+    }
+
+
 }

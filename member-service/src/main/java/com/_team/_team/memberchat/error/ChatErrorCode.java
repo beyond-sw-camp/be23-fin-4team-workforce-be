@@ -21,7 +21,6 @@ public enum ChatErrorCode {
     NOTICE_FORBIDDEN("CHAT_4035", HttpStatus.FORBIDDEN, "공지 전송 권한이 없습니다."),
     EDIT_FORBIDDEN("CHAT_4036", HttpStatus.FORBIDDEN, "본인의 메시지만 수정할 수 있습니다."),
     EDIT_WINDOW_EXPIRED("CHAT_4037", HttpStatus.FORBIDDEN, "수정 가능한 기간이 지났습니다."),
-    LEGAL_HOLD_LOCKED("CHAT_4038", HttpStatus.FORBIDDEN, "법적 보존(Legal Hold) 상태입니다."),
 
     ROOM_NOT_FOUND("CHAT_4041", HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
     MESSAGE_NOT_FOUND("CHAT_4042", HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다."),

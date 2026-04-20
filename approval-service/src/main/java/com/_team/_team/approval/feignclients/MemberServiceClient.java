@@ -2,6 +2,7 @@ package com._team._team.approval.feignclients;
 
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
 import com._team._team.approval.feignclients.dto.OrganizationResDto;
+import com._team._team.approval.feignclients.dto.SignatureResDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,9 @@ public interface MemberServiceClient {
     @GetMapping("/organization/internal/{organizationId}/descendants")
     List<UUID> getOrganizationDescendantIds(
             @PathVariable("organizationId") UUID organizationId);
+
+    @GetMapping("/member/internal/{memberId}/signature")
+    SignatureResDto getSignatureUrl(@PathVariable("memberId") UUID memberId);
 
     @GetMapping("/members/active")
     List<UUID> findActiveMemberIds(@RequestParam("companyId") UUID companyId);

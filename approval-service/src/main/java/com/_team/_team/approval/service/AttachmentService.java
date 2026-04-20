@@ -33,6 +33,7 @@ public class AttachmentService {
         this.s3Uploader = s3Uploader;
     }
 
+    private static final int MAX_ATTACHMENT_COUNT = 3;
     // 첨부파일 업로드
     public List<AttachmentResDto> upload(UUID memberId, UUID requestId,
                                          List<MultipartFile> files) {
@@ -50,6 +51,14 @@ public class AttachmentService {
                 && request.getRequestStatus() != RequestStatus.WAIT) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "임시저장(DRAFT) 또는 결재대기(WAIT) 상태에서만 첨부파일을 추가할 수 있습니다.");
+        }
+
+        // 기존 첨부파일 개수 + 이번 업로드 개수 합산 체크
+        long existingCount = attachmentRepository.countByRequestId(requestId);
+        if (existingCount + files.size() > MAX_ATTACHMENT_COUNT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "첨부파일은 최대 " + MAX_ATTACHMENT_COUNT + "개까지 등록할 수 있습니다. "
+                            + "(현재 " + existingCount + "개)");
         }
 
         List<Attachment> savedAttachments = new ArrayList<>();
@@ -73,7 +82,15 @@ public class AttachmentService {
 
     // 첨부파일 목록 조회
     @Transactional(readOnly = true)
-    public List<AttachmentResDto> findByRequestId(UUID requestId) {
+    public List<AttachmentResDto> findByRequestId(UUID companyId, UUID memberId, UUID requestId) {
+
+        ApprovalRequest request = approvalRequestRepository.findByIdWithDocument(requestId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "결재 요청을 찾을 수 없습니다."));
+
+        if (!request.getApprovalDocument().getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
 
         List<Attachment> attachments = attachmentRepository.findByRequestId(requestId);
 
@@ -94,10 +111,9 @@ public class AttachmentService {
                     "본인의 첨부파일만 삭제할 수 있습니다.");
         }
 
-        if (attachment.getRequest().getRequestStatus() != RequestStatus.DRAFT
-                && attachment.getRequest().getRequestStatus() != RequestStatus.WAIT) {
+        if (attachment.getRequest().getRequestStatus() != RequestStatus.DRAFT) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "임시저장(DRAFT) 또는 결재대기(WAIT) 상태에서만 첨부파일을 삭제할 수 있습니다.");
+                    "임시저장(DRAFT) 상태에서만 첨부파일을 삭제할 수 있습니다.");
         }
 
         s3Uploader.delete(attachment.getApprovalUrl());

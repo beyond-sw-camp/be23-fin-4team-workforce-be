@@ -16,6 +16,6 @@ public class OrgChartResDto {
 
     private UUID organizationId;
     private String name;
+    private List<OrgChartMemberResDto> members;  // jobGrades → members 로 변경
     private List<OrgChartResDto> children;
-    private List<OrgChartJobGradeResDto> jobGrades;
-}
+ }

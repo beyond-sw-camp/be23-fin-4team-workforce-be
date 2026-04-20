@@ -6,12 +6,17 @@ import com._team._team.approval.domain.ApprovalRequest;
 import com._team._team.approval.domain.ApprovalViewer;
 import com._team._team.approval.domain.enums.LineStatus;
 import com._team._team.approval.domain.enums.RequestStatus;
+import com._team._team.approval.domain.enums.RequestType;
 import com._team._team.approval.dto.reqdto.ApprovalActionReqDto;
 import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
+import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
+import com._team._team.approval.feignclients.MemberServiceClient;
+import com._team._team.approval.feignclients.dto.SignatureResDto;
 import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.approval.repository.ApprovalRepository;
 import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
+import com._team._team.approval.repository.OfficialRecipientRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.event.AllowanceApprovalEvent;
 import com._team._team.event.LeaveApprovalEvent;
@@ -27,10 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Transactional
@@ -46,6 +48,9 @@ public class ApprovalService {
     private final ScheduleApprovalEventPublisher scheduleApprovalEventPublisher;
     private final ApprovalRequestRepository approvalRequestRepository;
     private final ObjectMapper objectMapper;
+    private final OfficialNumberService officialNumberService;
+    private final OfficialRecipientRepository officialRecipientRepository;
+    private final MemberServiceClient memberServiceClient;
 
     @Autowired
     public ApprovalService(ApprovalRepository approvalRepository,
@@ -53,9 +58,14 @@ public class ApprovalService {
                            AbsenceProxyRepository absenceProxyRepository,
                            ApprovalNotificationService approvalNotificationService,
                            OvertimeApprovalEventPublisher overtimeApprovalEventPublisher,
-                           LeaveApprovalEventPublisher leaveApprovalEventPublisher, AllowanceApprovalEventPublisher allowanceApprovalEventPublisher, ScheduleApprovalEventPublisher scheduleApprovalEventPublisher,
+                           LeaveApprovalEventPublisher leaveApprovalEventPublisher,
+                           AllowanceApprovalEventPublisher allowanceApprovalEventPublisher,
+                           ScheduleApprovalEventPublisher scheduleApprovalEventPublisher,
                            ApprovalRequestRepository approvalRequestRepository,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           OfficialNumberService officialNumberService,
+                           OfficialRecipientRepository officialRecipientRepository,
+                           MemberServiceClient memberServiceClient) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
@@ -66,6 +76,9 @@ public class ApprovalService {
         this.scheduleApprovalEventPublisher = scheduleApprovalEventPublisher;
         this.approvalRequestRepository = approvalRequestRepository;
         this.objectMapper = objectMapper;
+        this.officialNumberService = officialNumberService;
+        this.officialRecipientRepository = officialRecipientRepository;
+        this.memberServiceClient = memberServiceClient;
     }
 
 
@@ -93,15 +106,7 @@ public class ApprovalService {
         }
 
         return mergedMap.values().stream()
-                .map(approval -> {
-                    UUID requestId = approval.getRequest().getRequestId();
-                    List<Approval> allApprovals =
-                            approvalRepository.findByRequestIdWithRequest(requestId);
-                    List<ApprovalViewer> viewers =
-                            approvalViewerRepository.findByRequestId(requestId);
-                    return ApprovalRequestResDto.fromEntity(
-                            approval.getRequest(), allApprovals, viewers);
-                })
+                .map(approval -> toResDtoWithRecipients(approval.getRequest()))
                 .toList();
     }
 
@@ -145,6 +150,16 @@ public class ApprovalService {
 //        현재 단계 승인 처리
         approval.approve(reqDto.getComment(), actualMemberId, actualMemberPositionId);
 
+        // 서명 이미지 복사
+        try {
+            SignatureResDto signatureRes = memberServiceClient.getSignatureUrl(actualMemberId);
+            if (signatureRes != null && signatureRes.getSignatureUrl() != null) {
+                approval.sign(signatureRes.getSignatureUrl());
+            }
+        } catch (Exception e) {
+            // 서명 조회 실패해도 승인은 진행
+        }
+
         ApprovalRequest request = approval.getRequest();
         UUID requestId = request.getRequestId();
 
@@ -167,6 +182,13 @@ public class ApprovalService {
         } else {
             request.updateStatus(RequestStatus.APPROVED);
 
+            // 공문이면 최종 승인 시점에 번호 발번
+            if (request.getRequestType() == RequestType.OFFICIAL) {
+                String docNumber = officialNumberService.generate(request.getRequestId());
+                request.updateDocumentNumber(docNumber);
+                approvalNotificationService.publishOfficialApprovedEvent(request);
+            }
+
             // 최종 승인 시 이벤트 발행
             publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.APPROVE);
             publishLeaveEventIfApplicable(request, LeaveApprovalEvent.Action.USE);
@@ -184,8 +206,16 @@ public class ApprovalService {
             approvalNotificationService.notifyApproved(request, viewers, actualMemberId);
         }
 
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL) {
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId)
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
 
-        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
     }
 
 
@@ -256,7 +286,15 @@ public class ApprovalService {
         approvalNotificationService.notifyRejected(
                 request, viewers, actualMemberId, reqDto.getComment());
 
-        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers);
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL){
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId)
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
     }
 
     // 결재 대기함 (내 건 + 대결 건)
@@ -294,17 +332,62 @@ public class ApprovalService {
         }
 
         return mergedMap.values().stream()
-                .map(approval -> {
-                    UUID requestId = approval.getRequest().getRequestId();
-                    List<Approval> allApprovals =
-                            approvalRepository.findByRequestIdWithRequest(requestId);
-                    List<ApprovalViewer> viewers =
-                            approvalViewerRepository.findByRequestId(requestId);
-                    return ApprovalRequestResDto.fromEntity(
-                            approval.getRequest(), allApprovals, viewers);
-                })
+                .map(approval -> toResDtoWithRecipients(approval.getRequest()))
                 .toList();
     }
+
+    // 결재 예정함 (아직 내 차례가 아닌 문서)
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestResDto> findWaiting(UUID memberPositionId) {
+
+        List<Approval> waitingApprovals =
+                approvalRepository.findWaitingByMemberPositionId(memberPositionId, LineStatus.WAITING);
+
+        return waitingApprovals.stream()
+                .map(approval -> toResDtoWithRecipients(approval.getRequest()))
+                .toList();
+    }
+
+    // 결재함 전체 (PENDING + WAITING 통합)
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestResDto> findAllInbox(UUID companyId, UUID memberId, UUID memberPositionId) {
+
+        // 1) PENDING (내 차례 + 대결)
+        List<ApprovalRequestResDto> pendingList = findPending(companyId, memberId, memberPositionId);
+
+        // 2) WAITING (예정)
+        List<ApprovalRequestResDto> waitingList = findWaiting(memberPositionId);
+
+        // 3) 합산 (중복 제거 — requestId 기준, PENDING 우선)
+        Map<UUID, ApprovalRequestResDto> mergedMap = new LinkedHashMap<>();
+        for (ApprovalRequestResDto dto : pendingList) {
+            mergedMap.putIfAbsent(dto.getRequestId(), dto);
+        }
+        for (ApprovalRequestResDto dto : waitingList) {
+            mergedMap.putIfAbsent(dto.getRequestId(), dto);
+        }
+
+        return new ArrayList<>(mergedMap.values());
+    }
+
+    private ApprovalRequestResDto toResDtoWithRecipients(ApprovalRequest request) {
+        UUID requestId = request.getRequestId();
+        List<Approval> allApprovals =
+                approvalRepository.findByRequestIdWithRequest(requestId);
+        List<ApprovalViewer> viewers =
+                approvalViewerRepository.findByRequestId(requestId);
+
+        List<OfficialRecipientResDto> recipientDtos = null;
+        if (request.getRequestType() == RequestType.OFFICIAL) {
+            recipientDtos = officialRecipientRepository
+                    .findByApprovalRequest_RequestId(requestId)
+                    .stream()
+                    .map(OfficialRecipientResDto::fromEntity)
+                    .toList();
+        }
+        return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
+    }
+
 
     // 아래는 승인/반려 직후 Kafka로 이벤트 쏘는 헬퍼들
 

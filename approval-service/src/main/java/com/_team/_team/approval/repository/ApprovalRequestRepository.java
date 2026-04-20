@@ -50,8 +50,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     @Query("SELECT ar FROM ApprovalRequest ar " +
             "JOIN FETCH ar.approvalDocument doc " +
             "WHERE doc.companyId = :companyId " +
-            "AND doc.isDeptVisibleYn = 'Y' " +
-            "AND ar.requesterOrganizationId IN :organizationIds " +
+            "AND ar.requesterOrganizationId = :organizationId " +
             "AND ar.requestStatus IN (" +
             "   com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
             "   com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
@@ -60,7 +59,54 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             "ORDER BY ar.createdAt DESC")
     List<ApprovalRequest> findDepartmentRequests(
             @Param("companyId") UUID companyId,
-            @Param("organizationIds") UUID organizationIds);
+            @Param("organizationId") UUID organizationId);
+
+    @Query("SELECT COUNT(r) FROM ApprovalRequest r " +
+            "WHERE r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
+            "  AND r.requesterOrganizationId = :organizationId " +
+            "  AND r.requestStatus = com._team._team.approval.domain.enums.RequestStatus.APPROVED " +
+            "  AND FUNCTION('YEAR', r.createdAt) = :year " +
+            "  AND r.delYn = 'N'")
+    long countOfficialApprovedInYear(@Param("organizationId") UUID organizationId,
+                                     @Param("year") int year);
+
+    @Query("SELECT r FROM ApprovalRequest r " +
+            "JOIN FETCH r.approvalDocument doc " +
+            "WHERE doc.companyId = :companyId " +
+            "  AND r.requesterOrganizationId = :organizationId " +
+            "  AND r.requestType = :requestType " +
+            "  AND r.requestStatus IN (" +
+            "    com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+            "    com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+            "  ) " +
+            "  AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<ApprovalRequest> findDepartmentRequestsByType(
+            @Param("companyId") UUID companyId,
+            @Param("organizationId") UUID organizationId,
+            @Param("requestType") RequestType requestType);
+
+    @Query("SELECT r FROM ApprovalRequest r " +
+            "WHERE r.requestId IN :requestIds " +
+            "  AND r.approvalDocument.companyId = :companyId " +
+            "  AND r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
+            "  AND r.requestStatus = com._team._team.approval.domain.enums.RequestStatus.APPROVED " +
+            "  AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<ApprovalRequest> findApprovedOfficialsByIdsAndCompany(
+            @Param("requestIds") List<UUID> requestIds,
+            @Param("companyId") UUID companyId);
+
+    @Query("SELECT r FROM ApprovalRequest r " +
+            "WHERE r.memberId = :memberId " +
+            "  AND (:status IS NULL OR r.requestStatus = :status) " +
+            "  AND (:requestType IS NULL OR r.requestType = :requestType) " +
+            "  AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<ApprovalRequest> findMyRequests(
+            @Param("memberId") UUID memberId,
+            @Param("status") RequestStatus status,
+            @Param("requestType") RequestType requestType);
 
     // 특정 직원이 특정 날짜에 승인받은 연장근무 종료시각 중 가장 늦은 값
     // 같은 날 여러 건 연장한 경우도 MAX로 잡기 위해 ar.startDateTime 기준 범위 조회
