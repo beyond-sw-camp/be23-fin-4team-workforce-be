@@ -29,7 +29,7 @@ public class MemberAllowanceAdminController {
     // 관리자, 신규 입사자에게 기본 수당 AUTO 등록 (결재 생략)
     @PostMapping("/auto-grant")
     public ResponseEntity<MemberAllowanceResDto> autoGrant(
-            @RequestHeader("X-Company-Id") UUID companyId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @Valid @RequestBody MemberAllowanceAutoGrantReqDto reqDto) {
 
         MemberAllowance saved = memberAllowanceService.autoGrant(
@@ -44,7 +44,7 @@ public class MemberAllowanceAdminController {
     // 관리자, 회사 전체 수당 상태별 조회 (결재 대기, 승인 등)
     @GetMapping
     public ResponseEntity<List<MemberAllowanceResDto>> listByStatus(
-            @RequestHeader("X-Company-Id") UUID companyId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestParam AllowanceApprovalStatus status) {
 
         List<MemberAllowanceResDto> result = memberAllowanceService
@@ -58,7 +58,7 @@ public class MemberAllowanceAdminController {
     // 관리자, 특정 직원의 정산일 기준 활성 수당 조회 (급여 계산 미리보기)
     @GetMapping("/members/{memberId}/active")
     public ResponseEntity<List<MemberAllowanceResDto>> activeOf(
-            @RequestHeader("X-Company-Id") UUID companyId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID memberId,
             @RequestParam LocalDate date) {
 
