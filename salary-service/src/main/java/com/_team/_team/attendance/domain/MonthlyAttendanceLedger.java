@@ -44,10 +44,8 @@ public class MonthlyAttendanceLedger extends BaseTimeEntity {
     private UUID companyId;
 
     /** 대상 월, "YYYY-MM" 형식 */
-    @Column(nullable = false, length = 7)
+    @Column(name = "ledger_year_month", nullable = false, length = 7)
     private String yearMonth;
-
-    // 근무 시간 집계
 
     /** 총 순 근무 시간(분) 휴게 제외, 휴가 차감 반영 */
     @Column(nullable = false)
