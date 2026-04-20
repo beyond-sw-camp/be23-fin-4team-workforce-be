@@ -24,7 +24,6 @@ public class SalaryPolicyResDto {
     private String policyName;
     private PayType payType;
     private Integer payDay;
-    private Integer overtimeRoundingMinutes;
     private WageSystemType wageSystemType;
     private Integer fixedOvertimeMinutes;
     private PeriodStartType periodStartType;
@@ -41,7 +40,6 @@ public class SalaryPolicyResDto {
                 .policyName(salaryPolicy.getPolicyName())
                 .payType(salaryPolicy.getPayType())
                 .payDay(salaryPolicy.getPayDay())
-                .overtimeRoundingMinutes(salaryPolicy.getOvertimeRoundingMinutes())
                 .wageSystemType(salaryPolicy.getWageSystemType())
                 .fixedOvertimeMinutes(salaryPolicy.getFixedOvertimeMinutes())
                 .periodStartType(salaryPolicy.getPeriodStartType())

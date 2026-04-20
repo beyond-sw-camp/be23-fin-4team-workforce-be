@@ -1,6 +1,6 @@
 package com._team._team.attendance.kafka;
 
-import com._team._team.attendance.Service.OvertimeApprovalService;
+import com._team._team.attendance.service.OvertimeApprovalService;
 import com._team._team.event.OvertimeApprovalEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

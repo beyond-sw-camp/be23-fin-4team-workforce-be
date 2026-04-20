@@ -9,10 +9,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * 휴가 결재 이벤트 — approval-service → salary-service
+ * 휴가 결재 이벤트 - approval-service -> salary-service
  * - 반려 시: approval-service가 RESTORE 이벤트 발행
  * - 취소 시: approval-service가 RESTORE 이벤트 발행
- * 토픽: "leave-approval"
  */
 @AllArgsConstructor
 @NoArgsConstructor
