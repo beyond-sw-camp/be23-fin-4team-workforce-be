@@ -72,6 +72,7 @@ public class BatchScheduledJob extends QuartzJobBean {
             case "payrollCalculateJob":
             case "severancePayJob":
             case "payslipSendJob":
+            case "monthlyAttendanceCloseJob":
                 builder.addString("yearMonth", today.format(YEAR_MONTH_FMT));
                 break;
             case "leaveGrantJob":
@@ -79,6 +80,8 @@ public class BatchScheduledJob extends QuartzJobBean {
             case "leaveExpireJob":
             case "dailyAttendanceDraftJob":
             case "dailyAttendanceFinalJob":
+            case "weeklyLimitCheckJob":
+            case "slotDeadlineAutoAssignJob":
                 builder.addString("date", today.toString());
                 break;
             default:
