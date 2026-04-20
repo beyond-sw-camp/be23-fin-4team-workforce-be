@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -16,6 +17,7 @@ public class LoginResDto {
     private String name;
     private UUID memberId;
     private UUID memberPositionId;
+    private List<String> permissions;
     private String isFirstLoginYn;
     private String isEmailVerifiedYn;
 }
