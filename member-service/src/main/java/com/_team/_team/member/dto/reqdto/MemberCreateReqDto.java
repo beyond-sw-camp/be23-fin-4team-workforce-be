@@ -91,6 +91,7 @@ public class MemberCreateReqDto {
                 .accountStatus(AccountStatus.ACTIVE)
                 .isFirstLoginYn("YES")
                 .isEmailVerifiedYn("NO")
+                .isOnboardingYn("NO")
                 .build();
     }
 }
