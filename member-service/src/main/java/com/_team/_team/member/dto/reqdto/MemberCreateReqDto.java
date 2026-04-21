@@ -53,9 +53,9 @@ public class MemberCreateReqDto {
     private UUID roleId;
 
     // 기본급 입사 시 HR이 협의된 금액 입력 Salary 자동 생성에 사용
-    @NotNull(message = "기본급을 입력해 주세요.")
-    @Min(value = 0, message = "기본급은 0원 이상이어야 합니다.")
-    private Long baseSalary;
+//    @NotNull(message = "기본급을 입력해 주세요.")
+//    @Min(value = 0, message = "기본급은 0원 이상이어야 합니다.")
+//    private Long baseSalary;
 
     // 선택 (최초 로그인 후 직원 직접 입력)
     private String phoneNumber;

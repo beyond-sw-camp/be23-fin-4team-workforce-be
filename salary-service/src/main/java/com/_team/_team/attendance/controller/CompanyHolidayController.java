@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -70,5 +71,28 @@ public class CompanyHolidayController {
                 ApiResponse.success(null, "공휴일이 삭제되었습니다."),
                 HttpStatus.OK
         );
+    }
+
+    // 회사 생성 시 법정 공휴일 일괄 복사
+    @PostMapping("/import-public")
+    public void importPublicHolidays(@RequestParam UUID companyId) {
+        companyHolidayService.importPublicHolidays(companyId);
+    }
+
+    /**
+     * 관리자 수동 새로고침 UI 용, 지정 연도 법정 공휴일 재수집, 커스텀 휴일은 보존
+     */
+    @PostMapping("/refresh-legal")
+    public ResponseEntity<?> refreshLegalHolidays(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestParam int year) {
+
+        int saved = companyHolidayService.refreshLegalHolidays(companyId, year);
+
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        Map.of("year", year, "importedCount", saved),
+                        year + "년 법정 공휴일 " + saved + "건 반영 완료"),
+                HttpStatus.OK);
     }
 }
