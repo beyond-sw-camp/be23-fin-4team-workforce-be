@@ -19,5 +19,6 @@ public class LoginResDto {
     private UUID memberPositionId;
     private List<String> permissions;
     private String isFirstLoginYn;
+    private String isOnboardingYn;
     private String isEmailVerifiedYn;
 }
