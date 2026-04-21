@@ -6,7 +6,6 @@ import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
-import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.SeasonCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
@@ -220,13 +219,10 @@ public class EvaluationSeasonService {
         if (season.getStatus() != SeasonStatus.ACTIVE) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "진행 중인 시즌만 종료할 수 있습니다.");
         }
-        // 결과 공개 이전에는 종료할 수 없음 — 피드백 미팅 자동 생성이 제대로 동작하려면
-        // 반드시 PUBLISHED 페이즈까지 도달해야 한다.
-        if (season.getPhase() != SeasonPhase.PUBLISHED) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "결과 공개(PUBLISHED) 이전에는 시즌을 종료할 수 없습니다. 현재 phase: " + season.getPhase());
-        }
-        // 안전장치: 미제출 응답이 남아 있으면 종료 차단
+        // 종료와 결과 공개(PUBLISHED)는 별개의 워크플로다.
+        // 관리자는 결과 공개 없이도 시즌을 행정적으로 종결할 수 있어야 한다.
+        // (예: 캘리브레이션 단계까지만 마치고 내부 종결 후 나중에 결과 공개 등)
+        // 단, 미제출 응답이 있으면 리마인드/재개방으로 먼저 정리하도록 차단한다.
         long notSubmitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
@@ -239,47 +235,9 @@ public class EvaluationSeasonService {
         return SeasonResDto.from(season);
     }
 
-    /**
-     * Phase 전이: ACTIVE 상태인 시즌에 한해 관리자가 페이즈를 진행시킬 수 있습니다.
-     * 현재 phase에 해당하는 평가 유형의 응답이 모두 제출(SUBMITTED)되었는지 사전 검증합니다.
-     */
-    @Transactional
-    public SeasonResDto transitionPhase(UUID seasonId, UUID companyId, SeasonPhase next) {
-        EvaluationSeason season = findSeasonOrThrow(seasonId, companyId);
-
-        // 현재 phase에 대응하는 평가 유형의 미제출 응답이 있으면 전이 차단
-        EvalType requiredType = mapPhaseToEvalType(season.getPhase());
-        if (requiredType != null) {
-            long notSubmitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
-                    .filter(r -> r.getCompanyId().equals(companyId))
-                    .filter(r -> r.getEvaluationType() == requiredType)
-                    .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
-                    .count();
-            if (notSubmitted > 0) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST,
-                        requiredType.name() + " 유형의 미제출 응답이 " + notSubmitted
-                                + "건 있어 phase 를 전이할 수 없습니다.");
-            }
-        }
-
-        season.transitionTo(next);
-        return SeasonResDto.from(season);
-    }
-
-    /**
-     * 평가 phase 에 대응하는 EvalType 을 반환합니다.
-     * 대응 관계가 없는 phase (NOT_STARTED, CALIBRATION 등) 는 null 을 반환합니다.
-     */
-    private static EvalType mapPhaseToEvalType(SeasonPhase phase) {
-        if (phase == null) return null;
-        return switch (phase) {
-            case SELF_EVAL -> EvalType.SELF;
-            case PEER_EVAL -> EvalType.PEER;
-            case UPWARD_EVAL -> EvalType.UPWARD;
-            case DOWNWARD_EVAL -> EvalType.DOWNWARD;
-            default -> null;
-        };
-    }
+    // [REMOVED] transitionPhase / mapPhaseToEvalType
+    // phase 기반 워크플로가 제거되었습니다. 시즌은 status(DRAFT/ACTIVE/CLOSED) 와
+    // resultsPublishedAt 만으로 관리되며, 모든 평가 유형은 status=ACTIVE 상태에서 병렬로 진행됩니다.
 
     private EvaluationSeason findSeasonOrThrow(UUID seasonId, UUID companyId) {
         EvaluationSeason season = seasonRepository.findById(seasonId)

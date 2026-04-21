@@ -1,13 +1,10 @@
 package com._team._team.evaluation.domain;
 
-import com._team._team.dto.BusinessException;
 import com._team._team.domain.BaseTimeEntity;
-import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.domain.enums.SeasonType;
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,19 +45,30 @@ public class EvaluationSeason extends BaseTimeEntity {
     private SeasonStatus status = SeasonStatus.DRAFT;
 
     /**
-     * ACTIVE 상태 내에서의 세부 진행 페이즈.
-     * DRAFT 일 때는 NOT_STARTED, CLOSED 이후에도 마지막 phase 가 유지됩니다.
+     * [DEPRECATED] 세부 phase 기반 워크플로는 제거되었습니다.
+     * 이제 시즌은 status(DRAFT/ACTIVE/CLOSED) 와 resultsPublishedAt 으로 관리됩니다.
+     *
+     * 기존 데이터 보존 + 롤백 안전을 위해 컬럼은 유지하며, 새로 생성되는 시즌에는
+     * 항상 'LEGACY_DEPRECATED' 값을 저장합니다. 서비스 로직은 이 필드를 참조하지 않습니다.
+     *
+     * TODO: 2-3 릴리즈 후 DB 컬럼까지 DROP.
      */
-    @Enumerated(EnumType.STRING)
     @Column(name = "phase", nullable = false, length = 32)
     @Builder.Default
-    private SeasonPhase phase = SeasonPhase.NOT_STARTED;
+    private String phase = "LEGACY_DEPRECATED";
 
     @Column(name = "phase_updated_at")
     private LocalDateTime phaseUpdatedAt;
 
     @Column(name = "result_publish_date")
     private LocalDate resultPublishDate;
+
+    /**
+     * 결과가 피평가자에게 공개된 시각. null 이면 비공개 상태.
+     * 관리자의 "결과 공개" 액션 또는 resultPublishDate 에 의해 스케줄러가 세팅합니다.
+     */
+    @Column(name = "results_published_at")
+    private LocalDateTime resultsPublishedAt;
 
     @Column(name = "schedule_json", columnDefinition = "JSON")
     private String scheduleJson;
@@ -72,9 +80,6 @@ public class EvaluationSeason extends BaseTimeEntity {
 
     public void activate() {
         this.status = SeasonStatus.ACTIVE;
-        if (this.phase == null) {
-            this.phase = SeasonPhase.NOT_STARTED;
-        }
         this.phaseUpdatedAt = LocalDateTime.now();
     }
 
@@ -83,55 +88,32 @@ public class EvaluationSeason extends BaseTimeEntity {
     }
 
     /**
-     * 상태 기계 기반의 phase 전이. 허용된 선형 순서대로만 이동할 수 있습니다.
+     * 결과 공개 (피평가자에게 노출). 이미 공개된 시즌에 재호출은 무시.
      */
-    public SeasonPhase transitionTo(SeasonPhase next) {
-        if (this.status != SeasonStatus.ACTIVE) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "시즌이 ACTIVE 상태가 아닙니다. phase 전이를 수행할 수 없습니다.");
+    public void markResultsPublished() {
+        if (this.resultsPublishedAt == null) {
+            this.resultsPublishedAt = LocalDateTime.now();
         }
-        if (next == null) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "전이 대상 phase 가 지정되지 않았습니다.");
-        }
-        if (!isAllowedNext(this.phase, next)) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "phase 전이가 허용되지 않습니다: " + this.phase + " → " + next);
-        }
-        SeasonPhase previous = this.phase;
-        this.phase = next;
-        this.phaseUpdatedAt = LocalDateTime.now();
-        return previous;
     }
 
-    private static boolean isAllowedNext(SeasonPhase from, SeasonPhase to) {
-        if (from == null) from = SeasonPhase.NOT_STARTED;
-        return switch (from) {
-            case NOT_STARTED -> to == SeasonPhase.SELF_EVAL;
-            case SELF_EVAL -> to == SeasonPhase.PEER_EVAL;
-            case PEER_EVAL -> to == SeasonPhase.UPWARD_EVAL;
-            case UPWARD_EVAL -> to == SeasonPhase.DOWNWARD_EVAL;
-            case DOWNWARD_EVAL -> to == SeasonPhase.CALIBRATION;
-            case CALIBRATION -> to == SeasonPhase.CONFIRMED;
-            case CONFIRMED -> to == SeasonPhase.PUBLISHED;
-            case PUBLISHED -> false;
-        };
+    public boolean isResultsPublished() {
+        return this.resultsPublishedAt != null;
     }
 
     /**
-     * 현재 phase 가 구성원이 응답 입력(저장/제출) 가능한 단계인지 여부.
+     * 구성원이 응답 입력(저장/제출) 가능한 상태인지 여부.
+     * ACTIVE 이면서 아직 결과가 공개되지 않은 경우에만 허용.
      */
-    public boolean isResponseEditablePhase() {
-        return this.phase == SeasonPhase.SELF_EVAL
-                || this.phase == SeasonPhase.PEER_EVAL
-                || this.phase == SeasonPhase.UPWARD_EVAL
-                || this.phase == SeasonPhase.DOWNWARD_EVAL;
+    public boolean isResponseEditable() {
+        return this.status == SeasonStatus.ACTIVE && this.resultsPublishedAt == null;
     }
 
     /**
-     * 캘리브레이션 조정이 가능한 phase 인지 여부.
+     * 캘리브레이션 조정이 가능한 상태인지 여부.
+     * ACTIVE 이면서 결과 공개 전에만 조정 가능.
      */
-    public boolean isCalibrationPhase() {
-        return this.phase == SeasonPhase.CALIBRATION;
+    public boolean canCalibrate() {
+        return this.status == SeasonStatus.ACTIVE && this.resultsPublishedAt == null;
     }
 
     public void update(String name, SeasonType type, LocalDate startDate, LocalDate endDate,
