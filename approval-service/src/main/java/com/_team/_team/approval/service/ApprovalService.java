@@ -24,9 +24,11 @@ import com._team._team.event.OvertimeApprovalEvent;
 import com._team._team.event.ScheduleApprovalEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import com._team._team.event.ApprovalChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,7 @@ public class ApprovalService {
     private final OfficialNumberService officialNumberService;
     private final OfficialRecipientRepository officialRecipientRepository;
     private final MemberServiceClient memberServiceClient;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
     public ApprovalService(ApprovalRepository approvalRepository,
@@ -65,7 +68,7 @@ public class ApprovalService {
                            ObjectMapper objectMapper,
                            OfficialNumberService officialNumberService,
                            OfficialRecipientRepository officialRecipientRepository,
-                           MemberServiceClient memberServiceClient) {
+                           MemberServiceClient memberServiceClient, ApplicationEventPublisher eventPublisher) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
@@ -79,6 +82,7 @@ public class ApprovalService {
         this.officialNumberService = officialNumberService;
         this.officialRecipientRepository = officialRecipientRepository;
         this.memberServiceClient = memberServiceClient;
+        this.eventPublisher = eventPublisher;
     }
 
 
@@ -189,7 +193,8 @@ public class ApprovalService {
 
             // 최종 승인 시 이벤트 발행
             publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.APPROVE);
-            publishLeaveEventIfApplicable(request, LeaveApprovalEvent.Action.USE);
+            publishLeaveEventIfApplicable(request, actualMemberId,
+                    LeaveApprovalEvent.Action.USE, null);
             publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.APPROVE, reqDto.getComment());
             publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.APPROVE);  // 추가
         }
@@ -212,6 +217,10 @@ public class ApprovalService {
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
         }
+
+        // 검색 인덱싱 이벤트 발행
+        eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
 
     }
@@ -277,10 +286,13 @@ public class ApprovalService {
         publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.REJECT);
         publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.REJECT, reqDto.getComment());
 
-        // 연차는 승인 전에는 차감되지 않았으므로 RESTORE 필요 없음 -> 반려 시 발행 생략
+        // 반려 시 REJECT 이벤트 발행
+        publishLeaveEventIfApplicable(request, actualMemberId,
+                LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
+
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 
-        //        요청자/참조자에게 반려 알림
+        // 요청자/참조자에게 반려 알림
         approvalNotificationService.notifyRejected(
                 request, viewers, actualMemberId, reqDto.getComment());
 
@@ -292,6 +304,10 @@ public class ApprovalService {
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
         }
+
+        // 검색 인덱스 이벤트 발행
+        eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
     }
 
@@ -428,38 +444,62 @@ public class ApprovalService {
 
     // 연차신청서 문서일 때만 leave 이벤트 발행
     // 연차=1일씩 누적, 반차=0.5일. BalanceType은 일단 ANNUAL 고정 (CARRYOVER 우선소진은 salary 쪽에서 처리)
-    private void publishLeaveEventIfApplicable(ApprovalRequest request, LeaveApprovalEvent.Action action) {
+    private void publishLeaveEventIfApplicable(ApprovalRequest request,
+                                               UUID approverId,
+                                               LeaveApprovalEvent.Action action,
+                                               String note) {
         String docName = request.getApprovalDocument().getDocumentName();
-        if (!"연차신청서".equals(docName)) {
-            return;
-        }
+        if (!"연차신청서".equals(docName)) return;
 
         JsonNode node = readContent(request.getContentJson());
-        if (node == null) {
-            return;
-        }
+        if (node == null) return;
 
         String vacationType = textOrNull(node, "vacationType");
         LocalDate startDate = dateOrNull(node, "startDate");
-        LocalDate endDate   = dateOrNull(node, "endDate");
-        if (vacationType == null || startDate == null) {
-            return;
-        }
+        LocalDate endDate = dateOrNull(node, "endDate");
+        if (vacationType == null || startDate == null) return;
 
+        UUID leaveRequestId = extractLeaveRequestId(node);
         double days = calculateLeaveDays(vacationType, startDate, endDate);
         if (days <= 0) return;
+
+        boolean needsDeduction = isAnnualLike(vacationType);
 
         leaveApprovalEventPublisher.publish(
                 LeaveApprovalEvent.builder()
                         .companyId(request.getApprovalDocument().getCompanyId())
                         .memberId(request.getMemberId())
                         .requestId(request.getRequestId())
-                        .balanceType("ANNUAL")
+                        .leaveRequestId(leaveRequestId)
+                        .needsDeduction(needsDeduction)
                         .days(days)
                         .leaveDate(startDate)
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .note(note)
                         .action(action)
                         .build()
         );
+    }
+
+    /**
+     * 연차/반차 류인지 판단, 잔고 차감 필요 여부
+     */
+    private boolean isAnnualLike(String vacationType) {
+        return vacationType.equals("연차") || vacationType.startsWith("반차");
+    }
+
+    /**
+     * contentJson 에서 leaveRequestId 추출
+     */
+    private UUID extractLeaveRequestId(JsonNode node) {
+        String raw = node.path("leaveRequestId").asText(null);
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return UUID.fromString(raw);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // 휴가 일수 계산 - 반차는 무조건 0.5, 연차는 시작/종료일 포함 일수

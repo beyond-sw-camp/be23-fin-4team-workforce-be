@@ -60,4 +60,13 @@ public interface CompanyHolidayRepository extends JpaRepository<CompanyHoliday, 
     default boolean existsByCompanyIdAndHolidayDate(UUID companyId, LocalDate date) {
         return existsByCompanyIdAndHolidayDateAndDelYn(companyId, date, "N");
     }
+
+    // 해당 연도 법정 공휴일 조회
+    List<CompanyHoliday> findByCompanyIdAndIsLegalYnAndHolidayDateBetween(
+            UUID companyId, String isLegalYn, LocalDate from, LocalDate to);
+
+    // 영업일 계산용 (기간 조회)
+    List<CompanyHoliday> findByCompanyIdAndHolidayDateBetweenAndDelYn(
+            UUID companyId, LocalDate from, LocalDate to, String delYn);
+
 }

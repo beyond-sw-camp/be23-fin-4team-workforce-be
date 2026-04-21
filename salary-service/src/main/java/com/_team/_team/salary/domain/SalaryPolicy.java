@@ -2,8 +2,6 @@ package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.salary.domain.enums.PayType;
-import com._team._team.salary.domain.enums.PeriodEndType;
-import com._team._team.salary.domain.enums.PeriodStartType;
 import com._team._team.salary.dto.reqdto.SalaryPolicyUpdateReqDto;
 import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.persistence.*;
@@ -52,14 +50,6 @@ public class SalaryPolicy extends BaseTimeEntity {
     @Builder.Default
     private Integer fixedOvertimeMinutes = 0;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PeriodStartType periodStartType;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PeriodEndType periodEndType;
-
     @Column(nullable = false)
     private LocalDate effectiveFrom;
 
@@ -88,8 +78,6 @@ public class SalaryPolicy extends BaseTimeEntity {
         this.policyName = reqDto.getPolicyName();
         this.payType = reqDto.getPayType();
         this.payDay = reqDto.getPayDay();
-        this.periodStartType = reqDto.getPeriodStartType();
-        this.periodEndType = reqDto.getPeriodEndType();
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();
         this.wageSystemType = reqDto.getWageSystemType();

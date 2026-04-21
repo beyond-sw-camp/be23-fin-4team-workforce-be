@@ -619,8 +619,8 @@ public class MemberService {
                 jobGrade.getJobGradeId(),
                 jobGrade.getName(),
                 jobTitle.getName(),
-                reqDto.getJoinDate(),
-                reqDto.getBaseSalary()
+                reqDto.getJoinDate()
+//                reqDto.getBaseSalary()
         ));
     }
 
