@@ -1,0 +1,31 @@
+package com._team._team.attendance.dto.reqDto;
+
+import jakarta.validation.constraints.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+/** 휴가 신청 DTO */
+@Getter
+@NoArgsConstructor
+public class LeaveRequestSubmitReqDto {
+
+    @NotNull(message = "휴가 종류는 필수입니다.")
+    private UUID companyLeaveTypeId;
+
+    @NotNull(message = "시작일은 필수입니다.")
+    private LocalDate startDate;
+
+    @NotNull(message = "종료일은 필수입니다.")
+    private LocalDate endDate;
+
+    @NotBlank(message = "휴가 사유는 필수입니다.")
+    @Size(max = 500)
+    private String reason;
+
+    // 병가/경조 등 증빙 필요한 휴가일 때 필수, 그 외엔 null
+    @Size(max = 500)
+    private String evidenceFileUrl;
+}
