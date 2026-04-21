@@ -92,8 +92,12 @@ public class ApprovalPolicyLineService {
     private List<MemberPositionResDto> searchInOrganization(
             UUID organizationId, UUID jobTitleId, UUID requesterMemberPositionId) {
 
-        List<MemberPositionResDto> found =
-                memberServiceClient.searchByJobTitle(organizationId, jobTitleId);
+        List<MemberPositionResDto> found;
+        try {
+            found = memberServiceClient.searchByJobTitle(organizationId, jobTitleId);
+        } catch (Exception e) {
+            return new ArrayList<>(); // 조회 실패 시 빈 후보 목록 반환
+        }
 
         if (found == null || found.isEmpty()) {
             return new ArrayList<>();
@@ -149,8 +153,13 @@ public class ApprovalPolicyLineService {
         }
 
         // 1. 요청자 MemberPosition 조회
-        MemberPositionResDto requester =
-                memberServiceClient.getMemberPosition(memberPositionId);
+        MemberPositionResDto requester;
+        try {
+            requester = memberServiceClient.getMemberPosition(memberPositionId);
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "인사 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+        }
 
         if (requester == null) {
             throw new BusinessException(HttpStatus.NOT_FOUND,
@@ -223,8 +232,12 @@ public class ApprovalPolicyLineService {
                 return candidates;
             }
 
-            OrganizationResDto org =
-                    memberServiceClient.getOrganization(currentOrgId);
+            OrganizationResDto org;
+            try {
+                org = memberServiceClient.getOrganization(currentOrgId);
+            } catch (Exception e) {
+                return new ArrayList<>(); // 조직 조회 실패 시 현재까지 결과로 종료
+            }
 
             if (org == null || org.getParentId() == null) {
                 return new ArrayList<>();
