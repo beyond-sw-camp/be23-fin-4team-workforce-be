@@ -1725,20 +1725,6 @@ public class MemberService {
     }
 
     /**
-     * memberId → name 매핑 조회 (내부 Feign 호출용).
-     * 삭제되었거나 존재하지 않는 id 는 결과 Map 에 포함되지 않음.
-     */
-    @Transactional(readOnly = true)
-    public java.util.Map<UUID, String> findNamesByIds(java.util.Collection<UUID> memberIds) {
-        if (memberIds == null || memberIds.isEmpty()) return java.util.Collections.emptyMap();
-        java.util.Map<UUID, String> result = new java.util.HashMap<>();
-        for (Member m : memberRepository.findAllById(memberIds)) {
-            result.put(m.getMemberId(), m.getName());
-        }
-        return result;
-    }
-
-    /**
      * 특정 대상자에 대한 평가자 후보 ID 배치 조회 (Feign 호출용).
      *
      * evalType 기준:

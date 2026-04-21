@@ -5,10 +5,7 @@ import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
 import com._team._team.member.dto.reqdto.*;
-import com._team._team.member.dto.resdto.LoginResDto;
-import com._team._team.member.dto.resdto.MemberResDto;
-import com._team._team.member.dto.resdto.MemberSearchItemResDto;
-import com._team._team.member.dto.resdto.SignatureResDto;
+import com._team._team.member.dto.resdto.*;
 import com._team._team.member.service.MemberService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -452,26 +449,13 @@ public class MemberController {
     }
 
     /**
-     * 내부용: memberId 목록에 대한 이름 배치 조회 (Feign 호출용).
-     * 평가/미팅 등 다른 도메인에서 대상자/평가자 이름 노출 시 사용.
-     *
-     * 응답 형식: { "<memberId>": "홍길동", ... }
-     * 존재하지 않는 id 는 응답에 포함되지 않습니다.
-     */
-    @GetMapping("/internal/names")
-    public java.util.Map<java.util.UUID, String> getNamesInternal(
-            @RequestParam("ids") java.util.List<java.util.UUID> ids) {
-        return memberService.findNamesByIds(ids);
-    }
-
-    /**
      * 내부용: memberId 목록에 대한 최소 프로필(name/department/position/profileUrl) 배치 조회.
      * 평가 화면의 Avatar/이름/부서 노출용.
      *
      * 응답 형식: { "<memberId>": { name, department, positionName, profileUrl } }
      */
     @GetMapping("/internal/profiles")
-    public java.util.Map<java.util.UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto>
+    public java.util.Map<java.util.UUID, MemberMinimalProfileResDto>
     getProfilesInternal(@RequestParam("ids") java.util.List<java.util.UUID> ids) {
         return memberService.findMinimalProfilesByIds(ids);
     }
@@ -490,6 +474,7 @@ public class MemberController {
         return memberService.findCandidatesForEvaluator(
                 targetMemberId, evalType, java.util.UUID.fromString(companyId));
     }
+
     @PatchMapping("/onboarding/complete")
     public ResponseEntity<?> completeOnboarding(
             @RequestHeader("X-User-UUID") UUID memberId) {

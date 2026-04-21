@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -17,17 +16,10 @@ import java.util.UUID;
 public interface MemberServiceClient {
 
     /**
-     * memberId 목록 → 이름 Map 배치 조회.
-     * 삭제된/존재하지 않는 id 는 결과 Map 에 포함되지 않을 수 있다.
-     */
-    @GetMapping("/member/internal/names")
-    Map<UUID, String> getNamesByIds(@RequestParam("ids") List<UUID> ids);
-
-    /**
      * memberId 목록 → 최소 프로필(name/department/positionName/profileUrl) 배치 조회.
      */
     @GetMapping("/member/internal/profiles")
-    Map<UUID, MemberMinimalProfileDto> getProfilesByIds(@RequestParam("ids") List<UUID> ids);
+    java.util.Map<UUID, MemberMinimalProfileDto> getProfilesByIds(@RequestParam("ids") List<UUID> ids);
 
     /**
      * 특정 대상자 기준 평가자 후보 조회 — 조직 + 직급 기반.
