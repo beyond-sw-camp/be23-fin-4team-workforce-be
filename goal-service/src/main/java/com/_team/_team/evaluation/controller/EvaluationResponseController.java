@@ -21,9 +21,12 @@ import java.util.UUID;
 public class EvaluationResponseController {
 
     private final EvaluationResponseService responseService;
+    private final com._team._team.evaluation.report.EvaluationReportService reportService;
 
-    public EvaluationResponseController(EvaluationResponseService responseService) {
+    public EvaluationResponseController(EvaluationResponseService responseService,
+                                         com._team._team.evaluation.report.EvaluationReportService reportService) {
         this.responseService = responseService;
+        this.reportService = reportService;
     }
 
     // 내 평가 목록
@@ -195,14 +198,37 @@ public class EvaluationResponseController {
         return ResponseEntity.ok(ApiResponse.success(result, "내 목표 요약 카드 조회 성공"));
     }
 
+    // ── 리포트 다운로드 ──
+
+    /**
+     * 본인이 받은 특정 시즌의 평가 결과를 PDF 로 다운로드.
+     * 일반 사원도 접근 가능 — 서비스에서 본인 / 시즌 공개 여부 검증.
+     */
+    @GetMapping("/seasons/{seasonId}/my-report")
+    public org.springframework.http.ResponseEntity<byte[]> downloadMyReport(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID seasonId) {
+        byte[] pdf = reportService.renderMySeasonReport(
+                seasonId, UUID.fromString(memberId), UUID.fromString(companyId));
+        String filename = "evaluation-report-" + seasonId + ".pdf";
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .body(pdf);
+    }
+
     // ── 진행도 / 분석 ──
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping("/seasons/{seasonId}/progress")
     public ResponseEntity<ApiResponse<List<ResponseResDto>>> getProgress(
             @RequestHeader("X-User-CompanyId") String companyId,
-            @PathVariable UUID seasonId) {
-        List<ResponseResDto> result = responseService.listBySeasonForProgress(seasonId, UUID.fromString(companyId));
+            @PathVariable UUID seasonId,
+            @org.springframework.web.bind.annotation.RequestParam(value = "q", required = false) String q) {
+        List<ResponseResDto> result = responseService.listBySeasonForProgress(
+                seasonId, UUID.fromString(companyId), q);
         return ResponseEntity.ok(ApiResponse.success(result, "진행도 조회 성공"));
     }
 
