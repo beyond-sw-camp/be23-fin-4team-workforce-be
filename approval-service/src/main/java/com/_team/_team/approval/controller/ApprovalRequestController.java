@@ -129,4 +129,18 @@ public class ApprovalRequestController {
         );
     }
 
+    // 공문 발송
+    @PostMapping("/{requestId}/send-official")
+    public ResponseEntity<?> sendOfficial(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
+            @PathVariable UUID requestId) {
+        ApprovalRequestResDto resDto = approvalRequestService.sendOfficial(companyId, memberId, memberPositionId, requestId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "공문이 발송되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
 }
