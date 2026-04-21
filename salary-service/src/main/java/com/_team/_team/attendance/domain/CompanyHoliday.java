@@ -41,6 +41,11 @@ public class CompanyHoliday extends BaseTimeEntity {
     @Column(nullable = false, length = 100)
     private String holidayName;
 
+    /** 법정 공휴일 여부 */
+    @Column(length = 1, nullable = false)
+    @Builder.Default
+    private String isLegalYn = "N";
+
     /** 유급 여부 (Y: 유급휴일 / N: 무급휴일) */
     @Column(length = 1, nullable = false)
     @Builder.Default

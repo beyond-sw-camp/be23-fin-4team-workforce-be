@@ -187,6 +187,13 @@ public class CompanyService {
         } catch (Exception e) {
             log.warn("기본 휴가 생성 실패: {}", e.getMessage());
         }
+
+        // 법정 공휴일 복사 (salary-service <- member-service Feign 내부 호출)
+        try {
+            salaryServiceClient.importPublicHolidays(company.getCompanyId());
+        } catch (Exception e) {
+            log.warn("법정 공휴일 가져오기 실패: {}", e.getMessage());
+        }
     }
 
     private Company createCompany(CompanyOnboardingReqDto reqDto) {
