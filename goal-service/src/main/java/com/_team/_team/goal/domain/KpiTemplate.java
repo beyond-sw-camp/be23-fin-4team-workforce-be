@@ -63,12 +63,7 @@ public class KpiTemplate extends BaseTimeEntity {
     @Column(name = "target_team_id")
     private UUID targetTeamId;
 
-    /**
-     * 승인 정책 (NONE / ACTIVATION_ONLY / COMPLETION_ONLY / BOTH).
-     * [D-1] 기존 requireApproval 불리언은 제거. 이 필드만 진실 공급원.
-     * 기존 DB 컬럼 `require_approval` 은 이후 마이그레이션에서 DROP.
-     *   - ALTER TABLE kpi_template DROP COLUMN require_approval;
-     */
+    /** 승인 정책 (NONE / ACTIVATION_ONLY / COMPLETION_ONLY / BOTH). */
     @Enumerated(EnumType.STRING)
     @Column(name = "goal_approval_policy", length = 32, nullable = false)
     @Builder.Default

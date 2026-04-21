@@ -29,6 +29,12 @@ public interface EvaluationResponseRepository extends JpaRepository<EvaluationRe
     long countByGroup_Season_SeasonIdAndStatus(UUID seasonId, EvaluationStatus status);
 
     /**
+     * [L-1 Phase D] PEER_FEEDBACK 섹션 채점용 — 같은 시즌·같은 대상자를 평가한 다른 응답 목록.
+     * 타입 무관하게 일단 전부 받아와서, 호출부에서 PEER 타입만 필터링하거나 자기 자신(responseId)만 제외.
+     */
+    List<EvaluationResponse> findByGroup_Season_SeasonIdAndTargetMemberId(UUID seasonId, UUID targetMemberId);
+
+    /**
      * 평가자가 해당 설계를 사용하는 그룹에 배정된 응답이 하나라도 있는지(작성 화면에서 설계 조회 허용 판별).
      */
     @Query("""

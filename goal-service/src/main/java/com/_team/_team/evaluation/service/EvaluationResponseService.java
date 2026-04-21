@@ -17,6 +17,8 @@ import com._team._team.evaluation.dto.resdto.ResponseResDto;
 import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
+import com._team._team.evaluation.service.scoring.ScoreBreakdown;
+import com._team._team.evaluation.service.scoring.SectionScorer;
 import com._team._team.goal.domain.Goal;
 import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.repository.GoalRepository;
@@ -55,6 +57,7 @@ public class EvaluationResponseService {
     private final ApplicationEventPublisher eventPublisher;
     private final EvaluationSeasonService evaluationSeasonService;
     private final com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient;
+    private final SectionScorer sectionScorer;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
                                       EvaluationSeasonRepository seasonRepository,
@@ -64,7 +67,8 @@ public class EvaluationResponseService {
                                       MeetingRecordService meetingRecordService,
                                       ApplicationEventPublisher eventPublisher,
                                       EvaluationSeasonService evaluationSeasonService,
-                                      com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient) {
+                                      com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient,
+                                      SectionScorer sectionScorer) {
         this.responseRepository = responseRepository;
         this.seasonRepository = seasonRepository;
         this.calibrationHistoryRepository = calibrationHistoryRepository;
@@ -74,6 +78,7 @@ public class EvaluationResponseService {
         this.eventPublisher = eventPublisher;
         this.evaluationSeasonService = evaluationSeasonService;
         this.memberServiceClient = memberServiceClient;
+        this.sectionScorer = sectionScorer;
     }
 
     /**
@@ -109,9 +114,49 @@ public class EvaluationResponseService {
                 dto.setEvaluatorDepartment(evaluator.getDepartment());
                 dto.setEvaluatorProfileUrl(evaluator.getProfileUrl());
             }
+            dto.setScoreBreakdown(computeBreakdownForResponse(r));
             out.add(dto);
         }
         return out;
+    }
+
+    /**
+     * [L-1 / Phase D] 응답의 섹션별 채점 breakdown 을 재계산한다.
+     * 저장하지 않고 매 조회마다 design·answers·snapshot 으로부터 만들어낸다.
+     * design 이 없거나 섹션이 없으면 null.
+     *
+     * PEER_FEEDBACK 섹션이 하나라도 존재하면, 같은 시즌·같은 대상자의 다른 응답들 answersJson 을
+     * 모아 질문별 동료 평균을 계산해 scorer 에 넘긴다. (자기 자신 응답은 제외)
+     */
+    private ScoreBreakdown computeBreakdownForResponse(EvaluationResponse r) {
+        var group = r.getGroup();
+        if (group == null || group.getDesign() == null) return null;
+        var design = group.getDesign();
+        var sections = design.getSections();
+        if (sections == null || sections.isEmpty()) return null;
+
+        java.util.Map<String, java.util.List<BigDecimal>> peerScores = null;
+        boolean hasPeerSection = sections.stream()
+                .anyMatch(s -> s.resolveType() == com._team._team.evaluation.domain.enums.SectionType.PEER_FEEDBACK);
+        if (hasPeerSection && group.getSeason() != null && r.getTargetMemberId() != null) {
+            UUID seasonId = group.getSeason().getSeasonId();
+            List<String> peerAnswersJson = responseRepository
+                    .findByGroup_Season_SeasonIdAndTargetMemberId(seasonId, r.getTargetMemberId())
+                    .stream()
+                    .filter(other -> !other.getResponseId().equals(r.getResponseId()))
+                    .filter(other -> other.getEvaluationType() == EvalType.PEER)
+                    .filter(other -> other.getStatus() == EvaluationStatus.SUBMITTED)
+                    .map(EvaluationResponse::getAnswersJson)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            peerScores = sectionScorer.aggregatePeerScores(peerAnswersJson);
+        }
+
+        return sectionScorer.score(
+                sections,
+                r.getAnswersJson(),
+                sectionScorer.parseGoalSnapshots(r.getGoalSnapshotJson()),
+                peerScores);
     }
 
     /**
@@ -142,6 +187,7 @@ public class EvaluationResponseService {
         } catch (Exception ignored) {
             // member-service 장애 시 이름 주입을 생략하고 기본 DTO 반환
         }
+        dto.setScoreBreakdown(computeBreakdownForResponse(response));
         return dto;
     }
 
@@ -270,7 +316,23 @@ public class EvaluationResponseService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "응답 내용이 비어있어 제출할 수 없습니다.");
         }
         response.submit();
+        // [L-1] 제출 시점에 섹션 타입별 채점으로 정규화 점수 산출.
+        //   - design.sections 에 KPI_SCORE 섹션이 있으면 goalSnapshot.achievementPctAtSnapshot 이 반영됨
+        //   - 채점 불가능 상태면 normalizedScore 는 그대로 null → 후속 applyBaseline 에서 계산 가능
+        applySectionScoring(response);
         return mapResponseWithNames(response);
+    }
+
+    /**
+     * [L-1 / Phase D] response.group.design.sections + answersJson + goalSnapshotJson +
+     * (옵션) 동료 응답 집계로 섹션 타입별 채점을 수행하고 normalizedScore 를 갱신한다.
+     * design 이 없거나 채점 가능한 섹션이 없으면 조용히 스킵.
+     */
+    private void applySectionScoring(EvaluationResponse response) {
+        ScoreBreakdown breakdown = computeBreakdownForResponse(response);
+        if (breakdown != null && breakdown.getTotalScore() != null) {
+            response.updateNormalizedScore(breakdown.getTotalScore());
+        }
     }
 
     @Transactional

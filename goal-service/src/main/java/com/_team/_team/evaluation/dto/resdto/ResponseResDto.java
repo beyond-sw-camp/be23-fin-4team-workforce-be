@@ -4,6 +4,7 @@ import com._team._team.evaluation.domain.EvaluationResponse;
 import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
+import com._team._team.evaluation.service.scoring.ScoreBreakdown;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -48,6 +49,12 @@ public class ResponseResDto {
     /** 평가 시즌 시작 시점에 캡처된 타깃 목표 스냅샷 (List&lt;GoalSnapshotDto&gt; 직렬화). */
     private String goalSnapshotJson;
     // [D-5] targetGoalIdsJson 제거 — goalSnapshotJson 안에 goalId 가 이미 포함됨
+
+    /**
+     * [L-1] 섹션 타입별 채점 breakdown — 결과 화면에서 KPI 기여도 시각화용.
+     * 저장하지 않고 조회 시점에 재계산된다. null 이면 아직 채점 불가/설계 없음.
+     */
+    private ScoreBreakdown scoreBreakdown;
 
     public static ResponseResDto from(EvaluationResponse e) {
         return ResponseResDto.builder()
