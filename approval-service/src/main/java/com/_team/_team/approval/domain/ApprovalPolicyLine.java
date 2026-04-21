@@ -1,6 +1,5 @@
 package com._team._team.approval.domain;
 
-import com._team._team.approval.domain.enums.ApproverType;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
