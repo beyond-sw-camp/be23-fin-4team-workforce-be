@@ -22,7 +22,6 @@ public class ApprovalDocumentResDto {
     private String formSchema;
     private String isActiveYn;
     private RequestType requestType;
-    private String isDeptVisibleYn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -34,7 +33,6 @@ public class ApprovalDocumentResDto {
                 .formSchema(doc.getFormSchema())
                 .isActiveYn(doc.getIsActiveYn())
                 .requestType(doc.getRequestType())
-                .isDeptVisibleYn(doc.getIsDeptVisibleYn())
                 .createdAt(doc.getCreatedAt())
                 .updatedAt(doc.getUpdatedAt())
                 .build();

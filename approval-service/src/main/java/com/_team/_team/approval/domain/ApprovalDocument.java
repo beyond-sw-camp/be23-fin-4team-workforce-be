@@ -39,24 +39,12 @@ public class ApprovalDocument extends BaseTimeEntity {
     @Column(nullable = false)
     private RequestType requestType;
 
-    @Builder.Default
-    @Column(nullable = false)
-    private String isDeptVisibleYn = "Y"; // 부서 문서함 노출 여부 (민감 양식은 'N')
-
     public void activate(){
         this.isActiveYn="Y";
     }
 
     public void deactivate(){
         this.isActiveYn="N";
-    }
-
-    public void enableDeptVisible() {
-        this.isDeptVisibleYn = "Y";
-    }
-
-    public void disableDeptVisible() {
-        this.isDeptVisibleYn = "N";
     }
 
     public void updateFormSchema(String formSchema) {

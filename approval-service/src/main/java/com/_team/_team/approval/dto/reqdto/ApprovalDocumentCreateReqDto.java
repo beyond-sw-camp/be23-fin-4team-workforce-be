@@ -26,15 +26,12 @@ public class ApprovalDocumentCreateReqDto {
     @NotNull(message = "요청 타입은 필수입니다.")
     private RequestType requestType;
 
-    private String isDeptVisibleYn; // null 허용, 생성 시 기본값 'Y'
-
     public ApprovalDocument toEntity(UUID companyId) {
         return ApprovalDocument.builder()
                 .companyId(companyId)
                 .documentName(documentName)
                 .formSchema(formSchema)
                 .requestType(requestType)
-                .isDeptVisibleYn(isDeptVisibleYn != null ? isDeptVisibleYn : "Y")
                 .build();
     }
 }
