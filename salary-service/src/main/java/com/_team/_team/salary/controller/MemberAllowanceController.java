@@ -28,8 +28,8 @@ public class MemberAllowanceController {
     // 본인 수당 변경 신청, PENDING 으로 생성
     @PostMapping
     public ResponseEntity<MemberAllowanceResDto> request(
-            @RequestHeader("X-Member-Id") UUID memberId,
-            @RequestHeader("X-Company-Id") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId,
             @Valid @RequestBody MemberAllowanceRequestReqDto reqDto) {
 
         MemberAllowance saved = memberAllowanceService.requestChange(
@@ -45,7 +45,7 @@ public class MemberAllowanceController {
     // approval-service 결재 생성 후 approvalRequestId 연결
     @PatchMapping("/{memberAllowanceId}/approval-link")
     public ResponseEntity<MemberAllowanceResDto> link(
-            @RequestHeader("X-Member-Id") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable UUID memberAllowanceId,
             @Valid @RequestBody MemberAllowanceLinkApprovalReqDto reqDto) {
 
@@ -58,7 +58,7 @@ public class MemberAllowanceController {
     // 본인 신청 철회, PENDING 만 가능
     @DeleteMapping("/{memberAllowanceId}")
     public ResponseEntity<Void> cancel(
-            @RequestHeader("X-Member-Id") UUID memberId,
+            @RequestHeader("X-User-UUID") UUID memberId,
             @PathVariable UUID memberAllowanceId) {
 
         memberAllowanceService.cancel(memberAllowanceId, memberId);
@@ -68,8 +68,8 @@ public class MemberAllowanceController {
     // 본인 수당 이력 전체 조회
     @GetMapping
     public ResponseEntity<List<MemberAllowanceResDto>> myHistory(
-            @RequestHeader("X-Member-Id") UUID memberId,
-            @RequestHeader("X-Company-Id") UUID companyId) {
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
 
         List<MemberAllowanceResDto> result = memberAllowanceService
                 .findMyHistory(memberId, companyId).stream()
