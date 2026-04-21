@@ -1,5 +1,6 @@
 package com._team._team.approval.service;
 
+import com._team._team.approval.domain.enums.RequestType;
 import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.dto.BusinessException;
 import lombok.extern.slf4j.Slf4j;
@@ -27,10 +28,10 @@ public class OfficialNumberService {
     }
 
     /**
-     * 공문 번호 생성: {부서명 앞 2글자}-{YYYY}-{순번 4자리}
-     * 예: 인사-2026-0147
+     * 문서 번호 생성: {타입 접두어}-{YYYY}-{순번 4자리}
+     * 예: 연차-2026-0001
      *
-     * - 년도별, 부서별 APPROVED 상태 공문 수 + 1
+     * - 년도별, 타입별 번호 부여된 문서 수 + 1
      * - DB unique 제약으로 중복 방지, 충돌 시 @Retryable 로 재시도
      */
     @Retryable(
@@ -38,25 +39,29 @@ public class OfficialNumberService {
             maxAttempts = 5,
             backoff = @Backoff(delay = 50, multiplier = 1.5)
     )
-    public String generate(UUID organizationId, String organizationName) {
+    public String generate(RequestType requestType) {
         int year = LocalDate.now().getYear();
-        String prefix = resolvePrefix(organizationName);
+        String prefix = resolvePrefix(requestType);
 
-        long approvedCount = approvalRequestRepository.countOfficialApprovedInYear(
-                organizationId, year);
+        long count = approvalRequestRepository.countByRequestTypeInYear(requestType, year);
 
-        long seq = approvedCount + 1;
+        long seq = count + 1;
         String number = String.format("%s-%d-%04d", prefix, year, seq);
 
-        log.info("공문 번호 생성: number={}", number);
+        log.info("문서 번호 생성: number={}", number);
         return number;
     }
 
-    private String resolvePrefix(String orgName) {
-        if (orgName == null || orgName.isBlank()) {
-            return "공문";
-        }
-        String trimmed = orgName.trim();
-        return trimmed.length() >= 2 ? trimmed.substring(0, 2) : trimmed;
+    private String resolvePrefix(RequestType type) {
+        return switch (type) {
+            case VACATION -> "연차";
+            case ATTENDANCE -> "근태";
+            case HR_MOVEMENT -> "인사";
+            case SALARY -> "급여";
+            case GENERAL -> "일반";
+            case CERTIFICATE -> "증명";
+            case CONTRACT -> "계약";
+            case OFFICIAL -> "공문";
+        };
     }
 }

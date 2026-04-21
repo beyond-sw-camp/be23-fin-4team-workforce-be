@@ -182,9 +182,9 @@ public class ApprovalService {
         } else {
             request.updateStatus(RequestStatus.APPROVED);
 
-            // 공문
+            // approve() 메서드 내 최종 승인 처리 블록에 추가
             if (request.getRequestType() == RequestType.OFFICIAL) {
-                approvalNotificationService.publishOfficialApprovedEvent(request);
+                approvalNotificationService.notifyOfficialReadyToSend(request);
             }
 
             // 최종 승인 시 이벤트 발행

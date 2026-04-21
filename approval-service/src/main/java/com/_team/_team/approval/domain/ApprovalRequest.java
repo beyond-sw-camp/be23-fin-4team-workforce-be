@@ -62,6 +62,10 @@ public class ApprovalRequest extends BaseTimeEntity {
 
     @Builder.Default
     @Column(nullable = false)
+    private String sendYn = "N"; // 공문 발송 여부
+
+    @Builder.Default
+    @Column(nullable = false)
     private String isDeptVisibleYn = "Y"; // 부서 문서함 공개 여부 (작성자 선택, 건별)
 
     // === 요청자 스냅샷 (작성 시점 정보) ===
@@ -102,6 +106,10 @@ public class ApprovalRequest extends BaseTimeEntity {
 
     public void updateDocumentNumber(String documentNumber) {
         this.documentNumber = documentNumber;
+    }
+
+    public void send() {
+        this.sendYn = "Y";
     }
 
 }

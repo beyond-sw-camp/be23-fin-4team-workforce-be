@@ -62,13 +62,12 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("organizationId") UUID organizationId);
 
     @Query("SELECT COUNT(r) FROM ApprovalRequest r " +
-            "WHERE r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
-            "  AND r.requesterOrganizationId = :organizationId " +
+            "WHERE r.requestType = :requestType " +
             "  AND r.documentNumber IS NOT NULL " +
             "  AND FUNCTION('YEAR', r.createdAt) = :year " +
             "  AND r.delYn = 'N'")
-    long countOfficialApprovedInYear(@Param("organizationId") UUID organizationId,
-                                     @Param("year") int year);
+    long countByRequestTypeInYear(@Param("requestType") RequestType requestType,
+                                  @Param("year") int year);
 
     @Query("SELECT r FROM ApprovalRequest r " +
             "JOIN FETCH r.approvalDocument doc " +
@@ -91,6 +90,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             "  AND r.approvalDocument.companyId = :companyId " +
             "  AND r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
             "  AND r.requestStatus = com._team._team.approval.domain.enums.RequestStatus.APPROVED " +
+            "  AND r.sendYn = 'Y' " +
             "  AND r.delYn = 'N' " +
             "ORDER BY r.createdAt DESC")
     List<ApprovalRequest> findApprovedOfficialsByIdsAndCompany(
@@ -125,4 +125,5 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("status") RequestStatus status,
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("startOfNextDay") LocalDateTime startOfNextDay);
+
 }

@@ -189,7 +189,7 @@ public class ApprovalNotificationService {
         }
     }
 
-    //    최종 승인/자동승인 시 수신자 중복 제거
+    //    최종 승인 시 수신자 중복 제거
     //    우선순위: 요청자 > 참조자(CC) > 공람자(CIRCULATION)
     private List<Receiver> resolveCompletionReceivers(UUID requesterId,
                                                       List<ApprovalViewer> viewers) {
@@ -248,6 +248,49 @@ public class ApprovalNotificationService {
         Receiver(UUID memberId, Role role) {
             this.memberId = memberId;
             this.role = role;
+        }
+    }
+
+    // 발송 가능 알림 (최종 승인 시 기안자에게)
+    public void notifyOfficialReadyToSend(ApprovalRequest request) {
+        String title = title(request);
+        publish(request.getMemberId(), null,
+                NotificationType.APPROVAL_APPROVED,
+                title + " 공문이 승인되었습니다. 발송해주세요.",
+                request.getRequestId());
+    }
+
+    // 공문 미발송 취소 알림 (결재자 + 참조자에게)
+    public void notifyOfficialCanceled(ApprovalRequest request,
+                                       List<Approval> approvals,
+                                       List<ApprovalViewer> viewers) {
+        String title = title(request);
+        UUID requesterId = request.getMemberId();
+        UUID requestId = request.getRequestId();
+
+        Set<UUID> notified = new HashSet<>();
+        notified.add(requesterId); // 기안자 본인 제외
+
+        // 결재자에게 알림
+        for (Approval a : approvals) {
+            if (notified.add(a.getApproverMemberId())) {
+                publish(a.getApproverMemberId(), requesterId,
+                        NotificationType.APPROVAL_CANCELED,
+                        title + " 공문이 발송 취소되었습니다.",
+                        requestId);
+            }
+        }
+
+        // 참조자에게 알림
+        if (viewers != null) {
+            viewers.stream()
+                    .filter(v -> v.getViewerType() == ViewerType.CC)
+                    .filter(v -> notified.add(v.getViewerMemberId()))
+                    .forEach(v -> publish(
+                            v.getViewerMemberId(), requesterId,
+                            NotificationType.APPROVAL_CANCELED,
+                            title + " 참조 중인 공문이 발송 취소되었습니다.",
+                            requestId));
         }
     }
 
