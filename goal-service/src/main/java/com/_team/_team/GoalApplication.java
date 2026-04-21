@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableJpaAuditing
 @EnableAspectJAutoProxy
 @EnableScheduling
-@EnableFeignClients(basePackages = "com._team._team.evaluation.feignclients")
+@EnableFeignClients
 public class GoalApplication {
 
 	public static void main(String[] args) {
