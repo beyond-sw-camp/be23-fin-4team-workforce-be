@@ -143,6 +143,12 @@ public class GoalService {
         goalRollupService.recalculateFrom(saved.getGoalId());
         goalActivityService.append(saved.getGoalId(), GoalActivityType.GOAL_CREATED, requesterId, "목표 생성", null);
 
+        // [D-2] 승인/활성 분기 단일화:
+        // - 프론트 호환: requireApproval/approverId 필드가 들어오면 여기서 번들 생성 (기존 직접 호출 경로)
+        // - KpiTemplateService.generateGoals 경로: requireApproval=false + activateImmediately=false 로 호출 후
+        //   호출부에서 tplPolicy.requiresActivation() 체크 → createBundleForGoals 명시 호출.
+        // 두 경로는 requireApproval 플래그 값으로 완전히 배타적. 중복 승인 번들 생성 위험 없음.
+        // 향후 리팩터: requireApproval 플래그 deprecate 하고 호출부 명시 방식으로 단일화.
         boolean needApproval = Boolean.TRUE.equals(dto.getRequireApproval())
                 && dto.getApproverId() != null;
         boolean activateNow = dto.getActivateImmediately() == null || dto.getActivateImmediately();
@@ -163,25 +169,37 @@ public class GoalService {
                                        UUID parentId, KpiCycle cycle, UUID ownerFilter, GoalHealthStatus status,
                                        Integer depth) {
         validateSameCompany(companyId, requesterCompanyId);
-        List<Goal> goals = goalRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
-                .stream()
+        List<Goal> allGoals = goalRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
+
+        // [P-1] 회사의 모든 goal 을 한 번에 조회해서 parentId → Goal 맵을 메모리에 구성.
+        // depth 필터 적용 시 기존처럼 findById 를 목표·깊이마다 호출하지 않고 맵 조회만 수행.
+        java.util.Map<UUID, Goal> byId = new java.util.HashMap<>();
+        for (Goal g : allGoals) byId.put(g.getGoalId(), g);
+
+        List<Goal> goals = allGoals.stream()
                 .filter(g -> isVisible(g, requesterId))
                 .filter(g -> parentId == null || (g.getParentGoal() != null && g.getParentGoal().getGoalId().equals(parentId)))
                 .filter(g -> cycle == null || g.getCycle() == cycle)
                 .filter(g -> ownerFilter == null || g.getOwnerId().equals(ownerFilter))
                 .filter(g -> status == null || g.getHealthStatus() == status)
-                .filter(g -> depth == null || computeDepth(g) == depth)
+                .filter(g -> depth == null || computeDepthInMemory(g, byId) == depth)
                 .collect(Collectors.toList());
         return goalTreeService.decorate(goals);
     }
 
-    private int computeDepth(Goal g) {
+    /**
+     * [P-1] 메모리 맵 기반 depth 계산. 기존의 findById N+1 제거.
+     * 사이클(부모 참조 순환) 이 생겨도 방문 표시로 무한 루프 방지.
+     */
+    private int computeDepthInMemory(Goal g, java.util.Map<UUID, Goal> byId) {
         int d = 0;
+        java.util.Set<UUID> visited = new java.util.HashSet<>();
         Goal c = g;
-        while (c.getParentGoal() != null) {
+        while (c != null && c.getParentGoal() != null) {
+            UUID parentId = c.getParentGoal().getGoalId();
+            if (!visited.add(parentId)) break; // 사이클 방어
             d++;
-            c = goalRepository.findById(c.getParentGoal().getGoalId()).orElse(null);
-            if (c == null) break;
+            c = byId.get(parentId);
         }
         return d;
     }
@@ -348,7 +366,14 @@ public class GoalService {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "ACTIVE 상태의 목표만 완료할 수 있습니다. 현재 상태: " + goal.getStatus());
         }
-        if (goal.getGoalApprovalStatus() != GoalApprovalStatus.APPROVED) {
+        // [B-1] 승인 정책이 COMPLETION/BOTH 인 경우에만 APPROVED 상태를 요구한다.
+        // NONE 또는 ACTIVATION_ONLY 정책 목표는 goalApprovalStatus 가 NOT_REQUESTED 이므로 곧바로 완료 가능해야 한다.
+        com._team._team.goal.domain.KpiTemplate tpl = goal.getKpiTemplate();
+        com._team._team.goal.domain.enums.GoalApprovalPolicy policy = tpl != null
+                ? tpl.resolveApprovalPolicy()
+                : com._team._team.goal.domain.enums.GoalApprovalPolicy.NONE;
+        if (policy.requiresCompletion()
+                && goal.getGoalApprovalStatus() != GoalApprovalStatus.APPROVED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "완료 처리는 승인 완료 후 가능합니다. 먼저 완료 승인 요청을 진행해 주세요.");
         }

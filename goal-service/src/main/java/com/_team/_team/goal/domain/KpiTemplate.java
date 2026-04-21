@@ -63,20 +63,16 @@ public class KpiTemplate extends BaseTimeEntity {
     @Column(name = "target_team_id")
     private UUID targetTeamId;
 
-    @Column(name = "require_approval", nullable = false)
-    @Builder.Default
-    private boolean requireApproval = false;
-
     /**
-     * 세분화된 승인 정책 (NONE / ACTIVATION_ONLY / COMPLETION_ONLY / BOTH).
-     *
-     * 기존 requireApproval 불리언을 확장한 개념이며 아래 우선순위로 해석한다:
-     *  1. goalApprovalPolicy != null  → 그 값을 그대로 사용
-     *  2. goalApprovalPolicy == null  → requireApproval 을 BOTH/NONE 로 매핑 (레거시 호환)
+     * 승인 정책 (NONE / ACTIVATION_ONLY / COMPLETION_ONLY / BOTH).
+     * [D-1] 기존 requireApproval 불리언은 제거. 이 필드만 진실 공급원.
+     * 기존 DB 컬럼 `require_approval` 은 이후 마이그레이션에서 DROP.
+     *   - ALTER TABLE kpi_template DROP COLUMN require_approval;
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "goal_approval_policy", length = 32)
-    private GoalApprovalPolicy goalApprovalPolicy;
+    @Column(name = "goal_approval_policy", length = 32, nullable = false)
+    @Builder.Default
+    private GoalApprovalPolicy goalApprovalPolicy = GoalApprovalPolicy.NONE;
 
     /** KPI 정의 목록 — DB에는 JSON 배열로 저장 */
     @Convert(converter = KpiDefinitionListConverter.class)
@@ -92,28 +88,21 @@ public class KpiTemplate extends BaseTimeEntity {
         this.kpis = kpis != null ? new ArrayList<>(kpis) : new ArrayList<>();
     }
 
-    public void setSpecMeta(KpiSpecCycleType specCycleType, UUID targetTeamId, boolean requireApproval) {
+    /**
+     * 스펙 메타(주기·대상팀·승인정책) 변경. GoalApprovalPolicy 하나로 단일화.
+     */
+    public void setSpecMeta(KpiSpecCycleType specCycleType, UUID targetTeamId, GoalApprovalPolicy approvalPolicy) {
         if (specCycleType != null) this.specCycleType = specCycleType;
         if (targetTeamId != null) this.targetTeamId = targetTeamId;
-        this.requireApproval = requireApproval;
+        if (approvalPolicy != null) this.goalApprovalPolicy = approvalPolicy;
     }
 
-    /**
-     * 세분화 승인 정책 설정. 호출 시 레거시 requireApproval 플래그도 동기화하여
-     * 기존 요구 사항(불리언 기반) 로직이 계속 동작하도록 한다.
-     */
     public void setGoalApprovalPolicy(GoalApprovalPolicy policy) {
-        this.goalApprovalPolicy = policy;
-        if (policy != null) {
-            this.requireApproval = policy != GoalApprovalPolicy.NONE;
-        }
+        if (policy != null) this.goalApprovalPolicy = policy;
     }
 
-    /**
-     * 실제 적용될 정책을 반환. goalApprovalPolicy 가 null 이면 requireApproval 로부터 유도.
-     */
+    /** 실제 적용될 정책 반환. null 방어를 위해 NONE 을 기본값으로 매핑. */
     public GoalApprovalPolicy resolveApprovalPolicy() {
-        if (this.goalApprovalPolicy != null) return this.goalApprovalPolicy;
-        return GoalApprovalPolicy.fromLegacyFlag(this.requireApproval);
+        return this.goalApprovalPolicy != null ? this.goalApprovalPolicy : GoalApprovalPolicy.NONE;
     }
 }

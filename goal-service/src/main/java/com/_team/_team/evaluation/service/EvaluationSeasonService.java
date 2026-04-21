@@ -4,6 +4,7 @@ import com._team._team.dto.BusinessException;
 import com._team._team.evaluation.domain.EvaluationResponse;
 import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.EvaluationGroup;
+import com._team._team.evaluation.domain.converter.EvaluatorMapping;
 import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
@@ -110,49 +111,37 @@ public class EvaluationSeasonService {
         List<EvaluationResponse> responses = new ArrayList<>();
         // 같은 시즌 시작 시점에는 대상자당 스냅샷을 한 번만 계산해서 재사용한다.
         Map<UUID, String> snapshotCache = new HashMap<>();
-        Map<UUID, String> targetIdsCache = new HashMap<>();
         String takenAtIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
+        // [D-3] 타입 세이프 List<EvaluatorMapping> 를 직접 순회. raw JSON 파싱 제거.
         for (EvaluationGroup group : groups) {
-            if (group.getEvaluatorMapsJson() == null) continue;
-            List<Map<String, String>> maps;
-            try {
-                maps = objectMapper.readValue(group.getEvaluatorMapsJson(), new TypeReference<>() {});
-            } catch (Exception e) {
-                // 개별 그룹의 JSON 이상은 400 Bad Request 로 반환 — 클라이언트에 원인 전달
-                throw new BusinessException(HttpStatus.BAD_REQUEST,
-                        "평가자 매핑 JSON 이 올바르지 않습니다. 그룹: " + group.getName());
-            }
-            for (Map<String, String> map : maps) {
-                try {
-                    UUID targetMemberId = UUID.fromString(map.get("targetMemberId"));
-                    UUID evaluatorId = UUID.fromString(map.get("evaluatorId"));
-                    EvalType evalType = EvalType.valueOf(map.get("evaluationType"));
-                    // SELF 가 아닌데 자기 자신을 평가하는 매핑은 잘못된 것으로 판단하여 제외
-                    if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
-                        continue;
-                    }
-
-                    // 평가 대상자의 "평가 가능한" 목표들을 시즌 시작 시점 스냅샷으로 캡처
-                    // - ACTIVE/COMPLETED 만 대상 (DRAFT/CANCELLED 는 제외)
-                    // - 별도 엔티티 없이 JSON 컬럼으로만 기록
-                    String goalSnapshotJson = snapshotCache.computeIfAbsent(targetMemberId,
-                            tid -> buildGoalSnapshotJson(companyId, tid, takenAtIso));
-                    String targetGoalIdsJson = targetIdsCache.computeIfAbsent(targetMemberId,
-                            tid -> buildTargetGoalIdsJson(companyId, tid));
-
-                    responses.add(EvaluationResponse.builder()
-                            .companyId(companyId)
-                            .group(group)
-                            .targetMemberId(targetMemberId)
-                            .evaluatorId(evaluatorId)
-                            .evaluationType(evalType)
-                            .goalSnapshotJson(goalSnapshotJson)
-                            .targetGoalIdsJson(targetGoalIdsJson)
-                            .build());
-                } catch (IllegalArgumentException ignore) {
-                    // 잘못된 UUID/enum 값은 해당 매핑만 건너뛴다 (다른 그룹까지 막지 않도록)
+            List<EvaluatorMapping> maps = group.getEvaluatorMaps();
+            if (maps == null || maps.isEmpty()) continue;
+            for (EvaluatorMapping em : maps) {
+                UUID targetMemberId = em.getTargetMemberId();
+                UUID evaluatorId = em.getEvaluatorId();
+                EvalType evalType = em.getEvaluationType();
+                if (targetMemberId == null || evaluatorId == null || evalType == null) continue;
+                // SELF 가 아닌데 자기 자신을 평가하는 매핑은 잘못된 것으로 판단하여 제외
+                if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
+                    continue;
                 }
+
+                // 평가 대상자의 "평가 가능한" 목표들을 시즌 시작 시점 스냅샷으로 캡처
+                // - ACTIVE/COMPLETED 만 대상 (DRAFT/CANCELLED 는 제외)
+                // - 별도 엔티티 없이 JSON 컬럼으로만 기록
+                // [D-5] targetGoalIdsJson 제거 — goalSnapshotJson 안에 goalId 가 이미 포함됨
+                String goalSnapshotJson = snapshotCache.computeIfAbsent(targetMemberId,
+                        tid -> buildGoalSnapshotJson(companyId, tid, takenAtIso));
+
+                responses.add(EvaluationResponse.builder()
+                        .companyId(companyId)
+                        .group(group)
+                        .targetMemberId(targetMemberId)
+                        .evaluatorId(evaluatorId)
+                        .evaluationType(evalType)
+                        .goalSnapshotJson(goalSnapshotJson)
+                        .build());
             }
         }
         if (!responses.isEmpty()) {
@@ -183,34 +172,20 @@ public class EvaluationSeasonService {
         }
     }
 
-    private String buildTargetGoalIdsJson(UUID companyId, UUID targetMemberId) {
-        try {
-            List<UUID> goalIds = goalRepository.findByCompanyIdAndOwnerId(companyId, targetMemberId).stream()
-                    .filter(g -> g.getStatus() == GoalStatus.ACTIVE || g.getStatus() == GoalStatus.COMPLETED)
-                    .map(Goal::getGoalId)
-                    .collect(Collectors.toList());
-            if (goalIds.isEmpty()) {
-                return null;
-            }
-            return objectMapper.writeValueAsString(goalIds);
-        } catch (Exception e) {
-            return null;
-        }
-    }
+    // [D-5] buildTargetGoalIdsJson 제거. goalSnapshotJson 이 ID 를 이미 포함.
 
     /**
      * 시즌 시작 시점이 아닌, 호출 시점 기준으로 대상자 목표 스냅샷을 만든다.
      * {@code materializeMissingResponsesForGroup} 등 늦게 생성되는 {@link EvaluationResponse}에 부착할 때 사용한다.
      * 규칙은 {@link #startSeason} 과 동일하게 ACTIVE/COMPLETED 목표만 포함한다.
      */
-    public record MemberGoalSnapshots(String goalSnapshotJson, String targetGoalIdsJson) {}
+    public record MemberGoalSnapshots(String goalSnapshotJson) {}
 
     @Transactional(readOnly = true)
     public MemberGoalSnapshots captureMemberGoalSnapshotsAtNow(UUID companyId, UUID targetMemberId) {
         String takenAtIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         return new MemberGoalSnapshots(
-                buildGoalSnapshotJson(companyId, targetMemberId, takenAtIso),
-                buildTargetGoalIdsJson(companyId, targetMemberId));
+                buildGoalSnapshotJson(companyId, targetMemberId, takenAtIso));
     }
 
     @Transactional

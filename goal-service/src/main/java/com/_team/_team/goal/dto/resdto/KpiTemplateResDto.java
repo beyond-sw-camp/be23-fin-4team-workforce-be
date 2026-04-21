@@ -34,6 +34,10 @@ public class KpiTemplateResDto {
     private boolean isActive;
     private KpiSpecCycleType specCycleType;
     private UUID targetTeamId;
+    /**
+     * 레거시 UI 호환 — goalApprovalPolicy 로부터 파생값.
+     * NONE 아니면 true.
+     */
     private boolean requireApproval;
     /** 세분화된 승인 정책. NONE/ACTIVATION_ONLY/COMPLETION_ONLY/BOTH. */
     private GoalApprovalPolicy goalApprovalPolicy;
@@ -42,6 +46,7 @@ public class KpiTemplateResDto {
     private LocalDateTime updatedAt;
 
     public static KpiTemplateResDto from(KpiTemplate kpiTemplate) {
+        GoalApprovalPolicy policy = kpiTemplate.resolveApprovalPolicy();
         return KpiTemplateResDto.builder()
                 .kpiTemplateId(kpiTemplate.getKpiTemplateId())
                 .companyId(kpiTemplate.getCompanyId())
@@ -54,8 +59,8 @@ public class KpiTemplateResDto {
                 .isActive(kpiTemplate.isActive())
                 .specCycleType(kpiTemplate.getSpecCycleType())
                 .targetTeamId(kpiTemplate.getTargetTeamId())
-                .requireApproval(kpiTemplate.isRequireApproval())
-                .goalApprovalPolicy(kpiTemplate.resolveApprovalPolicy())
+                .requireApproval(policy != GoalApprovalPolicy.NONE)
+                .goalApprovalPolicy(policy)
                 .kpis(kpiTemplate.getKpis() != null ? kpiTemplate.getKpis() : Collections.emptyList())
                 .createdAt(kpiTemplate.getCreatedAt())
                 .updatedAt(kpiTemplate.getUpdatedAt())

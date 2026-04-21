@@ -44,21 +44,11 @@ public class EvaluationSeason extends BaseTimeEntity {
     @Builder.Default
     private SeasonStatus status = SeasonStatus.DRAFT;
 
-    /**
-     * [DEPRECATED] 세부 phase 기반 워크플로는 제거되었습니다.
-     * 이제 시즌은 status(DRAFT/ACTIVE/CLOSED) 와 resultsPublishedAt 으로 관리됩니다.
-     *
-     * 기존 데이터 보존 + 롤백 안전을 위해 컬럼은 유지하며, 새로 생성되는 시즌에는
-     * 항상 'LEGACY_DEPRECATED' 값을 저장합니다. 서비스 로직은 이 필드를 참조하지 않습니다.
-     *
-     * TODO: 2-3 릴리즈 후 DB 컬럼까지 DROP.
-     */
-    @Column(name = "phase", nullable = false, length = 32)
-    @Builder.Default
-    private String phase = "LEGACY_DEPRECATED";
-
-    @Column(name = "phase_updated_at")
-    private LocalDateTime phaseUpdatedAt;
+    // [T-1] phase / phase_updated_at 컬럼은 더 이상 엔티티에 매핑하지 않음.
+    // DB 마이그레이션에서 DROP:
+    //   ALTER TABLE evaluation_season DROP COLUMN phase;
+    //   ALTER TABLE evaluation_season DROP COLUMN phase_updated_at;
+    // 기존 데이터는 status + results_published_at 로 모두 표현됨.
 
     @Column(name = "result_publish_date")
     private LocalDate resultPublishDate;
@@ -80,7 +70,6 @@ public class EvaluationSeason extends BaseTimeEntity {
 
     public void activate() {
         this.status = SeasonStatus.ACTIVE;
-        this.phaseUpdatedAt = LocalDateTime.now();
     }
 
     public void close() {

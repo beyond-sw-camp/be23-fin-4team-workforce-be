@@ -74,15 +74,23 @@ public class EvaluationGroupService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "그룹 설정 JSON 이 올바르지 않습니다.");
         }
 
-        List<java.util.Map<String, String>> newMaps = new java.util.ArrayList<>();
+        // [D-3] 타입 세이프 List<EvaluatorMapping> 로 직접 구성. 더 이상 수동 JSON 작성 불필요.
+        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> newMaps = new java.util.ArrayList<>();
         for (UUID targetId : targets) {
             for (String rawType : evalTypes) {
                 String type = rawType == null ? "" : rawType.trim().toUpperCase();
-                if ("SELF".equals(type)) {
-                    newMaps.add(java.util.Map.of(
-                            "targetMemberId", targetId.toString(),
-                            "evaluatorId", targetId.toString(),
-                            "evaluationType", "SELF"));
+                com._team._team.evaluation.domain.enums.EvalType evalType;
+                try {
+                    evalType = com._team._team.evaluation.domain.enums.EvalType.valueOf(type);
+                } catch (IllegalArgumentException ex) {
+                    continue;
+                }
+                if (evalType == com._team._team.evaluation.domain.enums.EvalType.SELF) {
+                    newMaps.add(com._team._team.evaluation.domain.converter.EvaluatorMapping.builder()
+                            .targetMemberId(targetId)
+                            .evaluatorId(targetId)
+                            .evaluationType(evalType)
+                            .build());
                     continue;
                 }
                 List<UUID> candidates;
@@ -92,21 +100,16 @@ public class EvaluationGroupService {
                     candidates = List.of();
                 }
                 if (candidates == null || candidates.isEmpty()) continue;
-                // 첫 후보를 기본 배정 (여러 명 후보일 경우 DOWNWARD 는 상급자 중 1명 / PEER 는 동급자 1명 등)
                 UUID evaluatorId = candidates.get(0);
-                newMaps.add(java.util.Map.of(
-                        "targetMemberId", targetId.toString(),
-                        "evaluatorId", evaluatorId.toString(),
-                        "evaluationType", type));
+                newMaps.add(com._team._team.evaluation.domain.converter.EvaluatorMapping.builder()
+                        .targetMemberId(targetId)
+                        .evaluatorId(evaluatorId)
+                        .evaluationType(evalType)
+                        .build());
             }
         }
 
-        try {
-            String json = objectMapper.writeValueAsString(newMaps);
-            group.updateEvaluatorMaps(json);
-        } catch (Exception e) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "평가자 매핑 저장에 실패했습니다.");
-        }
+        group.updateEvaluatorMaps(newMaps);
         groupRepository.save(group);
         if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
             evaluationResponseService.materializeMissingResponsesForGroup(group);
@@ -183,7 +186,7 @@ public class EvaluationGroupService {
                 dto.getName() != null ? dto.getName() : group.getName(),
                 evalTypesJson,
                 targetMemberIdsJson,
-                group.getEvaluatorMapsJson()
+                group.getEvaluatorMaps()
         );
 
         return GroupResDto.from(group);
@@ -198,7 +201,19 @@ public class EvaluationGroupService {
     @Transactional
     public GroupResDto updateEvaluatorMaps(UUID groupId, UUID companyId, String evaluatorMapsJson) {
         EvaluationGroup group = findGroupOrThrow(groupId, companyId);
-        group.updateEvaluatorMaps(evaluatorMapsJson);
+        // [D-3] 프론트에서 넘어오는 JSON 문자열을 VO 리스트로 파싱 후 엔티티에 주입.
+        // 프론트 호환을 위해 API 시그니처는 유지하되 엔티티 내부는 타입 세이프.
+        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> maps;
+        try {
+            maps = evaluatorMapsJson == null || evaluatorMapsJson.isBlank()
+                    ? new java.util.ArrayList<>()
+                    : objectMapper.readValue(
+                            evaluatorMapsJson,
+                            new com.fasterxml.jackson.core.type.TypeReference<List<com._team._team.evaluation.domain.converter.EvaluatorMapping>>() {});
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "평가자 매핑 JSON이 올바르지 않습니다.");
+        }
+        group.updateEvaluatorMaps(maps);
         groupRepository.save(group);
         if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
             evaluationResponseService.materializeMissingResponsesForGroup(group);

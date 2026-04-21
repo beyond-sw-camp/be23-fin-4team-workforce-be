@@ -51,11 +51,10 @@ public class KpiTemplateService {
             }
         }
 
-        boolean reqApr = dto.getRequireApproval() != null && dto.getRequireApproval();
-
-        // goalApprovalPolicy 가 명시적으로 들어오면 사용, 아니면 requireApproval 로 유도
+        // [D-1] goalApprovalPolicy 가 명시적으로 들어오면 사용, 아니면 requireApproval 레거시 플래그로 유도
         GoalApprovalPolicy policy = dto.getGoalApprovalPolicy();
         if (policy == null) {
+            boolean reqApr = dto.getRequireApproval() != null && dto.getRequireApproval();
             policy = GoalApprovalPolicy.fromLegacyFlag(reqApr);
         }
 
@@ -70,7 +69,6 @@ public class KpiTemplateService {
                 .isActive(true)
                 .specCycleType(dto.getSpecCycleType())
                 .targetTeamId(dto.getTargetTeamId())
-                .requireApproval(reqApr)
                 .goalApprovalPolicy(policy)
                 .kpis(kpis)
                 .build();

@@ -78,9 +78,25 @@ public class MeetingRecordService {
                     .relatedSeasonId(seasonId)
                     .companyId(companyId)
                     .build();
-            // 평가 응답에 연결된 목표 ID 를 면담에 자동 링크
-            if (response.getTargetGoalIdsJson() != null && !response.getTargetGoalIdsJson().isBlank()) {
-                feedback.linkGoals(response.getTargetGoalIdsJson());
+            // [D-5] targetGoalIdsJson 제거됨. goalSnapshotJson 에서 goalId 목록만 추출해 링크.
+            String snap = response.getGoalSnapshotJson();
+            if (snap != null && !snap.isBlank()) {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode arr =
+                            new com.fasterxml.jackson.databind.ObjectMapper().readTree(snap);
+                    if (arr.isArray() && arr.size() > 0) {
+                        List<String> ids = new java.util.ArrayList<>();
+                        for (com.fasterxml.jackson.databind.JsonNode n : arr) {
+                            com.fasterxml.jackson.databind.JsonNode idNode = n.get("goalId");
+                            if (idNode != null && !idNode.isNull()) ids.add(idNode.asText());
+                        }
+                        if (!ids.isEmpty()) {
+                            feedback.linkGoals(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(ids));
+                        }
+                    }
+                } catch (Exception ignore) {
+                    // 스냅샷 파싱 실패해도 미팅 생성 자체는 진행
+                }
             }
             meetingRecordRepository.save(feedback);
         }

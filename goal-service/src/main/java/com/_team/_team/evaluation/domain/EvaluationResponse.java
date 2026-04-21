@@ -55,13 +55,10 @@ public class EvaluationResponse extends BaseTimeEntity {
     @Column(name = "calibration_json", columnDefinition = "JSON")
     private String calibrationJson;
 
-    /**
-     * 이 평가 응답이 평가 대상으로 삼은 goal id 목록 (JSON 배열).
-     * goal-service 모듈 내 Goal 엔티티에 대한 참조를 외래키 대신 ID 목록으로 유지하여
-     * 결재/캘리브레이션 과정에서 실제 성과와의 링크를 추적할 수 있게 합니다.
-     */
-    @Column(name = "target_goal_ids_json", columnDefinition = "TEXT")
-    private String targetGoalIdsJson;
+    // [D-5] targetGoalIdsJson 제거 — goalSnapshotJson 안에 이미 goalId 가 포함되어 있어 중복.
+    //   ID 목록이 필요한 곳은 GoalSnapshotDto 리스트에서 .getGoalId() 로 추출한다.
+    //   DB 컬럼 DROP 마이그레이션:
+    //     ALTER TABLE evaluation_response DROP COLUMN target_goal_ids_json;
 
     /**
      * 응답 채점으로 산출된 정규화된 점수 (0~100).
@@ -110,10 +107,6 @@ public class EvaluationResponse extends BaseTimeEntity {
 
     public void updateCalibration(String calibrationJson) {
         this.calibrationJson = calibrationJson;
-    }
-
-    public void updateTargetGoalIds(String targetGoalIdsJson) {
-        this.targetGoalIdsJson = targetGoalIdsJson;
     }
 
     public void updateNormalizedScore(java.math.BigDecimal score) {

@@ -1,8 +1,13 @@
 package com._team._team.evaluation.domain;
 
 import com._team._team.domain.BaseTimeEntity;
+import com._team._team.evaluation.domain.converter.EvaluatorMapping;
+import com._team._team.evaluation.domain.converter.EvaluatorMappingListConverter;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -38,21 +43,30 @@ public class EvaluationGroup extends BaseTimeEntity {
     @JoinColumn(name = "design_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private EvaluationDesign design;
 
+    /**
+     * [D-3] 기존 raw String evaluatorMapsJson 을 타입 세이프 List&lt;EvaluatorMapping&gt; 으로 대체.
+     * DB 컬럼 이름/타입(JSON) 은 동일하게 유지. 직렬화는 EvaluatorMappingListConverter 가 담당.
+     */
+    @Convert(converter = EvaluatorMappingListConverter.class)
     @Column(name = "evaluator_maps_json", columnDefinition = "JSON")
-    private String evaluatorMapsJson;
+    @Builder.Default
+    private List<EvaluatorMapping> evaluatorMaps = new ArrayList<>();
 
-    public void update(String name, String evaluationTypesJson, String targetMemberIdsJson, String evaluatorMapsJson) {
+    public void update(String name, String evaluationTypesJson, String targetMemberIdsJson,
+                       List<EvaluatorMapping> evaluatorMaps) {
         this.name = name;
         this.evaluationTypesJson = evaluationTypesJson;
         this.targetMemberIdsJson = targetMemberIdsJson;
-        this.evaluatorMapsJson = evaluatorMapsJson;
+        if (evaluatorMaps != null) {
+            this.evaluatorMaps = new ArrayList<>(evaluatorMaps);
+        }
     }
 
     public void assignDesign(EvaluationDesign design) {
         this.design = design;
     }
 
-    public void updateEvaluatorMaps(String evaluatorMapsJson) {
-        this.evaluatorMapsJson = evaluatorMapsJson;
+    public void updateEvaluatorMaps(List<EvaluatorMapping> evaluatorMaps) {
+        this.evaluatorMaps = evaluatorMaps != null ? new ArrayList<>(evaluatorMaps) : new ArrayList<>();
     }
 }

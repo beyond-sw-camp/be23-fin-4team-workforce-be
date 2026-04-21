@@ -193,44 +193,35 @@ public class EvaluationResponseService {
      */
     @Transactional
     public void materializeMissingResponsesForGroup(EvaluationGroup group) {
-        if (group.getEvaluatorMapsJson() == null || group.getEvaluatorMapsJson().isBlank()) {
-            return;
-        }
-        final List<Map<String, String>> maps;
-        try {
-            maps = objectMapper.readValue(group.getEvaluatorMapsJson(), new TypeReference<>() {});
-        } catch (Exception e) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "평가자 매핑 JSON이 올바르지 않습니다.");
-        }
+        // [D-3] 타입 세이프 List<EvaluatorMapping> 직접 순회. raw JSON 파싱 제거.
+        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> maps = group.getEvaluatorMaps();
+        if (maps == null || maps.isEmpty()) return;
+
         UUID companyId = group.getCompanyId();
         UUID groupId = group.getGroupId();
         List<EvaluationResponse> toSave = new ArrayList<>();
-        for (Map<String, String> map : maps) {
-            try {
-                UUID targetMemberId = UUID.fromString(map.get("targetMemberId"));
-                UUID evaluatorId = UUID.fromString(map.get("evaluatorId"));
-                EvalType evalType = EvalType.valueOf(map.get("evaluationType"));
-                if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
-                    continue;
-                }
-                if (responseRepository.existsByGroup_GroupIdAndTargetMemberIdAndEvaluatorIdAndEvaluationType(
-                        groupId, targetMemberId, evaluatorId, evalType)) {
-                    continue;
-                }
-                EvaluationSeasonService.MemberGoalSnapshots snaps =
-                        evaluationSeasonService.captureMemberGoalSnapshotsAtNow(companyId, targetMemberId);
-                toSave.add(EvaluationResponse.builder()
-                        .companyId(companyId)
-                        .group(group)
-                        .targetMemberId(targetMemberId)
-                        .evaluatorId(evaluatorId)
-                        .evaluationType(evalType)
-                        .goalSnapshotJson(snaps.goalSnapshotJson())
-                        .targetGoalIdsJson(snaps.targetGoalIdsJson())
-                        .build());
-            } catch (IllegalArgumentException ignored) {
-                // 잘못된 UUID/enum 행은 건너뜀 — startSeason 과 동일
+        for (com._team._team.evaluation.domain.converter.EvaluatorMapping em : maps) {
+            UUID targetMemberId = em.getTargetMemberId();
+            UUID evaluatorId = em.getEvaluatorId();
+            EvalType evalType = em.getEvaluationType();
+            if (targetMemberId == null || evaluatorId == null || evalType == null) continue;
+            if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
+                continue;
             }
+            if (responseRepository.existsByGroup_GroupIdAndTargetMemberIdAndEvaluatorIdAndEvaluationType(
+                    groupId, targetMemberId, evaluatorId, evalType)) {
+                continue;
+            }
+            EvaluationSeasonService.MemberGoalSnapshots snaps =
+                    evaluationSeasonService.captureMemberGoalSnapshotsAtNow(companyId, targetMemberId);
+            toSave.add(EvaluationResponse.builder()
+                    .companyId(companyId)
+                    .group(group)
+                    .targetMemberId(targetMemberId)
+                    .evaluatorId(evaluatorId)
+                    .evaluationType(evalType)
+                    .goalSnapshotJson(snaps.goalSnapshotJson())
+                    .build());
         }
         if (!toSave.isEmpty()) {
             responseRepository.saveAll(toSave);
