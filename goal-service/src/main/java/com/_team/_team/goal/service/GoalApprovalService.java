@@ -299,7 +299,7 @@ public class GoalApprovalService {
                 .targetId(bundle.getBundleId())
                 .targetType("GOAL_APPROVAL_BUNDLE")
                 .build());
-        return get(goalId, companyId);
+        return get(goalId, companyId, approverId);
     }
 
     @Transactional
@@ -329,7 +329,7 @@ public class GoalApprovalService {
                 .targetId(bundle.getBundleId())
                 .targetType("GOAL_APPROVAL_BUNDLE")
                 .build());
-        return get(goalId, companyId);
+        return get(goalId, companyId, approverId);
     }
 
     @Transactional
@@ -338,7 +338,7 @@ public class GoalApprovalService {
         GoalApprovalBundle bundle = getBundle(bundleId, companyId);
         assertBundleContainsGoal(bundle, goalId);
         bundle.addWatchers(dto.getWatcherIds());
-        return get(goalId, companyId);
+        return get(goalId, companyId, bundle.getRequestedBy());
     }
 
     @Transactional(readOnly = true)
