@@ -450,6 +450,46 @@ public class MemberController {
         String signatureUrl = memberService.getSignatureUrl(memberId);
         return new SignatureResDto(signatureUrl);
     }
+
+    /**
+     * 내부용: memberId 목록에 대한 이름 배치 조회 (Feign 호출용).
+     * 평가/미팅 등 다른 도메인에서 대상자/평가자 이름 노출 시 사용.
+     *
+     * 응답 형식: { "<memberId>": "홍길동", ... }
+     * 존재하지 않는 id 는 응답에 포함되지 않습니다.
+     */
+    @GetMapping("/internal/names")
+    public java.util.Map<java.util.UUID, String> getNamesInternal(
+            @RequestParam("ids") java.util.List<java.util.UUID> ids) {
+        return memberService.findNamesByIds(ids);
+    }
+
+    /**
+     * 내부용: memberId 목록에 대한 최소 프로필(name/department/position/profileUrl) 배치 조회.
+     * 평가 화면의 Avatar/이름/부서 노출용.
+     *
+     * 응답 형식: { "<memberId>": { name, department, positionName, profileUrl } }
+     */
+    @GetMapping("/internal/profiles")
+    public java.util.Map<java.util.UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto>
+    getProfilesInternal(@RequestParam("ids") java.util.List<java.util.UUID> ids) {
+        return memberService.findMinimalProfilesByIds(ids);
+    }
+
+    /**
+     * 내부용: 특정 대상자에 대한 평가자 후보 조회 (Feign 호출용).
+     * evalType ∈ {SELF, DOWNWARD, UPWARD, PEER} — 조직 + 직급(JobGrade.displayOrder) 기반.
+     *
+     * 응답: [memberId, ...]
+     */
+    @GetMapping("/internal/candidates-for-evaluator")
+    public java.util.List<java.util.UUID> getCandidatesForEvaluator(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestParam("targetMemberId") java.util.UUID targetMemberId,
+            @RequestParam("evalType") String evalType) {
+        return memberService.findCandidatesForEvaluator(
+                targetMemberId, evalType, java.util.UUID.fromString(companyId));
+    }
     @PatchMapping("/onboarding/complete")
     public ResponseEntity<?> completeOnboarding(
             @RequestHeader("X-User-UUID") UUID memberId) {
