@@ -8,7 +8,6 @@ import com._team._team.evaluation.domain.EvaluationResponse;
 import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
-import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.CalibrationAdjustReqDto;
 import com._team._team.evaluation.dto.reqdto.ResponseSaveReqDto;
@@ -78,6 +77,43 @@ public class EvaluationResponseService {
     public List<ResponseResDto> listMyResponses(UUID evaluatorId) {
         return responseRepository.findByEvaluatorId(evaluatorId)
                 .stream().map(ResponseResDto::from).collect(Collectors.toList());
+    }
+
+    /**
+     * 본인(피평가자)이 받은 평가 응답 목록.
+     * 결과가 공개된(PUBLISHED) 시즌에 한해서만 반환하여, 결과 공개 이전의 평가 내용이 유출되지 않도록 한다.
+     * 일반 사원도 접근 가능 — 컨트롤러에서 @CheckPermission 을 걸지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public List<ResponseResDto> listMyReceivedResults(UUID memberId, UUID companyId) {
+        return responseRepository.findByTargetMemberId(memberId).stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getGroup() != null && r.getGroup().getSeason() != null)
+                .filter(r -> r.getGroup().getSeason().isResultsPublished())
+                .map(ResponseResDto::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 본인(피평가자)이 받은 특정 시즌의 평가 응답 목록.
+     * 결과가 공개된(PUBLISHED) 시즌만 조회 허용 — 그렇지 않으면 400.
+     */
+    @Transactional(readOnly = true)
+    public List<ResponseResDto> listMySeasonResult(UUID seasonId, UUID memberId, UUID companyId) {
+        EvaluationSeason season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다."));
+        if (!season.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다.");
+        }
+        if (!season.isResultsPublished()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "아직 결과가 공개되지 않은 시즌입니다.");
+        }
+        return responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getTargetMemberId().equals(memberId))
+                .map(ResponseResDto::from)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -151,12 +187,8 @@ public class EvaluationResponseService {
         if (response.getStatus() == EvaluationStatus.SUBMITTED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 제출된 평가는 수정할 수 없습니다.");
         }
-        // 현재 시즌 phase 가 응답 편집 가능한 단계가 아니면 차단
-        EvaluationSeason season = response.getGroup().getSeason();
-        if (season.getStatus() != SeasonStatus.ACTIVE || !season.isResponseEditablePhase()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "현재 평가 페이즈에서는 응답을 저장할 수 없습니다. phase=" + season.getPhase());
-        }
+        // 작성 화면에서는 평가자 본인 응답을 항상 저장 가능하게 둔다.
+        // 시즌 phase 제어는 운영 UI(시즌 전이)와 관리자 정책에서 관리한다.
         response.saveAnswers(dto.getAnswersJson());
         return ResponseResDto.from(response);
     }
@@ -171,12 +203,7 @@ public class EvaluationResponseService {
         if (response.getStatus() == EvaluationStatus.SUBMITTED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 제출된 평가입니다.");
         }
-        // 현재 phase 가 편집 가능한 단계가 아니면 제출 차단
-        EvaluationSeason season = response.getGroup().getSeason();
-        if (season.getStatus() != SeasonStatus.ACTIVE || !season.isResponseEditablePhase()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "현재 평가 페이즈에서는 제출할 수 없습니다. phase=" + season.getPhase());
-        }
+        // 평가자 본인 응답은 시즌 phase와 무관하게 제출 허용.
         if (response.getAnswersJson() == null || response.getAnswersJson().isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "응답 내용이 비어있어 제출할 수 없습니다.");
         }
@@ -191,11 +218,11 @@ public class EvaluationResponseService {
         if (!response.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다.");
         }
-        // 캘리브레이션이 확정된 뒤에는 재개방 불가
+        // 결과가 공개된 뒤에는 재개방 불가
         EvaluationSeason season = response.getGroup().getSeason();
-        if (season.getPhase() == SeasonPhase.CONFIRMED || season.getPhase() == SeasonPhase.PUBLISHED) {
+        if (season.isResultsPublished()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "캘리브레이션 확정/결과 공개 이후에는 응답을 재개방할 수 없습니다.");
+                    "결과 공개 이후에는 응답을 재개방할 수 없습니다.");
         }
         response.reopen();
         String seasonName = season.getName() != null ? season.getName() : "평가";
@@ -277,9 +304,9 @@ public class EvaluationResponseService {
         if (!season.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
         }
-        if (!season.isCalibrationPhase()) {
+        if (!season.canCalibrate()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "캘리브레이션 페이즈에서만 기준점을 적용할 수 있습니다. 현재 phase=" + season.getPhase());
+                    "진행 중이면서 결과 미공개 상태에서만 기준점을 적용할 수 있습니다.");
         }
 
         List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
@@ -356,10 +383,10 @@ public class EvaluationResponseService {
         if (!season.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
         }
-        // 캘리브레이션 단계에서만 조정 가능
-        if (!season.isCalibrationPhase()) {
+        // 결과 공개 이전 ACTIVE 시즌에서만 조정 가능
+        if (!season.canCalibrate()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "캘리브레이션 페이즈에서만 조정이 가능합니다. 현재 phase=" + season.getPhase());
+                    "진행 중이면서 결과 미공개 상태에서만 등급 조율이 가능합니다.");
         }
         for (CalibrationAdjustReqDto.Adjustment adj : dto.getAdjustments()) {
             EvaluationResponse response = responseRepository.findById(adj.getResponseId())
@@ -405,10 +432,10 @@ public class EvaluationResponseService {
         if (!season.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
         }
-        // 캘리브레이션 페이즈에서만 확정 가능
-        if (!season.isCalibrationPhase()) {
+        // 결과 공개 이전 ACTIVE 시즌에서만 확정 가능
+        if (!season.canCalibrate()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "캘리브레이션 페이즈에서만 확정할 수 있습니다. 현재 phase=" + season.getPhase());
+                    "진행 중이면서 결과 미공개 상태에서만 등급 조율을 확정할 수 있습니다.");
         }
         List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
                 .stream()
@@ -436,12 +463,21 @@ public class EvaluationResponseService {
                 throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "캘리브레이션 확정 처리 실패");
             }
         }
-        // Phase 전이: CALIBRATION → CONFIRMED
-        season.transitionTo(SeasonPhase.CONFIRMED);
+        // phase 전이는 더 이상 존재하지 않음. 각 응답의 calibrationJson.confirmedAt 이
+        // "이 응답은 확정되었다" 표시자 역할을 계속 수행한다.
     }
 
     /**
-     * 결과 공개 — CONFIRMED → PUBLISHED 전이 후 피드백 면담을 바로 생성
+     * 결과 공개 — 관리자가 호출하거나 스케줄러가 자동 호출.
+     * resultsPublishedAt 을 now() 로 세팅하고 피드백 면담을 자동 생성합니다.
+     *
+     * 선행 조건:
+     *  - status = ACTIVE
+     *  - 이미 공개된 상태가 아님 (resultsPublishedAt == null)
+     *  - 모든 응답이 SUBMITTED
+     *
+     * 참고: 캘리브레이션 데이터 누락은 경고만 로깅하고 공개는 허용합니다
+     * (관리자가 캘리브레이션을 건너뛰고 원시 점수로 공개하는 시나리오 지원).
      */
     @Transactional
     public void publishResults(UUID seasonId, UUID companyId) {
@@ -450,23 +486,26 @@ public class EvaluationResponseService {
         if (!season.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
         }
-        if (season.getPhase() != SeasonPhase.CONFIRMED) {
+        if (season.getStatus() != SeasonStatus.ACTIVE && season.getStatus() != SeasonStatus.CLOSED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "확정(CONFIRMED) 이후에만 결과를 공개할 수 있습니다. 현재 phase=" + season.getPhase());
+                    "DRAFT 상태에서는 결과를 공개할 수 없습니다. 먼저 시즌을 시작하세요.");
         }
-        // 모든 응답에 캘리브레이션(등급) 정보가 있어야 결과 공개 가능
+        if (season.isResultsPublished()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "이미 결과가 공개된 시즌입니다.");
+        }
         List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
                 .stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .collect(Collectors.toList());
-        long missingCalibration = responses.stream()
-                .filter(r -> r.getCalibrationJson() == null || r.getCalibrationJson().isBlank())
+        long notSubmitted = responses.stream()
+                .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
                 .count();
-        if (missingCalibration > 0) {
+        if (notSubmitted > 0) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "캘리브레이션 데이터가 없는 응답이 " + missingCalibration + "건 있어 결과를 공개할 수 없습니다.");
+                    "제출되지 않은 평가 응답이 " + notSubmitted + "건 있어 결과를 공개할 수 없습니다.");
         }
-        season.transitionTo(SeasonPhase.PUBLISHED);
+        season.markResultsPublished();
         // 피드백 면담 자동 생성 (같은 트랜잭션에서 수행)
         meetingRecordService.createFeedbackMeetingsForSeason(seasonId, companyId);
     }

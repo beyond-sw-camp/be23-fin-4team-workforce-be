@@ -37,6 +37,28 @@ public class EvaluationResponseController {
         return ResponseEntity.ok(ApiResponse.success(result, "내 평가 목록 조회 성공"));
     }
 
+    // 본인이 피평가자인 응답들 중 결과 공개된 시즌만 반환. 일반 사원도 접근 가능.
+    // 2세그먼트 경로(/me/received)로 구성해 1세그먼트인 /{responseId} 매핑과 충돌하지 않도록 한다.
+    @GetMapping("/me/received")
+    public ResponseEntity<ApiResponse<List<ResponseResDto>>> listMyReceivedResults(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        List<ResponseResDto> result = responseService.listMyReceivedResults(
+                UUID.fromString(memberId), UUID.fromString(companyId));
+        return ResponseEntity.ok(ApiResponse.success(result, "내 평가 결과 목록 조회 성공"));
+    }
+
+    // 특정 시즌에 대해 본인이 받은 평가 결과(결과 공개된 시즌만). 일반 사원 접근 가능.
+    @GetMapping("/seasons/{seasonId}/my-result")
+    public ResponseEntity<ApiResponse<List<ResponseResDto>>> listMySeasonResult(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID seasonId) {
+        List<ResponseResDto> result = responseService.listMySeasonResult(
+                seasonId, UUID.fromString(memberId), UUID.fromString(companyId));
+        return ResponseEntity.ok(ApiResponse.success(result, "내 평가 결과 조회 성공"));
+    }
+
     // 응답 상세 — 본인(평가자)만 조회 가능. 서비스에서 evaluatorId == requesterId 검증.
     @GetMapping("/{responseId}")
     public ResponseEntity<ApiResponse<ResponseResDto>> getResponse(
@@ -46,7 +68,7 @@ public class EvaluationResponseController {
         return ResponseEntity.ok(ApiResponse.success(result, "평가 응답 조회 성공"));
     }
 
-    // 임시 저장 — 서비스에서 evaluatorId 일치 + phase 편집 가능 여부 검증.
+    // 임시 저장 — 서비스에서 evaluatorId 일치 검증.
     @PatchMapping("/{responseId}")
     public ResponseEntity<ApiResponse<ResponseResDto>> saveResponse(
             @RequestHeader("X-User-UUID") String memberId,
@@ -56,7 +78,7 @@ public class EvaluationResponseController {
         return ResponseEntity.ok(ApiResponse.success(result, "평가가 임시 저장되었습니다."));
     }
 
-    // 제출 — 서비스에서 evaluatorId 일치 + phase 편집 가능 여부 검증.
+    // 제출 — 서비스에서 evaluatorId 일치 검증.
     @PostMapping("/{responseId}/submit")
     public ResponseEntity<ApiResponse<ResponseResDto>> submitResponse(
             @RequestHeader("X-User-UUID") String memberId,
