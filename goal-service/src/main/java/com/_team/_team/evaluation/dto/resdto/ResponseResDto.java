@@ -24,7 +24,19 @@ public class ResponseResDto {
     /** 그룹에 연결된 평가 설계 — 작성 화면에서 문항 로드용 */
     private UUID designId;
     private UUID targetMemberId;
+    /** 대상자 이름 — member-service Feign 조회로 채워짐 (장애 시 null) */
+    private String targetMemberName;
+    /** 대상자 소속 조직명 */
+    private String targetMemberDepartment;
+    /** 대상자 프로필 이미지 URL */
+    private String targetMemberProfileUrl;
     private UUID evaluatorId;
+    /** 평가자 이름 — member-service Feign 조회로 채워짐 (장애 시 null) */
+    private String evaluatorName;
+    /** 평가자 소속 조직명 */
+    private String evaluatorDepartment;
+    /** 평가자 프로필 이미지 URL */
+    private String evaluatorProfileUrl;
     private EvalType evaluationType;
     private EvaluationStatus status;
     private LocalDateTime submittedAt;

@@ -54,6 +54,7 @@ public class EvaluationResponseService {
     private final MeetingRecordService meetingRecordService;
     private final ApplicationEventPublisher eventPublisher;
     private final EvaluationSeasonService evaluationSeasonService;
+    private final com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
                                       EvaluationSeasonRepository seasonRepository,
@@ -62,7 +63,8 @@ public class EvaluationResponseService {
                                       ObjectMapper objectMapper,
                                       MeetingRecordService meetingRecordService,
                                       ApplicationEventPublisher eventPublisher,
-                                      EvaluationSeasonService evaluationSeasonService) {
+                                      EvaluationSeasonService evaluationSeasonService,
+                                      com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient) {
         this.responseRepository = responseRepository;
         this.seasonRepository = seasonRepository;
         this.calibrationHistoryRepository = calibrationHistoryRepository;
@@ -71,12 +73,81 @@ public class EvaluationResponseService {
         this.meetingRecordService = meetingRecordService;
         this.eventPublisher = eventPublisher;
         this.evaluationSeasonService = evaluationSeasonService;
+        this.memberServiceClient = memberServiceClient;
+    }
+
+    /**
+     * 응답 리스트를 DTO 로 매핑하면서 대상자/평가자 이름·소속·프로필을 일괄 주입한다.
+     * N+1 방지를 위해 Feign 호출 1회로 모든 프로필을 가져온다.
+     * member-service 장애 시 이름은 null 로 두고 계속 진행.
+     */
+    private List<ResponseResDto> mapResponsesWithNames(List<EvaluationResponse> responses) {
+        if (responses.isEmpty()) return java.util.Collections.emptyList();
+        java.util.Set<UUID> ids = new java.util.HashSet<>();
+        for (EvaluationResponse r : responses) {
+            if (r.getTargetMemberId() != null) ids.add(r.getTargetMemberId());
+            if (r.getEvaluatorId() != null) ids.add(r.getEvaluatorId());
+        }
+        java.util.Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> profiles;
+        try {
+            profiles = memberServiceClient.getProfilesByIds(new java.util.ArrayList<>(ids));
+        } catch (Exception e) {
+            profiles = java.util.Collections.emptyMap();
+        }
+        List<ResponseResDto> out = new java.util.ArrayList<>(responses.size());
+        for (EvaluationResponse r : responses) {
+            ResponseResDto dto = ResponseResDto.from(r);
+            var target = profiles.get(r.getTargetMemberId());
+            if (target != null) {
+                dto.setTargetMemberName(target.getName());
+                dto.setTargetMemberDepartment(target.getDepartment());
+                dto.setTargetMemberProfileUrl(target.getProfileUrl());
+            }
+            var evaluator = profiles.get(r.getEvaluatorId());
+            if (evaluator != null) {
+                dto.setEvaluatorName(evaluator.getName());
+                dto.setEvaluatorDepartment(evaluator.getDepartment());
+                dto.setEvaluatorProfileUrl(evaluator.getProfileUrl());
+            }
+            out.add(dto);
+        }
+        return out;
+    }
+
+    /**
+     * 단건 응답 DTO에 대상자/평가자 프로필(이름·소속·프로필 URL)을 주입한다.
+     * member-service 조회 실패 시 기본 DTO를 그대로 반환한다.
+     */
+    private ResponseResDto mapResponseWithNames(EvaluationResponse response) {
+        ResponseResDto dto = ResponseResDto.from(response);
+        java.util.Set<UUID> ids = new java.util.HashSet<>();
+        if (response.getTargetMemberId() != null) ids.add(response.getTargetMemberId());
+        if (response.getEvaluatorId() != null) ids.add(response.getEvaluatorId());
+        if (ids.isEmpty()) return dto;
+        try {
+            java.util.Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> profiles =
+                    memberServiceClient.getProfilesByIds(new java.util.ArrayList<>(ids));
+            var target = profiles.get(response.getTargetMemberId());
+            if (target != null) {
+                dto.setTargetMemberName(target.getName());
+                dto.setTargetMemberDepartment(target.getDepartment());
+                dto.setTargetMemberProfileUrl(target.getProfileUrl());
+            }
+            var evaluator = profiles.get(response.getEvaluatorId());
+            if (evaluator != null) {
+                dto.setEvaluatorName(evaluator.getName());
+                dto.setEvaluatorDepartment(evaluator.getDepartment());
+                dto.setEvaluatorProfileUrl(evaluator.getProfileUrl());
+            }
+        } catch (Exception ignored) {
+            // member-service 장애 시 이름 주입을 생략하고 기본 DTO 반환
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)
     public List<ResponseResDto> listMyResponses(UUID evaluatorId) {
-        return responseRepository.findByEvaluatorId(evaluatorId)
-                .stream().map(ResponseResDto::from).collect(Collectors.toList());
+        return mapResponsesWithNames(responseRepository.findByEvaluatorId(evaluatorId));
     }
 
     /**
@@ -86,12 +157,12 @@ public class EvaluationResponseService {
      */
     @Transactional(readOnly = true)
     public List<ResponseResDto> listMyReceivedResults(UUID memberId, UUID companyId) {
-        return responseRepository.findByTargetMemberId(memberId).stream()
+        List<EvaluationResponse> list = responseRepository.findByTargetMemberId(memberId).stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .filter(r -> r.getGroup() != null && r.getGroup().getSeason() != null)
                 .filter(r -> r.getGroup().getSeason().isResultsPublished())
-                .map(ResponseResDto::from)
                 .collect(Collectors.toList());
+        return mapResponsesWithNames(list);
     }
 
     /**
@@ -109,11 +180,11 @@ public class EvaluationResponseService {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "아직 결과가 공개되지 않은 시즌입니다.");
         }
-        return responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+        List<EvaluationResponse> list = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
                 .filter(r -> r.getTargetMemberId().equals(memberId))
-                .map(ResponseResDto::from)
                 .collect(Collectors.toList());
+        return mapResponsesWithNames(list);
     }
 
     /**
@@ -174,7 +245,7 @@ public class EvaluationResponseService {
         if (!response.getEvaluatorId().equals(requesterId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 조회할 수 있습니다.");
         }
-        return ResponseResDto.from(response);
+        return mapResponseWithNames(response);
     }
 
     @Transactional
@@ -190,7 +261,7 @@ public class EvaluationResponseService {
         // 작성 화면에서는 평가자 본인 응답을 항상 저장 가능하게 둔다.
         // 시즌 phase 제어는 운영 UI(시즌 전이)와 관리자 정책에서 관리한다.
         response.saveAnswers(dto.getAnswersJson());
-        return ResponseResDto.from(response);
+        return mapResponseWithNames(response);
     }
 
     @Transactional
@@ -208,7 +279,7 @@ public class EvaluationResponseService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "응답 내용이 비어있어 제출할 수 없습니다.");
         }
         response.submit();
-        return ResponseResDto.from(response);
+        return mapResponseWithNames(response);
     }
 
     @Transactional
@@ -233,7 +304,7 @@ public class EvaluationResponseService {
                 .targetId(responseId)
                 .targetType("EVALUATION_RESPONSE")
                 .build());
-        return ResponseResDto.from(response);
+        return mapResponseWithNames(response);
     }
 
     // 리마인드
@@ -525,10 +596,28 @@ public class EvaluationResponseService {
     // 진행도
     @Transactional(readOnly = true)
     public List<ResponseResDto> listBySeasonForProgress(UUID seasonId, UUID companyId) {
-        return responseRepository.findByGroup_Season_SeasonId(seasonId)
+        return listBySeasonForProgress(seasonId, companyId, null);
+    }
+
+    /**
+     * 진행도 조회 + 대상자 이름 contains 필터.
+     * q 가 null/빈값이면 전체 반환. q 는 DTO 매핑 이후 targetMemberName 에 대해 case-insensitive contains 매칭한다.
+     */
+    public List<ResponseResDto> listBySeasonForProgress(UUID seasonId, UUID companyId, String q) {
+        List<EvaluationResponse> list = responseRepository.findByGroup_Season_SeasonId(seasonId)
                 .stream()
                 .filter(r -> r.getCompanyId().equals(companyId))
-                .map(ResponseResDto::from)
+                .collect(Collectors.toList());
+        List<ResponseResDto> dtos = mapResponsesWithNames(list);
+        if (q == null || q.isBlank()) return dtos;
+        String needle = q.trim().toLowerCase();
+        return dtos.stream()
+                .filter(d -> {
+                    String name = d.getTargetMemberName();
+                    String dept = d.getTargetMemberDepartment();
+                    return (name != null && name.toLowerCase().contains(needle))
+                            || (dept != null && dept.toLowerCase().contains(needle));
+                })
                 .collect(Collectors.toList());
     }
 

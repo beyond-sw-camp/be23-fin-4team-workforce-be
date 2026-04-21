@@ -28,17 +28,90 @@ public class EvaluationGroupService {
     private final EvaluationDesignRepository designRepository;
     private final ObjectMapper objectMapper;
     private final EvaluationResponseService evaluationResponseService;
+    private final com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient;
 
     public EvaluationGroupService(EvaluationGroupRepository groupRepository,
                                    EvaluationSeasonRepository seasonRepository,
                                    EvaluationDesignRepository designRepository,
                                    ObjectMapper objectMapper,
-                                   EvaluationResponseService evaluationResponseService) {
+                                   EvaluationResponseService evaluationResponseService,
+                                   com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient) {
         this.groupRepository = groupRepository;
         this.seasonRepository = seasonRepository;
         this.designRepository = designRepository;
         this.objectMapper = objectMapper;
         this.evaluationResponseService = evaluationResponseService;
+        this.memberServiceClient = memberServiceClient;
+    }
+
+    /**
+     * 평가자 자동 지정.
+     *
+     * 각 대상자 × (그룹에 설정된 평가 유형) 조합마다 member-service 후보 조회 API 로 후보를 얻어
+     * evaluatorMaps 를 구성한다.
+     *  - SELF: 항상 target = evaluator
+     *  - DOWNWARD/UPWARD/PEER: 후보 중 첫 번째 (조직 + 직급 조건 일치) 를 배정. 후보 0명이면 건너뜀
+     *
+     * 기존 evaluatorMaps 는 덮어씀.
+     * 반환값: 자동 배정 결과가 반영된 GroupResDto.
+     */
+    @Transactional
+    public GroupResDto autoAssignEvaluators(UUID seasonId, UUID groupId, UUID companyId, String basis) {
+        EvaluationGroup group = findGroupOrThrow(groupId, companyId);
+
+        List<UUID> targets;
+        List<String> evalTypes;
+        try {
+            targets = group.getTargetMemberIdsJson() != null
+                    ? objectMapper.readValue(group.getTargetMemberIdsJson(),
+                            new com.fasterxml.jackson.core.type.TypeReference<List<UUID>>() {})
+                    : List.of();
+            evalTypes = group.getEvaluationTypesJson() != null
+                    ? objectMapper.readValue(group.getEvaluationTypesJson(),
+                            new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {})
+                    : List.of();
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "그룹 설정 JSON 이 올바르지 않습니다.");
+        }
+
+        List<java.util.Map<String, String>> newMaps = new java.util.ArrayList<>();
+        for (UUID targetId : targets) {
+            for (String rawType : evalTypes) {
+                String type = rawType == null ? "" : rawType.trim().toUpperCase();
+                if ("SELF".equals(type)) {
+                    newMaps.add(java.util.Map.of(
+                            "targetMemberId", targetId.toString(),
+                            "evaluatorId", targetId.toString(),
+                            "evaluationType", "SELF"));
+                    continue;
+                }
+                List<UUID> candidates;
+                try {
+                    candidates = memberServiceClient.getCandidatesForEvaluator(companyId.toString(), targetId, type);
+                } catch (Exception e) {
+                    candidates = List.of();
+                }
+                if (candidates == null || candidates.isEmpty()) continue;
+                // 첫 후보를 기본 배정 (여러 명 후보일 경우 DOWNWARD 는 상급자 중 1명 / PEER 는 동급자 1명 등)
+                UUID evaluatorId = candidates.get(0);
+                newMaps.add(java.util.Map.of(
+                        "targetMemberId", targetId.toString(),
+                        "evaluatorId", evaluatorId.toString(),
+                        "evaluationType", type));
+            }
+        }
+
+        try {
+            String json = objectMapper.writeValueAsString(newMaps);
+            group.updateEvaluatorMaps(json);
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "평가자 매핑 저장에 실패했습니다.");
+        }
+        groupRepository.save(group);
+        if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
+            evaluationResponseService.materializeMissingResponsesForGroup(group);
+        }
+        return GroupResDto.from(group);
     }
 
     @Transactional(readOnly = true)
