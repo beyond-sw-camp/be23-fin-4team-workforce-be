@@ -65,4 +65,22 @@ public class EvaluationDesignController {
         DesignResDto result = designService.updateDesign(designId, UUID.fromString(companyId), dto);
         return ResponseEntity.ok(ApiResponse.success(result, "평가 설계가 수정되었습니다."));
     }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.CREATE)
+    @PostMapping("/{designId}/duplicate")
+    public ResponseEntity<ApiResponse<DesignResDto>> duplicateDesign(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID designId) {
+        DesignResDto result = designService.duplicateDesign(designId, UUID.fromString(companyId));
+        return ResponseEntity.ok(ApiResponse.success(result, "평가 설계가 복제되었습니다."));
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.DELETE)
+    @DeleteMapping("/{designId}")
+    public ResponseEntity<ApiResponse<Void>> deleteDesign(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID designId) {
+        designService.deleteDesign(designId, UUID.fromString(companyId));
+        return ResponseEntity.ok(ApiResponse.success(null, "평가 설계가 삭제되었습니다."));
+    }
 }

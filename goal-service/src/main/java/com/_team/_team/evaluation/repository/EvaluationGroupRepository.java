@@ -8,4 +8,5 @@ import java.util.UUID;
 public interface EvaluationGroupRepository extends JpaRepository<EvaluationGroup, UUID> {
     List<EvaluationGroup> findBySeason_SeasonId(UUID seasonId);
     List<EvaluationGroup> findByCompanyId(UUID companyId);
+    long countByDesign_DesignId(UUID designId);
 }

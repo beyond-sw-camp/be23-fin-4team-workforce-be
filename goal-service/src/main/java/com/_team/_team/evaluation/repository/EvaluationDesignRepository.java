@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface EvaluationDesignRepository extends JpaRepository<EvaluationDesign, UUID> {
     List<EvaluationDesign> findByCompanyId(UUID companyId);
+    boolean existsByCompanyIdAndDefaultTemplateTrue(UUID companyId);
 }

@@ -30,9 +30,22 @@ public class EvaluationDesign extends BaseTimeEntity {
     @Column(name = "grade_config_json", columnDefinition = "JSON")
     private String gradeConfigJson;
 
+    /** 설계 버전 — 수정 시 증가 */
+    @Column(name = "template_version")
+    private Integer templateVersion;
+
+    /** 기본 템플릿 여부 */
+    @Column(name = "is_default_template")
+    private Boolean defaultTemplate;
+
     public void update(String name, String sectionsJson, String gradeConfigJson) {
         this.name = name;
         this.sectionsJson = sectionsJson;
         this.gradeConfigJson = gradeConfigJson;
+        this.templateVersion = (this.templateVersion == null ? 1 : this.templateVersion) + 1;
+    }
+
+    public void markDefaultTemplate(boolean value) {
+        this.defaultTemplate = value;
     }
 }
