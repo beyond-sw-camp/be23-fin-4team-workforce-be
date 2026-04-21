@@ -4,6 +4,7 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.dto.resdto.CompanyInfoResDto;
 import com._team._team.company.feignclients.ApprovalServiceClient;
+import com._team._team.company.feignclients.SalaryServiceClient;
 import com._team._team.company.repository.CompanyRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.esg.service.EsgService;
@@ -45,6 +46,7 @@ public class CompanyService {
     private final S3Uploader s3Uploader;
     private final EsgService esgService;
     private final ApprovalServiceClient approvalServiceClient;
+    private final SalaryServiceClient salaryServiceClient;
 
     @Autowired
     public CompanyService(
@@ -53,7 +55,7 @@ public class CompanyService {
             MemberService memberService,
             NtsApiService ntsApiService,
             MailService mailService,
-            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, MemberRepository memberRepository, S3Uploader s3Uploader, EsgService esgService, ApprovalServiceClient approvalServiceClient) {
+            @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, MemberRepository memberRepository, S3Uploader s3Uploader, EsgService esgService, ApprovalServiceClient approvalServiceClient, SalaryServiceClient salaryServiceClient) {
         this.companyRepository = companyRepository;
         this.organizationService = organizationService;
         this.memberService = memberService;
@@ -64,6 +66,7 @@ public class CompanyService {
         this.s3Uploader = s3Uploader;
         this.esgService = esgService;
         this.approvalServiceClient = approvalServiceClient;
+        this.salaryServiceClient = salaryServiceClient;
     }
 
     // 이메일 인증 코드 발송
@@ -176,6 +179,13 @@ public class CompanyService {
             approvalServiceClient.initDefaultDocuments(company.getCompanyId());
         } catch (Exception e) {
             log.warn("기본 결재양식 생성 실패: {}", e.getMessage());
+        }
+
+        // 기본 휴가 종류 생성 (salary-service 호출)
+        try {
+            salaryServiceClient.initDefaultLeaveTypes(company.getCompanyId());
+        } catch (Exception e) {
+            log.warn("기본 휴가 생성 실패: {}", e.getMessage());
         }
     }
 
