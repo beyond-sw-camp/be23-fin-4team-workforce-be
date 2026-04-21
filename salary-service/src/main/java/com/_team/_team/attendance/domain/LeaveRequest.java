@@ -65,6 +65,10 @@ public class LeaveRequest extends BaseTimeEntity {
     @Column(length = 20)
     private BalanceType deductedBalanceType;
 
+    // 분할 차감 이력 JSON, {"MONTHLY": 2.0, "ANNUAL": 1.0}
+    @Column(columnDefinition = "TEXT")
+    private String deductionsJson;
+
     // 변경 사유/휴가 사유, 결재 시 필수
     @Column(length = 500)
     private String reason;
@@ -113,7 +117,8 @@ public class LeaveRequest extends BaseTimeEntity {
 
     // 결재 승인 반영, Consumer 호출
     public void approve(UUID approverId, LocalDateTime decidedAt,
-                        BalanceType deductedBalanceType) {
+                        BalanceType deductedBalanceType,
+                        String deductionsJson) {
         if (this.approvalStatus != LeaveApprovalStatus.PENDING) {
             throw new IllegalStateException("결재대기 상태에서만 승인 가능합니다.");
         }
@@ -121,6 +126,7 @@ public class LeaveRequest extends BaseTimeEntity {
         this.decidedBy = approverId;
         this.decidedAt = decidedAt;
         this.deductedBalanceType = deductedBalanceType;
+        this.deductionsJson = deductionsJson;
     }
 
     // 결재 반려 반영, Consumer 호출
