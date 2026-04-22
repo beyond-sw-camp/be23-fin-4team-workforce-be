@@ -13,16 +13,32 @@ import com._team._team.approval.feignclients.dto.MemberPositionResDto;
 import com._team._team.approval.feignclients.dto.OrganizationResDto;
 import com._team._team.approval.repository.*;
 import com._team._team.dto.BusinessException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com._team._team.approval.domain.ApprovalSearchOutboxEvent;
+import com._team._team.approval.repository.ApprovalSearchOutboxRepository;
+import com._team._team.event.ApprovalChangedEvent;
+import com._team._team.event.ApprovalDeletedEvent;
+import com._team._team.event.ApprovalSavedEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import java.time.LocalDateTime;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @Transactional
 public class ApprovalRequestService {
 
@@ -35,10 +51,13 @@ public class ApprovalRequestService {
     private final ApprovalNotificationService approvalNotificationService;
     private final OfficialRecipientRepository officialRecipientRepository;
     private final OfficialNumberService officialNumberService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ApprovalSearchOutboxRepository approvalSearchOutboxRepository;
+    private final ObjectMapper objectMapper;
 
 
     @Autowired
-    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService, OfficialRecipientRepository officialRecipientRepository, OfficialNumberService officialNumberService) {
+    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService, OfficialRecipientRepository officialRecipientRepository, OfficialNumberService officialNumberService, ApplicationEventPublisher eventPublisher, ApprovalSearchOutboxRepository approvalSearchOutboxRepository, ObjectMapper objectMapper) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.approvalRepository = approvalRepository;
@@ -48,6 +67,9 @@ public class ApprovalRequestService {
         this.approvalNotificationService = approvalNotificationService;
         this.officialRecipientRepository = officialRecipientRepository;
         this.officialNumberService = officialNumberService;
+        this.eventPublisher = eventPublisher;
+        this.approvalSearchOutboxRepository = approvalSearchOutboxRepository;
+        this.objectMapper = objectMapper;
     }
 
 //    결재요청 생성(결재라인 + 참조/공람자 포함)
@@ -232,6 +254,10 @@ public class ApprovalRequestService {
         List<OfficialRecipientResDto> recipientDtos = savedRecipients.stream()
                 .map(OfficialRecipientResDto::fromEntity)
                 .toList();
+
+        // 검색 인덱싱 이벤트 발행
+        eventPublisher.publishEvent(new ApprovalChangedEvent(savedRequest.getRequestId()));
+
         return ApprovalRequestResDto.fromEntity(savedRequest, savedApprovals, savedViewers, recipientDtos);
 
 
@@ -600,6 +626,10 @@ public class ApprovalRequestService {
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
         }
+
+        // ES 삭제 이벤트 직접 저장
+        saveApprovalSearchOutboxDeleteEvent(request.getRequestId());
+
         return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
     }
 
@@ -779,4 +809,77 @@ public ApprovalRequestResDto sendOfficial(UUID companyId, UUID memberId, UUID me
     return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
 }
 
+    // ======== 검색 인덱싱 이벤트 처리 (Outbox 패턴) ========
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void handleApprovalChangedEvent(ApprovalChangedEvent event) {
+        saveApprovalSearchOutboxEvent(event.getRequestId());
+    }
+
+    public void saveApprovalSearchOutboxEvent(UUID requestId) {
+        try {
+            ApprovalRequest request = approvalRequestRepository
+                    .findByIdWithDocument(requestId)
+                    .orElse(null);
+
+            if (request == null) {
+                log.warn("[APPROVAL-OUTBOX] request not found. requestId={}", requestId);
+                return;
+            }
+
+            ApprovalSavedEvent savedEvent = ApprovalSavedEvent.builder()
+                    .requestId(request.getRequestId())
+                    .companyId(request.getApprovalDocument().getCompanyId())
+                    .memberId(request.getMemberId())
+                    .requesterName(request.getRequesterName())
+                    .requesterOrganizationName(request.getRequesterOrganizationName())
+                    .requesterOrganizationId(request.getRequesterOrganizationId())
+                    .documentName(request.getApprovalDocument().getDocumentName())
+                    .requestStatus(request.getRequestStatus().name())
+                    .requestType(request.getRequestType().name())
+                    .contentJson(request.getContentJson())
+                    .createdAt(request.getCreatedAt())
+                    .isDeptVisibleYn(request.getIsDeptVisibleYn())
+                    .build();
+
+            String payload = objectMapper.writeValueAsString(savedEvent);
+
+            ApprovalSearchOutboxEvent outboxEvent = ApprovalSearchOutboxEvent.builder()
+                    .topic("approval-saved")
+                    .aggregateId(request.getRequestId())
+                    .payload(payload)
+                    .processed("NO")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            approvalSearchOutboxRepository.save(outboxEvent);
+
+        } catch (Exception e) {
+            log.error("ApprovalSearchOutboxEvent 저장 실패: {}", e.getMessage());
+        }
+    }
+
+    private void saveApprovalSearchOutboxDeleteEvent(UUID requestId) {
+        try {
+            ApprovalDeletedEvent event = ApprovalDeletedEvent.builder()
+                    .requestId(requestId)
+                    .build();
+
+            String payload = objectMapper.writeValueAsString(event);
+
+            ApprovalSearchOutboxEvent outboxEvent = ApprovalSearchOutboxEvent.builder()
+                    .topic("approval-deleted")
+                    .aggregateId(requestId)
+                    .payload(payload)
+                    .processed("NO")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            approvalSearchOutboxRepository.save(outboxEvent);
+
+        } catch (Exception e) {
+            log.error("ApprovalSearchOutboxDeleteEvent 저장 실패: {}", e.getMessage());
+        }
+    }
 }

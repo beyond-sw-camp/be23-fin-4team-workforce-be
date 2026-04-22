@@ -23,12 +23,16 @@ public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUI
     List<LeaveRequest> findAllByMemberIdAndStartDateAndDelYn(
             UUID memberId, LocalDate startDate, String delYn);
 
-    // Kafka Consumer 역조회 (결재 ID 로)
+    // 역조회 (결재 ID 로)
     Optional<LeaveRequest> findByApprovalRequestId(UUID approvalRequestId);
 
     // 본인 소유 휴가인지 검증
     Optional<LeaveRequest> findByLeaveRequestIdAndMemberId(
             UUID leaveRequestId, UUID memberId);
+
+    // 관리자 단건 조회, 회사 소속 검증
+    Optional<LeaveRequest> findByLeaveRequestIdAndCompanyIdAndDelYn(
+            UUID leaveRequestId, UUID companyId, String delYn);
 
     // 관리자 상태별 목록, 오래된 순
     List<LeaveRequest> findAllByCompanyIdAndApprovalStatusAndDelYnOrderByRequestedAtAsc(
@@ -52,7 +56,7 @@ public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUI
             @Param("date") LocalDate date);
 
     /**
-     * 연간 사용량 체크
+     * 연간 사용량 집계, 시작일이 기간 내인 승인 휴가 합산
      */
     @Query("""
            SELECT COALESCE(SUM(l.usageDays), 0)
@@ -61,34 +65,14 @@ public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUI
              AND l.companyId = :companyId
              AND l.companyLeaveTypeId = :companyLeaveTypeId
              AND l.approvalStatus = 'APPROVED'
-             AND EXTRACT(YEAR FROM l.startDate) = :year
+             AND l.startDate >= :rangeStart
+             AND l.startDate <= :rangeEnd
              AND l.delYn = 'N'
            """)
-    Double sumUsedDaysInYear(
+    Double sumUsedDaysInPeriod(
             @Param("memberId") UUID memberId,
             @Param("companyId") UUID companyId,
             @Param("companyLeaveTypeId") UUID companyLeaveTypeId,
-            @Param("year") int year);
-
-    /**
-     * 월별 휴가 집계
-     */
-    @Query("""
-           SELECT l.companyLeaveTypeId, SUM(l.usageDays)
-           FROM LeaveRequest l
-           WHERE l.memberId = :memberId
-             AND l.approvalStatus = 'APPROVED'
-             AND l.startDate <= :endOfMonth
-             AND l.endDate >= :startOfMonth
-             AND l.delYn = 'N'
-           GROUP BY l.companyLeaveTypeId
-           """)
-    List<Object[]> groupByTypeInMonth(
-            @Param("memberId") UUID memberId,
-            @Param("startOfMonth") LocalDate startOfMonth,
-            @Param("endOfMonth") LocalDate endOfMonth);
-
-    // 단건 조회 + 회사 검증 한 번에
-    Optional<LeaveRequest> findByLeaveRequestIdAndCompanyIdAndDelYn(
-            UUID leaveRequestId, UUID companyId, String delYn);
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd);
 }

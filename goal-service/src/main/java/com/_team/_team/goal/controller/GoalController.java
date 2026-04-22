@@ -63,8 +63,7 @@ public class GoalController {
                 "목표가 생성되었습니다.");
     }
 
-    // 목표 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 목표 목록 조회 (가시성은 GoalService에서 필터)
     @GetMapping
     public ApiResponse<List<GoalResDto>> listGoals(
             @RequestHeader("X-User-UUID") String memberId,
@@ -88,7 +87,6 @@ public class GoalController {
     }
 
     // 목표 트리 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/tree")
     public ApiResponse<List<GoalResDto>> treeGoals(
             @RequestHeader("X-User-UUID") String memberId,
@@ -111,7 +109,6 @@ public class GoalController {
     }
 
     // 목표 상세 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/{goalId}")
     public ApiResponse<GoalResDto> getGoal(
             @PathVariable UUID goalId,
@@ -122,8 +119,7 @@ public class GoalController {
                 "목표 조회 성공");
     }
 
-    // 목표 수정
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 목표 수정 (본인 목표 또는 GOAL:UPDATE — 서비스에서 검증)
     @PatchMapping("/{goalId}")
     public ApiResponse<GoalResDto> updateGoal(
             @PathVariable UUID goalId,
@@ -197,10 +193,7 @@ public class GoalController {
                 "목표 롤업 재계산 완료");
     }
 
-    // 진행률 업데이트 등록
-    /** 담당/참여는 READ로 진입 가능. 대리 갱신은 GOAL:UPDATE 필요. */
-    // 완료 제출 등록
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 진행률 업데이트 등록 (담당·참여 또는 GOAL:UPDATE — 서비스에서 검증)
     @PostMapping("/{goalId}/updates")
     public ApiResponse<GoalProgressUpdateResDto> addProgressUpdate(
             @PathVariable UUID goalId,
@@ -219,8 +212,6 @@ public class GoalController {
                 "진행률이 업데이트되었습니다.");
     }
 
-    // 완료 제출 등록
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @PostMapping("/{goalId}/completion/submit")
     public ApiResponse<GoalResDto> submitCompletion(
             @PathVariable UUID goalId,
@@ -239,8 +230,7 @@ public class GoalController {
                 "완료 제출이 등록되었습니다.");
     }
 
-    // 완료 제출 파일 업로드
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 완료 제출 파일 업로드 (인증된 사용자 — 파일 URL은 완료 제출 시에만 연결)
     @PostMapping("/completion/files")
     public ApiResponse<List<String>> uploadCompletionFiles(
             @RequestParam("files") List<MultipartFile> files) {
@@ -249,13 +239,13 @@ public class GoalController {
                 "완료 제출 파일 업로드 성공");
     }
 
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/{goalId}/updates")
     public ApiResponse<List<GoalProgressUpdateResDto>> listProgressUpdates(
             @PathVariable UUID goalId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
-                goalProgressUpdateService.list(goalId, UUID.fromString(companyId)),
+                goalProgressUpdateService.list(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
                 "진행률 이력 조회 성공");
     }
 
@@ -273,12 +263,14 @@ public class GoalController {
     }
 
     // 댓글 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/{goalId}/comments")
     public ApiResponse<List<GoalCommentResDto>> listComments(
             @PathVariable UUID goalId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(goalCommentService.list(goalId, UUID.fromString(companyId)), "댓글 목록 조회 성공");
+        return ApiResponse.success(
+                goalCommentService.list(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
+                "댓글 목록 조회 성공");
     }
 
     // 댓글 수정

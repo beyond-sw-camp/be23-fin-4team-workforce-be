@@ -1,5 +1,6 @@
 package com._team._team.goal.dto.resdto;
 
+import com._team._team.goal.domain.enums.BundleApprovalKind;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,6 +14,8 @@ public class GoalApprovalBundleDetailResDto {
     private UUID requestId;
     /** pending | approved | rejected */
     private String status;
+    /** 번들이 활성화(ACTIVATION) 승인인지 종료(COMPLETION) 승인인지 구분. */
+    private BundleApprovalKind approvalKind;
     private String rejectionReason;
     private List<GoalResDto> goals;
     private UUID approverId;
