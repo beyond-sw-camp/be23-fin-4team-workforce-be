@@ -4,7 +4,6 @@ import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
-import com._team._team.evaluation.domain.enums.SeasonPhase;
 import com._team._team.evaluation.dto.reqdto.SeasonCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.SeasonResDto;
@@ -75,31 +74,30 @@ public class EvaluationSeasonController {
         return ResponseEntity.ok(ApiResponse.success(result, "평가 시즌이 시작되었습니다."));
     }
 
+    /**
+     * 시즌 종료 — status 를 CLOSED 로 전이합니다.
+     * 선택적으로 publishResults=true 를 주면 종료와 동시에 결과를 공개합니다(미공개 상태인 경우).
+     */
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PostMapping("/{seasonId}/close")
     public ResponseEntity<ApiResponse<SeasonResDto>> closeSeason(
             @RequestHeader("X-User-CompanyId") String companyId,
-            @PathVariable UUID seasonId) {
-        SeasonResDto result = seasonService.closeSeason(seasonId, UUID.fromString(companyId));
+            @PathVariable UUID seasonId,
+            @RequestParam(value = "publishResults", defaultValue = "false") boolean publishResults) {
+        UUID companyUuid = UUID.fromString(companyId);
+        if (publishResults) {
+            // 이미 공개된 경우엔 내부에서 예외가 나므로 미공개일 때만 시도
+            SeasonResDto current = seasonService.getSeason(seasonId, companyUuid);
+            if (current.getResultsPublishedAt() == null) {
+                responseService.publishResults(seasonId, companyUuid);
+            }
+        }
+        SeasonResDto result = seasonService.closeSeason(seasonId, companyUuid);
         return ResponseEntity.ok(ApiResponse.success(result, "평가 시즌이 종료되었습니다."));
     }
 
     /**
-     * 시즌 페이즈 전이 (SELF_EVAL → PEER_EVAL → ... → CALIBRATION).
-     * CONFIRMED / PUBLISHED 는 별도 엔드포인트(캘리브레이션 확정, 결과 공개)를 사용
-     */
-    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
-    @PostMapping("/{seasonId}/phase")
-    public ResponseEntity<ApiResponse<SeasonResDto>> transitionPhase(
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @PathVariable UUID seasonId,
-            @RequestParam("next") SeasonPhase next) {
-        SeasonResDto result = seasonService.transitionPhase(seasonId, UUID.fromString(companyId), next);
-        return ResponseEntity.ok(ApiResponse.success(result, "평가 페이즈가 전이되었습니다."));
-    }
-
-    /**
-     * 평가 결과 공개 — PUBLISHED 로 전이하고 피드백 면담 자동 생성 이벤트를 발행
+     * 평가 결과 공개 — resultsPublishedAt 을 현재 시각으로 세팅하고 피드백 면담 자동 생성.
      */
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
     @PostMapping("/{seasonId}/publish")

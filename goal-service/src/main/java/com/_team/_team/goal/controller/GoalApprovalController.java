@@ -38,14 +38,14 @@ public class GoalApprovalController {
                 "목표 승인 요청 생성 성공");
     }
 
-    // 목표 승인 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 목표 승인 조회 (가시성 또는 번들 요청자·승인자·워처)
     @GetMapping("/{goalId}/approval")
     public ApiResponse<GoalApprovalResDto> get(
             @PathVariable UUID goalId,
+            @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
-                goalApprovalService.get(goalId, UUID.fromString(companyId)),
+                goalApprovalService.get(goalId, UUID.fromString(companyId), UUID.fromString(memberId)),
                 "목표 승인 조회 성공");
     }
 

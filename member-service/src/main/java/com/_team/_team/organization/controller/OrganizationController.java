@@ -42,7 +42,7 @@ public class OrganizationController {
         );
     }
 
-    @CheckPermission(resource = Resource.ORGANIZATION, action = Action.READ)
+    /** 본인 소속 회사 조직 트리 (서비스에서 member → company 로 한정) */
     @GetMapping("/list")
     public ResponseEntity<?> getOrganizationList(
             @RequestHeader("X-User-UUID") UUID memberId) {

@@ -70,10 +70,12 @@ public class EvaluationGroupController {
     @PostMapping("/{groupId}/evaluator-maps/auto")
     public ResponseEntity<ApiResponse<GroupResDto>> autoAssignEvaluators(
             @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID seasonId,
             @PathVariable UUID groupId,
             @Valid @RequestBody EvaluatorMapAutoReqDto dto) {
-        // TODO: 조직도 기반 자동 매핑 로직 구현
-        return ResponseEntity.ok(ApiResponse.success(null, "평가자 자동 지정이 적용되었습니다."));
+        GroupResDto result = groupService.autoAssignEvaluators(
+                seasonId, groupId, UUID.fromString(companyId), dto.getBasis());
+        return ResponseEntity.ok(ApiResponse.success(result, "평가자 자동 지정이 적용되었습니다."));
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)

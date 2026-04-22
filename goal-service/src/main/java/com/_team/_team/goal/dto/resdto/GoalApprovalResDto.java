@@ -1,5 +1,6 @@
 package com._team._team.goal.dto.resdto;
 
+import com._team._team.goal.domain.enums.BundleApprovalKind;
 import com._team._team.goal.domain.enums.GoalApprovalStatus;
 import com._team._team.goal.domain.enums.GoalApprovalDecision;
 import lombok.Builder;
@@ -16,6 +17,8 @@ public class GoalApprovalResDto {
     /** 승인 번들 ID — 명세의 approvalRequestId / 프론트 requestId */
     private UUID requestId;
     private GoalApprovalStatus approvalStatus;
+    /** 번들이 활성화(ACTIVATION) 승인인지 종료(COMPLETION) 승인인지 구분. */
+    private BundleApprovalKind approvalKind;
     private UUID approverId;
     private GoalApprovalDecision decision;
     private LocalDateTime decidedAt;
