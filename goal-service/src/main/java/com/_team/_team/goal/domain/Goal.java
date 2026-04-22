@@ -147,6 +147,15 @@ public class Goal extends BaseTimeEntity {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    /**
+     * 목표 생성 시 지정한 "종료(완료) 승인자".
+     * 초기 활성 승인과 완료 승인에 모두 기본값으로 사용된다.
+     * 완료 승인 요청 시 요청자가 별도로 지정하지 않으면 이 값이 적용.
+     * null 이면 완료 승인 요청 시 반드시 지정해야 한다.
+     */
+    @Column(name = "completion_approver_id")
+    private UUID completionApproverId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "goal_approval_status", nullable = false, length = 32)
     @Builder.Default
@@ -271,5 +280,13 @@ public class Goal extends BaseTimeEntity {
 
     public void updateGoalApprovalStatus(GoalApprovalStatus goalApprovalStatus) {
         this.goalApprovalStatus = goalApprovalStatus;
+    }
+
+    /**
+     * 목표 생성 이후에도 종료 승인자를 바꿀 수 있게 허용.
+     * null 이면 "지정 해제" 로 간주 (이 경우 완료 제출 시 DTO 로 지정 필수).
+     */
+    public void updateCompletionApproverId(UUID approverId) {
+        this.completionApproverId = approverId;
     }
 }

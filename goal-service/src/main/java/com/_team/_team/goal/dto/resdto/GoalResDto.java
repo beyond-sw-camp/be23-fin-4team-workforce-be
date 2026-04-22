@@ -61,6 +61,8 @@ public class GoalResDto {
     private KpiCycle cycle;
     private UUID approvedBy;
     private LocalDateTime approvedAt;
+    /** 목표 생성 시 지정된 "종료 승인자". 완료 요청 모달에서 기본값으로 사용된다. */
+    private UUID completionApproverId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -109,6 +111,7 @@ public class GoalResDto {
                 .cycle(goal.getCycle() != null ? goal.getCycle() : (goal.getKpiTemplate() != null ? goal.getKpiTemplate().getCycle() : null))
                 .approvedBy(goal.getApprovedBy())
                 .approvedAt(goal.getApprovedAt())
+                .completionApproverId(goal.getCompletionApproverId())
                 .createdAt(goal.getCreatedAt())
                 .updatedAt(goal.getUpdatedAt())
                 .build();

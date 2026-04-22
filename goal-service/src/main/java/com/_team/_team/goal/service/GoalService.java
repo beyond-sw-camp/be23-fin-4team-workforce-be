@@ -137,6 +137,9 @@ public class GoalService {
                 .visibility(dto.getVisibility())
                 .status(GoalStatus.DRAFT)
                 .rollupPolicy(rollup)
+                // 생성 시 지정한 approverId 를 "종료 승인자" 로 영구 저장.
+                // 완료 제출 때 별도 지정 없이도 이 값이 기본 승인자로 사용됨.
+                .completionApproverId(dto.getApproverId())
                 .build();
 
         Goal saved = goalRepository.save(goal);
@@ -425,15 +428,40 @@ public class GoalService {
         if (goal.getStatus() != GoalStatus.ACTIVE) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "진행 중(ACTIVE) 목표만 완료 제출할 수 있습니다.");
         }
-        boolean isOwner = goal.getOwnerType() == GoalOwnerType.MEMBER && goal.getOwnerId().equals(requesterId);
-        if (!isOwner && !hasGoalUpdatePermission) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "본인 목표 또는 목표 수정 권한자만 완료 제출할 수 있습니다.");
+
+        // [완료 승인 요청 권한] 본인(owner) 만 허용.
+        // 기존엔 GOAL:UPDATE 권한자도 가능했지만, "완료 여부"는 목표 당사자만 선언할 수 있도록 엄격화.
+        //   - MEMBER 목표: ownerId 가 요청자와 동일해야 함
+        //   - TEAM 목표: 후속 정책 필요 (현재는 팀 owner 자체가 UUID 기준 매칭이 어려우므로 일단 막음)
+        boolean isOwner = goal.getOwnerType() == GoalOwnerType.MEMBER
+                && goal.getOwnerId().equals(requesterId);
+        if (!isOwner) {
+            throw new BusinessException(HttpStatus.FORBIDDEN,
+                    "목표 당사자(소유자)만 완료 승인 요청을 제출할 수 있습니다.");
         }
         if (goal.getGoalApprovalStatus() == GoalApprovalStatus.PENDING) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 승인 요청이 진행 중입니다.");
         }
+
+        // [승인자 결정] DTO.approverId > Goal.completionApproverId > 400
+        //   - 목표 생성 시 이미 지정된 승인자(goal.completionApproverId)가 있으면 그대로 사용
+        //   - DTO 로 오버라이드된 값이 오면 그 값 사용 + Goal 엔티티에도 갱신 (향후 다시 승인 요청 시 재사용)
+        //   - 둘 다 없으면 400
+        UUID resolvedApproverId = dto.getApproverId() != null
+                ? dto.getApproverId()
+                : goal.getCompletionApproverId();
+        if (resolvedApproverId == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "종료 승인자가 지정되지 않았습니다. 목표 생성 시 지정하거나 완료 요청 시 명시해주세요.");
+        }
+        if (dto.getApproverId() != null
+                && !dto.getApproverId().equals(goal.getCompletionApproverId())) {
+            // 사용자가 명시적으로 바꿨으면 향후 기본값으로도 사용되도록 Goal 엔티티에 반영.
+            goal.updateCompletionApproverId(dto.getApproverId());
+        }
+
         GoalApprovalRequestCreateReqDto ar = new GoalApprovalRequestCreateReqDto();
-        ar.setApproverId(dto.getApproverId());
+        ar.setApproverId(resolvedApproverId);
         goalApprovalService.request(goalId, requesterId, requesterCompanyId, ar, dto.getSummary(), dto.getEvidenceFiles());
         String summary = (dto.getSummary() != null && !dto.getSummary().isBlank())
                 ? dto.getSummary().trim()
