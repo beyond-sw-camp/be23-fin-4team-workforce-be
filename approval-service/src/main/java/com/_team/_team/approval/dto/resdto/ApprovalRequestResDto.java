@@ -34,6 +34,7 @@ public class ApprovalRequestResDto {
     private String isDeptVisibleYn;
     private List<ApprovalLineResDto> approvalLines;
     private List<ApprovalViewerResDto> viewers;
+    private String sendYn;
 
 
     // === 요청자 스냅샷 ===
@@ -73,6 +74,7 @@ public class ApprovalRequestResDto {
                 .recipients(recipients)
                 .isDeptVisibleYn(entity.getIsDeptVisibleYn())
                 .formSchemaSnapshot(entity.getFormSchemaSnapshot())
+                .sendYn(entity.getSendYn())
                 .build();
     }
 

@@ -138,7 +138,7 @@ public class ApprovalRequestService {
             }
         }
 
-        // stepOrder 연속성 검증dfdfd
+        // stepOrder 연속성 검증
         if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
             List<Integer> orders = reqDto.getApprovalLines().stream()
                     .map(ApprovalRequestCreateReqDto.ApprovalLineItem::getStepOrder)
@@ -155,7 +155,13 @@ public class ApprovalRequestService {
 
         // === 요청자 스냅샷 조회 ===
         // member-service에 요청자 정보 조회 (Feign 실패 시 트랜잭션 롤백)
-        MemberPositionResDto requester = memberServiceClient.getMemberPosition(memberPositionId);
+        MemberPositionResDto requester;
+        try {
+            requester = memberServiceClient.getMemberPosition(memberPositionId);
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "인사 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+        }
         if (requester == null) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "요청자 정보를 찾을 수 없습니다.");
         }
@@ -231,12 +237,11 @@ public class ApprovalRequestService {
         // 알림 발행 - WAIT 제출 시에만
         if (savedRequest.getRequestStatus() == RequestStatus.WAIT) {
 
-            // 공문이면 번호 생성
-            if (document.getRequestType() == RequestType.OFFICIAL) {
-                String docNumber = officialNumberService.generate(savedRequest.getRequestId());
-                savedRequest.updateDocumentNumber(docNumber);
-            }
-            // 일반 → 첫 결재자에게 알림
+            // 문서 번호 생성
+            String docNumber = officialNumberService.generate(document.getRequestType());
+            savedRequest.updateDocumentNumber(docNumber);
+
+            // 첫 결재자에게 알림
             Approval firstApproval = savedApprovals.stream()
                     .filter(a -> a.getStepOrder() == 1)
                     .findFirst()
@@ -281,7 +286,13 @@ public class ApprovalRequestService {
                     .findByApprovalRequest_RequestId(requestId);
 
             // 현재 로그인 유저의 조직 ID 조회 (기존 Feign 재활용)
-            MemberPositionResDto me = memberServiceClient.getMemberPosition(memberPositionId);
+            MemberPositionResDto me;
+            try {
+                me = memberServiceClient.getMemberPosition(memberPositionId);
+            } catch (Exception e) {
+                throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE,
+                        "인사 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+            }
             UUID myOrgId = (me != null) ? me.getOrganizationId() : null;
 
             if (!canAccessOfficial(memberId, myOrgId, request, approvals, viewers, recipients)) {
@@ -536,10 +547,6 @@ public class ApprovalRequestService {
         List<OfficialRecipientResDto> recipientDtos = savedRecipients.stream()
                 .map(OfficialRecipientResDto::fromEntity)
                 .toList();
-
-        // 검색 인덱싱 이벤트 발행
-        eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
-
         return ApprovalRequestResDto.fromEntity(request, savedApprovals, savedViewers, recipientDtos);
 
     }
@@ -564,10 +571,16 @@ public class ApprovalRequestService {
         }
 
         // DRAFT, WAIT만 취소 가능
-        if (request.getRequestStatus() != RequestStatus.DRAFT
-                && request.getRequestStatus() != RequestStatus.WAIT) {
+        boolean isDraftOrWait = request.getRequestStatus() == RequestStatus.DRAFT
+                || request.getRequestStatus() == RequestStatus.WAIT;
+
+        boolean isApprovedOfficialNotSent = request.getRequestStatus() == RequestStatus.APPROVED
+                && request.getRequestType() == RequestType.OFFICIAL
+                && "N".equals(request.getSendYn());
+
+        if (!isDraftOrWait && !isApprovedOfficialNotSent) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "임시저장(DRAFT) 또는 결재대기(WAIT) 상태에서만 취소 가능합니다.");
+                    "취소할 수 없는 상태입니다.");
         }
 
         // 취소사유 필수 검증
@@ -600,6 +613,11 @@ public class ApprovalRequestService {
             approvalNotificationService.notifyCanceled(request, activeApproval, viewers);
         }
 
+        // 승인 완료된 공문 미발송 취소 시 → 결재자 + 참조자에게 알림
+        if (prevStatus == RequestStatus.APPROVED) {
+            approvalNotificationService.notifyOfficialCanceled(request, approvals, viewers);
+        }
+
         List<OfficialRecipientResDto> recipientDtos = null;
         if (request.getRequestType() == RequestType.OFFICIAL) {
             recipientDtos = officialRecipientRepository
@@ -621,7 +639,13 @@ public class ApprovalRequestService {
             UUID companyId, UUID memberPositionId, UUID memberId, UUID organizationId, RequestType requestType) {
 
         // 1. 요청자 본인 정보 조회
-        MemberPositionResDto requester = memberServiceClient.getMemberPosition(memberPositionId);
+        MemberPositionResDto requester;
+        try {
+            requester = memberServiceClient.getMemberPosition(memberPositionId);
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "인사 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+        }
         if (requester == null) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
         }
@@ -668,7 +692,13 @@ public class ApprovalRequestService {
     public List<ApprovalRequestResDto> findReceivedOfficials(
             UUID companyId, UUID memberPositionId) {
 
-        MemberPositionResDto me = memberServiceClient.getMemberPosition(memberPositionId);
+        MemberPositionResDto me;
+        try {
+            me = memberServiceClient.getMemberPosition(memberPositionId);
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "인사 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+        }
         if (me == null || me.getOrganizationId() == null) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
         }
@@ -700,9 +730,13 @@ public class ApprovalRequestService {
 
         for (int i = 0; i < maxDepth && currentId != null; i++) {
             orgIds.add(currentId);
-            OrganizationResDto org = memberServiceClient.getOrganization(currentId);
-            if (org == null || org.getParentId() == null) break;
-            currentId = org.getParentId();
+            try {
+                OrganizationResDto org = memberServiceClient.getOrganization(currentId);
+                if (org == null || org.getParentId() == null) break;
+                currentId = org.getParentId();
+            } catch (Exception e) {
+                break; // 조직 조회 실패 시 현재까지 수집된 목록으로 진행
+            }
         }
 
         return orgIds;
@@ -719,6 +753,62 @@ public class ApprovalRequestService {
                 .map(this::toResDtoWithRecipients)
                 .toList();
     }
+
+//    공문 발송 (기안자 수동 발송)
+@Transactional
+public ApprovalRequestResDto sendOfficial(UUID companyId, UUID memberId, UUID memberPositionId, UUID requestId) {
+
+    ApprovalRequest request = approvalRequestRepository.findByIdWithDocument(requestId)
+            .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "결재 요청을 찾을 수 없습니다."));
+
+    // 회사 검증
+    if (!request.getApprovalDocument().getCompanyId().equals(companyId)) {
+        throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+    }
+
+    // 기안자 본인 검증
+    if (!request.getMemberId().equals(memberId)) {
+        throw new BusinessException(HttpStatus.FORBIDDEN, "기안자만 공문을 발송할 수 있습니다.");
+    }
+
+    // OFFICIAL 타입 검증
+    if (request.getRequestType() != RequestType.OFFICIAL) {
+        throw new BusinessException(HttpStatus.BAD_REQUEST, "공문 타입의 결재만 발송할 수 있습니다.");
+    }
+
+    // 승인 상태 검증
+    if (request.getRequestStatus() != RequestStatus.APPROVED) {
+        throw new BusinessException(HttpStatus.BAD_REQUEST, "승인된 결재만 발송할 수 있습니다.");
+    }
+
+    // 중복 발송 방지
+    if ("Y".equals(request.getSendYn())) {
+        throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 발송된 공문입니다.");
+    }
+
+    // 수신 부서 존재 여부 검증
+    List<OfficialRecipient> recipients = officialRecipientRepository
+            .findByApprovalRequest_RequestId(requestId);
+    if (recipients.isEmpty()) {
+        throw new BusinessException(HttpStatus.BAD_REQUEST, "수신 부서가 없습니다.");
+    }
+
+    // 발송 처리
+    request.send();
+
+    // 공문 발송 이벤트 발행 (Kafka)
+    approvalNotificationService.publishOfficialApprovedEvent(request);
+
+    List<Approval> approvals = approvalRepository.findByRequestIdWithRequest(requestId);
+    List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
+
+    List<OfficialRecipientResDto> recipientDtos = recipients.stream()
+            .map(OfficialRecipientResDto::fromEntity)
+            .toList();
+
+    return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
+}
+
     // ======== 검색 인덱싱 이벤트 처리 (Outbox 패턴) ========
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

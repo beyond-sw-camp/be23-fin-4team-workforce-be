@@ -28,7 +28,7 @@ public class MemberHiredEventListener {
                 .jobGradeName(e.getJobGradeName())
                 .jobTitleName(e.getJobTitleName())
                 .hireDate(e.getHireDate())
-                .baseSalary(e.getBaseSalary())
+//                .baseSalary(e.getBaseSalary())
                 .eventTime(Instant.now())
                 .build();
         try {

@@ -174,4 +174,8 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
          AND b.isExpireYn = 'N'
        """)
     List<MemberBalance> findAllToExpire(@Param("today") LocalDate today);
+
+    // 휴가 신청 시 휴가 잔고 사전 체크
+    Optional<MemberBalance> findByCompanyIdAndMemberIdAndBalanceTypeAndDelYn(
+            UUID companyId, UUID memberId, BalanceType balanceType, String delYn);
 }

@@ -1,8 +1,6 @@
 package com._team._team.salary.service;
 
-import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.MonthlyAttendanceLedger;
-import com._team._team.attendance.domain.enums.AttendanceStatus;
 import com._team._team.attendance.repository.MonthlyAttendanceLedgerRepository;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.repository.TaxRateRepository;
@@ -39,55 +37,13 @@ public class PayrollCalculationService {
         this.monthlyAttendanceLedgerRepository = monthlyAttendanceLedgerRepository;
     }
 
-    // 1. 정산기간 산출
-    public SettlementPeriod calculateSettlementPeriod(UUID companyId, LocalDate payrollDate){
-
-        // 활성 급여정책 조회
-        List<SalaryPolicy> policies = salaryPolicyRepository.findActivePolicies(companyId, payrollDate);
-
-        // 정책 없으면 fallback : 당월 1일 ~ 당월 말일
-        if(policies.isEmpty()){
-            return new SettlementPeriod(
-                    payrollDate.withDayOfMonth(1),
-                    payrollDate.withDayOfMonth(payrollDate.lengthOfMonth())
-            );
-        }
-        // 가장 최신 정책
-        SalaryPolicy policy = policies.get(0);
-        int payDay = policy.getPayDay();
-
-        // 정산 시작일 결정
-        LocalDate from;
-        if(policy.getPeriodStartType() == PeriodStartType.FIRST){
-            // FIRST: 당월 1일
-            from = payrollDate.withDayOfMonth(1);
-        } else {
-            // SPECIFIC: 전월 (payDay + 1)일
-            LocalDate prevMonth = payrollDate.minusMonths(1);
-            int startDay = payDay + 1;
-
-            if(startDay > prevMonth.lengthOfMonth()){
-                // payDay+1 이 전월 일수 초과 시 -> 당월 1일로 보정
-                from = payrollDate.withDayOfMonth(1);
-            }else {
-                from = prevMonth.withDayOfMonth(startDay);
-            }
-        }
-
-        // 정산 종료일 결정
-        LocalDate to;
-        if(policy.getPeriodEndType() == PeriodEndType.LAST) {
-            // LAST : 당월 말일
-            to = payrollDate.withDayOfMonth(payrollDate.lengthOfMonth());
-        }else {
-            // SPECIFIC : 당월 payDay (말일 보정)
-            int endDay = Math.min(payDay, payrollDate.lengthOfMonth());
-            to = payrollDate.withDayOfMonth(endDay);
-        }
-
-        return new SettlementPeriod(from, to);
+     // 1. 정산 기간 계산, 매월 1일 ~ 말일 고정
+    public SettlementPeriod calculateSettlementPeriod(UUID companyId, LocalDate payrollDate) {
+        return new SettlementPeriod(
+                payrollDate.withDayOfMonth(1),
+                payrollDate.withDayOfMonth(payrollDate.lengthOfMonth())
+        );
     }
-
     // 2. 활성 급여정책 단건 조회
     public SalaryPolicy findActivePolicy(UUID companyId, LocalDate payrollDate) {
         List<SalaryPolicy> policies = salaryPolicyRepository.findActivePolicies(companyId, payrollDate);
@@ -97,7 +53,7 @@ public class PayrollCalculationService {
     // 3. 월 장부 조회, 마감 안됐거나 잠금 해제 상태면 예외
     public MonthlyAttendanceLedger findLedger(UUID memberId, YearMonth yearMonth) {
         return monthlyAttendanceLedgerRepository
-                .findByMemberIdAndYearMonth(memberId, yearMonth.toString())
+                .findByMemberIdAndLedgerYearMonth(memberId, yearMonth.toString())
                 .orElseThrow(() -> new IllegalStateException(
                         "월 장부가 없습니다. memberId=" + memberId + " yearMonth=" + yearMonth));
     }
