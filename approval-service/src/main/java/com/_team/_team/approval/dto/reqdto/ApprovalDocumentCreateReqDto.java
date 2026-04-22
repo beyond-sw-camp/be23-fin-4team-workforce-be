@@ -26,7 +26,11 @@ public class ApprovalDocumentCreateReqDto {
     @NotNull(message = "요청 타입은 필수입니다.")
     private RequestType requestType;
 
-    private String isDeptVisibleYn; // null 허용, 생성 시 기본값 'Y'
+    private String isCalendarVisibleYn;
+    private String calendarDisplayName;
+    private String calendarStartField;
+    private String calendarEndField;
+    private String calendarTitleField;
 
     public ApprovalDocument toEntity(UUID companyId) {
         return ApprovalDocument.builder()
@@ -34,7 +38,11 @@ public class ApprovalDocumentCreateReqDto {
                 .documentName(documentName)
                 .formSchema(formSchema)
                 .requestType(requestType)
-                .isDeptVisibleYn(isDeptVisibleYn != null ? isDeptVisibleYn : "Y")
+                .isCalendarVisibleYn(isCalendarVisibleYn != null ? isCalendarVisibleYn : "N")
+                .calendarDisplayName(calendarDisplayName)
+                .calendarStartField(calendarStartField)
+                .calendarEndField(calendarEndField)
+                .calendarTitleField(calendarTitleField)
                 .build();
     }
 }

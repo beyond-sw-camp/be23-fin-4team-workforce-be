@@ -123,28 +123,5 @@ public class ApprovalDocumentController {
         );
     }
 
-    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
-    @PatchMapping("/{documentId}/dept-visible/enable")
-    public ResponseEntity<?> enableDeptVisible(
-            @RequestHeader("X-User-CompanyId") UUID companyId,
-            @PathVariable UUID documentId) {
-        ApprovalDocumentResDto resDto = approvalDocumentService.enableDeptVisible(companyId, documentId);
-        return new ResponseEntity<>(
-                ApiResponse.success(resDto, "부서 문서함 노출이 활성화되었습니다."),
-                HttpStatus.OK
-        );
-    }
-
-    @CheckPermission(resource = Resource.APPROVAL_AD, action = Action.UPDATE)
-    @PatchMapping("/{documentId}/dept-visible/disable")
-    public ResponseEntity<?> disableDeptVisible(
-            @RequestHeader("X-User-CompanyId") UUID companyId,
-            @PathVariable UUID documentId) {
-        ApprovalDocumentResDto resDto = approvalDocumentService.disableDeptVisible(companyId, documentId);
-        return new ResponseEntity<>(
-                ApiResponse.success(resDto, "부서 문서함 노출이 비활성화되었습니다."),
-                HttpStatus.OK
-        );
-    }
 
 }
