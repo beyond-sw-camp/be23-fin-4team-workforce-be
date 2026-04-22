@@ -24,9 +24,11 @@ import com._team._team.event.OvertimeApprovalEvent;
 import com._team._team.event.ScheduleApprovalEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import com._team._team.event.ApprovalChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,7 @@ public class ApprovalService {
     private final OfficialNumberService officialNumberService;
     private final OfficialRecipientRepository officialRecipientRepository;
     private final MemberServiceClient memberServiceClient;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
     public ApprovalService(ApprovalRepository approvalRepository,
@@ -65,7 +68,7 @@ public class ApprovalService {
                            ObjectMapper objectMapper,
                            OfficialNumberService officialNumberService,
                            OfficialRecipientRepository officialRecipientRepository,
-                           MemberServiceClient memberServiceClient) {
+                           MemberServiceClient memberServiceClient, ApplicationEventPublisher eventPublisher) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
@@ -79,6 +82,7 @@ public class ApprovalService {
         this.officialNumberService = officialNumberService;
         this.officialRecipientRepository = officialRecipientRepository;
         this.memberServiceClient = memberServiceClient;
+        this.eventPublisher = eventPublisher;
     }
 
 
@@ -214,6 +218,10 @@ public class ApprovalService {
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
         }
+
+        // 검색 인덱싱 이벤트 발행
+        eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
 
     }
@@ -294,6 +302,10 @@ public class ApprovalService {
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
         }
+
+        // 검색 인덱스 이벤트 발행
+        eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
     }
 
