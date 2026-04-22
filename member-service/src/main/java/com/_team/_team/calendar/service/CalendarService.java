@@ -81,6 +81,11 @@ public class CalendarService {
                                     CalendarEventUpdateReqDto reqDto) {
         CalendarEvent event = getEvent(eventId);
 
+        if (event.getEventType() == EventType.APPROVAL) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "결재 연동 일정은 수정/삭제할 수 없습니다.");
+        }
+
         validateOwner(event, memberId);
         validateEventType(event, EventType.PERSONAL);
         validateDate(reqDto.getStartAt(), reqDto.getEndAt());
@@ -97,6 +102,11 @@ public class CalendarService {
     // 개인 일정 삭제 (본인만)
     public void deletePersonalEvent(UUID memberId, UUID eventId) {
         CalendarEvent event = getEvent(eventId);
+
+        if (event.getEventType() == EventType.APPROVAL) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "결재 연동 일정은 수정/삭제할 수 없습니다.");
+        }
 
         validateOwner(event, memberId);
         validateEventType(event, EventType.PERSONAL);
@@ -270,6 +280,19 @@ public class CalendarService {
 
             if (position != null) {
                 events.addAll(calendarEventRepository.findTeamByMonth(
+                        position.getOrganization().getOrganizationId(),
+                        startAt, endAt));
+            }
+        }
+
+        if (eventType == null || eventType == EventType.APPROVAL) {
+            MemberPosition position = memberPositionRepository
+                    .findById(member.getDefaultPositionId())
+                    .orElse(null);
+
+            if (position != null) {
+                events.addAll(calendarEventRepository.findApprovalByMonth(
+                        member,
                         position.getOrganization().getOrganizationId(),
                         startAt, endAt));
             }

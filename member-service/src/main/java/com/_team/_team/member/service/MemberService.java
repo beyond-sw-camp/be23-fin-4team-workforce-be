@@ -606,6 +606,10 @@ public class MemberService {
                 .build();
 
         employmentJobHistoryRepository.save(history);
+
+        // 임시 비밀번호 로그로 보기
+        log.info("Email: {}, TempPassword: {}", companyEmail, tempPassword);
+
         // 13. 임시 비밀번호 개인 이메일로 발송
         mailService.sendTempPassword(reqDto.getPersonalEmail(), companyEmail, tempPassword);
 
@@ -619,8 +623,8 @@ public class MemberService {
                 jobGrade.getJobGradeId(),
                 jobGrade.getName(),
                 jobTitle.getName(),
-                reqDto.getJoinDate(),
-                reqDto.getBaseSalary()
+                reqDto.getJoinDate()
+//                reqDto.getBaseSalary()
         ));
     }
 

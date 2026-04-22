@@ -16,5 +16,5 @@ public class MemberHiredInternalEvent {
     private String jobGradeName;
     private String jobTitleName;
     private LocalDate hireDate;
-    private Long baseSalary;
+//    private Long baseSalary;
 }

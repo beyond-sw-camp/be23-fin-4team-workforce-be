@@ -57,4 +57,21 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, UU
                          @Param("startAt") LocalDateTime startAt,
                          @Param("endAt") LocalDateTime endAt);
 
+    // 결재 일정 조회 (본인 + 본인 부서)
+    @Query("SELECT c FROM CalendarEvent c " +
+            "WHERE c.eventType = 'APPROVAL' " +
+            "AND c.delYn = 'NO' " +
+            "AND (c.member = :member OR c.organizationId = :organizationId) " +
+            "AND c.startAt < :endAt " +
+            "AND c.endAt >= :startAt " +
+            "ORDER BY c.startAt ASC")
+    List<CalendarEvent> findApprovalByMonth(
+            @Param("member") Member member,
+            @Param("organizationId") UUID organizationId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt);
+
+    // referenceId로 존재 여부 확인 (중복 방지)
+    boolean existsByReferenceId(UUID referenceId);
+
 }

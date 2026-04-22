@@ -209,10 +209,6 @@ public class ApprovalDocumentService {
                         + "\"options\":[\"연차\",\"반차(오전)\",\"반차(오후)\",\"경조휴가\",\"공가\",\"병가\",\"예비군\",\"민방위\"]},"
                         + "{\"name\":\"startDate\",\"label\":\"시작일\",\"type\":\"date\"},"
                         + "{\"name\":\"endDate\",\"label\":\"종료일\",\"type\":\"date\"},"
-                        + "{\"name\":\"halfDayStart\",\"label\":\"반차여부 - 시작일\",\"type\":\"select\","
-                        + "\"options\":[\"해당없음\",\"오전前\",\"오전後\",\"오후前\",\"오후後\"]},"
-                        + "{\"name\":\"halfDayEnd\",\"label\":\"반차여부 - 종료일\",\"type\":\"select\","
-                        + "\"options\":[\"해당없음\",\"오전前\",\"오전後\",\"오후前\",\"오후後\"]},"
                         + "{\"name\":\"usageDays\",\"label\":\"사용일수\",\"type\":\"number\"},"
                         + "{\"name\":\"reason\",\"label\":\"휴가 사유\",\"type\":\"textarea\"}"
                         + "]}")
@@ -347,6 +343,11 @@ public class ApprovalDocumentService {
         }
 
         ApprovalDocument document = reqDto.toEntity(companyId);
+
+        // 캘린더 연동 검증
+        validateCalendarFields(reqDto.getIsCalendarVisibleYn(),
+                reqDto.getCalendarDisplayName(), reqDto.getCalendarStartField());
+
         ApprovalDocument saved = approvalDocumentRepository.save(document);
         return ApprovalDocumentResDto.fromEntity(saved);
     }
@@ -368,7 +369,34 @@ public class ApprovalDocumentService {
         // formSchema 업데이트
         document.updateFormSchema(reqDto.getFormSchema());
 
+        // 캘린더 설정 업데이트
+        if (reqDto.getIsCalendarVisibleYn() != null) {
+            validateCalendarFields(reqDto.getIsCalendarVisibleYn(),
+                    reqDto.getCalendarDisplayName(), reqDto.getCalendarStartField());
+            document.updateCalendarSettings(
+                    reqDto.getIsCalendarVisibleYn(),
+                    reqDto.getCalendarDisplayName(),
+                    reqDto.getCalendarStartField(),
+                    reqDto.getCalendarEndField(),
+                    reqDto.getCalendarTitleField());
+        }
+
         return ApprovalDocumentResDto.fromEntity(document);
+    }
+
+    private void validateCalendarFields(String isCalendarVisibleYn,
+                                        String calendarDisplayName,
+                                        String calendarStartField) {
+        if ("Y".equals(isCalendarVisibleYn)) {
+            if (calendarDisplayName == null || calendarDisplayName.isBlank()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "캘린더 연동 시 캘린더 표시명은 필수입니다.");
+            }
+            if (calendarStartField == null || calendarStartField.isBlank()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "캘린더 연동 시 시작일 필드는 필수입니다.");
+            }
+        }
     }
 
     /**
