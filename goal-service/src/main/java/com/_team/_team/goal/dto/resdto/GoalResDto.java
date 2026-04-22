@@ -25,6 +25,11 @@ public class GoalResDto {
     private UUID parentGoalId;
     private GoalOwnerType ownerType;
     private UUID ownerId;
+    /**
+     * TEAM 목표의 책임자 memberId. MEMBER 목표는 null (ownerId 자체가 책임자).
+     * 프론트에서 완료 요청 가능 여부, 책임자 뱃지 표시 등에 사용.
+     */
+    private UUID responsibleMemberId;
     private String title;
     private String description;
     private LocalDate startDate;
@@ -77,6 +82,7 @@ public class GoalResDto {
                 .parentGoalId(goal.getParentGoal() != null ? goal.getParentGoal().getGoalId() : null)
                 .ownerType(goal.getOwnerType())
                 .ownerId(goal.getOwnerId())
+                .responsibleMemberId(goal.getResponsibleMemberId())
                 .title(goal.getTitle())
                 .description(goal.getDescription())
                 .startDate(goal.getStartDate())

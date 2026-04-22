@@ -72,8 +72,22 @@ public class Goal extends BaseTimeEntity {
     @Column(name = "owner_type", nullable = false)
     private GoalOwnerType ownerType;
 
+    /**
+     * owner_type == MEMBER : 소유 사원의 memberId
+     * owner_type == TEAM   : 소유 조직의 organizationId (사람이 아니라 조직 UUID)
+     */
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
+
+    /**
+     * [TEAM 목표 책임자]
+     *   - owner_type == TEAM 일 때만 사용.
+     *   - 이 팀 목표의 "완료 승인 요청 주도자" — 진행률 편집 주도자이기도 함.
+     *   - MEMBER 목표는 null (ownerId 가 곧 책임자이므로 중복 저장 불필요).
+     *   - 팀장 교체/이전 시 PATCH /goal/{id}/responsible 로 변경.
+     */
+    @Column(name = "responsible_member_id")
+    private UUID responsibleMemberId;
 
     @Column(name = "title", length = 300, nullable = false)
     private String title;
@@ -288,5 +302,12 @@ public class Goal extends BaseTimeEntity {
      */
     public void updateCompletionApproverId(UUID approverId) {
         this.completionApproverId = approverId;
+    }
+
+    /**
+     * TEAM 목표의 책임자 교체. MEMBER 목표는 의미 없으므로 호출부에서 가드 필요.
+     */
+    public void updateResponsibleMemberId(UUID responsibleMemberId) {
+        this.responsibleMemberId = responsibleMemberId;
     }
 }

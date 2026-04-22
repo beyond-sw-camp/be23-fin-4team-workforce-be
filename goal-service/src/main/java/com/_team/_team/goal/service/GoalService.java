@@ -58,6 +58,9 @@ public class GoalService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "타사의 목표를 생성할 수 없습니다.");
         }
 
+        // [TEAM 목표] 책임자는 팀 목표에서 필수, MEMBER 목표에서는 무시.
+        UUID responsibleMemberId = resolveResponsibleMemberIdForCreate(dto);
+
         BigDecimal baseline = dto.getBaseline() != null ? dto.getBaseline() : BigDecimal.ZERO;
         if (dto.getTargetValue().compareTo(baseline) == 0) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "목표값은 기준값과 달라야 합니다.");
@@ -140,6 +143,8 @@ public class GoalService {
                 // 생성 시 지정한 approverId 를 "종료 승인자" 로 영구 저장.
                 // 완료 제출 때 별도 지정 없이도 이 값이 기본 승인자로 사용됨.
                 .completionApproverId(dto.getApproverId())
+                // [TEAM 목표] 책임자 — MEMBER 목표는 null.
+                .responsibleMemberId(responsibleMemberId)
                 .build();
 
         Goal saved = goalRepository.save(goal);
@@ -284,8 +289,14 @@ public class GoalService {
                 goal.getOwnerType() == GoalOwnerType.MEMBER
                         && actorMemberId != null
                         && goal.getOwnerId().equals(actorMemberId);
-        if (!hasGoalUpdatePermission && !isOwnMemberGoal) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "본인 목표 또는 목표 수정 권한자만 수정할 수 있습니다.");
+        // TEAM 목표는 책임자도 자기 목표 편집으로 간주 (운영 우회 분기와 별개)
+        boolean isTeamResponsible =
+                goal.getOwnerType() == GoalOwnerType.ORGANIZATION
+                        && actorMemberId != null
+                        && actorMemberId.equals(goal.getResponsibleMemberId());
+        if (!hasGoalUpdatePermission && !isOwnMemberGoal && !isTeamResponsible) {
+            throw new BusinessException(HttpStatus.FORBIDDEN,
+                    "본인 목표(또는 팀 목표 책임자) 및 목표 수정 권한자만 수정할 수 있습니다.");
         }
 
         goal.updateExtended(
@@ -300,6 +311,18 @@ public class GoalService {
                 dto.getVisibleTeamIds(),
                 dto.getMemberIds(),
                 dto.getCycle());
+
+        // [TEAM 목표] 책임자 교체 — GOAL:UPDATE 권한자만 변경 가능 (셀프 교체 차단).
+        if (dto.getResponsibleMemberId() != null) {
+            if (goal.getOwnerType() != GoalOwnerType.ORGANIZATION) {
+                // MEMBER 목표에 책임자 지정이 오면 무시 (엔티티 저장 안 함)
+            } else if (!hasGoalUpdatePermission) {
+                throw new BusinessException(HttpStatus.FORBIDDEN,
+                        "팀 목표 책임자 교체는 목표 수정 권한자만 가능합니다.");
+            } else {
+                goal.updateResponsibleMemberId(dto.getResponsibleMemberId());
+            }
+        }
 
         if (dto.getRollupPolicy() != null) {
             goal.updateRollupPolicy(dto.getRollupPolicy());
@@ -429,15 +452,17 @@ public class GoalService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "진행 중(ACTIVE) 목표만 완료 제출할 수 있습니다.");
         }
 
-        // [완료 승인 요청 권한] 본인(owner) 만 허용.
-        // 기존엔 GOAL:UPDATE 권한자도 가능했지만, "완료 여부"는 목표 당사자만 선언할 수 있도록 엄격화.
-        //   - MEMBER 목표: ownerId 가 요청자와 동일해야 함
-        //   - TEAM 목표: 후속 정책 필요 (현재는 팀 owner 자체가 UUID 기준 매칭이 어려우므로 일단 막음)
-        boolean isOwner = goal.getOwnerType() == GoalOwnerType.MEMBER
-                && goal.getOwnerId().equals(requesterId);
-        if (!isOwner) {
+        // [완료 승인 요청 권한]
+        //   - MEMBER 목표: ownerId == requesterId
+        //   - TEAM 목표: responsibleMemberId == requesterId
+        //                || participantMemberIds 에 포함
+        //                || hasGoalUpdatePermission (운영 우회)
+        //   운영 우회(GOAL:UPDATE)는 TEAM 목표에만 허용 — MEMBER 목표는 본인만 선언 가능.
+        if (!canRequestCompletion(goal, requesterId, hasGoalUpdatePermission)) {
             throw new BusinessException(HttpStatus.FORBIDDEN,
-                    "목표 당사자(소유자)만 완료 승인 요청을 제출할 수 있습니다.");
+                    goal.getOwnerType() == GoalOwnerType.ORGANIZATION
+                            ? "팀 목표 책임자 또는 참여자만 완료 승인 요청을 제출할 수 있습니다."
+                            : "목표 당사자(소유자)만 완료 승인 요청을 제출할 수 있습니다.");
         }
         if (goal.getGoalApprovalStatus() == GoalApprovalStatus.PENDING) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 승인 요청이 진행 중입니다.");
@@ -511,16 +536,58 @@ public class GoalService {
     }
 
     /**
-     * 수동 진행률(비-자동집계): 담당 구성원 또는 참여 멤버이고, 공개 범위상 조회 가능한 경우.
-     * (그 외에는 GOAL:UPDATE 권한으로 진행 — 컨트롤러·서비스에서 별도 처리)
+     * 수동 진행률(비-자동집계) 권한.
+     *   - MEMBER 목표: owner 본인
+     *   - TEAM 목표  : 책임자 또는 참여 멤버
+     *   (공개 범위상 조회 가능해야 함.  그 외에는 GOAL:UPDATE 권한으로 처리)
      */
     public boolean canMemberPostManualProgress(Goal goal, UUID memberId) {
+        if (memberId == null) return false;
         if (goal.getOwnerType() == GoalOwnerType.MEMBER && goal.getOwnerId().equals(memberId)) {
+            return isVisible(goal, memberId);
+        }
+        if (goal.getOwnerType() == GoalOwnerType.ORGANIZATION
+                && memberId.equals(goal.getResponsibleMemberId())) {
             return isVisible(goal, memberId);
         }
         if (goal.getParticipantMemberIds().contains(memberId)) {
             return isVisible(goal, memberId);
         }
         return false;
+    }
+
+    // ─────────────────────────── TEAM 목표 권한 helper ───────────────────────────
+
+    /**
+     * 생성 시 ownerType 과 책임자 지정을 교차 검증.
+     *   - MEMBER 목표: 책임자 지정은 무시 (null 반환)
+     *   - TEAM 목표  : responsibleMemberId 필수
+     */
+    private UUID resolveResponsibleMemberIdForCreate(GoalCreateReqDto dto) {
+        if (dto.getOwnerType() == GoalOwnerType.ORGANIZATION) {
+            if (dto.getResponsibleMemberId() == null) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "팀(조직) 목표는 책임자(responsibleMemberId) 지정이 필수입니다.");
+            }
+            return dto.getResponsibleMemberId();
+        }
+        return null; // MEMBER 목표는 ownerId 자체가 책임자
+    }
+
+    /**
+     * 완료 승인 요청 가능 여부.
+     *   - MEMBER 목표: ownerId == requesterId (GOAL:UPDATE 우회 없음)
+     *   - TEAM 목표  : 책임자 또는 참여자 || hasGoalUpdatePermission
+     */
+    private boolean canRequestCompletion(Goal goal, UUID requesterId, boolean hasGoalUpdatePermission) {
+        if (requesterId == null) return false;
+        if (goal.getOwnerType() == GoalOwnerType.MEMBER) {
+            return goal.getOwnerId().equals(requesterId);
+        }
+        // TEAM
+        if (requesterId.equals(goal.getResponsibleMemberId())) return true;
+        if (goal.getParticipantMemberIds() != null
+                && goal.getParticipantMemberIds().contains(requesterId)) return true;
+        return hasGoalUpdatePermission;
     }
 }
