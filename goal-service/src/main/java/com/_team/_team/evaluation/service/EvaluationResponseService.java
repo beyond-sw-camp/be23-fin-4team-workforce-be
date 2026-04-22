@@ -1,7 +1,6 @@
 package com._team._team.evaluation.service;
 
 import com._team._team.dto.BusinessException;
-import com._team._team.dto.NotificationMessage;
 import com._team._team.evaluation.domain.CalibrationHistory;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationResponse;
@@ -22,12 +21,12 @@ import com._team._team.evaluation.service.scoring.SectionScorer;
 import com._team._team.goal.domain.Goal;
 import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.repository.GoalRepository;
+import com._team._team.goal.service.GoalNotificationService;
 import com._team._team.meeting.service.MeetingRecordService;
 import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,10 +53,10 @@ public class EvaluationResponseService {
     private final GoalRepository goalRepository;
     private final ObjectMapper objectMapper;
     private final MeetingRecordService meetingRecordService;
-    private final ApplicationEventPublisher eventPublisher;
     private final EvaluationSeasonService evaluationSeasonService;
     private final com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient;
     private final SectionScorer sectionScorer;
+    private final GoalNotificationService notificationService;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
                                       EvaluationSeasonRepository seasonRepository,
@@ -65,20 +64,20 @@ public class EvaluationResponseService {
                                       GoalRepository goalRepository,
                                       ObjectMapper objectMapper,
                                       MeetingRecordService meetingRecordService,
-                                      ApplicationEventPublisher eventPublisher,
                                       EvaluationSeasonService evaluationSeasonService,
                                       com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient,
-                                      SectionScorer sectionScorer) {
+                                      SectionScorer sectionScorer,
+                                      GoalNotificationService notificationService) {
         this.responseRepository = responseRepository;
         this.seasonRepository = seasonRepository;
         this.calibrationHistoryRepository = calibrationHistoryRepository;
         this.goalRepository = goalRepository;
         this.objectMapper = objectMapper;
         this.meetingRecordService = meetingRecordService;
-        this.eventPublisher = eventPublisher;
         this.evaluationSeasonService = evaluationSeasonService;
         this.memberServiceClient = memberServiceClient;
         this.sectionScorer = sectionScorer;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -350,13 +349,12 @@ public class EvaluationResponseService {
         }
         response.reopen();
         String seasonName = season.getName() != null ? season.getName() : "평가";
-        eventPublisher.publishEvent(NotificationMessage.builder()
-                .receiverId(response.getEvaluatorId())
-                .notificationType(NotificationType.EVALUATION_REOPENED)
-                .content("\"" + seasonName + "\" 평가 응답이 재작성 가능한 상태로 변경되었습니다.")
-                .targetId(responseId)
-                .targetType("EVALUATION_RESPONSE")
-                .build());
+        notificationService.publishSystem(
+                response.getEvaluatorId(),
+                NotificationType.EVALUATION_REOPENED,
+                "\"" + seasonName + "\" 평가 응답이 재작성 가능한 상태로 변경되었습니다.",
+                responseId,
+                "EVALUATION_RESPONSE");
         return mapResponseWithNames(response);
     }
 
@@ -407,13 +405,12 @@ public class EvaluationResponseService {
     }
 
     private void publishEvaluationReminder(UUID receiverId, UUID seasonId, String seasonName, int pendingCount) {
-        eventPublisher.publishEvent(NotificationMessage.builder()
-                .receiverId(receiverId)
-                .notificationType(NotificationType.EVALUATION_REMINDER)
-                .content("\"" + seasonName + "\" 미제출 평가가 " + pendingCount + "건 있습니다.")
-                .targetId(seasonId)
-                .targetType("EVALUATION_SEASON")
-                .build());
+        notificationService.publishSystem(
+                receiverId,
+                NotificationType.EVALUATION_REMINDER,
+                "\"" + seasonName + "\" 미제출 평가가 " + pendingCount + "건 있습니다.",
+                seasonId,
+                "EVALUATION_SEASON");
     }
 
     /**
