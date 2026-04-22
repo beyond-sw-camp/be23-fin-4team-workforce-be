@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum EventType {
 
     PERSONAL("개인 일정"),
-    TEAM("팀 일정");
+    TEAM("팀 일정"),
+    APPROVAL("결재 일정");
 
     private final String description;
 }

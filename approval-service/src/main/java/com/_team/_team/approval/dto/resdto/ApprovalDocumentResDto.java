@@ -22,9 +22,14 @@ public class ApprovalDocumentResDto {
     private String formSchema;
     private String isActiveYn;
     private RequestType requestType;
-    private String isDeptVisibleYn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private String isCalendarVisibleYn;
+    private String calendarDisplayName;
+    private String calendarStartField;
+    private String calendarEndField;
+    private String calendarTitleField;
 
     public static ApprovalDocumentResDto fromEntity(ApprovalDocument doc) {
         return ApprovalDocumentResDto.builder()
@@ -34,9 +39,13 @@ public class ApprovalDocumentResDto {
                 .formSchema(doc.getFormSchema())
                 .isActiveYn(doc.getIsActiveYn())
                 .requestType(doc.getRequestType())
-                .isDeptVisibleYn(doc.getIsDeptVisibleYn())
                 .createdAt(doc.getCreatedAt())
                 .updatedAt(doc.getUpdatedAt())
+                .isCalendarVisibleYn(doc.getIsCalendarVisibleYn())
+                .calendarDisplayName(doc.getCalendarDisplayName())
+                .calendarStartField(doc.getCalendarStartField())
+                .calendarEndField(doc.getCalendarEndField())
+                .calendarTitleField(doc.getCalendarTitleField())
                 .build();
     }
 }
