@@ -38,8 +38,7 @@ public class KpiTemplateController {
                 kpiTemplateService.createKpiTemplate(dto, UUID.fromString(companyId)), "KPI 템플릿이 생성되었습니다.");
     }
 
-    // 템플릿 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 템플릿 목록 조회 (회사 스코프는 서비스에서 검증)
     @GetMapping
     public ApiResponse<List<KpiTemplateResDto>> listKpiTemplates(
             @RequestHeader("X-User-CompanyId") String companyId) {
@@ -48,7 +47,6 @@ public class KpiTemplateController {
     }
 
     // 템플릿 상세 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
     @GetMapping("/{kpiTemplateId}")
     public ApiResponse<KpiTemplateResDto> getKpiTemplate(
             @PathVariable UUID kpiTemplateId,

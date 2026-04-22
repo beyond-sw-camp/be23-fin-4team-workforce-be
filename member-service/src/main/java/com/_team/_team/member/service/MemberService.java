@@ -1724,6 +1724,97 @@ public class MemberService {
                 .toList();
     }
 
+    /**
+     * 특정 대상자에 대한 평가자 후보 ID 배치 조회 (Feign 호출용).
+     *
+     * evalType 기준:
+     *  - SELF: [target] 단일 반환
+     *  - DOWNWARD: 같은 조직 내 JobGrade.displayOrder 가 target 보다 작은(= 상급자) 멤버
+     *  - UPWARD:   같은 조직 내 JobGrade.displayOrder 가 target 보다 큰(= 하급자) 멤버
+     *  - PEER:     같은 조직 내 JobGrade.displayOrder 가 target 과 같은(= 동급) 멤버, 본인 제외
+     *
+     * 조직이나 포지션 정보가 없는 대상자는 빈 배열을 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<UUID> findCandidatesForEvaluator(UUID targetMemberId, String evalType, UUID companyId) {
+        if ("SELF".equalsIgnoreCase(evalType)) {
+            return java.util.List.of(targetMemberId);
+        }
+
+        Member target = memberRepository.findById(targetMemberId).orElse(null);
+        if (target == null) return java.util.Collections.emptyList();
+        if (target.getDefaultPositionId() == null) return java.util.Collections.emptyList();
+
+        MemberPosition targetPos = memberPositionRepository.findByIdWithDetails(target.getDefaultPositionId()).orElse(null);
+        if (targetPos == null || targetPos.getOrganization() == null || targetPos.getJobGrade() == null) {
+            return java.util.Collections.emptyList();
+        }
+
+        UUID orgId = targetPos.getOrganization().getOrganizationId();
+        Integer targetRank = targetPos.getJobGrade().getDisplayOrder();
+        if (targetRank == null) return java.util.Collections.emptyList();
+
+        // 같은 회사 내 활성 사원 중 같은 조직에 속한 사람을 후보로 모음
+        java.util.List<Member> sameCompany = memberRepository.findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE);
+        java.util.List<UUID> candidates = new java.util.ArrayList<>();
+        for (Member m : sameCompany) {
+            if (m.getMemberId().equals(targetMemberId)) continue;
+            if (m.getDefaultPositionId() == null) continue;
+            java.util.Optional<MemberPosition> pOpt = memberPositionRepository.findByIdWithDetails(m.getDefaultPositionId());
+            if (pOpt.isEmpty()) continue;
+            MemberPosition p = pOpt.get();
+            if (p.getOrganization() == null || !orgId.equals(p.getOrganization().getOrganizationId())) continue;
+            if (p.getJobGrade() == null || p.getJobGrade().getDisplayOrder() == null) continue;
+            int order = p.getJobGrade().getDisplayOrder();
+            boolean match;
+            switch (evalType.toUpperCase()) {
+                case "DOWNWARD" -> match = order < targetRank;
+                case "UPWARD"   -> match = order > targetRank;
+                case "PEER"     -> match = order == targetRank;
+                default -> match = false;
+            }
+            if (match) candidates.add(m.getMemberId());
+        }
+        return candidates;
+    }
+
+    /**
+     * memberId → {name, department, position, profileUrl} 최소 프로필 배치 조회 (Feign 호출용).
+     * 존재하지 않는 id 는 결과 Map 에 포함되지 않는다.
+     * defaultPositionId 가 있는 경우 해당 포지션의 조직/직책 이름까지 채운다.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto>
+    findMinimalProfilesByIds(java.util.Collection<UUID> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) return java.util.Collections.emptyMap();
+        java.util.Map<UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto> result = new java.util.HashMap<>();
+        java.util.List<Member> members = memberRepository.findAllById(memberIds);
+        for (Member m : members) {
+            String department = null;
+            String positionName = null;
+            if (m.getDefaultPositionId() != null) {
+                java.util.Optional<MemberPosition> posOpt = memberPositionRepository.findByIdWithDetails(m.getDefaultPositionId());
+                if (posOpt.isPresent()) {
+                    MemberPosition p = posOpt.get();
+                    if (p.getOrganization() != null) {
+                        department = p.getOrganization().getName();
+                    }
+                    if (p.getJobTitle() != null) {
+                        positionName = p.getJobTitle().getName();
+                    }
+                }
+            }
+            result.put(m.getMemberId(),
+                    com._team._team.member.dto.resdto.MemberMinimalProfileResDto.builder()
+                            .name(m.getName())
+                            .department(department)
+                            .positionName(positionName)
+                            .profileUrl(m.getProfileUrl())
+                            .build());
+        }
+        return result;
+    }
+
 
     @Transactional(readOnly = true)
     public DashboardProfileResDto getDashboardProfile(UUID memberId) {

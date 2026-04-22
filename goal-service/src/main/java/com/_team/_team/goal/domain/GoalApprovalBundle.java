@@ -2,6 +2,7 @@ package com._team._team.goal.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.goal.domain.converter.UuidListConverter;
+import com._team._team.goal.domain.enums.BundleApprovalKind;
 import com._team._team.goal.domain.enums.BundleApprovalStatus;
 import com._team._team.goal.domain.enums.GoalApprovalDecision;
 import jakarta.persistence.*;
@@ -38,6 +39,16 @@ public class GoalApprovalBundle extends BaseTimeEntity {
     @Column(name = "status", nullable = false, length = 32)
     @Builder.Default
     private BundleApprovalStatus status = BundleApprovalStatus.PENDING;
+
+    /**
+     * 승인 번들이 "활성화 승인"인지 "종료 승인"인지를 명시적으로 기록한다.
+     * GoalApprovalService.approve() 에서 자동 분기(DRAFT→activate / ACTIVE→complete) 하기 전에
+     * KpiTemplate.goalApprovalPolicy 와 교차 검증하여 불필요한 번들 생성을 차단한다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_kind", nullable = false, length = 32)
+    @Builder.Default
+    private BundleApprovalKind approvalKind = BundleApprovalKind.ACTIVATION;
 
     @Column(name = "rejection_reason", length = 2000)
     private String rejectionReason;
