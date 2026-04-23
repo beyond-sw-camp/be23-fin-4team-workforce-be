@@ -19,7 +19,7 @@ import java.util.UUID;
 public class OvertimePolicyCreateReqDto {
 
     @Positive
-    private Integer overtimeRoundingMinutes;
+    private Integer overtimeFloorMinutes;
 
     @NotNull
     private ApprovalMode approvalMode;
@@ -29,13 +29,11 @@ public class OvertimePolicyCreateReqDto {
     private Integer postApprovalDeadlineHours;
 
     /** 주 연장근로 상한(분) 법정 720 */
-    @NotNull
-    @Positive
+    @Min(value = 0, message = "주 연장근로 한도는 0 이상이어야 합니다.")
     private Integer weeklyOvertimeLimitMinutes;
 
     /** 주 총 근로시간 상한(분) 법정 3120 */
-    @NotNull
-    @Positive
+    @Min(value = 0, message = "주 총 근로시간 한도는 0 이상이어야 합니다.")
     private Integer weeklyTotalLimitMinutes;
 
     /** 일 연장근로 회사 한도(분) nullable */
@@ -60,17 +58,17 @@ public class OvertimePolicyCreateReqDto {
 
     private LocalDate effectiveTo;
 
-    /** overtimeRoundingMinutes 는 15분 또는 30분 만 허용 */
+    /** overtimeFloorMinutes 는 15분 또는 30분 만 허용 */
     @AssertTrue(message = "연장근로 인정 단위는 15분 또는 30분만 가능합니다.")
-    public boolean isValidOvertimeRounding() {
-        return overtimeRoundingMinutes != null
-                && (overtimeRoundingMinutes == 15 || overtimeRoundingMinutes == 30);
+    public boolean isValidOvertimeFloorMinutes() {
+        return overtimeFloorMinutes != null
+                && (overtimeFloorMinutes == 15 || overtimeFloorMinutes == 30);
     }
 
     public OvertimePolicy toEntity(UUID companyId) {
         return OvertimePolicy.builder()
                 .companyId(companyId)
-                .overtimeRoundingMinutes(overtimeRoundingMinutes)
+                .overtimeFloorMinutes(overtimeFloorMinutes)
                 .approvalMode(approvalMode)
                 .postApprovalDeadlineHours(postApprovalDeadlineHours)
                 .weeklyOvertimeLimitMinutes(weeklyOvertimeLimitMinutes)

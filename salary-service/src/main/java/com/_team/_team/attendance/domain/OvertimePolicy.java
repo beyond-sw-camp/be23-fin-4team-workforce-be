@@ -36,9 +36,9 @@ public class OvertimePolicy extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID companyId;
 
-    // 연장근로 인정 단위(분), 15 또는 30 만 허용
+    // 연장근로 인정 단위(분), 15분 또는 30분만 허용 (FLOOR 기반 내림 처리)
     @Column(nullable = false)
-    private Integer overtimeRoundingMinutes;
+    private Integer overtimeFloorMinutes;
 
     /**
      * 승인 모드
@@ -105,7 +105,7 @@ public class OvertimePolicy extends BaseTimeEntity {
 
     /**
      * 공휴일 근무 시 사전 승인 필요 여부
-     * true면 공휴일에 리더기 찍기 전 미리 결재 받아야 함
+     * true면 공휴일전에 미리 결재 받아야 함
      */
     @Column(nullable = false)
     @Builder.Default
@@ -124,7 +124,7 @@ public class OvertimePolicy extends BaseTimeEntity {
     }
 
     // 정책 내용 수정
-    public void update(Integer overtimeRoundingMinutes,
+    public void update(Integer overtimeFloorMinutes,
                        ApprovalMode approvalMode,
                        Integer postApprovalDeadlineHours,
                        Integer weeklyOvertimeLimitMinutes,
@@ -134,7 +134,7 @@ public class OvertimePolicy extends BaseTimeEntity {
                        LocalTime nightStartTime,
                        LocalTime nightEndTime,
                        Boolean holidayWorkRequiresApproval) {
-        if (overtimeRoundingMinutes != null) this.overtimeRoundingMinutes = overtimeRoundingMinutes;
+        if (overtimeFloorMinutes != null) this.overtimeFloorMinutes = overtimeFloorMinutes;
         if (approvalMode != null) this.approvalMode = approvalMode;
         if (postApprovalDeadlineHours != null) this.postApprovalDeadlineHours = postApprovalDeadlineHours;
         if (weeklyOvertimeLimitMinutes != null) this.weeklyOvertimeLimitMinutes = weeklyOvertimeLimitMinutes;
