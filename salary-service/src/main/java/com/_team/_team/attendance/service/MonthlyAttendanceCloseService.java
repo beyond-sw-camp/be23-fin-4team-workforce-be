@@ -243,7 +243,7 @@ public class MonthlyAttendanceCloseService {
 
         return workTimeClassifier.classify(
                 daily, schedule, isHoliday, approvedMinutes,
-                otPolicy.getOvertimeRoundingMinutes());
+                otPolicy.getOvertimeFloorMinutes());
     }
 
     // 결과 요약 record
