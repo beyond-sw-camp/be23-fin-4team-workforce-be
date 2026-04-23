@@ -23,7 +23,8 @@ public class CalendarApprovalConsumer {
         this.memberRepository = memberRepository;
     }
 
-    @KafkaListener(topics = "approval-calendar", groupId = "member-service")
+    @KafkaListener(topics = "approval-calendar", groupId = "member-service-calendar",
+    containerFactory = "calendarKafkaListenerContainerFactory")
     @Transactional
     public void consume(CalendarApprovalEvent event) {
         try {

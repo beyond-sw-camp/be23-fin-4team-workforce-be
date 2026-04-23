@@ -276,18 +276,18 @@ public class ApprovalService {
             }
         }
 
-//        calendarApprovalEventPublisher.publish(
-////                CalendarApprovalEvent.builder()
-////                        .companyId(document.getCompanyId())
-////                        .memberId(request.getMemberId())
-////                        .requesterName(request.getRequesterName())
-////                        .organizationId(request.getRequesterOrganizationId())
-////                        .title(title)
-////                        .startAt(startAt)
-////                        .endAt(endAt)
-////                        .requestId(request.getRequestId())
-////                        .build()
-////        );
+        calendarApprovalEventPublisher.publish(
+                CalendarApprovalEvent.builder()
+                        .companyId(document.getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requesterName(request.getRequesterName())
+                        .organizationId(request.getRequesterOrganizationId())
+                        .title(title)
+                        .startAt(startAt)
+                        .endAt(endAt)
+                        .requestId(request.getRequestId())
+                        .build()
+        );
     }
 
     // LocalDate, LocalDateTime 둘 다 파싱 가능하도록
