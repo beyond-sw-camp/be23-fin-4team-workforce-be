@@ -26,5 +26,6 @@ public class MemberHiredEvent {
     private String jobTitleName;
     private LocalDate hireDate;
     private Long baseSalary;
+    private Integer step;
     private Instant eventTime;
 }
