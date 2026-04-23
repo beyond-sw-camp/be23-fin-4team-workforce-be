@@ -21,6 +21,7 @@ public class SalaryResDto {
     private UUID companyId;
     private UUID salaryPolicyId;
     private Long baseSalary;
+    private Integer step;
     private String jobGradeName;
     private String jobTitleName;
     private LocalDate effectiveFrom;
@@ -35,6 +36,7 @@ public class SalaryResDto {
                 .companyId(salary.getCompanyId())
                 .salaryPolicyId(salary.getSalaryPolicyId())
                 .baseSalary(salary.getBaseSalary())
+                .step(salary.getStep())
                 .jobGradeName(salary.getJobGradeName())
                 .jobTitleName(salary.getJobTitleName())
                 .effectiveFrom(salary.getEffectiveFrom())
