@@ -1,54 +1,119 @@
-from app.core.openai import get_embedding
+from app.core.openai import get_embedding, expand_query, detect_category
 from app.core.pinecone import search_vectors
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# 차단 마커 - context가 비어있을 때 사용
+# n8n 프롬프트에서 이 마커를 감지하면 LLM 답변 대신 안내 문구만 반환
+NO_CONTEXT_MARKER = "__NO_RELEVANT_DOCUMENT__"
+
 
 async def rag_search(
         question: str,
         company_id: str) -> dict:
+    """
+    RAG 검색 다단계 파이프라인.
 
-    # 1. 질문 임베딩
-    query_vector = await asyncio.to_thread(get_embedding, question)
+    단계:
+      1. 카테고리 감지 (LLM)
+      2. 질문 확장 (짧은 질문만)
+      3. 임베딩 생성
+      4. 카테고리 필터 적용 1차 검색
+      5. 결과 없으면 전체 검색 (fallback)
+      6. 중복 제거 + 컨텍스트 구성
 
-    # 2. Pinecone 유사 문서 검색 (top_k 3으로 최소화)
-    matches = await asyncio.to_thread(
-        search_vectors, query_vector, company_id, top_k=3)
+    검색 실패 시 차단 마커 반환하여 LLM의 Hallucination 방지.
+    """
 
-    # 3. 유사도 필터링 (0.5 이하만 - 엄격하게)
-    filtered_matches = [m for m in matches if m.score < 0.5]
+    logger.info(f"[rag_search] ========================================")
+    logger.info(f"[rag_search] Q: '{question}'")
 
-    if not filtered_matches:
-        return {
-            "context": "",
-            "sources": []
-        }
+    if not question or not question.strip():
+        logger.info("[rag_search] 빈 질문, 차단 마커 반환")
+        return {"context": NO_CONTEXT_MARKER, "sources": []}
 
-    # 4. 중복 문서 제거
-    seen = set()
-    unique_matches = []
-    for m in filtered_matches:
-        doc_name = m.metadata['document_name']
-        if doc_name not in seen:
-            seen.add(doc_name)
-            unique_matches.append(m)
+    category = await asyncio.to_thread(detect_category, question)
+    expanded_question = await asyncio.to_thread(expand_query, question)
 
-    # 5. 컨텍스트 최소화 (500자로 청크 제한)
+    query_vector = await asyncio.to_thread(
+        get_embedding, expanded_question)
+
+    matches = []
+    if category:
+        logger.info(f"[rag_search] 카테고리 필터 검색: {category}")
+        matches = await asyncio.to_thread(
+            search_vectors,
+            query_vector,
+            company_id,
+            top_k=5,
+            min_score=0.35,
+            category=category
+        )
+
+    if not matches:
+        if category:
+            logger.info(
+                f"[rag_search] 카테고리({category}) 매칭 없음, 전체 검색 fallback"
+            )
+        else:
+            logger.info(f"[rag_search] 카테고리 미감지, 전체 검색")
+
+        matches = await asyncio.to_thread(
+            search_vectors,
+            query_vector,
+            company_id,
+            top_k=5,
+            min_score=0.35,
+            category=None
+        )
+
+    logger.info(f"[rag_search] 최종 매칭 {len(matches)}개")
+    for i, m in enumerate(matches):
+        md = m.metadata
+        content_preview = md.get('content', '')[:60].replace('\n', ' ')
+        logger.info(
+            f"  #{i+1} score={m.score:.3f} "
+            f"[{md.get('category', '?')}/{md.get('subcategory', '?')}] "
+            f"'{content_preview}...'"
+        )
+
+    # 매칭 결과 없으면 차단 마커 반환
+    if not matches:
+        logger.info("[rag_search] 매칭 없음, 차단 마커 반환")
+        return {"context": NO_CONTEXT_MARKER, "sources": []}
+
+    # 중복 제거 + 컨텍스트 구성
+    seen_content = set()
     context_parts = []
-    for m in unique_matches:
-        content = m.metadata['content']
-        # 500자 초과 시 자르기
-        if len(content) > 500:
-            content = content[:500]
-        context_parts.append(
-            f"[{m.metadata['document_name']}]\n{content}")
+    sources = set()
 
-    context = "\n\n".join(context_parts)
+    for m in matches:
+        md = m.metadata
+        content = md.get('content', '').strip()
+        document_name = md.get('document_name', '문서')
 
-    # 6. 출처 추출
-    sources = list(set([
-        m.metadata['document_name'] for m in unique_matches
-    ]))
+        content_hash = hash(content)
+        if content_hash in seen_content:
+            continue
+        seen_content.add(content_hash)
+
+        if len(content) > 1200:
+            content = content[:1200]
+
+        context_parts.append(content)
+        sources.add(document_name)
+
+    context = "\n\n---\n\n".join(context_parts)
+
+    logger.info(
+        f"[rag_search] context {len(context)}자, sources={list(sources)}"
+    )
+    logger.info(f"[rag_search] ========================================")
 
     return {
         "context": context,
-        "sources": sources
+        "sources": list(sources)
     }
