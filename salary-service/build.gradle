@@ -35,6 +35,9 @@ dependencies {
     // Apache POI, Excel (.xlsx) 처리
     implementation 'org.apache.poi:poi:5.2.5'
     implementation 'org.apache.poi:poi-ooxml:5.2.5'
+
+    // 급여명세서 PDF (OpenPDF, MPL/LGPL)
+    implementation 'com.github.librepdf:openpdf:2.0.3'
 }
 
 tasks.named('test') {
