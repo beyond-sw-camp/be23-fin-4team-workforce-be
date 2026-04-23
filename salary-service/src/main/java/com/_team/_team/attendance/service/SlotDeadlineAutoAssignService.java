@@ -7,6 +7,9 @@ import com._team._team.attendance.domain.enums.WorkType;
 import com._team._team.attendance.repository.FlexibleTimeSlotRepository;
 import com._team._team.attendance.repository.MemberScheduleSelectionRepository;
 import com._team._team.attendance.repository.WorkScheduleRepository;
+import com._team._team.dto.ApiResponse;
+import com._team._team.salary.feignClients.MemberFeignClient;
+import com._team._team.salary.feignClients.dto.MemberResDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,8 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -36,17 +41,20 @@ public class SlotDeadlineAutoAssignService {
     private final FlexibleTimeSlotRepository flexibleTimeSlotRepository;
     private final MemberScheduleSelectionRepository memberScheduleSelectionRepository;
     private final MemberScheduleSelectionService memberScheduleSelectionService;
+    private final MemberFeignClient memberFeignClient;
 
     @Autowired
     public SlotDeadlineAutoAssignService(
             WorkScheduleRepository workScheduleRepository,
             FlexibleTimeSlotRepository flexibleTimeSlotRepository,
             MemberScheduleSelectionRepository memberScheduleSelectionRepository,
-            MemberScheduleSelectionService memberScheduleSelectionService) {
+            MemberScheduleSelectionService memberScheduleSelectionService,
+            MemberFeignClient memberFeignClient) {
         this.workScheduleRepository = workScheduleRepository;
         this.flexibleTimeSlotRepository = flexibleTimeSlotRepository;
         this.memberScheduleSelectionRepository = memberScheduleSelectionRepository;
         this.memberScheduleSelectionService = memberScheduleSelectionService;
+        this.memberFeignClient = memberFeignClient;
     }
 
     /**
@@ -94,10 +102,8 @@ public class SlotDeadlineAutoAssignService {
                 memberScheduleSelectionRepository.findMembersWithActiveSelection(
                         schedule.getCompanyId(), targetYearMonth));
 
-        // TODO member-service Feign 으로 회사 활성 직원 목록 조회 필요
-        // 현재는 임시로 빈 리스트 반환, 실제 연동 시 아래 주석 해제
-        // List<UUID> allMembers = memberServiceClient.findActiveMembers(schedule.getCompanyId());
-        List<UUID> allMembers = List.of();
+        // member-service Feign 으로 회사 재직 사원 목록 조회
+        List<UUID> allMembers = fetchActiveMemberIds(schedule.getCompanyId());
 
         int assigned = 0;
         for (UUID memberId : allMembers) {
@@ -113,6 +119,23 @@ public class SlotDeadlineAutoAssignService {
         }
 
         return assigned;
+    }
+
+    // member-service 호출, 실패 시 빈 리스트로 배치 안전 종료
+    private List<UUID> fetchActiveMemberIds(UUID companyId) {
+        try {
+            ApiResponse<List<MemberResDto>> response = memberFeignClient.getMembersByCompany(companyId);
+            if (response == null || response.getData() == null) {
+                return Collections.emptyList();
+            }
+            return response.getData().stream()
+                    .map(MemberResDto::getMemberId)
+                    .filter(Objects::nonNull)
+                    .toList();
+        } catch (Exception e) {
+            log.error("[SlotDeadline] member-service 조회 실패 companyId={}", companyId, e);
+            return Collections.emptyList();
+        }
     }
 
     public record AssignResult(int targetSchedules, int assignedMembers) {}

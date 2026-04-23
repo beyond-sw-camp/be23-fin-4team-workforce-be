@@ -113,28 +113,25 @@ public class ApprovalDocumentService {
                 .build());
 
         // ========== HR ==========
+
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)
-                .documentName("휴직신청서")
-                .requestType(RequestType.HR)
+                .documentName("휴직 신청서")
+                .requestType(RequestType.VACATION)
                 .formSchema("""
                 {
                   "fields": [
                     { "name": "title", "label": "제목", "type": "text", "required": true },
-                    {
-                      "name": "leaveType",
-                      "label": "휴직 유형",
-                      "type": "select",
-                      "required": true,
-                      "options": ["병가휴직","육아휴직","가족돌봄휴직","개인사유휴직","기타"]
-                    },
-                    { "name": "startDate", "label": "휴직 시작일", "type": "date",     "required": true },
-                    { "name": "endDate",   "label": "휴직 종료일", "type": "date",     "required": true },
-                    { "name": "reason",    "label": "휴직 사유",   "type": "textarea", "required": true },
-                    { "name": "note",      "label": "비고",        "type": "textarea"                  }
+                    { "name": "type", "label": "휴직 종류", "type": "select", "options": ["출산휴가", "육아휴직", "장기병가", "무급휴직", "학업휴직", "군복무"] },
+                    { "name": "startDate", "label": "시작일", "type": "date" },
+                    { "name": "endDate", "label": "종료일", "type": "date" },
+                    { "name": "isPaidYn", "label": "유급 여부", "type": "select", "options": ["Y", "N"] },
+                    { "name": "reason", "label": "휴직 사유", "type": "textarea" },
+                    { "name": "evidenceFileUrl", "label": "증빙 서류", "type": "file" },
+                    { "name": "leaveOfAbsenceId", "label": "salary 연결 ID", "type": "hidden" }
                   ]
                 }
-            """)
+                """)
                 .build());
 
         approvalDocumentRepository.save(ApprovalDocument.builder()

@@ -66,7 +66,7 @@ public class OvertimeRequestService {
                         "연장근로 정책이 설정되지 않았습니다."));
 
         // 연장근로 단위(분) 조회
-        int unit = otPolicy.getOvertimeRoundingMinutes();
+        int unit = otPolicy.getOvertimeFloorMinutes();
         if (requestedMinutes % unit != 0) {
             throw new BusinessException(
                     HttpStatus.BAD_REQUEST,

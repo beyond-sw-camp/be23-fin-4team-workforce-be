@@ -158,4 +158,8 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
        """)
     List<UUID> findDistinctCompanyIdsInRange(@Param("from") LocalDate from,
                                              @Param("to") LocalDate to);
+
+
+    Optional<DailyAttendance> findByMemberIdAndAttendanceDate(
+            UUID memberId, LocalDate attendanceDate);
 }

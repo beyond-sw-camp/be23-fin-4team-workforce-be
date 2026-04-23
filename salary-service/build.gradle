@@ -32,7 +32,7 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation 'com.4team:workforce-common:1.0.2'
+    implementation 'com.4team:workforce-common:1.0.3'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
@@ -62,6 +62,9 @@ dependencies {
     // Apache POI, Excel (.xlsx) 처리
     implementation 'org.apache.poi:poi:5.2.5'
     implementation 'org.apache.poi:poi-ooxml:5.2.5'
+
+    // 급여명세서 PDF (OpenPDF, MPL/LGPL)
+    implementation 'com.github.librepdf:openpdf:2.0.3'
 }
 
 tasks.named('test') {

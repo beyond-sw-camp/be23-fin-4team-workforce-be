@@ -78,6 +78,7 @@ public class BatchScheduledJob extends QuartzJobBean {
             case "leaveGrantJob":
             case "carryoverLeaveJob":
             case "leaveExpireJob":
+            case "leavePromotionJob":
             case "dailyAttendanceDraftJob":
             case "dailyAttendanceFinalJob":
             case "weeklyLimitCheckJob":

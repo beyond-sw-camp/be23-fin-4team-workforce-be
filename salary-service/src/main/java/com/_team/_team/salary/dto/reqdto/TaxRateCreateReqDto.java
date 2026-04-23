@@ -3,6 +3,7 @@ package com._team._team.salary.dto.reqdto;
 import com._team._team.salary.domain.TaxRate;
 import com._team._team.salary.domain.enums.TaxType;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,6 +27,12 @@ public class TaxRateCreateReqDto {
     /** 근로자 부담률 (예: 0.0450) */
     @NotNull(message = "세율은 필수입니다.")
     private BigDecimal rate;
+
+    @PositiveOrZero
+    private Long incomeCeiling;
+
+    @PositiveOrZero
+    private Long incomeFloor;
 
     @NotNull(message = "적용 연도는 필수 입니다.")
     private Integer applyYear;

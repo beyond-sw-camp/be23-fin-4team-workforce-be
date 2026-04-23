@@ -1,6 +1,8 @@
 package com._team._team.salary.service;
 
 import com._team._team.event.MemberHiredEvent;
+import com._team._team.salary.domain.PayGradeTable;
+import com._team._team.salary.repository.PayGradeTableRepository;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.repository.SalaryRepository;
 import com._team._team.salary.config.SalaryAutoCreateProperties;
@@ -19,18 +21,19 @@ public class SalaryAutoCreateService {
     private final SalaryRepository salaryRepository;
     private final SalaryPolicyRepository salaryPolicyRepository;
     private final SalaryAutoCreateProperties autoCreateProps;
+    private final PayGradeTableRepository payGradeTableRepository;
 
     @Autowired
     public SalaryAutoCreateService(SalaryRepository salaryRepository,
                                    SalaryPolicyRepository salaryPolicyRepository,
-                                   SalaryAutoCreateProperties autoCreateProps) {
+                                   SalaryAutoCreateProperties autoCreateProps, PayGradeTableRepository payGradeTableRepository) {
         this.salaryRepository = salaryRepository;
         this.salaryPolicyRepository = salaryPolicyRepository;
         this.autoCreateProps = autoCreateProps;
+        this.payGradeTableRepository = payGradeTableRepository;
     }
 
     // 입사 이벤트 -> Salary INSERT
-    // 멱등성: 같은 날짜 기준 Active Salary 이미 있으면 스킵
     @Transactional
     public void bootstrapSalary(MemberHiredEvent e) {
 
@@ -51,10 +54,28 @@ public class SalaryAutoCreateService {
             return;
         }
 
-        // 3. 기본급 결정 HR이 입력한 값 우선 없으면 yml default로 폴백
-        long baseSalary = e.getBaseSalary() != null
-                ? e.getBaseSalary()
-                : autoCreateProps.getDefaultBaseSalary();
+        // 3. 기본급 결정 (호봉제와 연봉협상제 분기)
+        long baseSalary;
+        Integer step = null;
+
+        if ("Y".equals(policy.getUsePayGradeYn())) {
+            // 호봉제, 이벤트에 step 지정되면 그 호봉으로, 없으면 1호봉 기본 배정
+            step = e.getStep() != null ? e.getStep() : 1;
+            PayGradeTable pg = payGradeTableRepository
+                    .findActiveOn(e.getCompanyId(), step, e.getHireDate())
+                    .orElse(null);
+            if (pg == null) {
+                log.warn("[SALARY-BOOTSTRAP] 호봉제지만 {}호봉 호봉표 없음 companyId={} → 스킵",
+                        step, e.getCompanyId());
+                return;
+            }
+            baseSalary = pg.getBaseSalary();
+        } else {
+            // 연봉제, 기존 로직 유지
+            baseSalary = e.getBaseSalary() != null
+                    ? e.getBaseSalary()
+                    : autoCreateProps.getDefaultBaseSalary();
+        }
 
         // 4. Salary 생성
         Salary salary = Salary.builder()
@@ -62,6 +83,7 @@ public class SalaryAutoCreateService {
                 .companyId(e.getCompanyId())
                 .salaryPolicyId(policy.getSalaryPolicyId())
                 .baseSalary(baseSalary)
+                .step(step)
                 .jobGradeName(e.getJobGradeName())
                 .jobTitleName(e.getJobTitleName())
                 .effectiveFrom(e.getHireDate())
@@ -69,7 +91,8 @@ public class SalaryAutoCreateService {
                 .build();
         Salary saved = salaryRepository.save(salary);
 
-        log.info("[SALARY-BOOTSTRAP] 생성 완료 salaryId={} memberId={} base={} policy={}",
-                saved.getSalaryId(), e.getMemberId(), baseSalary, policy.getSalaryPolicyId());
+
+        log.info("[SALARY-BOOTSTRAP] 생성 완료 salaryId={} memberId={} step={} base={} policy={}",
+                saved.getSalaryId(), e.getMemberId(), step, baseSalary, policy.getSalaryPolicyId());
     }
 }

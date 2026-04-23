@@ -3,6 +3,7 @@ package com._team._team.salary.controller;
 import com._team._team.batch.payroll.worker.PayrollCalculateWorker;
 import com._team._team.dto.ApiResponse;
 import com._team._team.salary.service.PayrollService;
+import com._team._team.salary.service.PayslipPdfService;
 import com._team._team.salary.dto.reqdto.PayrollCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemUpdateReqDto;
@@ -11,10 +12,14 @@ import com._team._team.salary.dto.reqdto.PayrollUpdateReqDto;
 import com._team._team.salary.dto.resdto.PayrollRecalculateResDto;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import com._team._team.salary.domain.enums.TaxCategory;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
@@ -23,12 +28,15 @@ public class PayrollController {
 
     private final PayrollService payrollService;
     private final PayrollCalculateWorker payrollCalculateWorker;
+    private final PayslipPdfService payslipPdfService;
 
     @Autowired
     public PayrollController(PayrollService payrollService,
-                             PayrollCalculateWorker payrollCalculateWorker){
+                             PayrollCalculateWorker payrollCalculateWorker,
+                             PayslipPdfService payslipPdfService) {
         this.payrollService = payrollService;
         this.payrollCalculateWorker = payrollCalculateWorker;
+        this.payslipPdfService = payslipPdfService;
     }
 
     // ===================== 급여대장 =====================
@@ -53,6 +61,29 @@ public class PayrollController {
                 ApiResponse.success(payrollService.findPayrollById(companyId, payrollId), "급여대장 조회 성공"),
                 HttpStatus.OK
         );
+    }
+
+    /** 급여명세서 PDF 다운로드 (본인 또는 급여 조회 권한) */
+    @GetMapping("/{payrollId}/payslip.pdf")
+    public ResponseEntity<?> downloadPayslipPdf(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID requesterMemberId,
+            @RequestHeader("X-User-MemberPositionId") UUID requesterPositionId,
+            @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin,
+            @PathVariable UUID payrollId) {
+
+        byte[] pdf = payslipPdfService.buildPdf(
+                companyId, payrollId, requesterMemberId, requesterPositionId, isSystemAdmin);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentLength(pdf.length);
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename("payslip-" + payrollId + ".pdf", StandardCharsets.UTF_8)
+                        .build());
+
+        return new ResponseEntity<>(pdf, headers, HttpStatus.OK);
     }
 
     /** 직원별 급여대장 목록 조회 */

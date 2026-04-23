@@ -14,7 +14,7 @@ import java.time.LocalTime;
 public class OvertimePolicyUpdateReqDto {
 
     @Positive
-    private Integer overtimeRoundingMinutes;
+    private Integer overtimeFloorMinutes;
 
     private ApprovalMode approvalMode;
 
@@ -38,10 +38,10 @@ public class OvertimePolicyUpdateReqDto {
 
     private Boolean holidayWorkRequiresApproval;
 
-    /** overtimeRoundingMinutes 가 15분 또는 30분 만 허용 */
+    /** overtimeFloorMinutes 가 15분 또는 30분 만 허용 */
     @AssertTrue(message = "연장근로 인정 단위는 15분 또는 30분만 가능합니다.")
-    public boolean isValidOvertimeRounding() {
-        return overtimeRoundingMinutes != null
-                && (overtimeRoundingMinutes == 15 || overtimeRoundingMinutes == 30);
+    public boolean isValidOvertimeFloorMinutes() {
+        return overtimeFloorMinutes != null
+                && (overtimeFloorMinutes == 15 || overtimeFloorMinutes == 30);
     }
 }

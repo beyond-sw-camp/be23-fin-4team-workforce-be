@@ -1,7 +1,9 @@
 package com._team._team.attendance.kafka;
 
+import com._team._team.attendance.domain.LeaveRequest;
 import com._team._team.attendance.domain.MemberBalance;
 import com._team._team.attendance.domain.enums.BalanceType;
+import com._team._team.attendance.repository.LeaveRequestRepository;
 import com._team._team.attendance.repository.MemberBalanceRepository;
 import com._team._team.attendance.service.BalancePriorityResolver;
 import com._team._team.attendance.service.LeaveApprovalService;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.stereotype.Component;
+
 
 import java.util.Map;
 import java.util.Optional;
@@ -31,16 +34,18 @@ public class LeaveApprovalEventConsumer {
     private final LeaveRequestService leaveRequestService;
     private final BalancePriorityResolver balancePriorityResolver;
     private final ObjectMapper objectMapper;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     @Autowired
     public LeaveApprovalEventConsumer(LeaveApprovalService leaveApprovalService,
                                       LeaveRequestService leaveRequestService,
                                       BalancePriorityResolver balancePriorityResolver,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper, LeaveRequestRepository leaveRequestRepository) {
         this.leaveApprovalService = leaveApprovalService;
         this.leaveRequestService = leaveRequestService;
         this.balancePriorityResolver = balancePriorityResolver;
         this.objectMapper = objectMapper;
+        this.leaveRequestRepository = leaveRequestRepository;
     }
 
     // 이벤트 수신 후 action에 따라 USE(차감) / RESTORE(복구) 분기
@@ -73,26 +78,30 @@ public class LeaveApprovalEventConsumer {
      * 승인 처리, 분할 차감 지원
      */
     private void handleApproval(LeaveApprovalEvent event) {
-        boolean needsDeduction = Boolean.TRUE.equals(event.getNeedsDeduction());
+        // LeaveRequest 에서 정확한 usageDays 확보 (영업일 반영된 값)
+        LeaveRequest leaveRequest = leaveRequestRepository
+                .findByApprovalRequestId(event.getRequestId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "LeaveRequest 없음, requestId=" + event.getRequestId()));
 
+        double actualDays = leaveRequest.getUsageDays();
+
+        boolean needsDeduction = Boolean.TRUE.equals(event.getNeedsDeduction());
         Map<BalanceType, Double> deductions = null;
         BalanceType representativeType = null;
         String deductionsJson = null;
 
         if (needsDeduction) {
             deductions = balancePriorityResolver.resolveDeductions(
-                    event.getCompanyId(), event.getMemberId(), event.getDays());
+                    event.getCompanyId(), event.getMemberId(), actualDays);
 
             if (deductions == null) {
-                log.error("[Leave] 잔고 부족으로 차감 불가, requestId={}", event.getRequestId());
-                // 정책: 그래도 승인 상태 유지 + 관리자 알림
-                // 또는 예외 던져서 재시도
+                log.error("[Leave] 잔고 부족, requestId={}", event.getRequestId());
             } else {
                 representativeType = findRepresentativeType(deductions);
                 deductionsJson = toJson(deductions);
             }
         }
-
         // 1. LeaveRequest 상태 APPROVED + 차감 이력 기록
         leaveRequestService.applyApproval(
                 event.getRequestId(),

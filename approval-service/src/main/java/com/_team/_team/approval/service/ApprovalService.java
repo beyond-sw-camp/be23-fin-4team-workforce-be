@@ -51,6 +51,7 @@ public class ApprovalService {
     private final CalendarApprovalEventPublisher calendarApprovalEventPublisher;
 
     private final ApplicationEventPublisher eventPublisher;
+    private final LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher;
 
     @Autowired
     public ApprovalService(ApprovalRepository approvalRepository,
@@ -63,7 +64,10 @@ public class ApprovalService {
                            ScheduleApprovalEventPublisher scheduleApprovalEventPublisher,
                            ObjectMapper objectMapper,
                            OfficialRecipientRepository officialRecipientRepository,
-                           MemberServiceClient memberServiceClient, CalendarApprovalEventPublisher calendarApprovalEventPublisher, ApplicationEventPublisher eventPublisher) {
+                           MemberServiceClient memberServiceClient,
+                           CalendarApprovalEventPublisher calendarApprovalEventPublisher,
+                           ApplicationEventPublisher eventPublisher,
+                           LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
@@ -77,6 +81,7 @@ public class ApprovalService {
         this.memberServiceClient = memberServiceClient;
         this.calendarApprovalEventPublisher = calendarApprovalEventPublisher;
         this.eventPublisher = eventPublisher;
+        this.leaveOfAbsenceApprovalEventPublisher = leaveOfAbsenceApprovalEventPublisher;
     }
 
 
@@ -189,10 +194,10 @@ public class ApprovalService {
 
             // 최종 승인 시 이벤트 발행
             publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.APPROVE);
-            publishLeaveEventIfApplicable(request, actualMemberId,
-                    LeaveApprovalEvent.Action.USE, null);
+            publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.USE, null);
             publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.APPROVE, reqDto.getComment());
-            publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.APPROVE);  // 추가
+            publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.APPROVE);
+            publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId, LeaveOfAbsenceApprovalEvent.Action.APPROVE, null);
         }
 
         List<Approval> allApprovals =
@@ -358,6 +363,9 @@ public class ApprovalService {
         // 반려 시 이벤트 발행
         publishOvertimeEventIfApplicable(request, OvertimeApprovalEvent.Action.REJECT);
         publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId,
+                LeaveOfAbsenceApprovalEvent.Action.REJECT, reqDto.getComment());
 
         // 반려 시 REJECT 이벤트 발행
         publishLeaveEventIfApplicable(request, actualMemberId,
@@ -685,6 +693,54 @@ public class ApprovalService {
         try {
             String raw = node.path("memberAllowanceId").asText(null);
             return raw == null ? null : UUID.fromString(raw);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 휴직 신청서 문서일 때만 leave-of-absence 이벤트 발행
+     */
+    private void publishLeaveOfAbsenceEventIfApplicable(ApprovalRequest request,
+                                                        UUID approverId,
+                                                        LeaveOfAbsenceApprovalEvent.Action action,
+                                                        String note) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"휴직 신청서".equals(docName)) {
+            return;
+        }
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) return;
+
+        // contentJson 에 심어진 leaveOfAbsenceId 추출
+        UUID leaveOfAbsenceId = extractLeaveOfAbsenceId(node);
+        if (leaveOfAbsenceId == null) {
+            return;
+        }
+
+        leaveOfAbsenceApprovalEventPublisher.publish(
+                LeaveOfAbsenceApprovalEvent.builder()
+                        .requestId(request.getRequestId())
+                        .leaveOfAbsenceId(leaveOfAbsenceId)
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .note(note)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    /**
+     * contentJson 에서 leaveOfAbsenceId 추출
+     */
+    private UUID extractLeaveOfAbsenceId(JsonNode node) {
+        String raw = node.path("leaveOfAbsenceId").asText(null);
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return UUID.fromString(raw);
         } catch (Exception e) {
             return null;
         }

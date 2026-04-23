@@ -22,6 +22,8 @@ public class TaxRateResDto {
     private UUID taxRateId;
     private TaxType taxType;
     private BigDecimal rate;
+    private Long incomeCeiling;
+    private Long incomeFloor;
     private Integer applyYear;
     private BigDecimal employerRate;
     private LocalDateTime createdAt;
@@ -32,6 +34,8 @@ public class TaxRateResDto {
                 .taxRateId(taxRate.getTaxRateId())
                 .taxType(taxRate.getTaxType())
                 .rate(taxRate.getRate())
+                .incomeCeiling(taxRate.getIncomeCeiling())
+                .incomeFloor(taxRate.getIncomeFloor())
                 .applyYear(taxRate.getApplyYear())
                 .employerRate(taxRate.getEmployerRate())
                 .createdAt(taxRate.getCreatedAt())
