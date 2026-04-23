@@ -3,6 +3,7 @@ package com._team._team.goal.domain;
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.goal.domain.converter.KpiDefinition;
 import com._team._team.goal.domain.converter.KpiDefinitionListConverter;
+import com._team._team.goal.domain.enums.GoalApprovalPolicy;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.domain.enums.KpiSpecCycleType;
 import com._team._team.goal.domain.enums.MeasureType;
@@ -62,9 +63,11 @@ public class KpiTemplate extends BaseTimeEntity {
     @Column(name = "target_team_id")
     private UUID targetTeamId;
 
-    @Column(name = "require_approval", nullable = false)
+    /** 승인 정책 (NONE / ACTIVATION_ONLY / COMPLETION_ONLY / BOTH). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "goal_approval_policy", length = 32, nullable = false)
     @Builder.Default
-    private boolean requireApproval = false;
+    private GoalApprovalPolicy goalApprovalPolicy = GoalApprovalPolicy.NONE;
 
     /** KPI 정의 목록 — DB에는 JSON 배열로 저장 */
     @Convert(converter = KpiDefinitionListConverter.class)
@@ -80,9 +83,21 @@ public class KpiTemplate extends BaseTimeEntity {
         this.kpis = kpis != null ? new ArrayList<>(kpis) : new ArrayList<>();
     }
 
-    public void setSpecMeta(KpiSpecCycleType specCycleType, UUID targetTeamId, boolean requireApproval) {
+    /**
+     * 스펙 메타(주기·대상팀·승인정책) 변경. GoalApprovalPolicy 하나로 단일화.
+     */
+    public void setSpecMeta(KpiSpecCycleType specCycleType, UUID targetTeamId, GoalApprovalPolicy approvalPolicy) {
         if (specCycleType != null) this.specCycleType = specCycleType;
         if (targetTeamId != null) this.targetTeamId = targetTeamId;
-        this.requireApproval = requireApproval;
+        if (approvalPolicy != null) this.goalApprovalPolicy = approvalPolicy;
+    }
+
+    public void setGoalApprovalPolicy(GoalApprovalPolicy policy) {
+        if (policy != null) this.goalApprovalPolicy = policy;
+    }
+
+    /** 실제 적용될 정책 반환. null 방어를 위해 NONE 을 기본값으로 매핑. */
+    public GoalApprovalPolicy resolveApprovalPolicy() {
+        return this.goalApprovalPolicy != null ? this.goalApprovalPolicy : GoalApprovalPolicy.NONE;
     }
 }

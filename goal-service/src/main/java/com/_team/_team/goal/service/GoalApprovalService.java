@@ -11,10 +11,9 @@ import com._team._team.goal.dto.resdto.GoalApprovalBundleSummaryResDto;
 import com._team._team.goal.dto.resdto.GoalApprovalResDto;
 import com._team._team.goal.dto.resdto.GoalApprovalWatcherResDto;
 import com._team._team.goal.dto.resdto.GoalResDto;
-import com._team._team.dto.NotificationMessage;
 import com._team._team.goal.repository.*;
 import com._team._team.notification.NotificationType;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +30,8 @@ public class GoalApprovalService {
     private final GoalApprovalBundleGoalRepository bundleGoalRepository;
     private final GoalActivityService goalActivityService;
     private final GoalRollupService goalRollupService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final GoalNotificationService notificationService;
+    private final GoalService goalService;
 
     public GoalApprovalService(
             GoalRepository goalRepository,
@@ -39,13 +39,15 @@ public class GoalApprovalService {
             GoalApprovalBundleGoalRepository bundleGoalRepository,
             GoalActivityService goalActivityService,
             GoalRollupService goalRollupService,
-            ApplicationEventPublisher eventPublisher) {
+            GoalNotificationService notificationService,
+            @Lazy GoalService goalService) {
         this.goalRepository = goalRepository;
         this.bundleRepository = bundleRepository;
         this.bundleGoalRepository = bundleGoalRepository;
         this.goalActivityService = goalActivityService;
         this.goalRollupService = goalRollupService;
-        this.eventPublisher = eventPublisher;
+        this.notificationService = notificationService;
+        this.goalService = goalService;
     }
 
     @Transactional
@@ -96,6 +98,16 @@ public class GoalApprovalService {
         if (dto.getApproverId().equals(requesterId)) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "완료 승인자는 요청자 본인으로 지정할 수 없습니다.");
         }
+
+        // 목표들의 현재 상태로부터 approvalKind 를 유도한다.
+        // - 모두 DRAFT  → ACTIVATION
+        // - 모두 ACTIVE → COMPLETION
+        // - 섞여 있으면 → BAD_REQUEST (같은 번들로 묶을 수 없음)
+        // 이후 KpiTemplate.goalApprovalPolicy 를 교차 검증해 불필요한 번들 생성 자체를 차단한다.
+        List<Goal> goalsForKind = goalIds.stream().map(gid -> getGoal(gid, companyId)).toList();
+        BundleApprovalKind kind = deriveApprovalKind(goalsForKind);
+        enforcePolicyForGoals(goalsForKind, kind);
+
         GoalApprovalBundle bundle = bundleRepository.save(
                 GoalApprovalBundle.builder()
                         .companyId(companyId)
@@ -104,13 +116,14 @@ public class GoalApprovalService {
                         .requestedAt(LocalDateTime.now())
                         .status(BundleApprovalStatus.PENDING)
                         .decision(GoalApprovalDecision.PENDING)
+                        .approvalKind(kind)
                         .completionSummary(trimToNull(completionSummary))
                         .completionEvidenceFiles(trimToNull(completionEvidenceFiles))
                         .build());
-        for (UUID gid : goalIds) {
-            Goal goal = getGoal(gid, companyId);
+        for (Goal goal : goalsForKind) {
             if (goal.getStatus() == GoalStatus.COMPLETED || goal.getStatus() == GoalStatus.CANCELLED) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, "완료/취소된 목표는 승인 요청할 수 없습니다. goalId=" + gid);
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "완료/취소된 목표는 승인 요청할 수 없습니다. goalId=" + goal.getGoalId());
             }
             bundleGoalRepository.save(
                     GoalApprovalBundleGoal.builder().bundle(bundle).goal(goal).build());
@@ -119,23 +132,32 @@ public class GoalApprovalService {
         for (UUID gid : goalIds) {
             goalActivityService.append(gid, GoalActivityType.APPROVAL_REQUESTED, requesterId, "승인 요청이 등록되었습니다.", null);
         }
-        eventPublisher.publishEvent(NotificationMessage.builder()
-                .receiverId(dto.getApproverId())
-                .senderId(requesterId)
-                .notificationType(NotificationType.APPROVAL_REQUESTED)
-                .content(goalIds.size() > 1
+        notificationService.publish(
+                dto.getApproverId(),
+                requesterId,
+                NotificationType.APPROVAL_REQUESTED,
+                goalIds.size() > 1
                         ? "목표 " + goalIds.size() + "건에 대한 승인 요청이 도착했습니다."
-                        : "목표 승인 요청이 도착했습니다.")
-                .targetId(bundle.getBundleId())
-                .targetType("GOAL_APPROVAL_BUNDLE")
-                .build());
-        return get(goalIds.get(0), companyId);
+                        : "목표 승인 요청이 도착했습니다.",
+                bundle.getBundleId(),
+                "GOAL_APPROVAL_BUNDLE");
+        return get(goalIds.get(0), companyId, requesterId);
     }
 
     @Transactional(readOnly = true)
-    public GoalApprovalResDto get(UUID goalId, UUID companyId) {
+    public GoalApprovalResDto get(UUID goalId, UUID companyId, UUID readerId) {
         Goal goal = getGoal(goalId, companyId);
-        return bundleGoalRepository.findFirstByGoal_GoalIdOrderByBundle_RequestedAtDesc(goalId)
+        var linkOpt = bundleGoalRepository.findFirstByGoal_GoalIdOrderByBundle_RequestedAtDesc(goalId);
+        GoalApprovalBundle bundle = linkOpt.map(GoalApprovalBundleGoal::getBundle).orElse(null);
+        if (!goalService.isVisibleToMember(goal, readerId)) {
+            boolean allowed = bundle != null && (readerId.equals(bundle.getApproverId())
+                    || readerId.equals(bundle.getRequestedBy())
+                    || bundle.getWatcherIds().contains(readerId));
+            if (!allowed) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, "해당 목표 승인 정보에 대한 접근 권한이 없습니다.");
+            }
+        }
+        return linkOpt
                 .map(link -> toResDto(goalId, link.getBundle()))
                 .orElseGet(() -> GoalApprovalResDto.builder()
                         .goalId(goalId)
@@ -155,6 +177,7 @@ public class GoalApprovalService {
                 .goalId(goalId)
                 .requestId(bundle.getBundleId())
                 .approvalStatus(st)
+                .approvalKind(bundle.getApprovalKind())
                 .approverId(bundle.getApproverId())
                 .decision(bundle.getDecision())
                 .decidedAt(bundle.getDecidedAt())
@@ -163,6 +186,43 @@ public class GoalApprovalService {
                 .completionEvidenceFiles(bundle.getCompletionEvidenceFiles())
                 .watchers(bundle.getWatcherIds().stream().map(GoalApprovalWatcherResDto::from).toList())
                 .build();
+    }
+
+    /**
+     * 번들의 목표 상태들로부터 활성화/종료 구분을 유도한다.
+     * 모두 DRAFT → ACTIVATION, 모두 ACTIVE → COMPLETION, 섞여 있으면 400 에러.
+     */
+    private static BundleApprovalKind deriveApprovalKind(List<Goal> goals) {
+        boolean hasDraft = goals.stream().anyMatch(g -> g.getStatus() == GoalStatus.DRAFT);
+        boolean hasActive = goals.stream().anyMatch(g -> g.getStatus() == GoalStatus.ACTIVE);
+        if (hasDraft && hasActive) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "DRAFT 와 ACTIVE 목표를 한 승인 번들로 묶을 수 없습니다. 활성화 승인과 종료 승인은 분리해주세요.");
+        }
+        if (!hasDraft && !hasActive) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "DRAFT 또는 ACTIVE 상태의 목표만 승인 요청할 수 있습니다.");
+        }
+        return hasDraft ? BundleApprovalKind.ACTIVATION : BundleApprovalKind.COMPLETION;
+    }
+
+    /**
+     * KpiTemplate 에 설정된 GoalApprovalPolicy / 기존 requireApproval 플래그를 읽어
+     * 해당 단계(activation/completion)에 승인 절차가 필요한지 검증한다.
+     * 템플릿이 없는 목표는 검사를 건너뛴다.
+     */
+    private static void enforcePolicyForGoals(List<Goal> goals, BundleApprovalKind kind) {
+        for (Goal g : goals) {
+            KpiTemplate tpl = g.getKpiTemplate();
+            if (tpl == null) continue;
+
+            GoalApprovalPolicy policy = tpl.resolveApprovalPolicy();
+            if (!policy.requires(kind)) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "해당 KPI 템플릿(" + tpl.getName() + ")은 " + kind.name()
+                                + " 승인을 요구하지 않습니다. 정책=" + policy.name());
+            }
+        }
     }
 
     private String trimToNull(String v) {
@@ -228,15 +288,14 @@ public class GoalApprovalService {
                     g.getStatus() == GoalStatus.COMPLETED ? "목표 완료 승인" : "목표 활성 승인",
                     null);
         }
-        eventPublisher.publishEvent(NotificationMessage.builder()
-                .receiverId(bundle.getRequestedBy())
-                .senderId(approverId)
-                .notificationType(NotificationType.APPROVAL_APPROVED)
-                .content("목표 승인이 완료되었습니다.")
-                .targetId(bundle.getBundleId())
-                .targetType("GOAL_APPROVAL_BUNDLE")
-                .build());
-        return get(goalId, companyId);
+        notificationService.publish(
+                bundle.getRequestedBy(),
+                approverId,
+                NotificationType.APPROVAL_APPROVED,
+                "목표 승인이 완료되었습니다.",
+                bundle.getBundleId(),
+                "GOAL_APPROVAL_BUNDLE");
+        return get(goalId, companyId, approverId);
     }
 
     @Transactional
@@ -256,17 +315,16 @@ public class GoalApprovalService {
             g.updateGoalApprovalStatus(GoalApprovalStatus.REJECTED);
             goalActivityService.append(g.getGoalId(), GoalActivityType.REJECTED, approverId, "목표 승인 반려", reason);
         }
-        eventPublisher.publishEvent(NotificationMessage.builder()
-                .receiverId(bundle.getRequestedBy())
-                .senderId(approverId)
-                .notificationType(NotificationType.APPROVAL_REJECTED)
-                .content(reason != null && !reason.isBlank()
+        notificationService.publish(
+                bundle.getRequestedBy(),
+                approverId,
+                NotificationType.APPROVAL_REJECTED,
+                reason != null && !reason.isBlank()
                         ? "목표 승인이 반려되었습니다. 사유: " + reason
-                        : "목표 승인이 반려되었습니다.")
-                .targetId(bundle.getBundleId())
-                .targetType("GOAL_APPROVAL_BUNDLE")
-                .build());
-        return get(goalId, companyId);
+                        : "목표 승인이 반려되었습니다.",
+                bundle.getBundleId(),
+                "GOAL_APPROVAL_BUNDLE");
+        return get(goalId, companyId, approverId);
     }
 
     @Transactional
@@ -275,7 +333,7 @@ public class GoalApprovalService {
         GoalApprovalBundle bundle = getBundle(bundleId, companyId);
         assertBundleContainsGoal(bundle, goalId);
         bundle.addWatchers(dto.getWatcherIds());
-        return get(goalId, companyId);
+        return get(goalId, companyId, bundle.getRequestedBy());
     }
 
     @Transactional(readOnly = true)
@@ -297,6 +355,7 @@ public class GoalApprovalService {
                 .map(b -> GoalApprovalBundleSummaryResDto.builder()
                         .requestId(b.getBundleId())
                         .status(b.getStatus().name().toLowerCase())
+                        .approvalKind(b.getApprovalKind())
                         .goalCount(bundleGoalRepository.findByBundle_BundleId(b.getBundleId()).size())
                         .requestedAt(b.getRequestedAt())
                         .completionSummary(b.getCompletionSummary())
@@ -311,6 +370,7 @@ public class GoalApprovalService {
                 .map(b -> GoalApprovalBundleSummaryResDto.builder()
                         .requestId(b.getBundleId())
                         .status(b.getStatus().name().toLowerCase())
+                        .approvalKind(b.getApprovalKind())
                         .goalCount(bundleGoalRepository.findByBundle_BundleId(b.getBundleId()).size())
                         .requestedAt(b.getRequestedAt())
                         .completionSummary(b.getCompletionSummary())
@@ -330,6 +390,7 @@ public class GoalApprovalService {
         return GoalApprovalBundleDetailResDto.builder()
                 .requestId(bundleId)
                 .status(bundle.getStatus().name().toLowerCase())
+                .approvalKind(bundle.getApprovalKind())
                 .rejectionReason(bundle.getRejectionReason())
                 .goals(goalRows)
                 .approverId(bundle.getApproverId())

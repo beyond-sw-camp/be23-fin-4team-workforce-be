@@ -111,12 +111,8 @@ public class GoalProgressUpdateService {
     }
 
     @Transactional(readOnly = true)
-    public List<GoalProgressUpdateResDto> list(UUID goalId, UUID companyId) {
-        Goal goal = goalRepository.findById(goalId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "목표를 찾을 수 없습니다."));
-        if (!goal.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 목표입니다.");
-        }
+    public List<GoalProgressUpdateResDto> list(UUID goalId, UUID requesterId, UUID companyId) {
+        goalService.requireReadableGoal(goalId, requesterId, companyId);
         return goalActivityRepository.findByGoal_GoalIdAndTypeOrderByCreatedAtDesc(goalId, GoalActivityType.PROGRESS_UPDATED).stream()
                 .map(this::toProgressUpdateRes)
                 .toList();

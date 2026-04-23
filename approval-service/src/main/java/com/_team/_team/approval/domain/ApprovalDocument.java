@@ -34,14 +34,26 @@ public class ApprovalDocument extends BaseTimeEntity {
     @Column(nullable = false)
     private String isActiveYn="Y"; //문서 사용 여부
 
+    @Builder.Default
+    @Column(nullable = false)
+    private String isCalendarVisibleYn = "N"; // 캘린더 연동 여부
+
+    @Column
+    private String calendarDisplayName; // 캘린더 표시명 (예: "연차", "출장")
+
+    @Column
+    private String calendarStartField; // contentJson에서 시작일로 쓸 필드 key
+
+    @Column
+    private String calendarEndField; // contentJson에서 종료일로 쓸 필드 key (null이면 당일)
+
+    @Column
+    private String calendarTitleField; // contentJson에서 title 부가 정보로 쓸 필드 key
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestType requestType;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private String isDeptVisibleYn = "Y"; // 부서 문서함 노출 여부 (민감 양식은 'N')
 
     public void activate(){
         this.isActiveYn="Y";
@@ -51,16 +63,20 @@ public class ApprovalDocument extends BaseTimeEntity {
         this.isActiveYn="N";
     }
 
-    public void enableDeptVisible() {
-        this.isDeptVisibleYn = "Y";
-    }
-
-    public void disableDeptVisible() {
-        this.isDeptVisibleYn = "N";
-    }
-
     public void updateFormSchema(String formSchema) {
         this.formSchema = formSchema;
+    }
+
+    public void updateCalendarSettings(String isCalendarVisibleYn,
+                                       String calendarDisplayName,
+                                       String calendarStartField,
+                                       String calendarEndField,
+                                       String calendarTitleField) {
+        this.isCalendarVisibleYn = isCalendarVisibleYn;
+        this.calendarDisplayName = calendarDisplayName;
+        this.calendarStartField = calendarStartField;
+        this.calendarEndField = calendarEndField;
+        this.calendarTitleField = calendarTitleField;
     }
 
 }

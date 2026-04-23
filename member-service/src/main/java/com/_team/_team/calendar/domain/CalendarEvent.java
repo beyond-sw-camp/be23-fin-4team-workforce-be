@@ -61,6 +61,9 @@ public class CalendarEvent extends BaseTimeEntity {
     @Builder.Default
     private String delYn = "NO";
 
+    @Column(unique = true)
+    private UUID referenceId; // 결재 requestId (APPROVAL 타입 중복 방지)
+
     public void update(String title, String description,
                        LocalDateTime startAt, LocalDateTime endAt,
                        String isPublicYn) {

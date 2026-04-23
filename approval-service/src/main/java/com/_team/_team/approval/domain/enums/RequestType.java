@@ -1,6 +1,10 @@
 package com._team._team.approval.domain.enums;
 
 public enum RequestType {
-    VACATION, ATTENDANCE, HR_MOVEMENT, SALARY, GENERAL, CONTRACT, CERTIFICATE, OFFICIAL
-//    휴가, 근태(출퇴근/시간 관리), 부서이동, 급여, 일반기안, 전자계약 문서발급
+    VACATION,       // 휴가
+    ATTENDANCE,     // 근태
+    HR,             // 인사 (휴직, 사직, 근로계약)
+    BUSINESS_TRIP,  // 출장
+    GENERAL,        // 일반기안
+    OFFICIAL        // 공문
 }

@@ -54,14 +54,12 @@ public class OfficialNumberService {
 
     private String resolvePrefix(RequestType type) {
         return switch (type) {
-            case VACATION -> "연차";
-            case ATTENDANCE -> "근태";
-            case HR_MOVEMENT -> "인사";
-            case SALARY -> "급여";
-            case GENERAL -> "일반";
-            case CERTIFICATE -> "증명";
-            case CONTRACT -> "계약";
-            case OFFICIAL -> "공문";
+            case VACATION      -> "휴가";
+            case ATTENDANCE    -> "근태";
+            case HR            -> "인사";
+            case BUSINESS_TRIP -> "출장";
+            case GENERAL       -> "일반기안";
+            case OFFICIAL      -> "공문";
         };
     }
 }

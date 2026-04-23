@@ -51,7 +51,12 @@ public class KpiTemplateService {
             }
         }
 
-        boolean reqApr = dto.getRequireApproval() != null && dto.getRequireApproval();
+        // [D-1] goalApprovalPolicy 가 명시적으로 들어오면 사용, 아니면 requireApproval 레거시 플래그로 유도
+        GoalApprovalPolicy policy = dto.getGoalApprovalPolicy();
+        if (policy == null) {
+            boolean reqApr = dto.getRequireApproval() != null && dto.getRequireApproval();
+            policy = GoalApprovalPolicy.fromLegacyFlag(reqApr);
+        }
 
         KpiTemplate kpiTemplate = KpiTemplate.builder()
                 .companyId(companyId)
@@ -64,7 +69,7 @@ public class KpiTemplateService {
                 .isActive(true)
                 .specCycleType(dto.getSpecCycleType())
                 .targetTeamId(dto.getTargetTeamId())
-                .requireApproval(reqApr)
+                .goalApprovalPolicy(policy)
                 .kpis(kpis)
                 .build();
 
@@ -157,12 +162,16 @@ public class KpiTemplateService {
             created.add(g.getGoalId());
         }
 
-        if (t.isRequireApproval()) {
+        GoalApprovalPolicy tplPolicy = t.resolveApprovalPolicy();
+        if (tplPolicy.requiresActivation()) {
+            // 활성화 승인이 필요한 정책이면 번들을 만들어 승인 요청
             if (dto.getApproval() == null || dto.getApproval().getApproverId() == null) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, "템플릿이 결재를 요구합니다. 승인 단계 정보가 필요합니다.");
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "템플릿이 활성화 결재를 요구합니다. 승인 단계 정보가 필요합니다.");
             }
             goalApprovalService.createBundleForGoals(created, requesterId, companyId, dto.getApproval());
         } else {
+            // 활성화 승인이 불필요하면 즉시 활성화
             for (UUID gid : created) {
                 goalService.activateGoal(gid, requesterId, companyId);
             }

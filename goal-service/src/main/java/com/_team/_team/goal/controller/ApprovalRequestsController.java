@@ -1,8 +1,5 @@
 package com._team._team.goal.controller;
 
-import com._team._team.annotation.Action;
-import com._team._team.annotation.CheckPermission;
-import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
 import com._team._team.goal.dto.reqdto.GoalApprovalDecisionReqDto;
 import com._team._team.goal.dto.resdto.GoalApprovalBundleDetailResDto;
@@ -25,7 +22,9 @@ public class ApprovalRequestsController {
     }
 
     // 승인 대기 목록 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // NOTE: 지정된 승인자(approverId == X-User-UUID) 본인의 건만 반환하도록
+    //       서비스 레이어에서 필터하므로 별도의 GOAL:READ 권한은 요구하지 않는다.
+    //       (@CheckPermission 을 걸면 일반 사원이 승인자로 지정됐을 때 403 으로 막힘)
     @GetMapping
     public ApiResponse<List<GoalApprovalBundleSummaryResDto>> myPending(
             @RequestHeader("X-User-UUID") String memberId,
@@ -37,7 +36,7 @@ public class ApprovalRequestsController {
     }
 
     // 승인 요청 상세 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 서비스 레이어에서 isReaderInvolved(요청자/승인자/워처)로 접근 통제 — 권한 체크 불요.
     @GetMapping("/{requestId}")
     public ApiResponse<GoalApprovalBundleDetailResDto> detail(
             @PathVariable UUID requestId,
@@ -49,8 +48,7 @@ public class ApprovalRequestsController {
                 "승인 요청 상세 조회 성공");
     }
 
-    // 승인 요청 흐름 조회
-    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    // 내가 보낸 요청(이력) — requestedBy == X-User-UUID 로 자체 필터.
     @GetMapping("/history")
     public ApiResponse<List<GoalApprovalBundleSummaryResDto>> history(
             @RequestHeader("X-User-UUID") String memberId,
@@ -62,7 +60,7 @@ public class ApprovalRequestsController {
     }
 
     // 승인 요청 승인
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    // 서비스 레이어에서 bundle.approverId == approverId 를 검증 — 권한 체크 불요.
     @PostMapping("/{requestId}/approve")
     public ApiResponse<GoalApprovalBundleDetailResDto> approve(
             @PathVariable UUID requestId,
@@ -75,8 +73,7 @@ public class ApprovalRequestsController {
                 "승인 처리되었습니다.");
     }
 
-    // 승인 요청 반려
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
+    // 승인 요청 반려 — 승인자 본인만 가능한지 서비스 레이어에서 검증.
     @PostMapping("/{requestId}/reject")
     public ApiResponse<GoalApprovalBundleDetailResDto> reject(
             @PathVariable UUID requestId,

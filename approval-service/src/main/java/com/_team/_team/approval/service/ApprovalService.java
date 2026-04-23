@@ -1,9 +1,6 @@
 package com._team._team.approval.service;
 
-import com._team._team.approval.domain.AbsenceProxy;
-import com._team._team.approval.domain.Approval;
-import com._team._team.approval.domain.ApprovalRequest;
-import com._team._team.approval.domain.ApprovalViewer;
+import com._team._team.approval.domain.*;
 import com._team._team.approval.domain.enums.LineStatus;
 import com._team._team.approval.domain.enums.RequestStatus;
 import com._team._team.approval.domain.enums.RequestType;
@@ -21,9 +18,13 @@ import com._team._team.dto.BusinessException;
 import com._team._team.event.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import com._team._team.event.ApprovalChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
+
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ import java.util.*;
 
 @Service
 @Transactional
+@Slf4j
 public class ApprovalService {
 
     private final ApprovalRepository approvalRepository;
@@ -43,11 +45,12 @@ public class ApprovalService {
     private final LeaveApprovalEventPublisher leaveApprovalEventPublisher;
     private final AllowanceApprovalEventPublisher allowanceApprovalEventPublisher;
     private final ScheduleApprovalEventPublisher scheduleApprovalEventPublisher;
-    private final ApprovalRequestRepository approvalRequestRepository;
     private final ObjectMapper objectMapper;
-    private final OfficialNumberService officialNumberService;
     private final OfficialRecipientRepository officialRecipientRepository;
     private final MemberServiceClient memberServiceClient;
+    private final CalendarApprovalEventPublisher calendarApprovalEventPublisher;
+
+    private final ApplicationEventPublisher eventPublisher;
     private final LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher;
 
     @Autowired
@@ -59,11 +62,12 @@ public class ApprovalService {
                            LeaveApprovalEventPublisher leaveApprovalEventPublisher,
                            AllowanceApprovalEventPublisher allowanceApprovalEventPublisher,
                            ScheduleApprovalEventPublisher scheduleApprovalEventPublisher,
-                           ApprovalRequestRepository approvalRequestRepository,
                            ObjectMapper objectMapper,
-                           OfficialNumberService officialNumberService,
                            OfficialRecipientRepository officialRecipientRepository,
-                           MemberServiceClient memberServiceClient, LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher) {
+                           MemberServiceClient memberServiceClient,
+                           CalendarApprovalEventPublisher calendarApprovalEventPublisher,
+                           ApplicationEventPublisher eventPublisher,
+                           LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
@@ -72,11 +76,11 @@ public class ApprovalService {
         this.leaveApprovalEventPublisher = leaveApprovalEventPublisher;
         this.allowanceApprovalEventPublisher = allowanceApprovalEventPublisher;
         this.scheduleApprovalEventPublisher = scheduleApprovalEventPublisher;
-        this.approvalRequestRepository = approvalRequestRepository;
         this.objectMapper = objectMapper;
-        this.officialNumberService = officialNumberService;
         this.officialRecipientRepository = officialRecipientRepository;
         this.memberServiceClient = memberServiceClient;
+        this.calendarApprovalEventPublisher = calendarApprovalEventPublisher;
+        this.eventPublisher = eventPublisher;
         this.leaveOfAbsenceApprovalEventPublisher = leaveOfAbsenceApprovalEventPublisher;
     }
 
@@ -180,6 +184,8 @@ public class ApprovalService {
 
         } else {
             request.updateStatus(RequestStatus.APPROVED);
+            // 캘린더 연동 이벤트 발행
+            publishCalendarEventIfApplicable(request);
 
             // approve() 메서드 내 최종 승인 처리 블록에 추가
             if (request.getRequestType() == RequestType.OFFICIAL) {
@@ -212,8 +218,89 @@ public class ApprovalService {
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
         }
+
+        // 검색 인덱싱 이벤트 발행
+        eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
 
+    }
+
+    private void publishCalendarEventIfApplicable(ApprovalRequest request) {
+        ApprovalDocument document = request.getApprovalDocument();
+        if (!"Y".equals(document.getIsCalendarVisibleYn())) {
+            return;
+        }
+
+        String contentJson = request.getContentJson();
+        JsonNode node = readContent(contentJson);
+        if (node == null) return;
+
+        // 시작일 추출
+        String startField = document.getCalendarStartField();
+        String startValue = textOrNull(node, startField);
+        if (startValue == null) return;
+
+        LocalDateTime startAt;
+        try {
+            startAt = parseToLocalDateTime(startValue);
+        } catch (Exception e) {
+            log.warn("[Calendar] 시작일 파싱 실패. field={}, value={}", startField, startValue);
+            return;
+        }
+
+        // 종료일 추출 (없으면 시작일과 동일)
+        LocalDateTime endAt = startAt;
+        String endField = document.getCalendarEndField();
+        if (endField != null) {
+            String endValue = textOrNull(node, endField);
+            if (endValue != null) {
+                try {
+                    endAt = parseToLocalDateTime(endValue);
+                } catch (Exception e) {
+                    log.warn("[Calendar] 종료일 파싱 실패. field={}, value={}", endField, endValue);
+                }
+            }
+        }
+
+        // 당일이면 endAt을 해당 날 23:59:59로
+        if (startAt.toLocalDate().equals(endAt.toLocalDate())) {
+            endAt = endAt.toLocalDate().atTime(23, 59, 59);
+            startAt = startAt.toLocalDate().atStartOfDay();
+        }
+
+        // title 생성
+        String displayName = document.getCalendarDisplayName();
+        String title = request.getRequesterName() + " " + displayName;
+
+        String titleField = document.getCalendarTitleField();
+        if (titleField != null) {
+            String titleExtra = textOrNull(node, titleField);
+            if (titleExtra != null && !titleExtra.isBlank()) {
+                title = title + " (" + titleExtra + ")";
+            }
+        }
+
+        calendarApprovalEventPublisher.publish(
+                CalendarApprovalEvent.builder()
+                        .companyId(document.getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requesterName(request.getRequesterName())
+                        .organizationId(request.getRequesterOrganizationId())
+                        .title(title)
+                        .startAt(startAt)
+                        .endAt(endAt)
+                        .requestId(request.getRequestId())
+                        .build()
+        );
+    }
+
+    // LocalDate, LocalDateTime 둘 다 파싱 가능하도록
+    private LocalDateTime parseToLocalDateTime(String value) {
+        if (value.contains("T")) {
+            return LocalDateTime.parse(value);
+        }
+        return LocalDate.parse(value).atStartOfDay();
     }
 
 
@@ -298,6 +385,10 @@ public class ApprovalService {
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
         }
+
+        // 검색 인덱스 이벤트 발행
+        eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
+
         return ApprovalRequestResDto.fromEntity(request, allApprovals, viewers, recipientDtos);
     }
 

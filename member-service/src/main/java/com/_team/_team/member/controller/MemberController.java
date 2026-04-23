@@ -5,10 +5,7 @@ import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
 import com._team._team.member.dto.reqdto.*;
-import com._team._team.member.dto.resdto.LoginResDto;
-import com._team._team.member.dto.resdto.MemberResDto;
-import com._team._team.member.dto.resdto.MemberSearchItemResDto;
-import com._team._team.member.dto.resdto.SignatureResDto;
+import com._team._team.member.dto.resdto.*;
 import com._team._team.member.service.MemberService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -450,6 +447,34 @@ public class MemberController {
         String signatureUrl = memberService.getSignatureUrl(memberId);
         return new SignatureResDto(signatureUrl);
     }
+
+    /**
+     * 내부용: memberId 목록에 대한 최소 프로필(name/department/position/profileUrl) 배치 조회.
+     * 평가 화면의 Avatar/이름/부서 노출용.
+     *
+     * 응답 형식: { "<memberId>": { name, department, positionName, profileUrl } }
+     */
+    @GetMapping("/internal/profiles")
+    public java.util.Map<java.util.UUID, MemberMinimalProfileResDto>
+    getProfilesInternal(@RequestParam("ids") java.util.List<java.util.UUID> ids) {
+        return memberService.findMinimalProfilesByIds(ids);
+    }
+
+    /**
+     * 내부용: 특정 대상자에 대한 평가자 후보 조회 (Feign 호출용).
+     * evalType ∈ {SELF, DOWNWARD, UPWARD, PEER} — 조직 + 직급(JobGrade.displayOrder) 기반.
+     *
+     * 응답: [memberId, ...]
+     */
+    @GetMapping("/internal/candidates-for-evaluator")
+    public java.util.List<java.util.UUID> getCandidatesForEvaluator(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestParam("targetMemberId") java.util.UUID targetMemberId,
+            @RequestParam("evalType") String evalType) {
+        return memberService.findCandidatesForEvaluator(
+                targetMemberId, evalType, java.util.UUID.fromString(companyId));
+    }
+
     @PatchMapping("/onboarding/complete")
     public ResponseEntity<?> completeOnboarding(
             @RequestHeader("X-User-UUID") UUID memberId) {
