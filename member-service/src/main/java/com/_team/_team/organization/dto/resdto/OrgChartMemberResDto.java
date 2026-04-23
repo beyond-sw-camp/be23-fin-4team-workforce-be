@@ -18,12 +18,22 @@ public class OrgChartMemberResDto {
     private UUID memberId;
     private String name;
     private String jobGradeName;
+    /** 프로필 이미지 URL(없으면 null) */
+    private String profileUrl;
 
     public static OrgChartMemberResDto fromEntity(Member member, MemberPosition position) {
+        String url = member.getProfileUrl();
+        if (url != null) {
+            url = url.trim();
+            if (url.isEmpty()) {
+                url = null;
+            }
+        }
         return OrgChartMemberResDto.builder()
                 .memberId(member.getMemberId())
                 .name(member.getName())
                 .jobGradeName(position.getJobGrade().getName())
+                .profileUrl(url)
                 .build();
     }
 }

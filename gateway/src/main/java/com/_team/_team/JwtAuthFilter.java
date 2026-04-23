@@ -38,6 +38,7 @@ public class JwtAuthFilter implements GlobalFilter {
     private static final List<String> ALLOWED_PATH = List.of(
             "/member/login",
             "/member/change-password",
+            "/member/generate-at",
             "/member/login",
             "/company/check-business-number",
             "/company/send-verification-code",

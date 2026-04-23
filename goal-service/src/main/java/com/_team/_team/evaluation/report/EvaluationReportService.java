@@ -5,11 +5,15 @@ import com._team._team.evaluation.dto.resdto.ResponseResDto;
 import com._team._team.evaluation.service.EvaluationResponseService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
@@ -26,11 +30,19 @@ import java.util.UUID;
  * 사용처: 평가 Hub 의 "리포트 다운로드" 버튼, 내 평가 결과 페이지.
  * member-service 가 제공하는 이름은 EvaluationResponseService 가 이미 주입해 준 값을 사용.
  */
+@Slf4j
 @Service
 public class EvaluationReportService {
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /** PDF 렌더링에 사용하는 한글 폰트 family 이름 (CSS font-family 와 일치해야 함). */
+    private static final String KOREAN_FONT_FAMILY = "NotoSansKR";
+
+    /** classpath 내 폰트 위치. 없으면 한글이 네모로 렌더링되므로 반드시 배치 필요. */
+    private static final String FONT_REGULAR = "fonts/NotoSansKR-Regular.ttf";
+    private static final String FONT_BOLD = "fonts/NotoSansKR-Bold.ttf";
 
     private final EvaluationResponseService responseService;
     private final ObjectMapper objectMapper;
@@ -53,6 +65,7 @@ public class EvaluationReportService {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
+            registerKoreanFonts(builder);
             builder.withHtmlContent(html, null);
             builder.toStream(out);
             builder.run();
@@ -60,6 +73,38 @@ public class EvaluationReportService {
         } catch (Exception e) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "PDF 생성에 실패했습니다: " + e.getMessage());
         }
+    }
+
+    /**
+     * classpath 의 한글 TTF 폰트를 PDF 렌더러에 등록.
+     * 폰트 파일이 없으면 WARN 로그만 남기고 진행 — 영문은 보이지만 한글은 네모로 렌더된다.
+     * 프로젝트 루트 기준 {@code goal-service/src/main/resources/fonts/} 에 TTF 두 개가 있어야 함:
+     *   - NotoSansKR-Regular.ttf (weight 400)
+     *   - NotoSansKR-Bold.ttf    (weight 700)
+     */
+    private void registerKoreanFonts(PdfRendererBuilder builder) {
+        registerFont(builder, FONT_REGULAR, 400);
+        registerFont(builder, FONT_BOLD, 700);
+    }
+
+    private void registerFont(PdfRendererBuilder builder, String classpath, int weight) {
+        ClassPathResource res = new ClassPathResource(classpath);
+        if (!res.exists()) {
+            log.warn("[PDF] 한글 폰트 파일이 없습니다 — 한글이 네모로 렌더링됨. path=classpath:{}", classpath);
+            return;
+        }
+        builder.useFont(
+                () -> {
+                    try {
+                        return (InputStream) res.getInputStream();
+                    } catch (Exception e) {
+                        throw new RuntimeException("폰트 로딩 실패: " + classpath, e);
+                    }
+                },
+                KOREAN_FONT_FAMILY,
+                weight,
+                BaseRendererBuilder.FontStyle.NORMAL,
+                true);
     }
 
     // ── HTML 조립 ─────────────────────────────────────────────
@@ -100,7 +145,8 @@ public class EvaluationReportService {
         sb.append("<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />");
         sb.append("<title>Evaluation Report</title>");
         sb.append("<style>");
-        sb.append("body { font-family: sans-serif; color: #1e293b; font-size: 11pt; margin: 28pt; }");
+        // 한글 렌더링: registerKoreanFonts() 에서 등록한 "NotoSansKR" family 를 1순위로.
+        sb.append("body { font-family: 'NotoSansKR', sans-serif; color: #1e293b; font-size: 11pt; margin: 28pt; }");
         sb.append("h1 { font-size: 20pt; margin: 0 0 4pt 0; color: #0f172a; }");
         sb.append("h2 { font-size: 13pt; margin: 18pt 0 6pt 0; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 4pt; }");
         sb.append("p.sub { color: #64748b; font-size: 10pt; margin: 0 0 16pt 0; }");
