@@ -2,6 +2,7 @@ package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.domain.enums.ItemType;
+import com._team._team.salary.domain.enums.TaxCategory;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -38,6 +39,10 @@ public class SalaryItemTemplateCreateReqDto {
                 .itemType(itemType)
                 .displayOrder(displayOrder)
                 .isTaxableYn(isTaxableYn)
+                // 커스텀 등록 시 자동 매핑
+                .taxCategory("Y".equals(isTaxableYn)
+                        ? TaxCategory.TAXABLE
+                        : TaxCategory.ETC_NON_TAXABLE)
                 .build();
     }
 }

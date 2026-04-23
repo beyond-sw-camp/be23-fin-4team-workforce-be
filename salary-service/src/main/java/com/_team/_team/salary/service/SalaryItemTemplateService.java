@@ -1,6 +1,7 @@
 package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.salary.domain.enums.TaxCategory;
 import com._team._team.salary.repository.SalaryItemTemplateRepository;
 import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateCreateReqDto;
@@ -11,7 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com._team._team.salary.domain.enums.ItemType;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -94,4 +97,63 @@ public class SalaryItemTemplateService {
             throw new BusinessException(HttpStatus.CONFLICT, "동일한 이름의 급여 항목 템플릿이 이미 존재합니다.");
         }
     }
+
+    /**
+     * 회사 표준 급여 항목 자동 생성, 이미 등록된 항목은 건너뛰고 없는 것만 추가
+     * - 기본급/직책수당 (과세 일반)
+     * - 식대/자가운전/보육수당/연구활동비 (비과세 각 월 20만원)
+     */
+    public SeedResult initializeDefaults(UUID companyId) {
+        List<DefaultSpec> specs = List.of(
+                new DefaultSpec("기본급",         ItemType.EARNING, 10, "Y", TaxCategory.TAXABLE),
+                new DefaultSpec("직책수당",       ItemType.EARNING, 20, "Y", TaxCategory.TAXABLE),
+                new DefaultSpec("식대",           ItemType.EARNING, 30, "N", TaxCategory.MEAL),
+                new DefaultSpec("자가운전보조금", ItemType.EARNING, 40, "N", TaxCategory.VEHICLE_SELF),
+                new DefaultSpec("교통비",         ItemType.EARNING, 41, "Y", TaxCategory.TAXABLE),
+                new DefaultSpec("보육수당",       ItemType.EARNING, 50, "N", TaxCategory.CHILDCARE),
+                new DefaultSpec("자녀수당",       ItemType.EARNING, 51, "Y", TaxCategory.TAXABLE),
+                new DefaultSpec("연구활동비",     ItemType.EARNING, 60, "N", TaxCategory.RESEARCH)
+        );
+
+        List<SalaryItemTemplate> toSave = new ArrayList<>();
+        int skipped = 0;
+
+        for (DefaultSpec spec : specs) {
+            boolean exists = salaryItemTemplateRepository
+                    .findByCompanyIdAndItemNameAndDelYn(companyId, spec.name(), "N")
+                    .isPresent();
+            if (exists) {
+                skipped++;
+                continue;
+            }
+            toSave.add(SalaryItemTemplate.builder()
+                    .companyId(companyId)
+                    .itemName(spec.name())
+                    .itemType(spec.type())
+                    .displayOrder(spec.order())
+                    .isTaxableYn(spec.taxable())
+                    .taxCategory(spec.category())
+                    .delYn("N")
+                    .build());
+        }
+
+        if (!toSave.isEmpty()) {
+            salaryItemTemplateRepository.saveAll(toSave);
+        }
+
+        String msg = toSave.isEmpty()
+                ? "이미 모든 표준 항목이 등록되어 있습니다."
+                : "신규 " + toSave.size() + "건 반영, " + skipped + "건 스킵";
+        return new SeedResult(toSave.size(), msg);
+    }
+
+    private record DefaultSpec(
+            String name,
+            ItemType type,
+            int order,
+            String taxable,
+            TaxCategory category
+    ) {}
+
+    public record SeedResult(int created, String message) {}
 }
