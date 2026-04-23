@@ -29,7 +29,7 @@ public class WorkTimeClassifier {
                                       ResolvedSchedule schedule,
                                       boolean isHoliday,
                                       int approvedOvertimeMinutes,
-                                      int overtimeRoundingMinutes) {
+                                      int overtimeFloorMinutes) {
 
         // 출퇴근 기록 없음 (휴가 또는 결근)
         if (daily.getFirstClockIn() == null || daily.getLastClockOut() == null) {
@@ -62,8 +62,8 @@ public class WorkTimeClassifier {
         int actualOt = Math.max(0, payable - schedule.workMinutes());
         int overtime = Math.min(actualOt, approvedOvertimeMinutes);
 
-        // 라운딩 적용 (FLOOR 고정)
-        overtime = floorRound(overtime, overtimeRoundingMinutes);
+        // 내림 처리, 단위 미만 시간은 인정하지 않음 (예: 단위 15분, 근무 14분 -> 0분 / 근무 29분 -> 15분)
+        overtime = floorRound(overtime, overtimeFloorMinutes);
 
         int late = calculateLateMinutes(daily, schedule);
         int early = calculateEarlyLeaveMinutes(daily, schedule);
