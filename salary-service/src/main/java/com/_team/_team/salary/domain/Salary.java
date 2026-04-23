@@ -31,6 +31,11 @@ public class Salary extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID salaryPolicyId;
 
+    /**
+     * 호봉, (호봉제인 회사용)
+     */
+    private Integer step;
+
     /** 기본급 */
     @Column(nullable = false)
     private Long baseSalary;
@@ -50,11 +55,11 @@ public class Salary extends BaseTimeEntity {
 
     /**
      * 급여 정보 수정
-     * - @Transactional 내에서 더티체킹으로 자동 UPDATE
      */
-    public void update(SalaryUpdateReqDto reqDto){
+    public void update(SalaryUpdateReqDto reqDto, long resolvedBaseSalary){
         this.salaryPolicyId = reqDto.getSalaryPolicyId();
-        this.baseSalary = reqDto.getBaseSalary();
+        this.baseSalary = resolvedBaseSalary;
+        this.step = reqDto.getStep();
         this.jobGradeName = reqDto.getJobGradeName();
         this.jobTitleName = reqDto.getJobTitleName();
         this.effectiveFrom = reqDto.getEffectiveFrom();

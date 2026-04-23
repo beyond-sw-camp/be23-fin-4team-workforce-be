@@ -2,6 +2,7 @@ package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.Salary;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,8 +27,10 @@ public class SalaryCreateReqDto {
     @NotNull(message = "급여 정책 ID는 필수입니다.")
     private UUID salaryPolicyId;
 
-    @NotNull(message = "기본급은 필수입니다.")
     private Long baseSalary;
+
+    @Positive
+    private Integer step;
 
     /** 직급명 (선택) */
     private String jobGradeName;
@@ -51,6 +54,7 @@ public class SalaryCreateReqDto {
                 .companyId(companyId)
                 .salaryPolicyId(salaryPolicyId)
                 .baseSalary(baseSalary)
+                .step(step)
                 .jobGradeName(jobGradeName)
                 .jobTitleName(jobTitleName)
                 .effectiveFrom(effectiveFrom)
