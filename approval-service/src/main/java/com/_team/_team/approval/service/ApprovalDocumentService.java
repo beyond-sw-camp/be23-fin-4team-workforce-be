@@ -218,6 +218,24 @@ public class ApprovalDocumentService {
                         + "]}")
                 .build());
 
+// 휴직 신청
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("휴직 신청서")
+                .requestType(RequestType.VACATION)   // 또는 HR_MOVEMENT, 적절한 타입 선택
+                .formSchema("{\"fields\":["
+                        + "{\"name\":\"type\",\"label\":\"휴직 종류\",\"type\":\"select\","
+                        + "\"options\":[\"MATERNITY\",\"PATERNAL\",\"SICK\",\"UNPAID\",\"STUDY\",\"MILITARY\"]},"
+                        + "{\"name\":\"startDate\",\"label\":\"시작일\",\"type\":\"date\"},"
+                        + "{\"name\":\"endDate\",\"label\":\"종료일\",\"type\":\"date\"},"
+                        + "{\"name\":\"isPaidYn\",\"label\":\"유급 여부\",\"type\":\"select\","
+                        + "\"options\":[\"Y\",\"N\"]},"
+                        + "{\"name\":\"reason\",\"label\":\"휴직 사유\",\"type\":\"textarea\"},"
+                        + "{\"name\":\"evidenceFileUrl\",\"label\":\"증빙 서류\",\"type\":\"file\"},"
+                        + "{\"name\":\"leaveOfAbsenceId\",\"label\":\"salary 연결 ID\",\"type\":\"hidden\"}"
+                        + "]}")
+                .build());
+
 // ========== 일반 카테고리 ==========
 
 // 업무기안
