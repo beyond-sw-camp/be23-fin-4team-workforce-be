@@ -1724,7 +1724,6 @@ public class MemberService {
                 .toList();
     }
 
-
     @Transactional(readOnly = true)
     public DashboardProfileResDto getDashboardProfile(UUID memberId) {
         Member member = memberRepository.findById(memberId)
