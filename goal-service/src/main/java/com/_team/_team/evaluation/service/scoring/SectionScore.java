@@ -8,6 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * [L-1] 섹션별 채점 결과 VO.
@@ -39,4 +41,33 @@ public class SectionScore {
 
     /** 섹션에 사용된 신호 개수(답변 수 / 스냅샷 수). UI 에서 근거 표시용. */
     private Integer sampleSize;
+
+    /**
+     * [KPI_SCORE 섹션 전용] 개별 목표가 이 섹션 점수에 기여한 상세.
+     * 결과 화면에서 "어떤 목표가 얼마만큼 점수에 반영됐는가" 를 보여주기 위한 드릴다운 정보.
+     * 스키마 변경 없이 조회 시점 재계산으로만 채워진다.
+     * MANUAL / PEER_FEEDBACK 섹션에서는 null.
+     */
+    private List<KpiContribution> kpiContributions;
+
+    /**
+     * KPI 섹션에서 한 목표(goalSnapshot) 가 얼마나 기여했는지.
+     *   achievement 가 사용된 달성률(rolledAchievementPctAtSnapshot ?? achievementPctAtSnapshot).
+     *   weight 는 Goal.weightPct (>0 이면 사용, 0/null 이면 1.0 균등 분배 간주).
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class KpiContribution {
+        private UUID goalId;
+        private String title;
+        /** 이 목표의 달성률 (0~100 또는 capPct 까지). */
+        private BigDecimal achievement;
+        /** 가중치 (Goal.weightPct, 없으면 null). */
+        private BigDecimal weight;
+        /** 섹션 점수에 실제로 기여한 비율(0~100). 시각화용. */
+        private BigDecimal contributionPct;
+    }
 }
