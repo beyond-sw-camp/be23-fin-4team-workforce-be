@@ -2,13 +2,17 @@ package com._team._team.attendance.service;
 
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.OvertimePolicy;
+import com._team._team.attendance.domain.enums.AttendanceStatus;
 import com._team._team.attendance.domain.enums.ViolationType;
+import com._team._team.attendance.dto.resDto.WorkTimeSummaryResDto;
 import com._team._team.attendance.dto.vo.LaborLawViolation;
 import com._team._team.attendance.dto.vo.ResolvedSchedule;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
 import com._team._team.attendance.repository.OvertimePolicyRepository;
 import com._team._team.attendance.repository.OvertimeRequestRepository;
+import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +35,9 @@ public class LaborLawValidator {
     private static final int EIGHT_HOURS = 480;
     private static final int MIN_BREAK_OVER_FOUR = 30;
     private static final int MIN_BREAK_OVER_EIGHT = 60;
+
+    // 근로기준법 55조 주휴수당 최소 소정근로, 주 15시간 = 900분
+    private static final int WEEKLY_HOLIDAY_MIN_MINUTES = 900;
 
     private final OvertimePolicyRepository overtimePolicyRepository;
     private final OvertimeRequestRepository overtimeRequestRepository;
@@ -106,7 +113,8 @@ public class LaborLawValidator {
             ));
         }
 
-        // 주 연장근로 체크 (12시간)
+        // 주 연장근로 한도 체크
+        // 법정 최대 12시간(근기법 53조), 회사가 더 엄격하게 설정 가능
         int weeklyOt = overtimeRequestRepository
                 .sumApprovedMinutesInRange(memberId, weekStart, weekEnd);
         if (weeklyOt > policy.getWeeklyOvertimeLimitMinutes()) {
@@ -269,5 +277,77 @@ public class LaborLawValidator {
                 .stream()
                 .mapToInt(d -> d.getWorkedMinutes() == null ? 0 : d.getWorkedMinutes())
                 .sum();
+    }
+
+    /**
+     * 주간 근무시간 요약 조회, 직원 본인 화면용
+     */
+    public WorkTimeSummaryResDto getWeeklySummary(UUID memberId, UUID companyId,
+                                                  LocalDate date) {
+        OvertimePolicy policy = overtimePolicyRepository
+                .findEffective(companyId, date)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "연장근로 정책이 설정되지 않았습니다."));
+
+        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+
+        List<DailyAttendance> weekly = dailyAttendanceRepository
+                .findAllByMemberInRange(memberId, weekStart, weekEnd);
+
+        int totalWorked = weekly.stream()
+                .mapToInt(d -> d.getWorkedMinutes() == null ? 0 : d.getWorkedMinutes())
+                .sum();
+        int overtimeApproved = overtimeRequestRepository
+                .sumApprovedMinutesInRange(memberId, weekStart, weekEnd);
+
+        int totalLimit = policy.getWeeklyTotalLimitMinutes();
+        int overtimeLimit = policy.getWeeklyOvertimeLimitMinutes();
+
+        // 주휴수당 자격, 주 소정근로 15시간 이상 + 개근 (ABSENT 0일)
+        int absentDays = (int) weekly.stream()
+                .filter(d -> d.getStatus() == AttendanceStatus.ABSENT)
+                .count();
+        boolean meetsMinutes = totalWorked >= WEEKLY_HOLIDAY_MIN_MINUTES;
+        boolean noAbsent = absentDays == 0;
+        boolean eligible = meetsMinutes && noAbsent;
+        String reason = buildWeeklyHolidayReason(meetsMinutes, noAbsent, absentDays, totalWorked);
+
+        return WorkTimeSummaryResDto.builder()
+                .weekStart(weekStart)
+                .weekEnd(weekEnd)
+                .totalWorkedMinutes(totalWorked)
+                .totalLimitMinutes(totalLimit)
+                .totalUsagePercent(calcPercent(totalWorked, totalLimit))
+                .overtimeApprovedMinutes(overtimeApproved)
+                .overtimeLimitMinutes(overtimeLimit)
+                .overtimeUsagePercent(calcPercent(overtimeApproved, overtimeLimit))
+                .weeklyHolidayEligible(eligible)
+                .weeklyHolidayMinRequiredMinutes(WEEKLY_HOLIDAY_MIN_MINUTES)
+                .weeklyAbsentDays(absentDays)
+                .weeklyHolidayReason(reason)
+                .build();
+    }
+
+    // 자격 여부에 따른 사유 문구 생성
+    private String buildWeeklyHolidayReason(boolean meetsMinutes, boolean noAbsent,
+                                            int absentDays, int totalWorked) {
+        if (meetsMinutes && noAbsent) {
+            return "주 15시간 이상 + 개근으로 주휴수당 자격 충족";
+        }
+        if (!meetsMinutes && !noAbsent) {
+            return "주 15시간 미달(" + totalWorked + "분) + 결근 " + absentDays + "일";
+        }
+        if (!meetsMinutes) {
+            return "주 소정근로 15시간 미달 (현재 " + totalWorked + "분)";
+        }
+        return "결근 " + absentDays + "일로 해당 주 자격 상실";
+    }
+
+    /**
+     * 사용률 계산
+     */
+    private int calcPercent(int part, int whole) {
+        return whole == 0 ? 0 : (int) Math.round((double) part / whole * 100);
     }
 }
