@@ -32,6 +32,15 @@ public class OvertimePolicyService {
      * 정책 신규 생성
      */
     public OvertimePolicyResDto create(UUID companyId, OvertimePolicyCreateReqDto reqDto) {
+
+        // 법정 한도 검증
+        validateLegalLimits(
+                reqDto.getWeeklyOvertimeLimitMinutes(),
+                reqDto.getWeeklyTotalLimitMinutes(),
+                reqDto.getDailyOvertimeLimitMinutes(),
+                reqDto.getMonthlyOvertimeLimitMinutes());
+
+        // 기존 활성 정책이 있으면 종료일 지정 (신규 시작일 하루 전)
         overtimePolicyRepository.findByCompanyIdAndEffectiveToIsNull(companyId)
                 .ifPresent(existing -> existing.close(reqDto.getEffectiveFrom().minusDays(1)));
 
@@ -46,9 +55,17 @@ public class OvertimePolicyService {
     public OvertimePolicyResDto update(UUID policyId,
                                        UUID companyId,
                                        OvertimePolicyUpdateReqDto reqDto) {
+
+        // 법정 한도 검증
+        validateLegalLimits(
+                reqDto.getWeeklyOvertimeLimitMinutes(),
+                reqDto.getWeeklyTotalLimitMinutes(),
+                reqDto.getDailyOvertimeLimitMinutes(),
+                reqDto.getMonthlyOvertimeLimitMinutes());
+
         OvertimePolicy policy = findPolicy(policyId, companyId);
         policy.update(
-                reqDto.getOvertimeRoundingMinutes(),
+                reqDto.getOvertimeFloorMinutes(),
                 reqDto.getApprovalMode(),
                 reqDto.getPostApprovalDeadlineHours(),
                 reqDto.getWeeklyOvertimeLimitMinutes(),
@@ -104,5 +121,43 @@ public class OvertimePolicyService {
                     HttpStatus.FORBIDDEN, "다른 회사의 정책은 접근할 수 없습니다.");
         }
         return policy;
+    }
+
+    /**
+     * 연장근로 정책 법정 한도 검증
+     * 근로기준법 50조의2 (주 52시간), 53조 (주 12시간 연장) 기반
+     */
+    private void validateLegalLimits(Integer weeklyOvertimeLimit,
+                                     Integer weeklyTotalLimit,
+                                     Integer dailyOvertimeLimit,
+                                     Integer monthlyOvertimeLimit) {
+
+        // 1. 주 연장근로 법정 최대 12시간 (근기법 53조 1항)
+        if (weeklyOvertimeLimit != null && weeklyOvertimeLimit > 720) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "주 연장근로 한도는 법정 12시간(720분)을 초과할 수 없습니다. (근로기준법 53조)");
+        }
+
+        // 2. 주 총 근로시간 법정 최대 52시간 (근기법 50조의2)
+        if (weeklyTotalLimit != null && weeklyTotalLimit > 3120) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "주 총 근로시간은 법정 52시간(3120분)을 초과할 수 없습니다. (근로기준법 50조)");
+        }
+
+        // 3. 일 연장근로가 주 연장근로 한도보다 클 수 없음 (논리 일관성)
+        if (dailyOvertimeLimit != null && weeklyOvertimeLimit != null
+                && dailyOvertimeLimit > weeklyOvertimeLimit) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    String.format("일 연장근로 한도(%d분)가 주 한도(%d분)보다 클 수 없습니다.",
+                            dailyOvertimeLimit, weeklyOvertimeLimit));
+        }
+
+        // 4. 월 연장근로가 주 연장근로 × 5주 초과 불가 (한 달 최대 5주 가정)
+        if (monthlyOvertimeLimit != null && weeklyOvertimeLimit != null
+                && monthlyOvertimeLimit > weeklyOvertimeLimit * 5) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    String.format("월 연장근로 한도(%d분)가 주 한도 × 5주(%d분)를 초과할 수 없습니다.",
+                            monthlyOvertimeLimit, weeklyOvertimeLimit * 5));
+        }
     }
 }

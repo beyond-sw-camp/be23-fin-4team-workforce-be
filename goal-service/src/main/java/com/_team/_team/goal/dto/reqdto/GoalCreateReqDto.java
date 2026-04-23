@@ -40,6 +40,12 @@ public class GoalCreateReqDto {
     @NotNull(message = "소유자 ID는 필수입니다.")
     private UUID ownerId;
 
+    /**
+     * [TEAM 목표 책임자] ownerType == TEAM 일 때 필수, MEMBER 일 때는 무시됨.
+     * 서비스 레이어에서 ownerType 과 교차 검증.
+     */
+    private UUID responsibleMemberId;
+
     @NotBlank(message = "제목은 필수입니다.")
     @Size(max = 300)
     private String title;

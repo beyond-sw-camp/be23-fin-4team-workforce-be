@@ -2,6 +2,7 @@ package com._team._team.salary.service;
 
 import com._team._team.attendance.domain.MonthlyAttendanceLedger;
 import com._team._team.dto.BusinessException;
+import com._team._team.salary.domain.enums.TaxCategory;
 import com._team._team.salary.repository.PayrollItemRepository;
 import com._team._team.salary.repository.PayrollRepository;
 import com._team._team.salary.repository.SalaryItemTemplateRepository;
@@ -22,13 +23,21 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com._team._team.attendance.domain.MemberLeaveOfAbsence;
+import com._team._team.attendance.domain.enums.LeaveOfAbsenceApprovalStatus;
+import com._team._team.attendance.repository.MemberLeaveOfAbsenceRepository;
+import com._team._team.dto.NotificationMessage;
+import com._team._team.notification.NotificationType;
+import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.time.temporal.ChronoUnit;
 
 
 @Service
@@ -41,19 +50,23 @@ public class PayrollService {
     private final SalaryItemTemplateRepository salaryItemTemplateRepository;
     private final PayrollCalculationService payrollCalculationService;
     private final MemberAllowanceService memberAllowanceService;
+    private final MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
     public PayrollService(PayrollRepository payrollRepository,
                           PayrollItemRepository payrollItemRepository,
                           SalaryRepository salaryRepository,
                           SalaryItemTemplateRepository salaryItemTemplateRepository,
-                          PayrollCalculationService payrollCalculationService, MemberAllowanceService memberAllowanceService){
+                          PayrollCalculationService payrollCalculationService, MemberAllowanceService memberAllowanceService, MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository, ApplicationEventPublisher eventPublisher){
         this.payrollRepository = payrollRepository;
         this.payrollItemRepository = payrollItemRepository;
         this.salaryRepository = salaryRepository;
         this.salaryItemTemplateRepository = salaryItemTemplateRepository;
         this.payrollCalculationService = payrollCalculationService;
         this.memberAllowanceService = memberAllowanceService;
+        this.memberLeaveOfAbsenceRepository = memberLeaveOfAbsenceRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -95,6 +108,10 @@ public class PayrollService {
         SettlementPeriod period = payrollCalculationService.calculateSettlementPeriod(
                 companyId, reqDto.getPayrollYearMonthDay());
 
+        /** 3-1. 무급 휴직 일수 기반 기본급 비례율 계산 */
+        int unpaidLeaveDays = calculateUnpaidLeaveDays(companyId, reqDto.getMemberId(), period);
+        double paidRatio = calculatePaidRatio(period, salary, unpaidLeaveDays);
+
         /** 4. Payroll 생성 (금액은 0으로 초기화, 항목 생성 후 재계산) */
         Payroll payroll = reqDto.toEntity(companyId, salary.getSalaryId());
         Payroll saved;
@@ -124,18 +141,19 @@ public class PayrollService {
         List<PayrollItem> payrollItems = new ArrayList<>();
 
         for (SalaryItemTemplate template : templates) {
-            /**
-             * 기본급은 baseSalary, 그 외 지급 항목은 MemberAllowance 금액, 없으면 0원
-             */
-            long amount;
-            if (template.getItemName().equals("기본급")) {
-                amount = salary.getBaseSalary();
-            } else {
-                amount = allowanceByTemplate.getOrDefault(
-                        template.getSalaryItemTemplateId(), 0L);
+             // 기본급은 baseSalary, 그 외 지급 항목은 MemberAllowance 금액, 없으면 0원
+            long amount = 0L;
+            if ("기본급".equals(template.getItemName())) {
+                // 기본급, 일할 + 무급휴직 반영
+                amount = (long) Math.floor(salary.getBaseSalary() * paidRatio);
+            }else if (template.getItemType() == ItemType.EARNING) {
+                // 그 외 EARNING, MemberAllowance 에서 조회 (없으면 0)
+                Long allowanceAmount = allowanceByTemplate.get(template.getSalaryItemTemplateId());
+                if (allowanceAmount != null) {
+                    amount = allowanceAmount;
+                }
             }
 
-            // payrollItem 생성
             PayrollItem payItem = PayrollItem.fromTemplate(saved, template, amount);
             payrollItems.add(payItem);
 
@@ -144,13 +162,22 @@ public class PayrollService {
                 totalPayment += amount;
                 // 과세 항목만 과세 총액에 누적 (비과세 식대, 비과세 교통비 등 제외)
                 if ("Y".equals(template.getIsTaxableYn())) {
+                    // 전액 과세
                     totalTaxableEarning += amount;
+                } else {
+                    // 비과세 항목, 한도 초과분은 과세 가산
+                    TaxCategory category = template.getTaxCategory();
+                    if (category != null) {
+                        Long limit = category.getMonthlyNonTaxableLimit();
+                        if (limit != null && amount > limit) {
+                            totalTaxableEarning += (amount - limit);
+                        }
+                    }
                 }
             } else {
                 totalDeduction += amount;
             }
         }
-
         /**
          * 6. 월 장부 조회
          */
@@ -204,6 +231,19 @@ public class PayrollService {
             if ("Y".equals(nightItem.isTaxableYn())) {
                 totalTaxableEarning += nightItem.amount();
             }
+        }
+
+        /**
+         * 8-2. 결근 공제, 주휴수당 포함
+         * 4대보험 계산 전에 공제하여 명세서에 명시적 표시, 4대보험 base 는 기본급 유지
+         */
+        AutoPayrollItem absentItem = payrollCalculationService.calculateAbsentDeduction(
+                ledger, salary.getBaseSalary());
+
+        if (absentItem != null) {
+            PayrollItem payrollItem = buildPayrollItem(saved, absentItem);
+            payrollItems.add(payrollItem);
+            totalDeduction += absentItem.amount();
         }
 
         /**
@@ -305,6 +345,16 @@ public class PayrollService {
         }
 
         payroll.confirm();
+
+        // 직원에게 명세서 발행 알림
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(payroll.getMemberId())
+                .senderId(null)
+                .notificationType(NotificationType.SALARY_PUBLISHED)
+                .content("[" + payroll.getPayrollYearMonthDay() + "] 급여명세서가 발행되었습니다.")
+                .targetId(payroll.getPayrollId())
+                .targetType("PAYROLL")
+                .build());
         return PayrollResDto.fromEntity(payroll);
     }
 
@@ -320,6 +370,18 @@ public class PayrollService {
         }
 
         payroll.pay();
+
+        // 직원에게 지급 완료 알림
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(payroll.getMemberId())
+                .senderId(null)
+                .notificationType(NotificationType.SALARY_PAID)
+                .content("[" + payroll.getPayrollYearMonthDay() + "] 급여 "
+                        + String.format("%,d", payroll.getNetPay()) + "원이 지급되었습니다.")
+                .targetId(payroll.getPayrollId())
+                .targetType("PAYROLL")
+                .build());
+
         return PayrollResDto.fromEntity(payroll);
     }
 
@@ -429,5 +491,72 @@ public class PayrollService {
                 .sumAmountByPayrollIdAndItemType(payroll.getPayrollId(), ItemType.DEDUCTION);
 
         payroll.recalculate(totalPayment, totalDeduction);
+    }
+
+    /**
+     * 정산기간 내 무급 휴직 일수 합산
+     * ACTIVE 는 endDate, ENDED 는 actualEndDate 기준으로 실제 기간 산정
+     */
+    private int calculateUnpaidLeaveDays(UUID companyId, UUID memberId, SettlementPeriod period) {
+        List<MemberLeaveOfAbsence> leaveOfAbsences = memberLeaveOfAbsenceRepository
+                .findInPeriod(companyId, memberId, period.to());
+
+        int unpaidDays = 0;
+        for (MemberLeaveOfAbsence loa : leaveOfAbsences) {
+            if (!"N".equals(loa.getIsPaidYn())) {
+                continue;   // 유급 휴직 (출산/육아/군복무 등) 은 차감 안 함
+            }
+
+            // 실제 종료일, ENDED 면 actualEndDate, 그 외 endDate
+            LocalDate effectiveEnd =
+                    loa.getStatus() == LeaveOfAbsenceApprovalStatus.ENDED
+                            && loa.getActualEndDate() != null
+                            ? loa.getActualEndDate()
+                            : loa.getEndDate();
+
+            // 정산기간 밖에서 끝난 건 제외
+            if (effectiveEnd.isBefore(period.from())) {
+                continue;
+            }
+
+            // 정산기간과 겹치는 부분만 계산
+            LocalDate overlapStart = loa.getStartDate().isBefore(period.from())
+                    ? period.from() : loa.getStartDate();
+            LocalDate overlapEnd = effectiveEnd.isAfter(period.to())
+                    ? period.to() : effectiveEnd;
+
+            if (!overlapStart.isAfter(overlapEnd)) {
+                unpaidDays += (int) ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
+            }
+        }
+        return unpaidDays;
+    }
+
+    /**
+     * 실근무일 비율, 정산기간 대비 근무일 / 총일수
+     * - Salary.effectiveFrom 이 period 시작 후 → 중도 입사 일할
+     * - Salary.effectiveTo 가 period 종료 전 → 중도 퇴사 일할
+     * - 무급휴직일 추가 차감
+     */
+    private double calculatePaidRatio(SettlementPeriod period, Salary salary, int unpaidLeaveDays) {
+        LocalDate periodStart = period.from();
+        LocalDate periodEnd = period.to();
+        int periodDays = (int) ChronoUnit.DAYS.between(periodStart, periodEnd) + 1;
+        if (periodDays <= 0) return 1.0;
+
+        LocalDate workStart = salary.getEffectiveFrom().isAfter(periodStart)
+                ? salary.getEffectiveFrom()
+                : periodStart;
+
+        LocalDate workEnd = (salary.getEffectiveTo() != null && salary.getEffectiveTo().isBefore(periodEnd))
+                ? salary.getEffectiveTo()
+                : periodEnd;
+
+        if (workStart.isAfter(workEnd)) return 0.0;
+
+        int workDays = (int) ChronoUnit.DAYS.between(workStart, workEnd) + 1;
+        workDays = Math.max(0, workDays - unpaidLeaveDays);
+
+        return (double) workDays / periodDays;
     }
 }

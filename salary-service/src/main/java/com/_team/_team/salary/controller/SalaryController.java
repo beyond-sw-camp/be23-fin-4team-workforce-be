@@ -35,7 +35,7 @@ public class SalaryController {
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @Valid @RequestBody SalaryCreateReqDto reqDto){
         return new ResponseEntity<>(
-                ApiResponse.success(salaryService.save(companyId, reqDto), "급여가 생성되었습니다."),
+                ApiResponse.success(salaryService.createSalary(companyId, reqDto), "급여가 생성되었습니다."),
                 HttpStatus.CREATED
         );
     }

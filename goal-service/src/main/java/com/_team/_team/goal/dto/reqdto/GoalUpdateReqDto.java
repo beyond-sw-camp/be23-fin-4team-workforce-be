@@ -33,4 +33,9 @@ public class GoalUpdateReqDto {
     private GoalHealthStatus healthStatus;
     private List<UUID> visibleTeamIds;
     private List<UUID> memberIds;
+    /**
+     * TEAM 목표의 책임자 교체. MEMBER 목표에 들어오면 무시.
+     * null 이면 "변경 없음" 으로 해석 (기존 값 유지).
+     */
+    private UUID responsibleMemberId;
 }

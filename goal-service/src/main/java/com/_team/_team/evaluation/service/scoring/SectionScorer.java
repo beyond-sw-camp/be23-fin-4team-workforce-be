@@ -201,6 +201,10 @@ public class SectionScorer {
         BigDecimal weightAcc = BigDecimal.ZERO;
         int used = 0;
 
+        // [워크플로우 보강] 개별 목표별 기여도 드릴다운 수집 — 결과 화면의 KPI 섹션에서
+        // "어떤 목표가 얼마만큼 반영됐는지" 시각화하기 위함. 스키마 변경 없이 조회 시 재계산.
+        java.util.List<java.util.Map<String, Object>> usedRaw = new java.util.ArrayList<>();
+
         for (GoalSnapshotDto snap : filtered) {
             BigDecimal achievement = snap.getRolledAchievementPctAtSnapshot() != null
                     ? snap.getRolledAchievementPctAtSnapshot()
@@ -213,6 +217,12 @@ public class SectionScorer {
             weightedSum = weightedSum.add(achievement.multiply(w));
             weightAcc = weightAcc.add(w);
             used++;
+
+            java.util.Map<String, Object> row = new java.util.HashMap<>();
+            row.put("snap", snap);
+            row.put("achievement", achievement);
+            row.put("weight", w);
+            usedRaw.add(row);
         }
 
         if (weightAcc.compareTo(BigDecimal.ZERO) == 0) {
@@ -221,6 +231,24 @@ public class SectionScorer {
 
         BigDecimal avg = weightedSum.divide(weightAcc, 4, RoundingMode.HALF_UP)
                 .setScale(2, RoundingMode.HALF_UP);
+
+        // 각 목표의 섹션 점수 기여 비율(100%) — weight 기반.
+        List<SectionScore.KpiContribution> contributions = new ArrayList<>(usedRaw.size());
+        BigDecimal hundred = BigDecimal.valueOf(100);
+        for (var row : usedRaw) {
+            GoalSnapshotDto snap = (GoalSnapshotDto) row.get("snap");
+            BigDecimal w = (BigDecimal) row.get("weight");
+            BigDecimal pct = w.multiply(hundred)
+                    .divide(weightAcc, 2, RoundingMode.HALF_UP);
+            contributions.add(SectionScore.KpiContribution.builder()
+                    .goalId(snap.getGoalId())
+                    .title(snap.getTitle())
+                    .achievement(clamp((BigDecimal) row.get("achievement")))
+                    .weight(snap.getWeightPct())
+                    .contributionPct(pct)
+                    .build());
+        }
+
         return SectionScore.builder()
                 .sectionId(section.getSectionId())
                 .title(section.getTitle())
@@ -229,6 +257,7 @@ public class SectionScorer {
                 .score(clamp(avg))
                 .skipped(false)
                 .sampleSize(used)
+                .kpiContributions(contributions)
                 .build();
     }
 

@@ -1,6 +1,8 @@
 package com._team._team.batch.leave.worker;
 
+import com._team._team.attendance.domain.MemberLeaveOfAbsence;
 import com._team._team.attendance.repository.MemberBalanceRepository;
+import com._team._team.attendance.repository.MemberLeaveOfAbsenceRepository;
 import com._team._team.attendance.service.AnnualLeaveGrantService;
 import com._team._team.attendance.domain.LeavePolicy;
 import com._team._team.attendance.domain.MemberBalance;
@@ -22,7 +24,6 @@ import java.util.stream.Collectors;
 /**
  * 근속 1년 미만 직원에게 발생하는 월차(월 단위 누적)를 부여하는 워커
  * 회사별 월차 누적 부여량을 한 번에 조회하여 Map으로 보관한 뒤, Feign으로 조회한 직원 목록과 결합하여 N+1을 방지
- * 회사 단위 트랜잭션은 propagation = REQUIRES_NEW 로 분리
  */
 @Component
 public class MonthlyLeaveGrantWorker {
@@ -33,14 +34,17 @@ public class MonthlyLeaveGrantWorker {
     private final MemberBalanceRepository memberBalanceRepository;
     private final MemberFeignClient memberFeignClient;
     private final EntityManager entityManager;
+    private final MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository;
+
 
     @Autowired
     public MonthlyLeaveGrantWorker(MemberBalanceRepository memberBalanceRepository,
                                    MemberFeignClient memberFeignClient,
-                                   EntityManager entityManager) {
+                                   EntityManager entityManager, MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository) {
         this.memberBalanceRepository = memberBalanceRepository;
         this.memberFeignClient = memberFeignClient;
         this.entityManager = entityManager;
+        this.memberLeaveOfAbsenceRepository = memberLeaveOfAbsenceRepository;
     }
 
     /**
@@ -64,12 +68,21 @@ public class MonthlyLeaveGrantWorker {
                         (a, b) -> a
                 ));
 
+        // 회사 현재 휴직자 Map
+        Map<UUID, MemberLeaveOfAbsence> loaMap = loadActiveLeaveOfAbsenceMap(companyId, baseDate);
+
         List<MemberBalance> insertBuffer = new ArrayList<>(BATCH_SIZE);
 
         for (MemberResDto member : members) {
             LocalDate joinDate = member.getJoinDate();
 
             if (joinDate == null || !baseDate.isBefore(joinDate.plusYears(1))) {
+                batchResult.skipCount++;
+                continue;
+            }
+
+            // 휴직 중 skip 대상 체크
+            if (isSkipByLeaveOfAbsence(loaMap, member.getMemberId())) {
                 batchResult.skipCount++;
                 continue;
             }
@@ -150,5 +163,23 @@ public class MonthlyLeaveGrantWorker {
                 .isExpireYn("N")
                 .delYn("N")
                 .build();
+    }
+
+    private Map<UUID, MemberLeaveOfAbsence> loadActiveLeaveOfAbsenceMap(UUID companyId,
+                                                                        LocalDate date) {
+        return memberLeaveOfAbsenceRepository
+                .findAllActiveInCompanyOnDate(companyId, date)
+                .stream()
+                .collect(Collectors.toMap(
+                        MemberLeaveOfAbsence::getMemberId,
+                        Function.identity(),
+                        (a, b) -> a
+                ));
+    }
+
+    private boolean isSkipByLeaveOfAbsence(Map<UUID, MemberLeaveOfAbsence> loaMap,
+                                           UUID memberId) {
+        MemberLeaveOfAbsence loa = loaMap.get(memberId);
+        return loa != null && !loa.getType().countsAsWorkday();
     }
 }

@@ -167,6 +167,40 @@ public class PayrollCalculationService {
         );
     }
 
+    /**
+     * 결근 공제, 주휴수당 포함
+     * 근로기준법 55조, 1주 15시간 이상 개근 시 유급 주휴일 부여
+     * 결근 발생 시 해당 주 주휴수당 자격 상실 → 1일 결근은 2일 치 차감이 법리
+     *
+     * 통상시급 = baseSalary / 209 (소정근로 176h + 주휴 35h 근사)
+     * 결근 1일 = 소정근로 8h + 주휴 자격 상실 8h = 16h
+     */
+    public AutoPayrollItem calculateAbsentDeduction(
+            MonthlyAttendanceLedger ledger,
+            Long baseSalary) {
+
+        int absentDays = ledger.getAbsentDays() == null ? 0 : ledger.getAbsentDays();
+
+        if (absentDays <= 0) {
+            return null;
+        }
+
+        double hourlyRate = baseSalary / 209.0;
+        long deduction = (long) Math.floor(hourlyRate * 16.0 * absentDays);
+
+        if (deduction <= 0) {
+            return null;
+        }
+
+        return new AutoPayrollItem(
+                "결근 공제(주휴 포함 " + absentDays + "일)",
+                ItemType.DEDUCTION,
+                deduction,
+                190, // 공제 200번대(4대보험/세금) 바로 앞
+                "Y"
+        );
+    }
+
     // 7. 세율 기반 공제 계산
     /**
      * 4대보험 + 소득세 + 지방소득세 자동 계산
@@ -238,12 +272,23 @@ public class PayrollCalculationService {
      */
     private long calculateSingleDeduction(Map<TaxType, TaxRate> rateMap, TaxType taxType, long baseAmount){
         TaxRate taxRate = rateMap.get(taxType);
-
         if(taxRate == null){
             return 0L;
         }
 
-        double amount = taxRate.getRate().doubleValue() * baseAmount;
+        long cappedBase = baseAmount;
+
+        // 상/하한은 지원 유형만 적용
+        if (taxType.supportsIncomeCap()) {
+            if (taxRate.getIncomeFloor() != null && cappedBase < taxRate.getIncomeFloor()) {
+                cappedBase = taxRate.getIncomeFloor();
+            }
+            if (taxRate.getIncomeCeiling() != null && cappedBase > taxRate.getIncomeCeiling()) {
+                cappedBase = taxRate.getIncomeCeiling();
+            }
+        }
+
+        double amount = taxRate.getRate().doubleValue() * cappedBase;
         return (long) Math.floor(amount);
     }
 }

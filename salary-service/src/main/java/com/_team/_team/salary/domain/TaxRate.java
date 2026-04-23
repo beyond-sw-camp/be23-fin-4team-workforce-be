@@ -40,6 +40,22 @@ public class TaxRate extends BaseTimeEntity {
     @Column(nullable = false, precision = 10, scale = 4)
     private BigDecimal rate;
 
+    /**
+     * 기준소득 상한 (월, 원). null 이면 상한 없음.
+     * - 국민연금: 2026년 617만원
+     * - 건강보험: 연 14억 수준 (매년 변동)
+     */
+    @Column
+    private Long incomeCeiling;
+
+    /**
+     * 기준소득 하한 (월, 원). null 이면 하한 없음.
+     * - 국민연금: 2026년 39만원
+     * - 건강보험: 약 28만원 (매년 변동)
+     */
+    @Column
+    private Long incomeFloor;
+
     /** 적용 연도 (예: 2026) */
     @Column(nullable = false)
     private Integer applyYear;
@@ -57,5 +73,7 @@ public class TaxRate extends BaseTimeEntity {
         this.rate = reqDto.getRate();
         this.applyYear = reqDto.getApplyYear();
         this.employerRate = reqDto.getEmployerRate();
+        this.incomeCeiling = reqDto.getIncomeCeiling();
+        this.incomeFloor = reqDto.getIncomeFloor();
     }
 }

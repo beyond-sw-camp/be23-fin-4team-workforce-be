@@ -1,6 +1,8 @@
 package com._team._team.batch.leave.worker;
 
+import com._team._team.attendance.domain.MemberLeaveOfAbsence;
 import com._team._team.attendance.repository.MemberBalanceRepository;
+import com._team._team.attendance.repository.MemberLeaveOfAbsenceRepository;
 import com._team._team.attendance.service.AnnualLeaveGrantService;
 import com._team._team.attendance.domain.LeavePolicy;
 import com._team._team.attendance.domain.MemberBalance;
@@ -16,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.function.Function;
+import java.time.temporal.ChronoUnit;
 
 /**
  * 법정 연차(연 단위) 부여를 회사(정책) 단위로 수행하는 워커
@@ -30,22 +35,25 @@ public class AnnualLeaveGrantWorker {
     private final MemberBalanceRepository memberBalanceRepository;
     private final MemberFeignClient memberFeignClient;
     private final EntityManager entityManager;
+    private final MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository;
 
     @Autowired
     public AnnualLeaveGrantWorker(
             MemberBalanceRepository memberBalanceRepository,
             MemberFeignClient memberFeignClient,
-            EntityManager entityManager) {
+            EntityManager entityManager, MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository) {
         this.memberBalanceRepository = memberBalanceRepository;
         this.memberFeignClient = memberFeignClient;
         this.entityManager = entityManager;
+        this.memberLeaveOfAbsenceRepository = memberLeaveOfAbsenceRepository;
     }
 
     /**
      * 회계연도(FISCAL) 기준 연차 일괄 부여
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public AnnualLeaveGrantService.BatchResult grantForCompanyFiscal(LeavePolicy policy, LocalDate grantDate, LocalDate expirationDate) {
+    public AnnualLeaveGrantService.BatchResult grantForCompanyFiscal(
+            LeavePolicy policy, LocalDate grantDate, LocalDate expirationDate) {
 
         UUID companyId = policy.getCompanyId();
         Double days = policy.getDefaultAnnualDays();
@@ -53,6 +61,9 @@ public class AnnualLeaveGrantWorker {
 
         Set<UUID> grantedMemberIds = memberBalanceRepository.findGrantedMemberIds(
                 companyId, BalanceType.ANNUAL, grantDate, expirationDate);
+
+        // 회사 현재 휴직자 Map (memberId -> LeaveOfAbsence)
+        Map<UUID, MemberLeaveOfAbsence> loaMap = loadActiveLeaveOfAbsenceMap(companyId, grantDate);
 
         List<MemberResDto> memberResDtos = fetchMembers(companyId);
         List<MemberBalance> buffer = new ArrayList<>(BATCH_SIZE);
@@ -67,8 +78,19 @@ public class AnnualLeaveGrantWorker {
                 batchResult.skipCount++;
                 continue;
             }
-            buffer.add(buildAnnualBalance(
-                    companyId, memberResDto.getMemberId(), days, expirationDate));
+
+            // 휴직 중 skip 대상 체크 (countsAsWorkday=false)
+            if (isSkipByLeaveOfAbsence(loaMap, memberResDto.getMemberId())) {
+                batchResult.skipCount++;
+                continue;
+            }
+
+            // 근속 연수 = joinDate ~ grantDate 의 완성 연도
+            int tenureYears = (int) ChronoUnit.YEARS.between(memberResDto.getJoinDate(), grantDate);
+            double grantDays = calculateAnnualDaysByTenure(days, tenureYears);
+
+            buffer.add(buildAnnualBalance(companyId, memberResDto.getMemberId(), grantDays, expirationDate));
+
             batchResult.successCount++;
 
             if (buffer.size() >= BATCH_SIZE) {
@@ -81,13 +103,13 @@ public class AnnualLeaveGrantWorker {
         }
         return batchResult;
     }
-
     /**
      * 입사일 기념일(HIRE_DATE) 기준 연차 부여
      * baseDate가 입사 기념일인 직원에게만 부여하며, 윤년 2/29 입사자에 대한 보정을 포함
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public AnnualLeaveGrantService.BatchResult grantForCompanyHireDate(LeavePolicy policy, LocalDate baseDate) {
+    public AnnualLeaveGrantService.BatchResult grantForCompanyHireDate(
+            LeavePolicy policy, LocalDate baseDate) {
 
         UUID companyId = policy.getCompanyId();
         Double days = policy.getDefaultAnnualDays();
@@ -98,6 +120,9 @@ public class AnnualLeaveGrantWorker {
 
         Set<UUID> grantedMemberIds = memberBalanceRepository.findGrantedMemberIds(
                 companyId, BalanceType.ANNUAL, grantDate, expirationDate);
+
+        // 회사 현재 휴직자 Map
+        Map<UUID, MemberLeaveOfAbsence> loaMap = loadActiveLeaveOfAbsenceMap(companyId, baseDate);
 
         List<MemberResDto> memberResDtos = fetchMembers(companyId);
         List<MemberBalance> buffer = new ArrayList<>(BATCH_SIZE);
@@ -121,8 +146,16 @@ public class AnnualLeaveGrantWorker {
                 batchResult.skipCount++;
                 continue;
             }
-            buffer.add(buildAnnualBalance(
-                    companyId, memberResDto.getMemberId(), days, expirationDate));
+
+            // 휴직 중 skip 대상 체크
+            if (isSkipByLeaveOfAbsence(loaMap, memberResDto.getMemberId())) {
+                batchResult.skipCount++;
+                continue;
+            }
+
+            double grantDays = calculateAnnualDaysByTenure(days, years);
+
+            buffer.add(buildAnnualBalance(companyId, memberResDto.getMemberId(), grantDays, expirationDate));
             batchResult.successCount++;
 
             if (buffer.size() >= BATCH_SIZE) {
@@ -134,7 +167,6 @@ public class AnnualLeaveGrantWorker {
         }
         return batchResult;
     }
-
     /** 버퍼를 DB에 반영한 뒤 영속성 컨텍스트를 비움 */
     private void flushBuffer(List<MemberBalance> buffer) {
         memberBalanceRepository.saveAll(buffer);
@@ -186,5 +218,45 @@ public class AnnualLeaveGrantWorker {
                 .isExpireYn("N")
                 .delYn("N")
                 .build();
+    }
+
+    /**
+     * 회사 내 특정 날짜 활성 휴직 리턴
+     */
+    private Map<UUID, MemberLeaveOfAbsence> loadActiveLeaveOfAbsenceMap(UUID companyId,
+                                                                        LocalDate date) {
+        return memberLeaveOfAbsenceRepository
+                .findAllActiveInCompanyOnDate(companyId, date)
+                .stream()
+                .collect(Collectors.toMap(
+                        MemberLeaveOfAbsence::getMemberId,
+                        Function.identity(),
+                        (a, b) -> a
+                ));
+    }
+
+    /**
+     * 휴직 중이고 연차 미발생 대상이면 true
+     * SICK, UNPAID, STUDY 는 연차 발생 안 함 (무급 휴가)
+     * MATERNITY, PATERNAL, MILITARY 는 법정 출근 간주로 정상 발생
+     */
+    private boolean isSkipByLeaveOfAbsence(Map<UUID, MemberLeaveOfAbsence> loaMap,
+                                           UUID memberId) {
+        MemberLeaveOfAbsence loa = loaMap.get(memberId);
+        return loa != null && !loa.getType().countsAsWorkday();
+    }
+
+    /**
+     * 근로기준법 60조 근속별 연차 계산
+     * - 1-2년차: defaultAnnualDays (회사 정책 기본, 보통 15일)
+     * - 3년차부터 2년마다 +1일 가산
+     * - 최대 25일 상한
+     * 수식: min(baseDays + floor((years - 1) / 2), 25)
+     */
+    private double calculateAnnualDaysByTenure(Double policyBaseDays, int tenureYears) {
+        final int LEGAL_MAX = 25;
+        double base = policyBaseDays != null ? policyBaseDays : 15.0;
+        int added = Math.max(0, (tenureYears - 1) / 2);
+        return Math.min(base + added, LEGAL_MAX);
     }
 }

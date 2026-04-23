@@ -1,6 +1,7 @@
 package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
+import com._team._team.salary.domain.enums.PayDayShiftRule;
 import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.dto.reqdto.SalaryPolicyUpdateReqDto;
 import com._team._team.salary.domain.enums.WageSystemType;
@@ -32,6 +33,21 @@ public class SalaryPolicy extends BaseTimeEntity {
 
     @Column(nullable = false)
     private Integer payDay;
+
+    // 지급일(payDay)이 주말/공휴일인 경우 지급 날짜
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10, nullable = false)
+    @Builder.Default
+    private PayDayShiftRule payDayShiftRule = PayDayShiftRule.BEFORE;
+
+    /**
+     * 호봉제 사용 여부 (N 이면 연봉협상제)
+     * Y: 호봉표 기반 기본급 자동 결정 (step 필수)
+     * N: baseSalary 직접 입력 (기본값)
+     */
+    @Column(length = 1, nullable = false)
+    @Builder.Default
+    private String usePayGradeYn = "N";
 
     /**
      * 임금제 유형 (COMPREHENSIVE: 포괄 / NON_COMPREHENSIVE: 비포괄)
@@ -80,10 +96,14 @@ public class SalaryPolicy extends BaseTimeEntity {
         this.payDay = reqDto.getPayDay();
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();
+        this.usePayGradeYn = reqDto.getUsePayGradeYn();
         this.wageSystemType = reqDto.getWageSystemType();
         this.fixedOvertimeMinutes = reqDto.getWageSystemType() == WageSystemType.NON_COMPREHENSIVE
                 ? 0
                 : (reqDto.getFixedOvertimeMinutes() == null ? 0 : reqDto.getFixedOvertimeMinutes());
+        if (reqDto.getPayDayShiftRule() != null) {
+            this.payDayShiftRule = reqDto.getPayDayShiftRule();
+        }
     }
 
     // 소프트 삭제

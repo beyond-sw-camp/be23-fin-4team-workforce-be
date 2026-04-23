@@ -26,6 +26,7 @@ public class WorkTripResDto {
     private String destination;
     private Double destinationLat;
     private Double destinationLng;
+    private Integer destinationRadiusMeters;
     private String purpose;
     private Long expenseAmount;
     private ExpenseType expenseType;
@@ -41,6 +42,7 @@ public class WorkTripResDto {
                 .destination(detail.getDestination())
                 .destinationLat(detail.getDestinationLat())
                 .destinationLng(detail.getDestinationLng())
+                .destinationRadiusMeters(detail.getDestinationRadiusMeters())
                 .purpose(detail.getPurpose())
                 .expenseAmount(detail.getExpenseAmount())
                 .expenseType(detail.getExpenseType())

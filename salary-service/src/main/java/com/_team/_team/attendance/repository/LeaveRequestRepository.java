@@ -75,4 +75,16 @@ public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUI
             @Param("companyLeaveTypeId") UUID companyLeaveTypeId,
             @Param("rangeStart") LocalDate rangeStart,
             @Param("rangeEnd") LocalDate rangeEnd);
+
+    /**
+     * 특정 날짜에 적용되는 모든 승인 휴가 조회, 전 직원 (근태 마감 배치 사용)
+     */
+    @Query("""
+       SELECT l FROM LeaveRequest l
+       WHERE l.approvalStatus = 'APPROVED'
+         AND l.startDate <= :date
+         AND l.endDate >= :date
+         AND l.delYn = 'N'
+       """)
+    List<LeaveRequest> findAllActiveOnDate(@Param("date") LocalDate date);
 }

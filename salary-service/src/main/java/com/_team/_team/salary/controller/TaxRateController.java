@@ -74,4 +74,16 @@ public class TaxRateController {
                 HttpStatus.OK
         );
     }
+
+    // 지정 연도 표준 4대보험 + 세금 세율 시드, 기존 값은 보존
+    @PostMapping("/init")
+    public ResponseEntity<?> initializeDefaults(
+            @RequestParam Integer applyYear) {
+        TaxRateService.SeedResult result = taxRateService.initializeDefaults(applyYear);
+        return new ResponseEntity<>(
+                ApiResponse.success(result,
+                        applyYear + "년 표준 세율 " + result.inserted() + "건 반영, "
+                                + result.skipped() + "건 스킵"),
+                HttpStatus.OK);
+    }
 }

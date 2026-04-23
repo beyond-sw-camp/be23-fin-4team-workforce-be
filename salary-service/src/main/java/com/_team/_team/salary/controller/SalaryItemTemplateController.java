@@ -81,4 +81,14 @@ public class SalaryItemTemplateController {
                 HttpStatus.OK
         );
     }
+
+    // 표준 템플릿 일괄 시드, 회사 온보딩 시 1회 호출
+    @PostMapping("/init")
+    public ResponseEntity<?> initializeDefaults(
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
+        SalaryItemTemplateService.SeedResult result = salaryItemTemplateService.initializeDefaults(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, result.message()),
+                HttpStatus.OK);
+    }
 }

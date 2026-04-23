@@ -15,7 +15,7 @@ import java.util.UUID;
 public class OvertimePolicyResDto {
 
     private UUID overtimePolicyId;
-    private Integer overtimeRoundingMinutes;
+    private Integer overtimeFloorMinutes;
     private ApprovalMode approvalMode;
     private Integer postApprovalDeadlineHours;
     private Integer weeklyOvertimeLimitMinutes;
@@ -31,7 +31,7 @@ public class OvertimePolicyResDto {
     public static OvertimePolicyResDto fromEntity(OvertimePolicy p) {
         return OvertimePolicyResDto.builder()
                 .overtimePolicyId(p.getOvertimePolicyId())
-                .overtimeRoundingMinutes(p.getOvertimeRoundingMinutes())
+                .overtimeFloorMinutes(p.getOvertimeFloorMinutes())
                 .approvalMode(p.getApprovalMode())
                 .postApprovalDeadlineHours(p.getPostApprovalDeadlineHours())
                 .weeklyOvertimeLimitMinutes(p.getWeeklyOvertimeLimitMinutes())

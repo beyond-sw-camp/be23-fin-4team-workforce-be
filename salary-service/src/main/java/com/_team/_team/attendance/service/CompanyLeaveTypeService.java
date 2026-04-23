@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,33 +27,72 @@ public class CompanyLeaveTypeService {
     }
 
     /**
-     * 회사 생성 시 시스템 기본 8종 자동 시드, 이미 있으면 건너뜀 (멱등성)
+     * 시스템 기본 휴가 추가
+     * - 기존 회사에도 신규 종류는 추가 가능
      */
     public void initializeDefaults(UUID companyId) {
-        if (repository.existsByCompanyIdAndIsSystemDefault(companyId, true)) {
-            return;
-        }
 
-        List<CompanyLeaveType> defaults = List.of(
-                buildDefault(companyId, "ANNUAL", "연차", BalanceType.ANNUAL,
-                        1.0, "Y", null, "N", 1),
-                buildDefault(companyId, "HALF_AM", "반차(오전)", BalanceType.ANNUAL,
-                        0.5, "Y", null, "N", 2),
-                buildDefault(companyId, "HALF_PM", "반차(오후)", BalanceType.ANNUAL,
-                        0.5, "Y", null, "N", 3),
-                buildDefault(companyId, "BEREAVEMENT", "경조휴가", null,
-                        1.0, "Y", null, "Y", 4),
-                buildDefault(companyId, "PUBLIC", "공가", null,
-                        1.0, "Y", null, "N", 5),
-                buildDefault(companyId, "SICK", "병가", BalanceType.ANNUAL,
-                        1.0, "Y", null, "Y", 6),
-                buildDefault(companyId, "RESERVE_TRAINING", "예비군", null,
-                        1.0, "Y", null, "Y", 7),
-                buildDefault(companyId, "CIVIL_DEFENSE", "민방위", null,
-                        1.0, "Y", null, "Y", 8)
+        List<DefaultSpec> specs = List.of(
+                // 기본 연차
+                new DefaultSpec("ANNUAL",           "연차",               BalanceType.ANNUAL, 1.0, "Y", null, "N", 1),
+                new DefaultSpec("HALF_AM",          "반차(오전)",          BalanceType.ANNUAL, 0.5, "Y", null, "N", 2),
+                new DefaultSpec("HALF_PM",          "반차(오후)",          BalanceType.ANNUAL, 0.5, "Y", null, "N", 3),
+
+                // 경조사
+                new DefaultSpec("BEREAVEMENT",      "경조휴가(일반)",       null,               1.0, "Y", null, "Y", 10),
+
+                // 경조사
+                new DefaultSpec("MARRIAGE_SELF",    "결혼(본인)",          null,               1.0, "Y", 5.0,  "Y", 11),
+                new DefaultSpec("MARRIAGE_CHILD",   "결혼(자녀)",          null,               1.0, "Y", 1.0,  "Y", 12),
+                new DefaultSpec("BIRTH_SPOUSE",     "배우자 출산휴가",      null,               1.0, "Y", 10.0, "Y", 13),
+                new DefaultSpec("DEATH_PARENT",     "부모 사망",           null,               1.0, "Y", 5.0,  "Y", 14),
+                new DefaultSpec("DEATH_SPOUSE",     "배우자 사망",          null,               1.0, "Y", 5.0,  "Y", 15),
+                new DefaultSpec("DEATH_CHILD",      "자녀 사망",           null,               1.0, "Y", 3.0,  "Y", 16),
+                new DefaultSpec("DEATH_SIBLING",    "형제자매 사망",        null,               1.0, "Y", 3.0,  "Y", 17),
+
+                // 기타 법정
+                new DefaultSpec("PUBLIC",           "공가",                null,               1.0, "Y", null, "N", 20),
+                new DefaultSpec("SICK",             "병가",                null,               1.0, "Y", 15.0, "Y", 21),
+                new DefaultSpec("RESERVE_TRAINING", "예비군",              null,               1.0, "Y", null, "Y", 22),
+                new DefaultSpec("CIVIL_DEFENSE",    "민방위",              null,               1.0, "Y", null, "Y", 23),
+
+                // 여성 보호
+                new DefaultSpec("MENSTRUATION",     "생리휴가",            null,               1.0, "N", 12.0, "N", 30)
         );
-        repository.saveAll(defaults);
+
+        List<CompanyLeaveType> toSave = new ArrayList<>();
+        for (DefaultSpec spec : specs) {
+            if (repository.findByCompanyIdAndCodeAndDelYn(companyId, spec.code(), "N").isPresent()) {
+                continue;
+            }
+            toSave.add(CompanyLeaveType.builder()
+                    .companyId(companyId)
+                    .code(spec.code())
+                    .name(spec.name())
+                    .balanceType(spec.balanceType())
+                    .daysPerUse(spec.daysPerUse())
+                    .isSystemDefault(true)
+                    .isPaidYn(spec.isPaidYn())
+                    .maxDaysPerYear(spec.maxDaysPerYear())
+                    .requireEvidenceYn(spec.requireEvidenceYn())
+                    .displayOrder(spec.displayOrder())
+                    .build());
+        }
+        if (!toSave.isEmpty()) {
+            repository.saveAll(toSave);
+        }
     }
+
+    private record DefaultSpec(
+            String code,
+            String name,
+            BalanceType balanceType,
+            Double daysPerUse,
+            String isPaidYn,
+            Double maxDaysPerYear,
+            String requireEvidenceYn,
+            Integer displayOrder
+    ) {}
 
     /**
      * 관리자 커스텀 휴가 생성
@@ -107,6 +147,10 @@ public class CompanyLeaveTypeService {
      */
     public void delete(UUID companyId, UUID companyLeaveTypeId) {
         CompanyLeaveType entity = findActive(companyId, companyLeaveTypeId);
+        if (Boolean.TRUE.equals(entity.getIsSystemDefault())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "시스템 기본 휴가는 삭제할 수 없습니다.");
+        }
         entity.softDelete();
     }
 
