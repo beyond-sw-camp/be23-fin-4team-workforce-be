@@ -9,6 +9,8 @@ import com._team._team.attendance.repository.*;
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.WorkSchedule;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
+import com._team._team.salary.service.LeaveAttendanceReflector;
+import com._team._team.salary.service.LeaveOfAbsenceAttendanceReflector;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,13 +39,16 @@ public class DailyAttendanceCloseService {
     private final CompanyHolidayRepository companyHolidayRepository;
     private final OvertimeRequestRepository overtimeRequestRepository;
     private final OvertimePolicyRepository overtimePolicyRepository;
+    private final LeaveAttendanceReflector leaveAttendanceReflector;
+    private final LeaveOfAbsenceAttendanceReflector leaveOfAbsenceAttendanceReflector;
+    private final MemberLeaveOfAbsenceService memberLeaveOfAbsenceService;
 
     @Autowired
     public DailyAttendanceCloseService(
             DailyAttendanceRepository dailyAttendanceRepository,
             WorkScheduleRepository workScheduleRepository,
             ApprovalServiceClient approvalServiceClient,
-            AttendanceAnomalyDetector anomalyDetector, ScheduleResolver scheduleResolver, WorkTimeClassifier workTimeClassifier, CompanyHolidayRepository companyHolidayRepository, OvertimeRequestRepository overtimeRequestRepository, OvertimePolicyRepository overtimePolicyRepository) {
+            AttendanceAnomalyDetector anomalyDetector, ScheduleResolver scheduleResolver, WorkTimeClassifier workTimeClassifier, CompanyHolidayRepository companyHolidayRepository, OvertimeRequestRepository overtimeRequestRepository, OvertimePolicyRepository overtimePolicyRepository, LeaveAttendanceReflector leaveAttendanceReflector, LeaveOfAbsenceAttendanceReflector leaveOfAbsenceAttendanceReflector, MemberLeaveOfAbsenceService memberLeaveOfAbsenceService) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.workScheduleRepository = workScheduleRepository;
         this.approvalServiceClient = approvalServiceClient;
@@ -53,12 +58,27 @@ public class DailyAttendanceCloseService {
         this.companyHolidayRepository = companyHolidayRepository;
         this.overtimeRequestRepository = overtimeRequestRepository;
         this.overtimePolicyRepository = overtimePolicyRepository;
+        this.leaveAttendanceReflector = leaveAttendanceReflector;
+        this.leaveOfAbsenceAttendanceReflector = leaveOfAbsenceAttendanceReflector;
+        this.memberLeaveOfAbsenceService = memberLeaveOfAbsenceService;
     }
 
     // OPEN 상태 근태를 DRAFT 로 일괄 전이 + 재계산 + 이상 감지
     public DraftResult processDraft(LocalDate targetDate) {
 
-        // 전일 OPEN 상태 근태 전체 조회
+        // 0단계: 승인된 휴가 반영
+        int leaveReflected = leaveAttendanceReflector.reflectForDate(targetDate);
+        log.info("[DRAFT] 휴가 반영 count={}", leaveReflected);
+
+        // 1단계: ACTIVE 휴직 -> 해당일 DailyAttendance LEAVE (endExpired 전에 수행 -> 마지막 휴직일 targetDate 반영 가능)
+        int loaReflected = leaveOfAbsenceAttendanceReflector.reflectForDate(targetDate);
+        log.info("[DRAFT] 휴직 근태 반영 count={}", loaReflected);
+
+        // 2단계 -> endDate < 오늘 인 ACTIVE 휴직 ENDED (1~2단계 이후)
+        int leaveOfAbsenceEnded = memberLeaveOfAbsenceService.endExpired(LocalDate.now());
+        log.info("[DRAFT] 휴직 자연 종료 count={}", leaveOfAbsenceEnded);
+
+        // 3단계: OPEN 상태 DRAFT 처리
         List<DailyAttendance> openList = dailyAttendanceRepository
                 .findAllByAttendanceDateAndClosureStatus(targetDate, ClosureStatus.OPEN);
 
@@ -124,7 +144,7 @@ public class DailyAttendanceCloseService {
 
         // 근무 시간 분류
         WorkTimeBreakdown breakdown = workTimeClassifier.classify(
-                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeRoundingMinutes());
+                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeFloorMinutes());
 
         // 지급 대상 총 분, 연장 분 저장
         da.applyWorkResult(
@@ -202,7 +222,7 @@ public class DailyAttendanceCloseService {
 
         // 근무 시간 분류
         WorkTimeBreakdown breakdown = workTimeClassifier.classify(
-                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeRoundingMinutes());
+                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeFloorMinutes());
 
         da.applyWorkResult(
                 breakdown.totalPayableMinutes(),
