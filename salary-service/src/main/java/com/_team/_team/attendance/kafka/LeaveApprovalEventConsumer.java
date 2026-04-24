@@ -1,8 +1,10 @@
 package com._team._team.attendance.kafka;
 
+import com._team._team.attendance.domain.CompanyLeaveType;
 import com._team._team.attendance.domain.LeaveRequest;
 import com._team._team.attendance.domain.MemberBalance;
 import com._team._team.attendance.domain.enums.BalanceType;
+import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.attendance.repository.LeaveRequestRepository;
 import com._team._team.attendance.repository.MemberBalanceRepository;
 import com._team._team.attendance.service.BalancePriorityResolver;
@@ -35,17 +37,19 @@ public class LeaveApprovalEventConsumer {
     private final BalancePriorityResolver balancePriorityResolver;
     private final ObjectMapper objectMapper;
     private final LeaveRequestRepository leaveRequestRepository;
+    private final CompanyLeaveTypeRepository companyLeaveTypeRepository;
 
     @Autowired
     public LeaveApprovalEventConsumer(LeaveApprovalService leaveApprovalService,
                                       LeaveRequestService leaveRequestService,
                                       BalancePriorityResolver balancePriorityResolver,
-                                      ObjectMapper objectMapper, LeaveRequestRepository leaveRequestRepository) {
+                                      ObjectMapper objectMapper, LeaveRequestRepository leaveRequestRepository, CompanyLeaveTypeRepository companyLeaveTypeRepository) {
         this.leaveApprovalService = leaveApprovalService;
         this.leaveRequestService = leaveRequestService;
         this.balancePriorityResolver = balancePriorityResolver;
         this.objectMapper = objectMapper;
         this.leaveRequestRepository = leaveRequestRepository;
+        this.companyLeaveTypeRepository = companyLeaveTypeRepository;
     }
 
     // 이벤트 수신 후 action에 따라 USE(차감) / RESTORE(복구) 분기
@@ -86,7 +90,12 @@ public class LeaveApprovalEventConsumer {
 
         double actualDays = leaveRequest.getUsageDays();
 
-        boolean needsDeduction = Boolean.TRUE.equals(event.getNeedsDeduction());
+        // 차감 여부, CompanyLeaveType.balanceType 으로 판정
+        CompanyLeaveType leaveType = companyLeaveTypeRepository
+                .findById(leaveRequest.getCompanyLeaveTypeId())
+                .orElse(null);
+        boolean needsDeduction = leaveType != null && leaveType.deductsBalance();
+
         Map<BalanceType, Double> deductions = null;
         BalanceType representativeType = null;
         String deductionsJson = null;
@@ -94,7 +103,6 @@ public class LeaveApprovalEventConsumer {
         if (needsDeduction) {
             deductions = balancePriorityResolver.resolveDeductions(
                     event.getCompanyId(), event.getMemberId(), actualDays);
-
             if (deductions == null) {
                 log.error("[Leave] 잔고 부족, requestId={}", event.getRequestId());
             } else {
@@ -102,6 +110,7 @@ public class LeaveApprovalEventConsumer {
                 deductionsJson = toJson(deductions);
             }
         }
+
         // 1. LeaveRequest 상태 APPROVED + 차감 이력 기록
         leaveRequestService.applyApproval(
                 event.getRequestId(),
