@@ -43,6 +43,11 @@ public class ApprovalDocumentService {
                 .companyId(companyId)
                 .documentName("연차신청서")
                 .requestType(RequestType.VACATION)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("휴가")
+                .calendarStartField("startDate")
+                .calendarEndField("endDate")
+                .calendarTitleField("title")
                 .formSchema("""
                 {
                   "fields": [
@@ -51,28 +56,17 @@ public class ApprovalDocumentService {
                       "name": "vacationType",
                       "label": "휴가 종류",
                       "type": "select",
-                      "required": true,
-                      "options": ["연차","반차(오전)","반차(오후)","병가","생리휴가","공가","예비군","민방위","경조사"]
-                    },
-                    {
-                      "name": "condolenceType",
-                      "label": "경조사 구분",
-                      "type": "select",
-                      "options": ["결혼(본인)","결혼(자녀)","출산","사망(배우자)","사망(자녀)","사망(형제자매)"],
-                      "visibleWhen": { "field": "vacationType", "value": "경조사" }
+                      "source": "companyLeaveType",
+                      "required": true
                     },
                     { "name": "startDate",  "label": "시작일",   "type": "date",     "required": true },
                     { "name": "endDate",    "label": "종료일",   "type": "date",     "required": true },
                     { "name": "usageDays",  "label": "사용일수", "type": "number",   "required": true },
-                    { "name": "reason",     "label": "휴가 사유","type": "textarea"                  }
+                    { "name": "reason",     "label": "휴가 사유","type": "textarea"                   },
+                    { "name": "leaveRequestId", "label": "salary 연결 ID", "type": "hidden"           }
                   ]
                 }
             """)
-                .isCalendarVisibleYn("Y")
-                .calendarDisplayName("연차")
-                .calendarStartField("startDate")
-                .calendarEndField("endDate")
-                .calendarTitleField("vacationType")
                 .build());
 
         // ========== ATTENDANCE ==========
@@ -80,10 +74,22 @@ public class ApprovalDocumentService {
                 .companyId(companyId)
                 .documentName("연장근무신청")
                 .requestType(RequestType.ATTENDANCE)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("연장근무")
+                .calendarStartField("workDate")
+                .calendarEndField("workDate")
+                .calendarTitleField("title")
                 .formSchema("""
                 {
                   "fields": [
                     { "name": "title", "label": "제목", "type": "text", "required": true },
+                    {
+                      "name": "timing",
+                      "label": "신청 구분",
+                      "type": "select",
+                      "required": true,
+                      "options": ["사전","사후"]
+                    },                    
                     {
                       "name": "workType",
                       "label": "근무구분",
@@ -95,35 +101,10 @@ public class ApprovalDocumentService {
                     { "name": "startTime",     "label": "시작시간",  "type": "time",     "required": true },
                     { "name": "endTime",       "label": "종료시간",  "type": "time",     "required": true },
                     { "name": "requestReason", "label": "신청 사유", "type": "textarea"                  }
+                    { "name": "overtimeRequestId", "label": "salary 연결 ID", "type": "hidden"          }
                   ]
                 }
             """)
-                .isCalendarVisibleYn("Y")
-                .calendarDisplayName("연장근무")
-                .calendarStartField("workDate")
-                .calendarEndField(null)
-                .build());
-
-        approvalDocumentRepository.save(ApprovalDocument.builder()
-                .companyId(companyId)
-                .documentName("휴일근무신청")
-                .requestType(RequestType.ATTENDANCE)
-                .formSchema("""
-                {
-                  "fields": [
-                    { "name": "title",     "label": "제목",     "type": "text",  "required": true },
-                    { "name": "workDate",  "label": "근무일자", "type": "date",  "required": true },
-                    { "name": "startTime", "label": "시작시간", "type": "time",  "required": true },
-                    { "name": "endTime",   "label": "종료시간", "type": "time",  "required": true },
-                    { "name": "reason",    "label": "사유",     "type": "textarea"               }
-                  ]
-                }
-            """)
-                .isCalendarVisibleYn("Y")
-                .calendarDisplayName("휴일근무")
-                .calendarStartField("workDate")
-                .calendarEndField(null)
-                .calendarTitleField(null)
                 .build());
 
         // ========== HR ==========
@@ -199,11 +180,63 @@ public class ApprovalDocumentService {
             """)
                 .build());
 
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("수당 변경 신청")
+                .requestType(RequestType.HR)
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title", "label": "제목", "type": "text", "required": true },
+                    {
+                      "name": "salaryItemTemplateId",
+                      "label": "수당 항목",
+                      "type": "select",
+                      "source": "salaryItemTemplate",
+                      "required": true
+                    },
+                    { "name": "amount",         "label": "신청 금액", "type": "number",   "required": true },
+                    { "name": "effectiveFrom",  "label": "적용 시작일","type": "date",    "required": true },
+                    { "name": "reason",         "label": "신청 사유", "type": "textarea"                   },
+                    { "name": "memberAllowanceId", "label": "salary 연결 ID", "type": "hidden"            }
+                  ]
+                }
+            """)
+                .build());
+
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("출퇴근시간 변경 신청서")
+                .requestType(RequestType.ATTENDANCE)
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",           "label": "제목",          "type": "text",     "required": true },
+                    { "name": "targetYearMonth", "label": "대상 연월",      "type": "text",     "required": true, "placeholder": "YYYY-MM" },
+                    {
+                      "name": "slotId",
+                      "label": "시차출퇴근 슬롯",
+                      "type": "select",
+                      "source": "flexibleTimeSlot",
+                      "required": true
+                    },
+                    { "name": "requestReason",   "label": "신청 사유",      "type": "textarea"                   },
+                    { "name": "selectionId",     "label": "salary 연결 ID", "type": "hidden"                    }
+                  ]
+                }
+            """)
+                .build());
+
         // ========== BUSINESS_TRIP ==========
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)
                 .documentName("국내출장신청")
                 .requestType(RequestType.BUSINESS_TRIP)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("국내출장")
+                .calendarStartField("tripStartDate")
+                .calendarEndField("tripEndDate")
+                .calendarTitleField(null)
                 .formSchema("""
                 {
                   "fields": [
@@ -220,17 +253,17 @@ public class ApprovalDocumentService {
                   ]
                 }
             """)
-                .isCalendarVisibleYn("Y")
-                .calendarDisplayName("국내출장")
-                .calendarStartField("tripStartDate")
-                .calendarEndField("tripEndDate")
-                .calendarTitleField(null)
                 .build());
 
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)
                 .documentName("해외출장신청")
                 .requestType(RequestType.BUSINESS_TRIP)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("해외출장")
+                .calendarStartField("tripStartDate")
+                .calendarEndField("tripEndDate")
+                .calendarTitleField(null)
                 .formSchema("""
                 {
                   "fields": [
@@ -252,11 +285,6 @@ public class ApprovalDocumentService {
                   ]
                 }
             """)
-                .isCalendarVisibleYn("Y")
-                .calendarDisplayName("해외출장")
-                .calendarStartField("tripStartDate")
-                .calendarEndField("tripEndDate")
-                .calendarTitleField(null)
                 .build());
 
         // ========== GENERAL ==========
@@ -520,6 +548,4 @@ public class ApprovalDocumentService {
         document.deactivate();
         return ApprovalDocumentResDto.fromEntity(document);
     }
-
-
 }

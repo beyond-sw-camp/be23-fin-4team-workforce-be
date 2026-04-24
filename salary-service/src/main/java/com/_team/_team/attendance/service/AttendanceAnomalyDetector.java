@@ -110,11 +110,9 @@ public class AttendanceAnomalyDetector {
                 HalfDayShift shift = resolveHalfDayShift(
                         da.getCompanyId(), da.getMemberId(), targetDate);
                 if (shift == HalfDayShift.AM) {
-                    // 오전 반차, 오후만 근무 대상
-                    effectiveStart = midpointOf(schedule.getStartTime(), schedule.getEndTime());
+                    effectiveStart = calculateHalfDayCutoff(schedule);
                 } else if (shift == HalfDayShift.PM) {
-                    // 오후 반차, 오전만 근무 대상
-                    effectiveEnd = midpointOf(schedule.getStartTime(), schedule.getEndTime());
+                    effectiveEnd = calculateHalfDayCutoff(schedule);
                 } else {
                     // 반차 유형 불명, 판정 보류
                     continue;
@@ -194,9 +192,8 @@ public class AttendanceAnomalyDetector {
     }
 
     // 근무 시작~종료의 중간점, 반차 경계 시각
-    private LocalTime midpointOf(LocalTime start, LocalTime end) {
-        long totalMinutes = Duration.between(start, end).toMinutes();
-        return start.plusMinutes(totalMinutes / 2);
+    private LocalTime calculateHalfDayCutoff(WorkSchedule schedule) {
+        return schedule.getStartTime().plusMinutes(schedule.getWorkMinutes() / 2);
     }
 
     public record AnomalyResult(int lateCount, int earlyLeaveCount,
