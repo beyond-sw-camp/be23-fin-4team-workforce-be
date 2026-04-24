@@ -46,12 +46,23 @@ public class Notification {
     @Column(name = "is_read", nullable = false)
     private String isRead;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private String delYn = "N";
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+
+
     // 읽음 처리
     public void read() {
-        this.isRead = "YES";
+        this.isRead = "Y";
     }
+
+    public void delete() {
+        this.delYn = "Y";
+    }
+
 }

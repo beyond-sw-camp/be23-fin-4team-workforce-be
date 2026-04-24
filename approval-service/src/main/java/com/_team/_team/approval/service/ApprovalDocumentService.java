@@ -232,6 +232,11 @@ public class ApprovalDocumentService {
                 .companyId(companyId)
                 .documentName("국내출장신청")
                 .requestType(RequestType.BUSINESS_TRIP)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("국내출장")
+                .calendarStartField("tripStartDate")
+                .calendarEndField("tripEndDate")
+                .calendarTitleField(null)
                 .formSchema("""
                 {
                   "fields": [
@@ -254,6 +259,11 @@ public class ApprovalDocumentService {
                 .companyId(companyId)
                 .documentName("해외출장신청")
                 .requestType(RequestType.BUSINESS_TRIP)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("해외출장")
+                .calendarStartField("tripStartDate")
+                .calendarEndField("tripEndDate")
+                .calendarTitleField(null)
                 .formSchema("""
                 {
                   "fields": [
@@ -325,7 +335,6 @@ public class ApprovalDocumentService {
             """)
                 .build());
     }
-
 
     // 결재 양식 생성
     public ApprovalDocumentResDto create(UUID companyId, ApprovalDocumentCreateReqDto reqDto) {
