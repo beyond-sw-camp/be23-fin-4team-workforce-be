@@ -5,7 +5,10 @@ import com._team._team.approval.dto.reqdto.AbsenceProxyCreateReqDto;
 import com._team._team.approval.dto.resdto.AbsenceProxyResDto;
 import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
+import com._team._team.notification.NotificationType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,10 +23,13 @@ import java.util.UUID;
 public class AbsenceProxyService {
 
     private final AbsenceProxyRepository absenceProxyRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
 
     @Autowired
-    public AbsenceProxyService(AbsenceProxyRepository absenceProxyRepository) {
+    public AbsenceProxyService(AbsenceProxyRepository absenceProxyRepository, ApplicationEventPublisher eventPublisher) {
         this.absenceProxyRepository = absenceProxyRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -81,11 +87,24 @@ public class AbsenceProxyService {
                 .build();
 
         AbsenceProxy saved = absenceProxyRepository.save(proxy);
+
+        // 수임자에게 알림
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(reqDto.getSubstituteId())
+                .senderId(memberId)
+                .notificationType(NotificationType.APPROVAL_PROXY_ASSIGNED)
+                .content("결재 위임이 등록되었습니다. ("
+                        + reqDto.getStartDate().toLocalDate() + " ~ "
+                        + reqDto.getEndDate().toLocalDate() + ")")
+                .targetId(saved.getProxyId())
+                .targetType("APPROVAL_PROXY")
+                .build());
+
         return AbsenceProxyResDto.fromEntity(saved);
     }
 
     /**
-     * 내가 설정한 위임 목록 (현재 진행 중 + 미래 예약)
+     * 내가 설정한 위임 목록
      * 기간 지난 건은 자동 제외
      */
     @Transactional(readOnly = true)

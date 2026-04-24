@@ -62,7 +62,6 @@ public interface AbsenceProxyRepository extends JpaRepository<AbsenceProxy, UUID
     @Query("SELECT ap FROM AbsenceProxy ap " +
             "WHERE ap.companyId = :companyId " +
             "AND ap.memberId = :memberId " +
-            "AND ap.isActiveYn = 'Y' " +
             "AND ap.endDate >= :now " +
             "ORDER BY ap.startDate ASC")
     List<AbsenceProxy> findCurrentAndFutureByMemberId(
@@ -74,7 +73,6 @@ public interface AbsenceProxyRepository extends JpaRepository<AbsenceProxy, UUID
     @Query("SELECT ap FROM AbsenceProxy ap " +
             "WHERE ap.companyId = :companyId " +
             "AND ap.substituteId = :substituteId " +
-            "AND ap.isActiveYn = 'Y' " +
             "AND ap.endDate >= :now " +
             "ORDER BY ap.startDate ASC")
     List<AbsenceProxy> findCurrentAndFutureBySubstituteId(
