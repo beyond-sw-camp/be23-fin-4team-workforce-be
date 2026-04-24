@@ -535,16 +535,9 @@ public class ApprovalService {
         JsonNode node = readContent(request.getContentJson());
         if (node == null) return;
 
-        String vacationType = textOrNull(node, "vacationType");
-        LocalDate startDate = dateOrNull(node, "startDate");
-        LocalDate endDate = dateOrNull(node, "endDate");
-        if (vacationType == null || startDate == null) return;
-
         UUID leaveRequestId = extractLeaveRequestId(node);
-        double days = calculateLeaveDays(vacationType, startDate, endDate);
-        if (days <= 0) return;
-
-        boolean needsDeduction = isAnnualLike(vacationType);
+        if (leaveRequestId == null) return;  // pre-action 누락 시 무시
+        LocalDate startDate = dateOrNull(node, "startDate");
 
         leaveApprovalEventPublisher.publish(
                 LeaveApprovalEvent.builder()
@@ -552,8 +545,6 @@ public class ApprovalService {
                         .memberId(request.getMemberId())
                         .requestId(request.getRequestId())
                         .leaveRequestId(leaveRequestId)
-                        .needsDeduction(needsDeduction)
-                        .days(days)
                         .leaveDate(startDate)
                         .approverId(approverId)
                         .decidedAt(LocalDateTime.now())
