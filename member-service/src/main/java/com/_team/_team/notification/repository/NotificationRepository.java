@@ -21,4 +21,13 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     List<Notification> findByMemberAndCreatedAtAfterOrderByCreatedAtAsc(
             Member member, LocalDateTime createdAt);
+
+    // 알림 목록 조회 (삭제 제외)
+    List<Notification> findByMemberAndDelYnOrderByCreatedAtDesc(Member member, String delYn);
+
+    // 안읽은 알림 수 (삭제 제외)
+    int countByMemberAndIsReadAndDelYn(Member member, String isRead, String delYn);
+
+    // 전체 읽음 처리 (삭제 제외)
+    List<Notification> findByMemberAndIsReadAndDelYn(Member member, String isRead, String delYn);
 }

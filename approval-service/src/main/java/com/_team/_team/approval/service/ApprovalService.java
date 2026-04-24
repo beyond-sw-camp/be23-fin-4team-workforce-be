@@ -15,7 +15,9 @@ import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
 import com._team._team.approval.repository.OfficialRecipientRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.event.*;
+import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com._team._team.event.ApprovalChangedEvent;
@@ -219,6 +221,19 @@ public class ApprovalService {
                     .toList();
         }
 
+        // 대결자가 처리한 경우 부재자(원래 결재자)에게 알림
+        if (!actualMemberId.equals(approval.getApproverMemberId())) {
+            String title = request.getApprovalDocument().getDocumentName();
+            eventPublisher.publishEvent(NotificationMessage.builder()
+                    .receiverId(approval.getApproverMemberId())
+                    .senderId(actualMemberId)
+                    .notificationType(NotificationType.APPROVAL_PROXY_ACTED)
+                    .content(title + " 결재가 대결 처리되었습니다.")
+                    .targetId(request.getRequestId())
+                    .targetType("APPROVAL")
+                    .build());
+        }
+
         // 검색 인덱싱 이벤트 발행
         eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
 
@@ -384,6 +399,19 @@ public class ApprovalService {
                     .stream()
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
+        }
+
+        // 대결자가 처리한 경우 부재자(원래 결재자)에게 알림
+        if (!actualMemberId.equals(approval.getApproverMemberId())) {
+            String title = request.getApprovalDocument().getDocumentName();
+            eventPublisher.publishEvent(NotificationMessage.builder()
+                    .receiverId(approval.getApproverMemberId())
+                    .senderId(actualMemberId)
+                    .notificationType(NotificationType.APPROVAL_PROXY_ACTED)
+                    .content(title + " 결재가 대결 처리되었습니다.")
+                    .targetId(request.getRequestId())
+                    .targetType("APPROVAL")
+                    .build());
         }
 
         // 검색 인덱스 이벤트 발행

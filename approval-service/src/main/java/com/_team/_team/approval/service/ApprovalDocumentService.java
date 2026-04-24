@@ -68,6 +68,11 @@ public class ApprovalDocumentService {
                   ]
                 }
             """)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("연차")
+                .calendarStartField("startDate")
+                .calendarEndField("endDate")
+                .calendarTitleField("vacationType")
                 .build());
 
         // ========== ATTENDANCE ==========
@@ -93,6 +98,10 @@ public class ApprovalDocumentService {
                   ]
                 }
             """)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("연장근무")
+                .calendarStartField("workDate")
+                .calendarEndField(null)
                 .build());
 
         approvalDocumentRepository.save(ApprovalDocument.builder()
@@ -110,6 +119,11 @@ public class ApprovalDocumentService {
                   ]
                 }
             """)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("휴일근무")
+                .calendarStartField("workDate")
+                .calendarEndField(null)
+                .calendarTitleField(null)
                 .build());
 
         // ========== HR ==========
@@ -206,6 +220,11 @@ public class ApprovalDocumentService {
                   ]
                 }
             """)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("국내출장")
+                .calendarStartField("tripStartDate")
+                .calendarEndField("tripEndDate")
+                .calendarTitleField(null)
                 .build());
 
         approvalDocumentRepository.save(ApprovalDocument.builder()
@@ -233,6 +252,11 @@ public class ApprovalDocumentService {
                   ]
                 }
             """)
+                .isCalendarVisibleYn("Y")
+                .calendarDisplayName("해외출장")
+                .calendarStartField("tripStartDate")
+                .calendarEndField("tripEndDate")
+                .calendarTitleField(null)
                 .build());
 
         // ========== GENERAL ==========
