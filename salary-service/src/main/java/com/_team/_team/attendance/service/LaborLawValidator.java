@@ -79,6 +79,9 @@ public class LaborLawValidator {
         // 월 연장근로 한도 체크 (회사 정책)
         checkMonthlyOvertimeLimit(memberId, targetDate, requestedMinutes, policy, violations);
 
+        // 주 총 근로시간 한도 체크 (정규 + 연장 합계, 법정 52시간)
+        checkWeeklyTotalLimit(memberId, targetDate, requestedMinutes, policy, violations);
+
         return violations;
     }
 
@@ -266,6 +269,32 @@ public class LaborLawValidator {
                             projected, policy.getMonthlyOvertimeLimitMinutes()),
                     projected,
                     policy.getMonthlyOvertimeLimitMinutes()
+            ));
+        }
+    }
+
+    // 주 총 근로시간 한도 체크 (정규 근무 + 연장 근무 합계)
+    private void checkWeeklyTotalLimit(UUID memberId,
+                                       LocalDate date,
+                                       int requestedMinutes,
+                                       OvertimePolicy policy,
+                                       List<LaborLawViolation> violations) {
+        if (policy.getWeeklyTotalLimitMinutes() == null) {
+            return;
+        }
+        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+
+        int existingWorked = sumWorkedMinutesInRange(memberId, weekStart, weekEnd);
+        int projected = existingWorked + requestedMinutes;
+
+        if (projected > policy.getWeeklyTotalLimitMinutes()) {
+            violations.add(new LaborLawViolation(
+                    ViolationType.WEEKLY_TOTAL_EXCEEDED,
+                    String.format("주 총 근로시간 한도 초과 예상 (%d분 / 한도 %d분, 주 52시간)",
+                            projected, policy.getWeeklyTotalLimitMinutes()),
+                    projected,
+                    policy.getWeeklyTotalLimitMinutes()
             ));
         }
     }
