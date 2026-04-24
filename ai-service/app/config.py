@@ -1,4 +1,6 @@
 from pydantic_settings import BaseSettings
+import logging
+
 
 class Settings(BaseSettings):
     openai_api_key: str
@@ -16,9 +18,18 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str
 
-    eureka_server_url: str  #
+    eureka_server_url: str
 
     class Config:
         env_file = ".env"
 
+
 settings = Settings()
+
+
+# RAG 디버깅을 위한 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
