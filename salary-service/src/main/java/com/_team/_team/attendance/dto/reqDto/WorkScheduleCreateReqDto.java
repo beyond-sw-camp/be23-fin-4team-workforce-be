@@ -18,6 +18,7 @@ import java.util.UUID;
 @Builder
 @Data
 public class WorkScheduleCreateReqDto {
+    private static final int DEFAULT_BREAK_MINUTES = 60;
 
     /** 개인 스케줄이면 memberId, 회사 기본이면 null */
     private UUID memberId;
@@ -54,7 +55,7 @@ public class WorkScheduleCreateReqDto {
                 .startTime(this.startTime)
                 .endTime(this.endTime)
                 .workMinutes(this.workMinutes)
-                .breakMinutes(this.breakMinutes)
+                .breakMinutes(this.breakMinutes != null ? this.breakMinutes : DEFAULT_BREAK_MINUTES)
                 .effectiveFrom(this.effectiveFrom)
                 .effectiveTo(this.effectiveTo)
                 .build();
