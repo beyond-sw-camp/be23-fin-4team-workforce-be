@@ -13,6 +13,7 @@ import com._team._team.member.repository.MemberRepository;
 import com._team._team.member.service.MemberService;
 import com._team._team.organization.service.OrganizationService;
 import com._team._team.s3.S3Uploader;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -178,14 +179,17 @@ public class CompanyService {
         try {
             approvalServiceClient.initDefaultDocuments(company.getCompanyId());
         } catch (Exception e) {
-            log.warn("기본 결재양식 생성 실패: {}", e.getMessage());
+            log.info("기본 결재양식 생성 실패: {}", e.getMessage());
+            if (e instanceof FeignException fe) {
+                log.error("응답 body: {}", fe.contentUTF8());  // 서버가 준 실제 에러 JSON
+            }
         }
 
         // 기본 휴가 종류 생성 (salary-service 호출)
         try {
             salaryServiceClient.initDefaultLeaveTypes(company.getCompanyId());
         } catch (Exception e) {
-            log.warn("기본 휴가 생성 실패: {}", e.getMessage());
+            log.info("기본 휴가 생성 실패: {}", e.getMessage());
         }
 
         // 법정 공휴일 복사 (salary-service <- member-service Feign 내부 호출)
