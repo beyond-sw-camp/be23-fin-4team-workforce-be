@@ -27,9 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -103,11 +105,12 @@ public class EvaluationSeasonService {
         if (season.getStatus() != SeasonStatus.DRAFT) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "초안 상태의 시즌만 시작할 수 있습니다.");
         }
+        List<EvaluationGroup> groups = groupRepository.findBySeason_SeasonId(seasonId);
+        validateStartReadiness(groups);
         season.activate();
 
         // 그룹 내 evaluatorMaps 기반으로 EvaluationResponse 일괄 생성
         // 검증 강화: targetMemberId == evaluatorId 인 경우는 SELF 타입 외에는 건너뛴다.
-        List<EvaluationGroup> groups = groupRepository.findBySeason_SeasonId(seasonId);
         List<EvaluationResponse> responses = new ArrayList<>();
         // 같은 시즌 시작 시점에는 대상자당 스냅샷을 한 번만 계산해서 재사용한다.
         Map<UUID, String> snapshotCache = new HashMap<>();
@@ -149,6 +152,74 @@ public class EvaluationSeasonService {
         }
 
         return SeasonResDto.from(season);
+    }
+
+    private void validateStartReadiness(List<EvaluationGroup> groups) {
+        if (groups == null || groups.isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "그룹이 없어 시즌을 시작할 수 없습니다. 최소 1개 그룹을 생성해 주세요.");
+        }
+        for (EvaluationGroup group : groups) {
+            List<UUID> targets = parseTargetIds(group.getTargetMemberIdsJson());
+            Set<EvalType> evalTypes = parseEvalTypes(group.getEvaluationTypesJson());
+            List<EvaluatorMapping> maps = group.getEvaluatorMaps() != null ? group.getEvaluatorMaps() : List.of();
+
+            if (targets.isEmpty()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "그룹 '" + group.getName() + "'에 대상 인원이 없어 시즌을 시작할 수 없습니다.");
+            }
+            if (evalTypes.isEmpty()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "그룹 '" + group.getName() + "'에 평가 유형이 없어 시즌을 시작할 수 없습니다.");
+            }
+            if (maps.isEmpty()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "그룹 '" + group.getName() + "'에 지정된 평가자가 없어 시즌을 시작할 수 없습니다.");
+            }
+
+            for (UUID targetId : targets) {
+                for (EvalType evalType : evalTypes) {
+                    boolean exists = maps.stream().anyMatch(m ->
+                            m != null
+                                    && targetId.equals(m.getTargetMemberId())
+                                    && evalType == m.getEvaluationType()
+                                    && m.getEvaluatorId() != null
+                                    && (evalType == EvalType.SELF
+                                    ? targetId.equals(m.getEvaluatorId())
+                                    : !targetId.equals(m.getEvaluatorId()))
+                    );
+                    if (!exists) {
+                        throw new BusinessException(
+                                HttpStatus.BAD_REQUEST,
+                                "그룹 '" + group.getName() + "'의 평가자 지정이 완료되지 않았습니다. (대상자별 평가 유형 누락)");
+                    }
+                }
+            }
+        }
+    }
+
+    private List<UUID> parseTargetIds(String targetMemberIdsJson) {
+        if (targetMemberIdsJson == null || targetMemberIdsJson.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(targetMemberIdsJson, new TypeReference<List<UUID>>() {});
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private Set<EvalType> parseEvalTypes(String evaluationTypesJson) {
+        if (evaluationTypesJson == null || evaluationTypesJson.isBlank()) return Set.of();
+        try {
+            List<String> raw = objectMapper.readValue(evaluationTypesJson, new TypeReference<List<String>>() {});
+            EnumSet<EvalType> out = EnumSet.noneOf(EvalType.class);
+            for (String type : raw) {
+                if (type == null || type.isBlank()) continue;
+                try {
+                    out.add(EvalType.valueOf(type.trim().toUpperCase()));
+                } catch (IllegalArgumentException ignored) {
+                    // ignore invalid enum token
+                }
+            }
+            return out;
+        } catch (Exception ignored) {
+            return Set.of();
+        }
     }
 
     /**
