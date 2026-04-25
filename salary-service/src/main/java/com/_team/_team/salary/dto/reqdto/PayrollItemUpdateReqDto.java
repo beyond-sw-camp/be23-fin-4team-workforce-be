@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class PayrollItemUpdateReqDto {
 
     /** 금액 */

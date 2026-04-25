@@ -11,10 +11,10 @@ import java.util.UUID;
  * 급여 항목 템플릿 응답 DTO
  */
 
-@NoArgsConstructor
 @AllArgsConstructor
-@Data
+@NoArgsConstructor
 @Builder
+@Data
 public class SalaryItemTemplateResDto {
 
     private UUID salaryItemTemplateId;

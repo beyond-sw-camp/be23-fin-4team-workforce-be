@@ -1,14 +1,13 @@
 package com._team._team.attendance.dto.resDto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
+@Builder
+@Data
 public class LegalHolidayResDto {
 
     private LocalDate holidayDate;

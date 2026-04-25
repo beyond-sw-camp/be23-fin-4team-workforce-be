@@ -12,8 +12,8 @@ import java.math.BigDecimal;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class TaxRateUpdateReqDto {
 
     @NotNull(message = "세금 유형은 필수 입니다.")

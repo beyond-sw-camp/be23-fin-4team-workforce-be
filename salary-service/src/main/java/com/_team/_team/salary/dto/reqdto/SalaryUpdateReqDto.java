@@ -13,8 +13,8 @@ import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class SalaryUpdateReqDto {
 
     @NotNull(message = "급여 정책 ID는 필수 입니다.")

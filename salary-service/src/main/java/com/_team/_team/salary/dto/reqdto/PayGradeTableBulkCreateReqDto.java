@@ -2,14 +2,15 @@ package com._team._team.salary.dto.reqdto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@Getter
+@AllArgsConstructor
 @NoArgsConstructor
+@Builder
+@Data
 public class PayGradeTableBulkCreateReqDto {
 
     @NotNull

@@ -17,8 +17,8 @@ import java.util.UUID;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class SalaryCreateReqDto {
 
     @NotNull(message = "직원 ID는 필수입니다.")

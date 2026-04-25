@@ -15,8 +15,8 @@ import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class SalaryPolicyResDto {
     private UUID salaryPolicyId;
     private UUID companyId;

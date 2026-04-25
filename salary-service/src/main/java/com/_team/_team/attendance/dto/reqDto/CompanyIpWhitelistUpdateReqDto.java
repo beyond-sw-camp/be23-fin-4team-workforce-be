@@ -1,11 +1,12 @@
 package com._team._team.attendance.dto.reqDto;
 
 import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-@Getter
+@AllArgsConstructor
 @NoArgsConstructor
+@Builder
+@Data
 public class CompanyIpWhitelistUpdateReqDto {
 
     @NotBlank

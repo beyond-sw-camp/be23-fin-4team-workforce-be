@@ -1,14 +1,15 @@
 package com._team._team.attendance.dto.resDto;
 
 import com._team._team.attendance.domain.CompanyIpWhitelist;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder
+@Data
 public class CompanyIpWhitelistResDto {
 
     private UUID companyIpWhitelistId;

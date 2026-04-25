@@ -17,8 +17,8 @@ import java.util.UUID;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class PayrollCreateReqDto {
 
     /** 대상 직원 ID */
