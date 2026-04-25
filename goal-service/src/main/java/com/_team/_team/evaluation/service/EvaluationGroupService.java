@@ -4,6 +4,7 @@ import com._team._team.dto.BusinessException;
 import com._team._team.evaluation.domain.EvaluationDesign;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationSeason;
+import com._team._team.evaluation.domain.converter.EvaluatorMapping;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.GroupCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupUpdateReqDto;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -110,6 +113,7 @@ public class EvaluationGroupService {
         }
 
         group.updateEvaluatorMaps(newMaps);
+        syncGroupScopeFieldsFromMaps(group, newMaps);
         groupRepository.save(group);
         if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
             evaluationResponseService.materializeMissingResponsesForGroup(group);
@@ -214,6 +218,7 @@ public class EvaluationGroupService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "평가자 매핑 JSON이 올바르지 않습니다.");
         }
         group.updateEvaluatorMaps(maps);
+        syncGroupScopeFieldsFromMaps(group, maps);
         groupRepository.save(group);
         if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
             evaluationResponseService.materializeMissingResponsesForGroup(group);
@@ -228,5 +233,39 @@ public class EvaluationGroupService {
             throw new BusinessException(HttpStatus.NOT_FOUND, "평가 그룹을 찾을 수 없습니다.");
         }
         return group;
+    }
+
+    /**
+     * evaluatorMaps 를 단일 소스 오브 트루스로 보고
+     * 그룹의 evaluationTypesJson / targetMemberIdsJson 을 동기화한다.
+     */
+    private void syncGroupScopeFieldsFromMaps(EvaluationGroup group, List<EvaluatorMapping> maps) {
+        Set<String> evalTypes = new LinkedHashSet<>();
+        Set<UUID> targetIds = new LinkedHashSet<>();
+        if (maps != null) {
+            for (EvaluatorMapping map : maps) {
+                if (map == null) continue;
+                if (map.getEvaluationType() != null) {
+                    evalTypes.add(map.getEvaluationType().name());
+                }
+                if (map.getTargetMemberId() != null) {
+                    targetIds.add(map.getTargetMemberId());
+                }
+            }
+        }
+        String evalTypesJson;
+        String targetMemberIdsJson;
+        try {
+            evalTypesJson = objectMapper.writeValueAsString(evalTypes);
+            targetMemberIdsJson = objectMapper.writeValueAsString(targetIds);
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "그룹 매핑 동기화에 실패했습니다.");
+        }
+        group.update(
+                group.getName(),
+                evalTypesJson,
+                targetMemberIdsJson,
+                group.getEvaluatorMaps()
+        );
     }
 }

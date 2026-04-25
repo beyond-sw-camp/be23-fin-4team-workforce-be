@@ -49,7 +49,6 @@ public class GoalSummaryService {
                             .draftCount(countByStatus(orgGoals, GoalStatus.DRAFT))
                             .activeCount(countByStatus(orgGoals, GoalStatus.ACTIVE))
                             .completedCount(countByStatus(orgGoals, GoalStatus.COMPLETED))
-                            .delayedCount(0L)
                             .avgRolledAchievementPct(avg)
                             .build();
                 })
