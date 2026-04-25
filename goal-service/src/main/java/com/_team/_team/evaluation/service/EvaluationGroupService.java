@@ -173,6 +173,9 @@ public class EvaluationGroupService {
     @Transactional
     public GroupResDto updateGroup(UUID seasonId, UUID groupId, UUID companyId, GroupUpdateReqDto dto) {
         EvaluationGroup group = findGroupOrThrow(groupId, companyId);
+        if (group.getSeason() != null && group.getSeason().getStatus() != SeasonStatus.DRAFT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "시즌 시작 이후에는 그룹을 수정할 수 없습니다.");
+        }
 
         String evalTypesJson = group.getEvaluationTypesJson();
         String targetMemberIdsJson = group.getTargetMemberIdsJson();
