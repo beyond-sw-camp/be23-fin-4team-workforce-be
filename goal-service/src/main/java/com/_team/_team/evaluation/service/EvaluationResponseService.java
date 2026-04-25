@@ -5,13 +5,16 @@ import com._team._team.evaluation.domain.CalibrationHistory;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationResponse;
 import com._team._team.evaluation.domain.EvaluationSeason;
+import com._team._team.evaluation.domain.converter.GradeConfig;
 import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.EvaluationStatus;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.CalibrationAdjustReqDto;
 import com._team._team.evaluation.dto.reqdto.ResponseSaveReqDto;
+import com._team._team.evaluation.dto.resdto.CalibrationOverviewResDto;
 import com._team._team.evaluation.dto.resdto.GoalSnapshotDto;
 import com._team._team.evaluation.dto.resdto.GoalSummaryCardResDto;
+import com._team._team.evaluation.dto.resdto.RelativeDistributionPreviewResDto;
 import com._team._team.evaluation.dto.resdto.ResponseResDto;
 import com._team._team.evaluation.repository.CalibrationHistoryRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
@@ -36,6 +39,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -331,6 +336,7 @@ public class EvaluationResponseService {
         ScoreBreakdown breakdown = computeBreakdownForResponse(response);
         if (breakdown != null && breakdown.getTotalScore() != null) {
             response.updateNormalizedScore(breakdown.getTotalScore());
+            applyAbsoluteOriginalGrade(response);
         }
     }
 
@@ -471,6 +477,7 @@ public class EvaluationResponseService {
                     .max(BigDecimal.ZERO)
                     .setScale(2, RoundingMode.HALF_UP);
             response.updateNormalizedScore(normalized);
+            applyAbsoluteOriginalGrade(response);
         }
     }
 
@@ -571,21 +578,291 @@ public class EvaluationResponseService {
                     "제출되지 않은 평가 응답이 " + notSubmitted + "건 있어 캘리브레이션을 확정할 수 없습니다.");
         }
         for (EvaluationResponse r : responses) {
+            if (r.getStatus() == EvaluationStatus.SUBMITTED) {
+                applyAbsoluteOriginalGrade(r);
+            }
+        }
+        enforceRelativeDistributionIfConfigured(responses);
+        stampCalibrationConfirmedAt(responses, "ADMIN_CONFIRM_CALIBRATION", false);
+        // phase 전이는 더 이상 존재하지 않음. 각 응답의 calibrationJson.confirmedAt 이
+        // "이 응답은 확정되었다" 표시자 역할을 계속 수행한다.
+    }
+
+    /**
+     * 설계상 등급 확정 시점:
+     * <ul>
+     *   <li><b>기본</b>: 결과 공개({@link #publishResults}) 시 제출된 응답 전체에 대해
+     *       ABSOLUTE 는 {@link #applyAbsoluteOriginalGrade}, RELATIVE 는 목표 분포
+     *       {@link #enforceRelativeDistributionIfConfigured} 를 한 번 적용해 최종 등급을 채운 뒤,
+     *       {@code confirmedVia=RESULT_PUBLISH} 로 확정 스탬프를 남긴다 (이미 스탬프가 있으면 생략).</li>
+     *   <li><b>선행 확정</b>: 공개 전 관리자가 {@link #confirmCalibration}을 호출하면 동일 로직으로
+     *       등급을 만들고 {@code confirmedVia=ADMIN_CONFIRM_CALIBRATION} 으로 스탬프한다.
+     *       이후 공개 시에는 등급 산식을 다시 덮어쓰지 않는다.</li>
+     *   <li><b>캘리브레이션 UI</b>: 분포 미리보기·수동 조정은 공개 전 조율용이며,
+     *       공개 시 자동 확정과 충돌하지 않도록 사전 확정된 시즌은 공개 경로에서 재산출하지 않는다.</li>
+     * </ul>
+     */
+    private boolean responseHasCalibrationConfirmedAt(EvaluationResponse r) {
+        if (r == null || r.getCalibrationJson() == null || r.getCalibrationJson().isBlank()) {
+            return false;
+        }
+        try {
+            var node = objectMapper.readTree(r.getCalibrationJson());
+            return node.has("confirmedAt") && !node.get("confirmedAt").asText().isBlank();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean anySubmittedResponseHasCalibrationConfirmed(List<EvaluationResponse> responses) {
+        return responses.stream()
+                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
+                .anyMatch(this::responseHasCalibrationConfirmedAt);
+    }
+
+    /**
+     * 공개 직전 기본 등급 산출 — 사전 확정({@code confirmedAt} 존재)이 없을 때만 호출.
+     */
+    private void finalizeDefaultGradesForPublish(List<EvaluationResponse> responses) {
+        for (EvaluationResponse r : responses) {
+            if (r.getStatus() == EvaluationStatus.SUBMITTED) {
+                applyAbsoluteOriginalGrade(r);
+            }
+        }
+        enforceRelativeDistributionIfConfigured(responses);
+    }
+
+    /**
+     * @param onlyIfMissing true 이면 이미 {@code confirmedAt} 이 있으면 해당 응답은 건너뜀 (공개 시 멱등).
+     */
+    private void stampCalibrationConfirmedAt(List<EvaluationResponse> responses, String confirmedVia,
+                                            boolean onlyIfMissing) {
+        LocalDateTime now = LocalDateTime.now();
+        for (EvaluationResponse r : responses) {
+            if (r.getStatus() != EvaluationStatus.SUBMITTED) {
+                continue;
+            }
             try {
                 ObjectNode calibration;
-                if (r.getCalibrationJson() != null) {
+                if (r.getCalibrationJson() != null && !r.getCalibrationJson().isBlank()) {
                     calibration = (ObjectNode) objectMapper.readTree(r.getCalibrationJson());
                 } else {
                     calibration = objectMapper.createObjectNode();
                 }
-                calibration.put("confirmedAt", LocalDateTime.now().toString());
+                boolean has = calibration.has("confirmedAt") && !calibration.get("confirmedAt").asText().isBlank();
+                if (onlyIfMissing && has) {
+                    continue;
+                }
+                calibration.put("confirmedAt", now.toString());
+                if (confirmedVia != null && !confirmedVia.isBlank()) {
+                    calibration.put("confirmedVia", confirmedVia);
+                }
                 r.updateCalibration(objectMapper.writeValueAsString(calibration));
             } catch (Exception e) {
-                throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "캘리브레이션 확정 처리 실패");
+                throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "캘리브레이션 확정 스탬프 처리 실패");
             }
         }
-        // phase 전이는 더 이상 존재하지 않음. 각 응답의 calibrationJson.confirmedAt 이
-        // "이 응답은 확정되었다" 표시자 역할을 계속 수행한다.
+    }
+
+    /**
+     * RELATIVE 등급 설정이 있는 설계에 대해 목표 분포를 강제 적용한다.
+     * 분포 적용 단위는 "같은 시즌 + 같은 설계" 버킷이며, 점수 내림차순으로 컷오프한다.
+     */
+    private void enforceRelativeDistributionIfConfigured(List<EvaluationResponse> responses) {
+        Map<UUID, List<EvaluationResponse>> byDesign = responses.stream()
+                .filter(r -> r.getGroup() != null && r.getGroup().getDesign() != null)
+                .collect(Collectors.groupingBy(r -> r.getGroup().getDesign().getDesignId()));
+
+        for (List<EvaluationResponse> bucket : byDesign.values()) {
+            if (bucket.isEmpty()) continue;
+            GradeConfig cfg = bucket.get(0).getGroup().getDesign().getGradeConfig();
+            if (cfg == null || !"RELATIVE".equalsIgnoreCase(cfg.getType())) continue;
+            if (cfg.getTargetDistribution() == null || cfg.getTargetDistribution().isEmpty()) continue;
+
+            LinkedHashMap<String, BigDecimal> distribution = normalizeDistribution(cfg);
+            if (distribution.isEmpty()) continue;
+
+            List<EvaluationResponse> ranked = new ArrayList<>(bucket);
+            ranked.sort(Comparator
+                    .comparing((EvaluationResponse r) ->
+                            r.getNormalizedScore() != null ? r.getNormalizedScore() : BigDecimal.valueOf(-1))
+                    .reversed()
+                    .thenComparing(r -> r.getResponseId().toString()));
+
+            Map<String, Integer> quotas = allocateRelativeQuotas(distribution, ranked.size());
+            applyRelativeGrades(ranked, quotas);
+        }
+    }
+
+    private LinkedHashMap<String, BigDecimal> normalizeDistribution(GradeConfig cfg) {
+        LinkedHashMap<String, BigDecimal> ordered = new LinkedHashMap<>();
+
+        if (cfg.getGrades() != null) {
+            for (GradeConfig.GradeBand band : cfg.getGrades()) {
+                if (band == null || band.getLabel() == null || band.getLabel().isBlank()) continue;
+                BigDecimal raw = cfg.getTargetDistribution().get(band.getLabel());
+                if (raw == null) continue;
+                ordered.put(band.getLabel(), normalizeRatio(raw));
+            }
+        }
+        // grades 목록에 없는 분포 키도 보전
+        for (Map.Entry<String, BigDecimal> e : cfg.getTargetDistribution().entrySet()) {
+            if (e.getKey() == null || e.getKey().isBlank()) continue;
+            ordered.putIfAbsent(e.getKey(), normalizeRatio(e.getValue()));
+        }
+        ordered.entrySet().removeIf(e -> e.getValue().compareTo(BigDecimal.ZERO) <= 0);
+        return ordered;
+    }
+
+    private BigDecimal normalizeRatio(BigDecimal v) {
+        if (v == null) return BigDecimal.ZERO;
+        if (v.compareTo(BigDecimal.ONE) > 0) {
+            return v.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+        }
+        return v.max(BigDecimal.ZERO);
+    }
+
+    private Map<String, Integer> allocateRelativeQuotas(LinkedHashMap<String, BigDecimal> distribution, int total) {
+        Map<String, Integer> quotas = new LinkedHashMap<>();
+        if (total <= 0 || distribution.isEmpty()) return quotas;
+
+        List<Map.Entry<String, BigDecimal>> labels = new ArrayList<>(distribution.entrySet());
+        Map<String, BigDecimal> fractional = new LinkedHashMap<>();
+        int assigned = 0;
+        for (Map.Entry<String, BigDecimal> e : labels) {
+            BigDecimal rawCount = e.getValue().multiply(BigDecimal.valueOf(total));
+            int floor = rawCount.setScale(0, RoundingMode.DOWN).intValue();
+            quotas.put(e.getKey(), floor);
+            fractional.put(e.getKey(), rawCount.subtract(BigDecimal.valueOf(floor)));
+            assigned += floor;
+        }
+        int remain = total - assigned;
+        if (remain > 0) {
+            List<String> byFraction = fractional.entrySet().stream()
+                    .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
+                    .map(Map.Entry::getKey)
+                    .toList();
+            int idx = 0;
+            while (remain > 0 && !byFraction.isEmpty()) {
+                String key = byFraction.get(idx % byFraction.size());
+                quotas.put(key, quotas.getOrDefault(key, 0) + 1);
+                remain--;
+                idx++;
+            }
+        } else if (remain < 0) {
+            int overflow = -remain;
+            List<String> byFractionAsc = fractional.entrySet().stream()
+                    .sorted(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
+                    .toList();
+            int idx = 0;
+            while (overflow > 0 && !byFractionAsc.isEmpty()) {
+                String key = byFractionAsc.get(idx % byFractionAsc.size());
+                int cur = quotas.getOrDefault(key, 0);
+                if (cur > 0) {
+                    quotas.put(key, cur - 1);
+                    overflow--;
+                }
+                idx++;
+            }
+        }
+        return quotas;
+    }
+
+    private void applyRelativeGrades(List<EvaluationResponse> ranked, Map<String, Integer> quotas) {
+        List<String> labels = quotas.entrySet().stream()
+                .filter(e -> e.getValue() != null && e.getValue() > 0)
+                .map(Map.Entry::getKey)
+                .toList();
+        if (labels.isEmpty()) return;
+
+        int cursor = 0;
+        for (String label : labels) {
+            int count = quotas.getOrDefault(label, 0);
+            for (int i = 0; i < count && cursor < ranked.size(); i++, cursor++) {
+                upsertAdjustedGrade(ranked.get(cursor), label, "RELATIVE_DISTRIBUTION_ENFORCED");
+            }
+        }
+        // 분포 반올림으로 잔여가 생긴 경우 마지막 등급으로 채운다.
+        String lastLabel = labels.get(labels.size() - 1);
+        while (cursor < ranked.size()) {
+            upsertAdjustedGrade(ranked.get(cursor), lastLabel, "RELATIVE_DISTRIBUTION_ENFORCED");
+            cursor++;
+        }
+    }
+
+    private record RelativePreviewResult(List<RelativeDistributionPreviewResDto.PreviewAdjustment> adjustments) {}
+
+    private RelativePreviewResult buildRelativePreview(List<EvaluationResponse> responses) {
+        Map<UUID, List<EvaluationResponse>> byDesign = responses.stream()
+                .filter(r -> r.getGroup() != null && r.getGroup().getDesign() != null)
+                .collect(Collectors.groupingBy(r -> r.getGroup().getDesign().getDesignId()));
+
+        List<RelativeDistributionPreviewResDto.PreviewAdjustment> out = new ArrayList<>();
+        for (List<EvaluationResponse> bucket : byDesign.values()) {
+            if (bucket.isEmpty()) continue;
+            GradeConfig cfg = bucket.get(0).getGroup().getDesign().getGradeConfig();
+            if (cfg == null || !"RELATIVE".equalsIgnoreCase(cfg.getType())) continue;
+            if (cfg.getTargetDistribution() == null || cfg.getTargetDistribution().isEmpty()) continue;
+
+            LinkedHashMap<String, BigDecimal> distribution = normalizeDistribution(cfg);
+            if (distribution.isEmpty()) continue;
+
+            List<EvaluationResponse> ranked = new ArrayList<>(bucket);
+            ranked.sort(Comparator
+                    .comparing((EvaluationResponse r) ->
+                            r.getNormalizedScore() != null ? r.getNormalizedScore() : BigDecimal.valueOf(-1))
+                    .reversed()
+                    .thenComparing(r -> r.getResponseId().toString()));
+
+            Map<String, Integer> quotas = allocateRelativeQuotas(distribution, ranked.size());
+            List<String> labels = quotas.entrySet().stream()
+                    .filter(e -> e.getValue() != null && e.getValue() > 0)
+                    .map(Map.Entry::getKey)
+                    .toList();
+            if (labels.isEmpty()) continue;
+
+            int cursor = 0;
+            for (String label : labels) {
+                int count = quotas.getOrDefault(label, 0);
+                for (int i = 0; i < count && cursor < ranked.size(); i++, cursor++) {
+                    EvaluationResponse r = ranked.get(cursor);
+                    out.add(RelativeDistributionPreviewResDto.PreviewAdjustment.builder()
+                            .responseId(r.getResponseId())
+                            .normalizedScore(r.getNormalizedScore())
+                            .currentGrade(resolveCurrentGrade(r))
+                            .predictedGrade(label)
+                            .build());
+                }
+            }
+            String lastLabel = labels.get(labels.size() - 1);
+            while (cursor < ranked.size()) {
+                EvaluationResponse r = ranked.get(cursor);
+                out.add(RelativeDistributionPreviewResDto.PreviewAdjustment.builder()
+                        .responseId(r.getResponseId())
+                        .normalizedScore(r.getNormalizedScore())
+                        .currentGrade(resolveCurrentGrade(r))
+                        .predictedGrade(lastLabel)
+                        .build());
+                cursor++;
+            }
+        }
+        return new RelativePreviewResult(out);
+    }
+
+    private void upsertAdjustedGrade(EvaluationResponse response, String grade, String reason) {
+        try {
+            ObjectNode calibration = objectMapper.createObjectNode();
+            if (response.getCalibrationJson() != null && !response.getCalibrationJson().isBlank()) {
+                calibration = (ObjectNode) objectMapper.readTree(response.getCalibrationJson());
+            }
+            calibration.put("adjustedGrade", grade);
+            calibration.put("adjustmentReason", reason);
+            calibration.put("adjustedAt", LocalDateTime.now().toString());
+            response.updateCalibration(objectMapper.writeValueAsString(calibration));
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "상대 등급 분포 적용 실패");
+        }
     }
 
     /**
@@ -593,12 +870,14 @@ public class EvaluationResponseService {
      * resultsPublishedAt 을 now() 로 세팅하고 피드백 면담을 자동 생성합니다.
      *
      * 선행 조건:
-     *  - status = ACTIVE
+     *  - status = ACTIVE 또는 CLOSED
      *  - 이미 공개된 상태가 아님 (resultsPublishedAt == null)
      *  - 모든 응답이 SUBMITTED
      *
-     * 참고: 캘리브레이션 데이터 누락은 경고만 로깅하고 공개는 허용합니다
-     * (관리자가 캘리브레이션을 건너뛰고 원시 점수로 공개하는 시나리오 지원).
+     * 등급: {@link #anySubmittedResponseHasCalibrationConfirmed} 가 false 이면
+     * {@link #finalizeDefaultGradesForPublish} 로 RELATIVE 분포·ABSOLUTE 구간 등급을 채웁니다.
+     * 제출 응답에 {@code confirmedAt} 이 없으면 {@code confirmedVia=RESULT_PUBLISH} 스탬프를 남깁니다.
+     * 공개 전 {@link #confirmCalibration}으로 이미 확정된 경우 등급 산식은 다시 적용하지 않습니다.
      */
     @Transactional
     public void publishResults(UUID seasonId, UUID companyId) {
@@ -626,6 +905,10 @@ public class EvaluationResponseService {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "제출되지 않은 평가 응답이 " + notSubmitted + "건 있어 결과를 공개할 수 없습니다.");
         }
+        if (!anySubmittedResponseHasCalibrationConfirmed(responses)) {
+            finalizeDefaultGradesForPublish(responses);
+        }
+        stampCalibrationConfirmedAt(responses, "RESULT_PUBLISH", true);
         season.markResultsPublished();
         // 피드백 면담 자동 생성 (같은 트랜잭션에서 수행)
         meetingRecordService.createFeedbackMeetingsForSeason(seasonId, companyId);
@@ -639,6 +922,94 @@ public class EvaluationResponseService {
                 return node.get("adjustedGrade").asText();
             }
         } catch (Exception ignore) {
+        }
+        return null;
+    }
+
+    private String extractOriginalGrade(String calibrationJson) {
+        if (calibrationJson == null) return null;
+        try {
+            var node = objectMapper.readTree(calibrationJson);
+            if (node.has("originalGrade")) {
+                return node.get("originalGrade").asText();
+            }
+        } catch (Exception ignore) {
+        }
+        return null;
+    }
+
+    private String resolveCurrentGrade(EvaluationResponse r) {
+        if (r == null) return null;
+        String adjusted = extractAdjustedGrade(r.getCalibrationJson());
+        if (adjusted != null && !adjusted.isBlank()) return adjusted;
+        return extractOriginalGrade(r.getCalibrationJson());
+    }
+
+    private Map<String, Double> extractTargetDistribution(List<EvaluationResponse> responses) {
+        for (EvaluationResponse r : responses) {
+            if (r.getGroup() == null || r.getGroup().getDesign() == null) continue;
+            GradeConfig cfg = r.getGroup().getDesign().getGradeConfig();
+            if (cfg == null || cfg.getTargetDistribution() == null || cfg.getTargetDistribution().isEmpty()) continue;
+            Map<String, Double> out = new LinkedHashMap<>();
+            for (Map.Entry<String, BigDecimal> e : cfg.getTargetDistribution().entrySet()) {
+                if (e.getKey() == null || e.getKey().isBlank()) continue;
+                out.put(e.getKey(), normalizeRatio(e.getValue()).doubleValue());
+            }
+            return out;
+        }
+        return Map.of();
+    }
+
+    private Map<String, Double> toDistributionMap(List<String> grades) {
+        if (grades == null || grades.isEmpty()) return Map.of();
+        Map<String, Long> counts = grades.stream()
+                .collect(Collectors.groupingBy(g -> g, LinkedHashMap::new, Collectors.counting()));
+        int total = grades.size();
+        Map<String, Double> out = new LinkedHashMap<>();
+        for (Map.Entry<String, Long> e : counts.entrySet()) {
+            out.put(e.getKey(), BigDecimal.valueOf(e.getValue())
+                    .divide(BigDecimal.valueOf(total), 6, RoundingMode.HALF_UP)
+                    .doubleValue());
+        }
+        return out;
+    }
+
+    /**
+     * ABSOLUTE 등급표가 설계에 존재하면 normalizedScore 를 기반으로 originalGrade 를 자동 반영한다.
+     * RELATIVE 는 캘리브레이션 조정(분포 고려)이 필요하므로 자동 반영하지 않는다.
+     */
+    private void applyAbsoluteOriginalGrade(EvaluationResponse response) {
+        if (response == null || response.getNormalizedScore() == null) return;
+        EvaluationGroup group = response.getGroup();
+        if (group == null || group.getDesign() == null || group.getDesign().getGradeConfig() == null) return;
+
+        GradeConfig cfg = group.getDesign().getGradeConfig();
+        if (!"ABSOLUTE".equalsIgnoreCase(cfg.getType())) return;
+        if (cfg.getGrades() == null || cfg.getGrades().isEmpty()) return;
+
+        String mapped = mapAbsoluteGrade(response.getNormalizedScore(), cfg);
+        if (mapped == null || mapped.isBlank()) return;
+
+        try {
+            ObjectNode calibration = objectMapper.createObjectNode();
+            if (response.getCalibrationJson() != null && !response.getCalibrationJson().isBlank()) {
+                calibration = (ObjectNode) objectMapper.readTree(response.getCalibrationJson());
+            }
+            calibration.put("originalGrade", mapped);
+            response.updateCalibration(objectMapper.writeValueAsString(calibration));
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "등급 자동 반영 처리 실패");
+        }
+    }
+
+    private String mapAbsoluteGrade(BigDecimal score, GradeConfig cfg) {
+        for (GradeConfig.GradeBand band : cfg.getGrades()) {
+            if (band == null || band.getLabel() == null) continue;
+            BigDecimal min = band.getMinScore() != null ? band.getMinScore() : BigDecimal.ZERO;
+            BigDecimal max = band.getMaxScore() != null ? band.getMaxScore() : BigDecimal.valueOf(100);
+            if (score.compareTo(min) >= 0 && score.compareTo(max) <= 0) {
+                return band.getLabel();
+            }
         }
         return null;
     }
@@ -669,6 +1040,52 @@ public class EvaluationResponseService {
                             || (dept != null && dept.toLowerCase().contains(needle));
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public CalibrationOverviewResDto getCalibrationOverview(UUID seasonId, UUID companyId) {
+        List<EvaluationResponse> submitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
+                .collect(Collectors.toList());
+
+        Map<String, Double> current = toDistributionMap(submitted.stream()
+                .map(this::resolveCurrentGrade)
+                .filter(Objects::nonNull)
+                .toList());
+        Map<String, Double> target = extractTargetDistribution(submitted);
+        return CalibrationOverviewResDto.builder()
+                .targetDistribution(target)
+                .currentDistribution(current)
+                .members(List.of())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public RelativeDistributionPreviewResDto previewRelativeDistribution(UUID seasonId, UUID companyId) {
+        List<EvaluationResponse> submitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> r.getCompanyId().equals(companyId))
+                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
+                .collect(Collectors.toList());
+
+        Map<String, Double> current = toDistributionMap(submitted.stream()
+                .map(this::resolveCurrentGrade)
+                .filter(Objects::nonNull)
+                .toList());
+        Map<String, Double> target = extractTargetDistribution(submitted);
+
+        RelativePreviewResult predicted = buildRelativePreview(submitted);
+        Map<String, Double> predictedDist = toDistributionMap(predicted.adjustments().stream()
+                .map(RelativeDistributionPreviewResDto.PreviewAdjustment::getPredictedGrade)
+                .filter(Objects::nonNull)
+                .toList());
+
+        return RelativeDistributionPreviewResDto.builder()
+                .targetDistribution(target)
+                .currentDistribution(current)
+                .predictedDistribution(predictedDist)
+                .adjustments(predicted.adjustments())
+                .build();
     }
 
     // ── 목표 요약 카드 ──

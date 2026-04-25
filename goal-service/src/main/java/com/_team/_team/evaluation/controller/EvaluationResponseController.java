@@ -7,7 +7,9 @@ import com._team._team.dto.ApiResponse;
 import com._team._team.evaluation.dto.reqdto.CalibrationAdjustReqDto;
 import com._team._team.evaluation.dto.reqdto.CalibrationBaselineReqDto;
 import com._team._team.evaluation.dto.reqdto.ResponseSaveReqDto;
+import com._team._team.evaluation.dto.resdto.CalibrationOverviewResDto;
 import com._team._team.evaluation.dto.resdto.GoalSummaryCardResDto;
+import com._team._team.evaluation.dto.resdto.RelativeDistributionPreviewResDto;
 import com._team._team.evaluation.dto.resdto.ResponseResDto;
 import com._team._team.evaluation.service.EvaluationResponseService;
 import org.springframework.http.ResponseEntity;
@@ -130,6 +132,25 @@ public class EvaluationResponseController {
             @PathVariable UUID seasonId) {
         List<ResponseResDto> result = responseService.listBySeasonForProgress(seasonId, UUID.fromString(companyId));
         return ResponseEntity.ok(ApiResponse.success(result, "캘리브레이션 현황 조회 성공"));
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/seasons/{seasonId}/calibration/overview")
+    public ResponseEntity<ApiResponse<CalibrationOverviewResDto>> getCalibrationDistributionOverview(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID seasonId) {
+        CalibrationOverviewResDto result = responseService.getCalibrationOverview(seasonId, UUID.fromString(companyId));
+        return ResponseEntity.ok(ApiResponse.success(result, "캘리브레이션 분포 조회 성공"));
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/seasons/{seasonId}/calibration/preview-relative")
+    public ResponseEntity<ApiResponse<RelativeDistributionPreviewResDto>> previewRelativeDistribution(
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @PathVariable UUID seasonId) {
+        RelativeDistributionPreviewResDto result = responseService.previewRelativeDistribution(
+                seasonId, UUID.fromString(companyId));
+        return ResponseEntity.ok(ApiResponse.success(result, "상대 등급 분포 프리뷰 조회 성공"));
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
