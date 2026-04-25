@@ -8,6 +8,7 @@ import com._team._team.evaluation.domain.converter.EvaluatorMapping;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.GroupCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupUpdateReqDto;
+import com._team._team.evaluation.dto.resdto.EvaluatorMappingResDto;
 import com._team._team.evaluation.dto.resdto.GroupResDto;
 import com._team._team.evaluation.repository.EvaluationDesignRepository;
 import com._team._team.evaluation.repository.EvaluationGroupRepository;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -118,7 +120,7 @@ public class EvaluationGroupService {
         if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
             evaluationResponseService.materializeMissingResponsesForGroup(group);
         }
-        return GroupResDto.from(group);
+        return toGroupResDto(group);
     }
 
     @Transactional(readOnly = true)
@@ -129,7 +131,7 @@ public class EvaluationGroupService {
             throw new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다.");
         }
         return groupRepository.findBySeason_SeasonId(seasonId)
-                .stream().map(GroupResDto::from).collect(Collectors.toList());
+                .stream().map(this::toGroupResDto).collect(Collectors.toList());
     }
 
     @Transactional
@@ -164,7 +166,7 @@ public class EvaluationGroupService {
                 .design(design)
                 .build();
 
-        return GroupResDto.from(groupRepository.save(group));
+        return toGroupResDto(groupRepository.save(group));
     }
 
     @Transactional
@@ -193,7 +195,7 @@ public class EvaluationGroupService {
                 group.getEvaluatorMaps()
         );
 
-        return GroupResDto.from(group);
+        return toGroupResDto(group);
     }
 
     @Transactional
@@ -223,7 +225,7 @@ public class EvaluationGroupService {
         if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
             evaluationResponseService.materializeMissingResponsesForGroup(group);
         }
-        return GroupResDto.from(group);
+        return toGroupResDto(group);
     }
 
     private EvaluationGroup findGroupOrThrow(UUID groupId, UUID companyId) {
@@ -233,6 +235,47 @@ public class EvaluationGroupService {
             throw new BusinessException(HttpStatus.NOT_FOUND, "평가 그룹을 찾을 수 없습니다.");
         }
         return group;
+    }
+
+    private GroupResDto toGroupResDto(EvaluationGroup group) {
+        List<EvaluatorMapping> maps = group.getEvaluatorMaps() != null
+                ? group.getEvaluatorMaps()
+                : List.of();
+
+        Set<UUID> memberIds = new LinkedHashSet<>();
+        for (EvaluatorMapping map : maps) {
+            if (map == null) continue;
+            if (map.getTargetMemberId() != null) memberIds.add(map.getTargetMemberId());
+            if (map.getEvaluatorId() != null) memberIds.add(map.getEvaluatorId());
+        }
+
+        Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> fetchedProfiles = Map.of();
+        if (!memberIds.isEmpty()) {
+            try {
+                fetchedProfiles = memberServiceClient.getProfilesByIds(List.copyOf(memberIds));
+            } catch (Exception ignored) {
+                fetchedProfiles = Map.of();
+            }
+        }
+        final Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> profiles = fetchedProfiles;
+
+        List<EvaluatorMappingResDto> resMaps = maps.stream()
+                .map(map -> {
+                    com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto targetProfile =
+                            profiles.get(map.getTargetMemberId());
+                    com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto evaluatorProfile =
+                            profiles.get(map.getEvaluatorId());
+                    return EvaluatorMappingResDto.builder()
+                            .targetMemberId(map.getTargetMemberId())
+                            .evaluatorId(map.getEvaluatorId())
+                            .evaluationType(map.getEvaluationType())
+                            .targetMemberProfileUrl(targetProfile != null ? targetProfile.getProfileUrl() : null)
+                            .evaluatorProfileUrl(evaluatorProfile != null ? evaluatorProfile.getProfileUrl() : null)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return GroupResDto.from(group, resMaps);
     }
 
     /**
