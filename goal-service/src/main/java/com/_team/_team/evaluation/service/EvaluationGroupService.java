@@ -163,6 +163,7 @@ public class EvaluationGroupService {
                 .name(dto.getName())
                 .evaluationTypesJson(evalTypesJson)
                 .targetMemberIdsJson(targetMemberIdsJson)
+                .evaluatorMaps(buildInitialEvaluatorMappings(dto.getEvaluationTypes(), dto.getTargetMemberIds()))
                 .design(design)
                 .build();
 
@@ -276,6 +277,28 @@ public class EvaluationGroupService {
                 .collect(Collectors.toList());
 
         return GroupResDto.from(group, resMaps);
+    }
+
+    /**
+     * 그룹 생성 시점 초기 매핑 생성.
+     * SELF 유형이 포함되어 있으면 각 대상자에 대해 (target -> target, SELF) 를 즉시 저장한다.
+     */
+    private List<EvaluatorMapping> buildInitialEvaluatorMappings(List<String> evaluationTypes, List<UUID> targetMemberIds) {
+        if (evaluationTypes == null || targetMemberIds == null) return List.of();
+        boolean hasSelf = evaluationTypes.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(v -> v.trim().toUpperCase())
+                .anyMatch("SELF"::equals);
+        if (!hasSelf) return List.of();
+        return targetMemberIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .map(targetId -> EvaluatorMapping.builder()
+                        .targetMemberId(targetId)
+                        .evaluatorId(targetId)
+                        .evaluationType(com._team._team.evaluation.domain.enums.EvalType.SELF)
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**
