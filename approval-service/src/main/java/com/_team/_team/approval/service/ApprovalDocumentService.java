@@ -89,7 +89,7 @@ public class ApprovalDocumentService {
                       "type": "select",
                       "required": true,
                       "options": ["사전","사후"]
-                    },                    
+                    },
                     {
                       "name": "workType",
                       "label": "근무구분",
@@ -100,7 +100,7 @@ public class ApprovalDocumentService {
                     { "name": "workDate",      "label": "근무일자",  "type": "date",     "required": true },
                     { "name": "startTime",     "label": "시작시간",  "type": "time",     "required": true },
                     { "name": "endTime",       "label": "종료시간",  "type": "time",     "required": true },
-                    { "name": "requestReason", "label": "신청 사유", "type": "textarea"                  }
+                    { "name": "requestReason", "label": "신청 사유", "type": "textarea"                  },
                     { "name": "overtimeRequestId", "label": "salary 연결 ID", "type": "hidden"          }
                   ]
                 }
