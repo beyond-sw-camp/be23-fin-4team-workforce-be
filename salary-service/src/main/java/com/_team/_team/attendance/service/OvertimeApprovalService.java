@@ -138,7 +138,7 @@ public class OvertimeApprovalService {
                 .findEffective(request.getCompanyId(), request.getTargetDate())
                 .orElseThrow(() -> new IllegalStateException(
                         "OvertimePolicy not found. companyId=" + request.getCompanyId()))
-                .getOvertimeRoundingMinutes();
+                .getOvertimeFloorMinutes();
         return (minutes / unit) * unit;
     }
 }

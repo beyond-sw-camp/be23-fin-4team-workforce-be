@@ -12,7 +12,12 @@ public enum NotificationType {
     LEAVE_REQUESTED,         // 연차 신청
     LEAVE_APPROVED,          // 연차 승인
     LEAVE_REJECTED,          // 연차 반려
-    LABOR_LAW_WEEKLY_VIOLATION,  // 주간 (52시간) 초과근로 시간 위반
+     LABOR_LAW_WEEKLY_VIOLATION,  // 주간 (52시간) 초과근로 시간 위반
+
+    // 연차 사용 촉진 (근기법 61조)
+    LEAVE_PROMOTION_FIRST,    // 연차 촉진 1차 (만료 N일 전)
+    LEAVE_PROMOTION_SECOND,   // 연차 촉진 2차 (만료 M일 전)
+
 
     // 결재
     APPROVAL_REQUESTED,      // 결재 요청
@@ -21,9 +26,12 @@ public enum NotificationType {
     APPROVAL_CANCELED,      // 결재 회수됨
     APPROVAL_REFERENCED,     // 결재 참조자
     APPROVAL_CIRCULATED,     // 결재 공람자
+    APPROVAL_PROXY_ASSIGNED,  // 결재 위임 지정됨
+    APPROVAL_PROXY_ACTED,     // 대결 처리됨 (부재자에게)
 
     // 급여
-    SALARY_PUBLISHED,        // 급여 명세서 발행
+    SALARY_PUBLISHED,        // 급여 명세서 발행 (확정)
+    SALARY_PAID,             // 급여 지급 완료 (계좌 입금)
 
     // 목표
     GOAL_EVALUATED,          // 목표 평가 완료

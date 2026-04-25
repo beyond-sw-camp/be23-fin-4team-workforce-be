@@ -4,10 +4,7 @@ import com._team._team.batch.attendance.worker.MonthlyAttendanceCloseWorker;
 import com._team._team.batch.attendance.worker.OvertimeExpirationWorker;
 import com._team._team.batch.attendance.worker.SlotDeadlineAutoAssignWorker;
 import com._team._team.batch.attendance.worker.WeeklyLimitCheckWorker;
-import com._team._team.batch.leave.worker.CarryoverLeaveWorker;
-import com._team._team.batch.leave.worker.DailyAttendanceCloseWorker;
-import com._team._team.batch.leave.worker.LeaveExpireWorker;
-import com._team._team.batch.leave.worker.LeaveGrantWorker;
+import com._team._team.batch.leave.worker.*;
 import com._team._team.batch.payroll.worker.PayrollCalculateWorker;
 import com._team._team.batch.payroll.worker.PayslipSendWorker;
 import com._team._team.batch.payroll.worker.SeverancePayWorker;
@@ -46,6 +43,7 @@ public class BatchJobConfig {
     private final OvertimeExpirationWorker overtimeExpirationWorker;
     private final SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker;
     private final MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker;
+    private final LeavePromotionWorker leavePromotionWorker;
 
     @Autowired
     public BatchJobConfig(
@@ -60,7 +58,7 @@ public class BatchJobConfig {
             CarryoverLeaveWorker carryoverLeaveWorker,
             WeeklyLimitCheckWorker weeklyLimitCheckWorker
             , OvertimeExpirationWorker overtimeExpirationWorker
-            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker) {
+            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker, LeavePromotionWorker leavePromotionWorker) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.leaveGrantWorker = leaveGrantWorker;
@@ -74,6 +72,7 @@ public class BatchJobConfig {
         this.overtimeExpirationWorker = overtimeExpirationWorker;
         this.slotDeadlineAutoAssignWorker = slotDeadlineAutoAssignWorker;
         this.monthlyAttendanceCloseWorker = monthlyAttendanceCloseWorker;
+        this.leavePromotionWorker = leavePromotionWorker;
     }
 
     /** 휴가 부여 Job */
@@ -299,6 +298,24 @@ public class BatchJobConfig {
         return new StepBuilder("monthlyAttendanceCloseStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
                     monthlyAttendanceCloseWorker.run();
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 연차사용촉진제 알림 Job */
+    @Bean
+    public Job leavePromotionJob() {
+        return new JobBuilder("leavePromotionJob", jobRepository)
+                .start(leavePromotionStep())
+                .build();
+    }
+
+    @Bean
+    public Step leavePromotionStep() {
+        return new StepBuilder("leavePromotionStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    leavePromotionWorker.run(java.time.LocalDate.now());
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();

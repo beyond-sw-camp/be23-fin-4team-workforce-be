@@ -1,5 +1,6 @@
 package com._team._team.salary.dto.reqdto;
 
+import com._team._team.salary.domain.enums.PayDayShiftRule;
 import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.validation.constraints.Max;
@@ -11,8 +12,8 @@ import java.time.LocalDate;
 
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @Data
-@Getter
 public class SalaryPolicyUpdateReqDto {
 
     @NotNull(message = "정책명은 필수입니다.")
@@ -25,6 +26,14 @@ public class SalaryPolicyUpdateReqDto {
     @Min(value = 1, message = "지급일은 1이상이어야합니다.")
     @Max(value = 31, message = "지급일은 31이하여야합니다.")
     private Integer payDay;
+
+    @NotNull
+    @Builder.Default
+    private PayDayShiftRule payDayShiftRule = PayDayShiftRule.BEFORE;
+
+    @NotNull(message = "호봉제 또는 연봉협상제 선택은 필수 입니다.")
+    @Builder.Default
+    private String usePayGradeYn = "N";
 
     @NotNull(message = "임금제 유형은 필수입니다.")
     private WageSystemType wageSystemType;

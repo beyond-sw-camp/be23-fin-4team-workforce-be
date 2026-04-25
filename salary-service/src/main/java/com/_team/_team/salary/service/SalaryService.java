@@ -1,6 +1,9 @@
 package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.salary.domain.PayGradeTable;
+import com._team._team.salary.domain.SalaryPolicy;
+import com._team._team.salary.repository.PayGradeTableRepository;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.repository.SalaryRepository;
 import com._team._team.salary.domain.Salary;
@@ -22,20 +25,24 @@ public class SalaryService {
 
     private final SalaryRepository salaryRepository;
     private final SalaryPolicyRepository salaryPolicyRepository;
+    private final PayGradeTableRepository payGradeTableRepository;
 
     @Autowired
     public SalaryService(SalaryRepository salaryRepository,
-                         SalaryPolicyRepository salaryPolicyRepository){
+                         SalaryPolicyRepository salaryPolicyRepository, PayGradeTableRepository payGradeTableRepository){
         this.salaryRepository = salaryRepository;
         this.salaryPolicyRepository = salaryPolicyRepository;
+        this.payGradeTableRepository = payGradeTableRepository;
     }
 
     // 급여 생성
-    public SalaryResDto save(UUID companyId, SalaryCreateReqDto reqDto){
-        // 급여 정책 존재 여부 확인
-        if(!salaryPolicyRepository.existsById(reqDto.getSalaryPolicyId())){
-            throw new BusinessException(HttpStatus.NOT_FOUND,"급여 정책을 찾을 수 없습니다.");
-        }
+    public SalaryResDto createSalary(UUID companyId, SalaryCreateReqDto reqDto) {
+        // 1. 적용일 기준 회사 활성 정책 조회
+        SalaryPolicy policy = salaryPolicyRepository
+                .findActivePolicies(companyId, reqDto.getEffectiveFrom())
+                .stream().findFirst()
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "활성 급여 정책이 없습니다."));
 
         // 적용 기간 검증
         validateDateRange(reqDto.getEffectiveFrom(), reqDto.getEffectiveTo());
@@ -47,7 +54,27 @@ public class SalaryService {
                     prevSalary.closeEffectivePeriod(reqDto.getEffectiveFrom().minusDays(1));
                 });
 
-        Salary salary = reqDto.toEntity(companyId);
+        // 호봉제 여부에 따라 step 필수 검증
+        if ("Y".equals(policy.getUsePayGradeYn()) && reqDto.getStep() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "호봉제 정책입니다. 호봉을 지정하세요.");
+        }
+
+        long resolvedBaseSalary = resolveBaseSalary(
+                companyId, reqDto.getStep(), reqDto.getBaseSalary(), reqDto.getEffectiveFrom());
+
+        Salary salary = Salary.builder()
+                .memberId(reqDto.getMemberId())
+                .companyId(companyId)
+                .salaryPolicyId(policy.getSalaryPolicyId())
+                .baseSalary(resolvedBaseSalary)
+                .step(reqDto.getStep())
+                .jobGradeName(reqDto.getJobGradeName())
+                .jobTitleName(reqDto.getJobTitleName())
+                .effectiveFrom(reqDto.getEffectiveFrom())
+                .effectiveTo(reqDto.getEffectiveTo())
+                .build();
+
         Salary saved = salaryRepository.save(salary);
         return SalaryResDto.fromEntity(saved);
     }
@@ -96,7 +123,18 @@ public class SalaryService {
         // 적용 기간 검증
         validateDateRange(reqDto.getEffectiveFrom(), reqDto.getEffectiveTo());
 
-        salary.update(reqDto);
+        SalaryPolicy policy = salaryPolicyRepository.findById(reqDto.getSalaryPolicyId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 정책을 찾을 수 없습니다."));
+
+        if ("Y".equals(policy.getUsePayGradeYn()) && reqDto.getStep() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "호봉제 정책입니다. 호봉을 지정하세요.");
+        }
+
+        long resolvedBaseSalary = resolveBaseSalary(
+                companyId, reqDto.getStep(), reqDto.getBaseSalary(), reqDto.getEffectiveFrom());
+
+        salary.update(reqDto, resolvedBaseSalary);
         return SalaryResDto.fromEntity(salary);
     }
 
@@ -121,5 +159,25 @@ public class SalaryService {
         if(effectiveTo != null && effectiveTo.isBefore(effectiveFrom)){
             throw new BusinessException(HttpStatus.BAD_REQUEST, "적용 종료일은 시작일보다 빠를 수 없습니다.");
         }
+    }
+
+    /**
+     * 호봉이 지정되면 호봉표에서 baseSalary 조회, 없으면 reqDto 값 사용
+     */
+    private long resolveBaseSalary(UUID companyId, Integer step, Long fallbackBase,
+                                   LocalDate effectiveFrom) {
+        if (step != null) {
+            PayGradeTable pg = payGradeTableRepository
+                    .findActiveOn(companyId, step, effectiveFrom)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                            step + "호봉이 " + effectiveFrom + " 기준 호봉표에 없습니다. "
+                                    + "호봉표 먼저 등록하세요."));
+            return pg.getBaseSalary();
+        }
+        if (fallbackBase == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "호봉을 지정하지 않으면 기본급을 직접 입력해야 합니다.");
+        }
+        return fallbackBase;
     }
 }

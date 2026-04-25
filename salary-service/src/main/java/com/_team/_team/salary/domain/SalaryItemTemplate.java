@@ -44,13 +44,18 @@ public class SalaryItemTemplate extends BaseTimeEntity {
     @Column(nullable = false, length = 30)
     private TaxCategory taxCategory;
 
-    /** 표시 순서 */
+    // 시스템 기본 항목 여부
     @Column(nullable = false)
-    private Integer displayOrder;
+    @Builder.Default
+    private Boolean isSystemDefault = false;
 
     /** 과세 여부 - Y이면 소득세 계산에 포함 */
     @Column(nullable = false, length = 1)
     private String isTaxableYn;
+
+    /** 표시 순서 */
+    @Column(nullable = false)
+    private Integer displayOrder;
 
     /** 삭제 여부 */
     @Column(length = 1)

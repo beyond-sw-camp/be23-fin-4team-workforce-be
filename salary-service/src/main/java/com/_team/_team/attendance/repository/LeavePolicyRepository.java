@@ -20,4 +20,7 @@ public interface LeavePolicyRepository extends JpaRepository<LeavePolicy, UUID> 
 
     /** 회사 연차 정책 조회 */
     Optional<LeavePolicy> findByCompanyIdAndPolicyIdAndDelYn(UUID companyId, UUID policyId, String delYn);
+
+    /** 촉진제 사용 중인 모든 회사 정책 */
+    List<LeavePolicy> findByIsPromotionYnAndDelYn(String isPromotionYn, String delYn);
 }

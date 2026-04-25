@@ -1,23 +1,21 @@
 package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.SalaryPolicy;
+import com._team._team.salary.domain.enums.PayDayShiftRule;
 import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @Data
-@Getter
 public class SalaryPolicyCreateReqDto {
 
     @NotNull(message = "정책명은 필수 입니다.")
@@ -30,6 +28,13 @@ public class SalaryPolicyCreateReqDto {
     @Min(value=1, message = "지급일은 1이상이어야합니다.")
     @Max(value=31, message = "지급일은 31이하여야합니다.")
     private Integer payDay;
+
+    @Builder.Default
+    private PayDayShiftRule payDayShiftRule = PayDayShiftRule.BEFORE;
+
+    @NotNull(message = "호봉제 또는 연봉협상제 선택은 필수 입니다.")
+    @Builder.Default
+    private String usePayGradeYn = "N";
 
     @NotNull(message = "임금제 유형은 필수입니다.")
     private WageSystemType wageSystemType;
@@ -53,6 +58,8 @@ public class SalaryPolicyCreateReqDto {
                 .policyName(policyName)
                 .payType(payType)
                 .payDay(payDay)
+                .payDayShiftRule(payDayShiftRule)
+                .usePayGradeYn(usePayGradeYn)
                 .effectiveFrom(effectiveFrom)
                 .effectiveTo(effectiveTo)
                 .wageSystemType(wageSystemType)

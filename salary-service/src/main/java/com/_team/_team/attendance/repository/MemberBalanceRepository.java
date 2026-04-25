@@ -178,4 +178,21 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
     // 휴가 신청 시 휴가 잔고 사전 체크
     Optional<MemberBalance> findByCompanyIdAndMemberIdAndBalanceTypeAndDelYn(
             UUID companyId, UUID memberId, BalanceType balanceType, String delYn);
+
+    /**
+     * 연차사용촉진제 대상 잔고 조회
+     * 회사 소속 ANNUAL 타입이면서 만료일이 targetDate 이고 잔여일수 > 0
+     */
+    @Query("""
+   SELECT b FROM MemberBalance b
+   WHERE b.companyId = :companyId
+     AND b.balanceType = 'ANNUAL'
+     AND b.expirationDate = :targetDate
+     AND b.remaining > 0
+     AND b.isExpireYn = 'N'
+     AND b.delYn = 'N'
+   """)
+    List<MemberBalance> findForPromotion(
+            @Param("companyId") UUID companyId,
+            @Param("targetDate") LocalDate targetDate);
 }
