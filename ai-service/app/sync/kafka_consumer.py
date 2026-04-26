@@ -9,6 +9,7 @@ from app.database import SessionLocal
 from app.sync.leave_syncer import sync_leave_documents
 from app.sync.attendance_syncer import sync_attendance_documents
 from app.sync.salary_syncer import sync_salary_documents
+from app.sync.approval_syncer import sync_approval_documents
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ TOPICS = [
     "rag.sync.leave",
     "rag.sync.attendance",
     "rag.sync.salary",
+    "rag.sync.approval",
 ]
 
 
@@ -44,6 +46,8 @@ def _process_event(event: dict):
         asyncio.run(_handle_attendance_sync(company_id))
     elif topic == "rag.sync.salary":
         asyncio.run(_handle_salary_sync(company_id))
+    elif topic == "rag.sync.approval":
+        asyncio.run(_handle_approval_sync(company_id))
     else:
         logger.warning(
             f"[kafka_consumer] 핸들러 없음: topic={topic}"
@@ -95,6 +99,23 @@ async def _handle_salary_sync(company_id: str):
     except Exception as e:
         logger.error(
             f"[kafka_consumer] 급여 동기화 실패: "
+            f"company={company_id}, {e}"
+        )
+    finally:
+        db.close()
+
+
+async def _handle_approval_sync(company_id: str):
+    db = SessionLocal()
+    try:
+        result = await sync_approval_documents(company_id, db)
+        logger.info(
+            f"[kafka_consumer] 결재 동기화 완료: "
+            f"company={company_id}, result={result}"
+        )
+    except Exception as e:
+        logger.error(
+            f"[kafka_consumer] 결재 동기화 실패: "
             f"company={company_id}, {e}"
         )
     finally:
