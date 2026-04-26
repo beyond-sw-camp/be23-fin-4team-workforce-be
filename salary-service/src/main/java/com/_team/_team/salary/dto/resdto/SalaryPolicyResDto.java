@@ -2,7 +2,6 @@ package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
-import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.WageSystemType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,7 +20,6 @@ public class SalaryPolicyResDto {
     private UUID salaryPolicyId;
     private UUID companyId;
     private String policyName;
-    private PayType payType;
     private Integer payDay;
     private PayDayShiftRule payDayShiftRule;
     private String usePayGradeYn;
@@ -37,7 +35,6 @@ public class SalaryPolicyResDto {
                 .salaryPolicyId(salaryPolicy.getSalaryPolicyId())
                 .companyId(salaryPolicy.getCompanyId())
                 .policyName(salaryPolicy.getPolicyName())
-                .payType(salaryPolicy.getPayType())
                 .payDay(salaryPolicy.getPayDay())
                 .payDayShiftRule(salaryPolicy.getPayDayShiftRule())
                 .usePayGradeYn(salaryPolicy.getUsePayGradeYn())
