@@ -14,6 +14,5 @@ public class GoalOrgSummaryResDto {
     private long draftCount;
     private long activeCount;
     private long completedCount;
-    private long delayedCount;
     private BigDecimal avgRolledAchievementPct;
 }

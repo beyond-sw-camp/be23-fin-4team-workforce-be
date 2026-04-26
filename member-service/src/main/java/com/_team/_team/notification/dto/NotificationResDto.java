@@ -23,6 +23,7 @@ public class NotificationResDto {
     private String targetType;
     private String isRead;
     private LocalDateTime createdAt;
+    private String delYn;
 
     public static NotificationResDto fromEntity(Notification notification) {
         return NotificationResDto.builder()
@@ -33,6 +34,7 @@ public class NotificationResDto {
                 .targetType(notification.getTargetType())
                 .isRead(notification.getIsRead())
                 .createdAt(notification.getCreatedAt())
+                .delYn(notification.getDelYn())
                 .build();
     }
 }

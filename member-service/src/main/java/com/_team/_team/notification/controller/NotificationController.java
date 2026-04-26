@@ -83,4 +83,16 @@ public class NotificationController {
                 HttpStatus.OK
         );
     }
+
+    // 알림 삭제
+    @PatchMapping("/{notificationId}/delete")
+    public ResponseEntity<?> deleteNotification(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID notificationId) {
+        notificationService.deleteNotification(memberId, notificationId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "알림 삭제 성공"),
+                HttpStatus.OK
+        );
+    }
 }

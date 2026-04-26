@@ -15,7 +15,9 @@ import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
 import com._team._team.approval.repository.OfficialRecipientRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.event.*;
+import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com._team._team.event.ApprovalChangedEvent;
@@ -219,6 +221,19 @@ public class ApprovalService {
                     .toList();
         }
 
+        // 대결자가 처리한 경우 부재자(원래 결재자)에게 알림
+        if (!actualMemberId.equals(approval.getApproverMemberId())) {
+            String title = request.getApprovalDocument().getDocumentName();
+            eventPublisher.publishEvent(NotificationMessage.builder()
+                    .receiverId(approval.getApproverMemberId())
+                    .senderId(actualMemberId)
+                    .notificationType(NotificationType.APPROVAL_PROXY_ACTED)
+                    .content(title + " 결재가 대결 처리되었습니다.")
+                    .targetId(request.getRequestId())
+                    .targetType("APPROVAL")
+                    .build());
+        }
+
         // 검색 인덱싱 이벤트 발행
         eventPublisher.publishEvent(new ApprovalChangedEvent(request.getRequestId()));
 
@@ -366,10 +381,7 @@ public class ApprovalService {
         publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
         publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId,
                 LeaveOfAbsenceApprovalEvent.Action.REJECT, reqDto.getComment());
-
-        // 반려 시 REJECT 이벤트 발행
-        publishLeaveEventIfApplicable(request, actualMemberId,
-                LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.REJECT);
 
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 
@@ -384,6 +396,19 @@ public class ApprovalService {
                     .stream()
                     .map(OfficialRecipientResDto::fromEntity)
                     .toList();
+        }
+
+        // 대결자가 처리한 경우 부재자(원래 결재자)에게 알림
+        if (!actualMemberId.equals(approval.getApproverMemberId())) {
+            String title = request.getApprovalDocument().getDocumentName();
+            eventPublisher.publishEvent(NotificationMessage.builder()
+                    .receiverId(approval.getApproverMemberId())
+                    .senderId(actualMemberId)
+                    .notificationType(NotificationType.APPROVAL_PROXY_ACTED)
+                    .content(title + " 결재가 대결 처리되었습니다.")
+                    .targetId(request.getRequestId())
+                    .targetType("APPROVAL")
+                    .build());
         }
 
         // 검색 인덱스 이벤트 발행
@@ -535,16 +560,9 @@ public class ApprovalService {
         JsonNode node = readContent(request.getContentJson());
         if (node == null) return;
 
-        String vacationType = textOrNull(node, "vacationType");
-        LocalDate startDate = dateOrNull(node, "startDate");
-        LocalDate endDate = dateOrNull(node, "endDate");
-        if (vacationType == null || startDate == null) return;
-
         UUID leaveRequestId = extractLeaveRequestId(node);
-        double days = calculateLeaveDays(vacationType, startDate, endDate);
-        if (days <= 0) return;
-
-        boolean needsDeduction = isAnnualLike(vacationType);
+        if (leaveRequestId == null) return;  // pre-action 누락 시 무시
+        LocalDate startDate = dateOrNull(node, "startDate");
 
         leaveApprovalEventPublisher.publish(
                 LeaveApprovalEvent.builder()
@@ -552,8 +570,6 @@ public class ApprovalService {
                         .memberId(request.getMemberId())
                         .requestId(request.getRequestId())
                         .leaveRequestId(leaveRequestId)
-                        .needsDeduction(needsDeduction)
-                        .days(days)
                         .leaveDate(startDate)
                         .approverId(approverId)
                         .decidedAt(LocalDateTime.now())

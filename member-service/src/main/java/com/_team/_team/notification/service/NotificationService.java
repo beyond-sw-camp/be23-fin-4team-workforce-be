@@ -30,30 +30,27 @@ public class NotificationService {
     // 알림 목록 조회
     @Transactional(readOnly = true)
     public List<NotificationResDto> getNotificationList(UUID memberId) {
-
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
 
         return notificationRepository
-                .findByMemberOrderByCreatedAtDesc(member)
+                .findByMemberAndDelYnOrderByCreatedAtDesc(member, "N")
                 .stream()
                 .map(NotificationResDto::fromEntity)
                 .collect(Collectors.toList());
     }
 
-    // 안읽은 알림 수 조회
+    // 안읽은 알림 수
     @Transactional(readOnly = true)
     public int getUnreadCount(UUID memberId) {
-
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-                ));
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
 
-        return notificationRepository.countByMemberAndIsRead(member, "NO");
+        return notificationRepository.countByMemberAndIsReadAndDelYn(member, "N", "N");
     }
+
 
     // 알림 읽음 처리
     public void readNotification(UUID memberId, UUID notificationId) {
@@ -81,9 +78,11 @@ public class NotificationService {
                 ));
 
         notificationRepository
-                .findByMemberAndIsRead(member, "NO")
+                .findByMemberAndIsReadAndDelYn(member, "N", "N")
                 .forEach(Notification::read);
     }
+
+
     public void sendMissedNotifications(UUID memberId,
                                         String lastEventId,
                                         SseEmitter emitter) {
@@ -111,5 +110,19 @@ public class NotificationService {
                         log.error("못받은 알림 전송 실패: {}", e.getMessage());
                     }
                 });
+    }
+
+    // 알림 삭제
+    public void deleteNotification(UUID memberId, UUID notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 알림입니다."));
+
+        if (!notification.getMember().getMemberId().equals(memberId)) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, "본인의 알림만 삭제할 수 있습니다.");
+        }
+
+        notification.delete();
     }
 }
