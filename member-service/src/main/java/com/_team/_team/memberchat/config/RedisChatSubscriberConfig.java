@@ -69,6 +69,7 @@ public class RedisChatSubscriberConfig {
      * Redis 로 들어오는 이벤트를 STOMP 목적지로 전달.
      *  - 기본: /mc/topic/room/{roomId}
      *  - READ 이벤트(eventType=READ) 는 /mc/topic/read/{roomId} 로 별도 전달
+     *  - TYPING 이벤트(eventType=TYPING) 는 /mc/topic/typing/{roomId} 로 별도 전달
      */
     @Slf4j
     public static class MemberChatRedisListener implements MessageListener {
@@ -122,10 +123,16 @@ public class RedisChatSubscriberConfig {
                 String eventType = node.hasNonNull("eventType") ? node.get("eventType").asText() : "";
                 String type      = node.hasNonNull("type")      ? node.get("type").asText()      : "MESSAGE";
                 boolean isRead = "READ".equalsIgnoreCase(eventType) || "READ".equalsIgnoreCase(type);
+                boolean isTyping = "TYPING".equalsIgnoreCase(eventType) || "TYPING".equalsIgnoreCase(type);
 
-                String destination = isRead
-                        ? topicPrefix + "/read/" + roomId
-                        : topicPrefix + "/room/" + roomId;
+                String destination;
+                if (isTyping) {
+                    destination = topicPrefix + "/typing/" + roomId;
+                } else if (isRead) {
+                    destination = topicPrefix + "/read/" + roomId;
+                } else {
+                    destination = topicPrefix + "/room/" + roomId;
+                }
 
                 messagingTemplate.convertAndSend(destination, json);
                 log.debug("[mc-sub] forward channel={} dest={} bytes={}", channel, destination, json.length());
