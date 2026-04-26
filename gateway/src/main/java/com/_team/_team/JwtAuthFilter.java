@@ -52,7 +52,10 @@ public class JwtAuthFilter implements GlobalFilter {
             "/leave-policies/internal",
             "/work-schedules/internal",
             "/attendance/overtime-policies/internal",
-            "/company-holidays/internal"
+            "/company-holidays/internal",
+            "/salary/salary-item-templates/internal",
+            "/salary/salary-policies/internal",
+            "/salary/pay-grade-table/internal"
     );
 
     @Override

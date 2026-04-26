@@ -1,7 +1,9 @@
 package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.event.RagSyncSalaryEvent;
 import com._team._team.salary.domain.enums.TaxCategory;
+import com._team._team.salary.kafka.RagSyncSalaryEventPublisher;
 import com._team._team.salary.repository.SalaryItemTemplateRepository;
 import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.dto.reqdto.SalaryItemTemplateCreateReqDto;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com._team._team.salary.domain.enums.ItemType;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -29,11 +32,13 @@ import java.util.UUID;
 public class SalaryItemTemplateService {
 
     private final SalaryItemTemplateRepository salaryItemTemplateRepository;
+    private final RagSyncSalaryEventPublisher ragSyncSalaryEventPublisher;
 
     /** 생성자 주입 */
     @Autowired
-    public SalaryItemTemplateService(SalaryItemTemplateRepository salaryItemTemplateRepository) {
+    public SalaryItemTemplateService(SalaryItemTemplateRepository salaryItemTemplateRepository, RagSyncSalaryEventPublisher ragSyncSalaryEventPublisher) {
         this.salaryItemTemplateRepository = salaryItemTemplateRepository;
+        this.ragSyncSalaryEventPublisher = ragSyncSalaryEventPublisher;
     }
 
     /** 급여 항목 템플릿 생성 */
@@ -42,6 +47,19 @@ public class SalaryItemTemplateService {
 
         SalaryItemTemplate template = reqDto.toEntity(companyId);
         SalaryItemTemplate saved = salaryItemTemplateRepository.save(template);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("CREATED")
+                        .resourceType("SALARY_ITEM_TEMPLATE")
+                        .resourceId(saved.getSalaryItemTemplateId())
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
         return SalaryItemTemplateResDto.fromEntity(saved);
     }
 
@@ -76,6 +94,19 @@ public class SalaryItemTemplateService {
         }
 
         template.update(reqDto);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("UPDATED")
+                        .resourceType("SALARY_ITEM_TEMPLATE")
+                        .resourceId(salaryItemTemplateId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
@@ -89,6 +120,19 @@ public class SalaryItemTemplateService {
         }
 
         template.softDelete();
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("DELETED")
+                        .resourceType("SALARY_ITEM_TEMPLATE")
+                        .resourceId(salaryItemTemplateId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
     }
 
     /** 동일 이름 항목 중복 검증 */
@@ -139,6 +183,19 @@ public class SalaryItemTemplateService {
 
         if (!toSave.isEmpty()) {
             salaryItemTemplateRepository.saveAll(toSave);
+
+            // RAG 동기화 이벤트 발행 (실제 저장된 경우만)
+            ragSyncSalaryEventPublisher.publish(
+                    RagSyncSalaryEvent.builder()
+                            .eventId(UUID.randomUUID())
+                            .companyId(companyId)
+                            .action("BULK")
+                            .resourceType("SALARY_ITEM_TEMPLATE")
+                            .resourceId(null)
+                            .timestamp(Instant.now())
+                            .triggeredBy("system")
+                            .build()
+            );
         }
 
         String msg = toSave.isEmpty()

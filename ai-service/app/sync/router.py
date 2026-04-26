@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.sync.leave_syncer import sync_leave_documents
 from app.sync.attendance_syncer import sync_attendance_documents
+from app.sync.salary_syncer import sync_salary_documents
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,6 @@ router = APIRouter(prefix="/admin/sync", tags=["sync"])
 async def trigger_leave_sync(
         company_id: str = Path(..., description="회사 UUID"),
         db: Session = Depends(get_db)):
-    """수동 트리거 - 휴가"""
     try:
         result = await sync_leave_documents(company_id, db)
         return {
@@ -32,7 +32,6 @@ async def trigger_leave_sync(
 async def trigger_attendance_sync(
         company_id: str = Path(..., description="회사 UUID"),
         db: Session = Depends(get_db)):
-    """수동 트리거 - 근무/근태"""
     try:
         result = await sync_attendance_documents(company_id, db)
         return {
@@ -42,4 +41,20 @@ async def trigger_attendance_sync(
         }
     except Exception as e:
         logger.error(f"[sync_router] 근무/근태 동기화 실패: {e}")
+        return {"companyId": company_id, "error": str(e)}
+
+
+@router.post("/salary/{company_id}")
+async def trigger_salary_sync(
+        company_id: str = Path(..., description="회사 UUID"),
+        db: Session = Depends(get_db)):
+    try:
+        result = await sync_salary_documents(company_id, db)
+        return {
+            "companyId": company_id,
+            "result": result,
+            "message": "급여 동기화 완료"
+        }
+    except Exception as e:
+        logger.error(f"[sync_router] 급여 동기화 실패: {e}")
         return {"companyId": company_id, "error": str(e)}
