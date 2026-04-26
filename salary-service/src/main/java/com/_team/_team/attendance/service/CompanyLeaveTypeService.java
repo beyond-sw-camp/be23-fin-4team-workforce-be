@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -98,15 +99,17 @@ public class CompanyLeaveTypeService {
      * 관리자 커스텀 휴가 생성
      */
     public CompanyLeaveType create(UUID companyId, CompanyLeaveTypeCreateReqDto reqDto) {
-        repository.findByCompanyIdAndCodeAndDelYn(companyId, reqDto.getCode(), "N")
+        String resolvedCode = resolveCodeForCreate(companyId, reqDto.getCode(), reqDto.getName());
+
+        repository.findByCompanyIdAndCodeAndDelYn(companyId, resolvedCode, "N")
                 .ifPresent(existing -> {
                     throw new BusinessException(HttpStatus.CONFLICT,
-                            "이미 존재하는 휴가 코드입니다: " + reqDto.getCode());
+                            "이미 존재하는 휴가 코드입니다: " + resolvedCode);
                 });
 
         CompanyLeaveType entity = CompanyLeaveType.builder()
                 .companyId(companyId)
-                .code(reqDto.getCode())
+                .code(resolvedCode)
                 .name(reqDto.getName())
                 .balanceType(reqDto.getBalanceType())
                 .daysPerUse(reqDto.getDaysPerUse())
@@ -118,6 +121,42 @@ public class CompanyLeaveTypeService {
                 .build();
 
         return repository.save(entity);
+    }
+
+    private String resolveCodeForCreate(UUID companyId, String requestedCode, String name) {
+        String trimmed = requestedCode == null ? "" : requestedCode.trim();
+        if (!trimmed.isEmpty()) {
+            return trimmed;
+        }
+        String base = buildCodeBaseFromName(name);
+        String candidate = base;
+        int seq = 2;
+        while (repository.findByCompanyIdAndCodeAndDelYn(companyId, candidate, "N").isPresent()) {
+            candidate = withAlphabeticSuffix(base, seq);
+            seq += 1;
+        }
+        return candidate;
+    }
+
+    private String withAlphabeticSuffix(String base, int seq) {
+        String suffix = "_AUTO" + "X".repeat(Math.max(0, seq - 2));
+        String candidate = base + suffix;
+        return candidate.length() > 50 ? candidate.substring(0, 50) : candidate;
+    }
+
+    private String buildCodeBaseFromName(String name) {
+        if (name == null || name.isBlank()) return "CUSTOM";
+        String normalized = name.trim().toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9가-힣]+", "_")
+                .replaceAll("_+", "_")
+                .replaceAll("^_|_$", "");
+        if (normalized.isBlank()) return "CUSTOM";
+        // 백엔드 검증 패턴(대문자+언더스코어)에 맞추기 위해 한글/숫자 등은 제거 후 재정규화
+        String strict = normalized.replaceAll("[^A-Z_]+", "_")
+                .replaceAll("_+", "_")
+                .replaceAll("^_|_$", "");
+        if (strict.isBlank()) return "CUSTOM";
+        return strict.length() > 50 ? strict.substring(0, 50) : strict;
     }
 
     /**

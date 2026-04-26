@@ -2,6 +2,7 @@ package com._team._team.attendance.repository;
 
 import com._team._team.attendance.domain.LeaveRequest;
 import com._team._team.attendance.domain.enums.LeaveApprovalStatus;
+import com._team._team.attendance.domain.enums.LeaveInitiator;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -87,4 +88,21 @@ public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUI
          AND l.delYn = 'N'
        """)
     List<LeaveRequest> findAllActiveOnDate(@Param("date") LocalDate date);
+
+    // 회사가 강제 지정한 연차가 해당 일자에 존재하는지
+    @Query("""
+    SELECT COUNT(r) > 0 FROM LeaveRequest r
+    WHERE r.memberId = :memberId
+      AND r.companyId = :companyId
+      AND r.startDate <= :date
+      AND r.endDate >= :date
+      AND r.initiator = :initiator
+      AND r.approvalStatus = :status
+      AND r.delYn = 'N'
+    """)
+    boolean existsForcedDesignationOnDate(@Param("memberId") UUID memberId,
+                                          @Param("companyId") UUID companyId,
+                                          @Param("date") LocalDate date,
+                                          @Param("initiator") LeaveInitiator initiator,
+                                          @Param("status") LeaveApprovalStatus status);
 }
