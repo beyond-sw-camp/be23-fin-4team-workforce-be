@@ -40,32 +40,6 @@ public class NotificationService {
                 .map(NotificationResDto::fromEntity)
                 .collect(Collectors.toList());
     }
-//    @Transactional(readOnly = true)
-//    public List<NotificationResDto> getNotificationList(UUID memberId) {
-//
-//        Member member = memberRepository.findById(memberId)
-//                .orElseThrow(() -> new BusinessException(
-//                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-//                ));
-//
-//        return notificationRepository
-//                .findByMemberOrderByCreatedAtDesc(member)
-//                .stream()
-//                .map(NotificationResDto::fromEntity)
-//                .collect(Collectors.toList());
-//    }
-
-//    // 안읽은 알림 수 조회
-//    @Transactional(readOnly = true)
-//    public int getUnreadCount(UUID memberId) {
-//
-//        Member member = memberRepository.findById(memberId)
-//                .orElseThrow(() -> new BusinessException(
-//                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
-//                ));
-//
-//        return notificationRepository.countByMemberAndIsRead(member, "NO", "N");
-//    }
 
     // 안읽은 알림 수
     @Transactional(readOnly = true)
@@ -74,7 +48,7 @@ public class NotificationService {
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
 
-        return notificationRepository.countByMemberAndIsReadAndDelYn(member, "NO", "N");
+        return notificationRepository.countByMemberAndIsReadAndDelYn(member, "N", "N");
     }
 
 
@@ -104,7 +78,7 @@ public class NotificationService {
                 ));
 
         notificationRepository
-                .findByMemberAndIsRead(member, "NO")
+                .findByMemberAndIsReadAndDelYn(member, "N", "N")
                 .forEach(Notification::read);
     }
 

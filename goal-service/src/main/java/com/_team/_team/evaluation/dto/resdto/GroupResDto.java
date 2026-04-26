@@ -23,7 +23,7 @@ public class GroupResDto {
      * [D-3] evaluatorMaps 를 raw JSON 문자열 대신 구조화된 리스트로 노출.
      * 프론트 호환을 위해 직렬화된 JSON 도 함께 제공 (evaluatorMapsJson — deprecated).
      */
-    private List<EvaluatorMapping> evaluatorMaps;
+    private List<EvaluatorMappingResDto> evaluatorMaps;
 
     /** @deprecated [D-3] 하위 호환용. 신규 코드는 evaluatorMaps 를 사용. */
     @Deprecated
@@ -31,13 +31,14 @@ public class GroupResDto {
 
     private static final ObjectMapper OM = new ObjectMapper();
 
-    public static GroupResDto from(EvaluationGroup e) {
-        List<EvaluatorMapping> maps = e.getEvaluatorMaps() != null
-                ? e.getEvaluatorMaps()
-                : Collections.emptyList();
+    public static GroupResDto from(EvaluationGroup e, List<EvaluatorMappingResDto> maps) {
+        List<EvaluatorMappingResDto> safeMaps = maps != null ? maps : Collections.emptyList();
         String legacyJson;
         try {
-            legacyJson = OM.writeValueAsString(maps);
+            List<EvaluatorMapping> legacyMaps = (e.getEvaluatorMaps() != null)
+                    ? e.getEvaluatorMaps()
+                    : Collections.emptyList();
+            legacyJson = OM.writeValueAsString(legacyMaps);
         } catch (Exception ex) {
             legacyJson = "[]";
         }
@@ -49,7 +50,7 @@ public class GroupResDto {
                 .evaluationTypesJson(e.getEvaluationTypesJson())
                 .targetMemberIdsJson(e.getTargetMemberIdsJson())
                 .designId(e.getDesign() != null ? e.getDesign().getDesignId() : null)
-                .evaluatorMaps(maps)
+                .evaluatorMaps(safeMaps)
                 .evaluatorMapsJson(legacyJson)
                 .build();
     }
