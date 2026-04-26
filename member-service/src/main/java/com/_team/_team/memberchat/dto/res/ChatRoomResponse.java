@@ -43,6 +43,7 @@ public record ChatRoomResponse(
         String otherMemberOrganizationName
 ) {
     public static ChatRoomResponse from(ChatRoom r,
+                                        String displayName,
                                         long participantCount,
                                         long unreadCount,
                                         Long lastMessageId,
@@ -54,7 +55,7 @@ public record ChatRoomResponse(
                                         UUID otherMemberId,
                                         ChatSenderView otherMemberView) {
         return new ChatRoomResponse(
-                r.getId(), r.getName(), r.getType(), r.getCompanyId(),
+                r.getId(), displayName, r.getType(), r.getCompanyId(),
                 r.getImageUrl(), r.isDeleted(),
                 r.getCreatedAt(), participantCount,
                 unreadCount,
@@ -66,6 +67,22 @@ public record ChatRoomResponse(
                 otherMemberView == null ? null : otherMemberView.jobTitleName(),
                 otherMemberView == null ? null : otherMemberView.jobGradeName(),
                 otherMemberView == null ? null : otherMemberView.organizationName());
+    }
+
+    public static ChatRoomResponse from(ChatRoom r,
+                                        long participantCount,
+                                        long unreadCount,
+                                        Long lastMessageId,
+                                        String lastMessagePreview,
+                                        UUID lastMessageSenderId,
+                                        LocalDateTime lastMessageAt,
+                                        Long myLastReadMessageId,
+                                        Long otherPartyLastReadMessageId,
+                                        UUID otherMemberId,
+                                        ChatSenderView otherMemberView) {
+        return from(r, r.getName(), participantCount, unreadCount, lastMessageId, lastMessagePreview,
+                lastMessageSenderId, lastMessageAt, myLastReadMessageId, otherPartyLastReadMessageId,
+                otherMemberId, otherMemberView);
     }
 
     /** 기존 호환용 (상대 프로필 없이). */
