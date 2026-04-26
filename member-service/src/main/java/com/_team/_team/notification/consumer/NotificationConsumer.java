@@ -35,7 +35,7 @@ public class NotificationConsumer {
                     .content(message.getContent())
                     .targetId(message.getTargetId())
                     .targetType(message.getTargetType())
-                    .isRead("NO")
+                    .isRead("N")
                     .build();
 
             Notification saved = notificationRepository.save(notification);
