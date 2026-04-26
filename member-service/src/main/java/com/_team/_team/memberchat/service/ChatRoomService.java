@@ -305,22 +305,14 @@ public class ChatRoomService {
         Map<UUID, ChatSenderView> views = senderEnricher.loadSenders(room.getCompanyId(), ids);
         List<String> names = joined.stream()
                 .map(ChatParticipant::getMemberId)
-                .filter(id -> !id.equals(me))
                 .map(id -> views.get(id) == null ? null : views.get(id).name())
                 .filter(name -> name != null && !name.isBlank())
                 .distinct()
                 .toList();
-        if (names.isEmpty()) {
-            names = joined.stream()
-                    .map(ChatParticipant::getMemberId)
-                    .map(id -> views.get(id) == null ? null : views.get(id).name())
-                    .filter(name -> name != null && !name.isBlank())
-                    .distinct()
-                    .toList();
-        }
         if (names.isEmpty()) return room.getName();
         if (names.size() == 1) return names.get(0);
         if (names.size() == 2) return names.get(0) + ", " + names.get(1);
-        return names.get(0) + ", " + names.get(1) + " 외 " + (names.size() - 2) + "명";
+        if (names.size() == 3) return names.get(0) + ", " + names.get(1) + ", " + names.get(2);
+        return names.get(0) + ", " + names.get(1) + ", " + names.get(2) + " 외 " + (names.size() - 3) + "명";
     }
 }
