@@ -381,10 +381,7 @@ public class ApprovalService {
         publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
         publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId,
                 LeaveOfAbsenceApprovalEvent.Action.REJECT, reqDto.getComment());
-
-        // 반려 시 REJECT 이벤트 발행
-        publishLeaveEventIfApplicable(request, actualMemberId,
-                LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.REJECT);
 
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 
