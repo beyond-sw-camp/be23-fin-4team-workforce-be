@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,4 +74,35 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
             @Param("status") PayrollStatus status);
+
+    /**
+     * [배치용] 회사 + 직원들, 다건의 특정 월 DRAFT Payroll 한 번에 조회
+     */
+    @Query("""
+        SELECT DISTINCT p FROM Payroll p
+        LEFT JOIN FETCH p.payrollItemList
+        WHERE p.companyId = :companyId
+          AND p.memberId IN :memberIds
+          AND p.payrollYearMonthDay BETWEEN :from AND :to
+          AND p.payrollStatus = :status
+          AND p.delYn = 'N'
+        """)
+    List<Payroll> findDraftsByCompanyMemberIdsAndMonthFetchItems(
+            @Param("companyId") UUID companyId,
+            @Param("memberIds") Collection<UUID> memberIds,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("status") PayrollStatus status);
+
+    // 회사 + 월 범위 totalPayment SUM 산재 회사부담 추정용
+    @Query("""
+        SELECT COALESCE(SUM(p.totalPayment), 0)
+        FROM Payroll p
+        WHERE p.companyId = :companyId
+          AND p.payrollYearMonthDay BETWEEN :from AND :to
+          AND p.delYn = 'N'
+        """)
+    long sumTotalPaymentInMonth(@Param("companyId") UUID companyId,
+                                @Param("from") LocalDate from,
+                                @Param("to") LocalDate to);
 }

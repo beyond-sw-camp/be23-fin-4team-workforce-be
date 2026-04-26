@@ -44,6 +44,7 @@ public class BatchJobConfig {
     private final SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker;
     private final MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker;
     private final LeavePromotionWorker leavePromotionWorker;
+    private final UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker;
 
     @Autowired
     public BatchJobConfig(
@@ -58,7 +59,7 @@ public class BatchJobConfig {
             CarryoverLeaveWorker carryoverLeaveWorker,
             WeeklyLimitCheckWorker weeklyLimitCheckWorker
             , OvertimeExpirationWorker overtimeExpirationWorker
-            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker, LeavePromotionWorker leavePromotionWorker) {
+            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker, LeavePromotionWorker leavePromotionWorker, UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.leaveGrantWorker = leaveGrantWorker;
@@ -73,6 +74,7 @@ public class BatchJobConfig {
         this.slotDeadlineAutoAssignWorker = slotDeadlineAutoAssignWorker;
         this.monthlyAttendanceCloseWorker = monthlyAttendanceCloseWorker;
         this.leavePromotionWorker = leavePromotionWorker;
+        this.unusedLeaveAutoPayoutWorker = unusedLeaveAutoPayoutWorker;
     }
 
     /** 휴가 부여 Job */
@@ -318,6 +320,24 @@ public class BatchJobConfig {
                     leavePromotionWorker.run(java.time.LocalDate.now());
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
+                .build();
+    }
+
+    /** 미사용 연차 수당 자동 정산 Job (매일 만료 임박분 처리) */
+    @Bean
+    public Job unusedLeaveAutoPayoutJob() {
+        return new JobBuilder("unusedLeaveAutoPayoutJob", jobRepository)
+                .start(unusedLeaveAutoPayoutStep())
+                .build();
+    }
+
+    @Bean
+    public Step unusedLeaveAutoPayoutStep() {
+        return new StepBuilder("unusedLeaveAutoPayoutStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    unusedLeaveAutoPayoutWorker.run(LocalDate.now());
+                    return RepeatStatus.FINISHED;
+                }, new ResourcelessTransactionManager())
                 .build();
     }
 }

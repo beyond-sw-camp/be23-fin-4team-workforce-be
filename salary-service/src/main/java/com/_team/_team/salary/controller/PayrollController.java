@@ -4,12 +4,15 @@ import com._team._team.batch.payroll.worker.PayrollCalculateWorker;
 import com._team._team.dto.ApiResponse;
 import com._team._team.salary.service.PayrollService;
 import com._team._team.salary.service.PayslipPdfService;
+import com._team._team.salary.service.TaxSummaryService;
 import com._team._team.salary.dto.reqdto.PayrollCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemUpdateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollRecalculateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollUpdateReqDto;
 import com._team._team.salary.dto.resdto.PayrollRecalculateResDto;
+import com._team._team.salary.dto.resdto.TaxSummaryResDto;
+import java.time.YearMonth;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ContentDisposition;
@@ -29,14 +32,31 @@ public class PayrollController {
     private final PayrollService payrollService;
     private final PayrollCalculateWorker payrollCalculateWorker;
     private final PayslipPdfService payslipPdfService;
+    private final TaxSummaryService taxSummaryService;
 
     @Autowired
     public PayrollController(PayrollService payrollService,
                              PayrollCalculateWorker payrollCalculateWorker,
-                             PayslipPdfService payslipPdfService) {
+                             PayslipPdfService payslipPdfService,
+                             TaxSummaryService taxSummaryService) {
         this.payrollService = payrollService;
         this.payrollCalculateWorker = payrollCalculateWorker;
         this.payslipPdfService = payslipPdfService;
+        this.taxSummaryService = taxSummaryService;
+    }
+
+    // 4대보험 + 원천세 월별 집계 한 번 호출로 두 섹션 채움
+    @GetMapping("/tax-summary")
+    public ResponseEntity<?> getTaxSummary(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestParam(value = "yearMonth", required = false) String yearMonthStr) {
+        YearMonth yearMonth = (yearMonthStr == null || yearMonthStr.isBlank())
+                ? YearMonth.now()
+                : YearMonth.parse(yearMonthStr);
+        TaxSummaryResDto data = taxSummaryService.getMonthlySummary(companyId, yearMonth);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "세금 집계 조회 성공"),
+                HttpStatus.OK);
     }
 
     // ===================== 급여대장 =====================
