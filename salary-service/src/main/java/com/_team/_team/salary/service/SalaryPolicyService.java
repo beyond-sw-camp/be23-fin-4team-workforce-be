@@ -1,6 +1,8 @@
 package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.event.RagSyncSalaryEvent;
+import com._team._team.salary.kafka.RagSyncSalaryEventPublisher;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.dto.reqdto.SalaryPolicyCreateReqDto;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -22,10 +25,13 @@ import java.util.UUID;
 public class SalaryPolicyService {
 
     private final SalaryPolicyRepository salaryPolicyRepository;
+    private final RagSyncSalaryEventPublisher ragSyncSalaryEventPublisher;
 
     @Autowired
-    public SalaryPolicyService(SalaryPolicyRepository salaryPolicyRepository) {
+    public SalaryPolicyService(SalaryPolicyRepository salaryPolicyRepository,
+                               RagSyncSalaryEventPublisher ragSyncSalaryEventPublisher) {
         this.salaryPolicyRepository = salaryPolicyRepository;
+        this.ragSyncSalaryEventPublisher = ragSyncSalaryEventPublisher;
     }
 
     // 급여 정책 생성
@@ -35,6 +41,20 @@ public class SalaryPolicyService {
 
         SalaryPolicy salaryPolicy = reqDto.toEntity(companyId);
         SalaryPolicy saved = salaryPolicyRepository.save(salaryPolicy);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("CREATED")
+                        .resourceType("SALARY_POLICY")
+                        .resourceId(saved.getSalaryPolicyId())
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return SalaryPolicyResDto.fromEntity(saved);
     }
 
@@ -83,6 +103,20 @@ public class SalaryPolicyService {
         validateDateRange(reqDto.getEffectiveFrom(), reqDto.getEffectiveTo());
 
         salaryPolicy.update(reqDto);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("UPDATED")
+                        .resourceType("SALARY_POLICY")
+                        .resourceId(salaryPolicyId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return SalaryPolicyResDto.fromEntity(salaryPolicy);
     }
 
@@ -108,6 +142,19 @@ public class SalaryPolicyService {
 
         // 미래 정책만 soft delete 처리
         salaryPolicy.softDelete();
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("DELETED")
+                        .resourceType("SALARY_POLICY")
+                        .resourceId(salaryPolicyId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
     }
 
     // 적용 종료일이 시작일보다 빠른지 검증

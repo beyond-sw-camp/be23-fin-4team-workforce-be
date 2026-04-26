@@ -78,4 +78,12 @@ public class SalaryPolicyController {
                 HttpStatus.OK
         );
     }
+    // 내부 통신용
+    @GetMapping("/internal")
+    public ResponseEntity<?> findByCompanyIdInternal(@RequestParam UUID companyId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(salaryService.findByCompanyId(companyId),
+                        "급여 정책 목록 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }

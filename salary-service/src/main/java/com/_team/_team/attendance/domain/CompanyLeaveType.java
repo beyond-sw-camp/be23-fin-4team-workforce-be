@@ -80,10 +80,16 @@ public class CompanyLeaveType extends BaseTimeEntity {
     private String delYn = "N";
 
     /**
-     * 사용자 수정 가능 필드만 반영, 시스템 기본은 name/order 만 허용
+     * 시스템 기본 휴가 수정 (연차/반차 제외)
+     * 연차/반차는 name과 displayOrder만 수정 가능하고,
+     * 나머지 기본 휴가는 일수/유급/증빙도 수정 가능.
      */
-    public void update(String name, Integer displayOrder) {
+    public void update(String name, String isPaidYn, Double maxDaysPerYear,
+                       String requireEvidenceYn, Integer displayOrder) {
         this.name = name;
+        this.isPaidYn = isPaidYn;
+        this.maxDaysPerYear = maxDaysPerYear;
+        this.requireEvidenceYn = requireEvidenceYn;
         this.displayOrder = displayOrder;
     }
 

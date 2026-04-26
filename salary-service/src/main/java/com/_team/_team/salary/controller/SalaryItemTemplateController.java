@@ -91,4 +91,13 @@ public class SalaryItemTemplateController {
                 ApiResponse.success(result, result.message()),
                 HttpStatus.OK);
     }
+
+    // 내부 통신용
+    @GetMapping("/internal")
+    public ResponseEntity<?> findByCompanyIdInternal(@RequestParam UUID companyId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(salaryItemTemplateService.findByCompanyId(companyId),
+                        "급여 항목 템플릿 목록 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }

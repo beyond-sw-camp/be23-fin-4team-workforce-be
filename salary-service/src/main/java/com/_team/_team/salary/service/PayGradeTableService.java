@@ -1,16 +1,19 @@
 package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.event.RagSyncSalaryEvent;
 import com._team._team.salary.domain.PayGradeTable;
 import com._team._team.salary.dto.reqdto.PayGradeTableBulkCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayGradeTableCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayGradeTableUpdateReqDto;
+import com._team._team.salary.kafka.RagSyncSalaryEventPublisher;
 import com._team._team.salary.repository.PayGradeTableRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,10 +32,13 @@ import java.util.stream.Collectors;
 public class PayGradeTableService {
 
     private final PayGradeTableRepository repository;
+    private final RagSyncSalaryEventPublisher ragSyncSalaryEventPublisher;
 
     @Autowired
-    public PayGradeTableService(PayGradeTableRepository repository) {
+    public PayGradeTableService(PayGradeTableRepository repository,
+                                RagSyncSalaryEventPublisher ragSyncSalaryEventPublisher) {
         this.repository = repository;
+        this.ragSyncSalaryEventPublisher = ragSyncSalaryEventPublisher;
     }
 
     public PayGradeTable create(UUID companyId, PayGradeTableCreateReqDto reqDto) {
@@ -55,19 +61,61 @@ public class PayGradeTableService {
                 .description(reqDto.getDescription())
                 .build();
 
-        return repository.save(newRow);
+        PayGradeTable saved = repository.save(newRow);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("CREATED")
+                        .resourceType("PAY_GRADE_TABLE")
+                        .resourceId(saved.getPayGradeTableId())
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
+        return saved;
     }
 
     public PayGradeTable update(UUID companyId, UUID payGradeTableId,
                                 PayGradeTableUpdateReqDto reqDto) {
         PayGradeTable row = findActiveOrThrow(companyId, payGradeTableId);
         row.update(reqDto);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("UPDATED")
+                        .resourceType("PAY_GRADE_TABLE")
+                        .resourceId(payGradeTableId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return row;
     }
 
     public void delete(UUID companyId, UUID payGradeTableId) {
         PayGradeTable row = findActiveOrThrow(companyId, payGradeTableId);
         row.delete();
+
+        // RAG 동기화 이벤트 발행
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("DELETED")
+                        .resourceType("PAY_GRADE_TABLE")
+                        .resourceId(payGradeTableId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
     }
 
     /**
@@ -120,6 +168,20 @@ public class PayGradeTableService {
         }
 
         repository.saveAll(toSave);
+
+        // RAG 동기화 이벤트 발행 (BULK)
+        ragSyncSalaryEventPublisher.publish(
+                RagSyncSalaryEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("BULK")
+                        .resourceType("PAY_GRADE_TABLE")
+                        .resourceId(null)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return new BulkResult(created, replaced);
     }
 

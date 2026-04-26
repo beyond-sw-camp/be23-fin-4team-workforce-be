@@ -7,6 +7,9 @@ logger = logging.getLogger(__name__)
 pc = Pinecone(api_key=settings.pinecone_api_key)
 index = pc.Index(settings.pinecone_index_name)
 
+# 플랫폼 공통 문서 저장 시 사용하는 특수 company_id
+PLATFORM_COMPANY_ID = "__PLATFORM__"
+
 
 def upsert_vectors(vectors: list[dict]):
     index.upsert(vectors=vectors)
@@ -16,21 +19,24 @@ def search_vectors(
         query_vector: list[float],
         company_id: str,
         top_k: int = 5,
-        min_score: float = 0.35,   # 0.5 → 0.35
-        category: str | None = None) -> list[dict]:
+        min_score: float = 0.35,
+        category: str | None = None,
+        include_platform: bool = True) -> list[dict]:
     """
     Pinecone 벡터 검색.
 
-    min_score 기준 (cosine similarity):
-      - 0.5+ : 매우 관련
-      - 0.35-0.5 : 관련 있음 (섹션 단위 청크의 일반적 범위)
-      - 0.2-0.35 : 약한 관련
-
-    카테고리 필터가 1차 정제 역할을 하므로 임계값을 0.35로 유지해도
-    오답 위험이 적다.
+    Args:
+        include_platform: True면 플랫폼 공통 문서도 함께 검색 (기본 True)
     """
-    filter_dict = {"company_id": {"$eq": company_id}}
+    # 회사 ID 필터
+    if include_platform:
+        company_filter = {
+            "company_id": {"$in": [company_id, PLATFORM_COMPANY_ID]}
+        }
+    else:
+        company_filter = {"company_id": {"$eq": company_id}}
 
+    filter_dict = company_filter.copy()
     if category:
         filter_dict["category"] = {"$eq": category}
 
@@ -46,16 +52,15 @@ def search_vectors(
         include_metadata=True
     )
 
-    # 전체 결과 로깅 (튜닝 용도)
     logger.info(f"[search_vectors] 전체 결과 {len(results.matches)}개:")
     for i, m in enumerate(results.matches):
         md = m.metadata
         logger.info(
             f"  #{i+1} score={m.score:.3f} "
+            f"layer={md.get('layer', '?')} "
             f"[{md.get('category', '?')}/{md.get('subcategory', '?')}]"
         )
 
-    # 임계값 필터
     filtered = [
         match for match in results.matches
         if match.score >= min_score
