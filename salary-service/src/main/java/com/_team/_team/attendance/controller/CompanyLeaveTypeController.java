@@ -94,4 +94,16 @@ public class CompanyLeaveTypeController {
     public void initDefaults(@RequestParam UUID companyId) {
         service.initializeDefaults(companyId);
     }
+
+
+    // ai-service 서비스 간 내부 호출용 - 회사 휴가 종류 전체 조회
+    @GetMapping("/internal")
+    public ResponseEntity<?> findAllInternal(@RequestParam UUID companyId) {
+        List<CompanyLeaveTypeResDto> list = service.findAll(companyId).stream()
+                .map(CompanyLeaveTypeResDto::fromEntity)
+                .toList();
+        return new ResponseEntity<>(
+                ApiResponse.success(list, "휴가 목록 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }

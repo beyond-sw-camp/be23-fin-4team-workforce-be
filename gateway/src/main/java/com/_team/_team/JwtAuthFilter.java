@@ -47,7 +47,12 @@ public class JwtAuthFilter implements GlobalFilter {
             "/member/reset-password/send-code",
             "/member/reset-password/verify-code",
             "/member/reset-password",
-            "/mc/**" // 사내 채팅 WS/STOMP — 인증은 STOMP CONNECT 프레임에서 처리
+            "/mc/**", // 사내 채팅 WS/STOMP — 인증은 STOMP CONNECT 프레임에서 처리
+            "/attendance/leave-types/internal",
+            "/leave-policies/internal",
+            "/work-schedules/internal",
+            "/attendance/overtime-policies/internal",
+            "/company-holidays/internal"
     );
 
     @Override

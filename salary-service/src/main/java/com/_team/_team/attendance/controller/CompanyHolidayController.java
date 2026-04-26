@@ -95,4 +95,12 @@ public class CompanyHolidayController {
                         year + "년 법정 공휴일 " + saved + "건 반영 완료"),
                 HttpStatus.OK);
     }
+    // 내부통신용
+    @GetMapping("/internal")
+    public ResponseEntity<?> findHolidaysInternal(@RequestParam UUID companyId) {
+        List<CompanyHolidayResDto> resDtoList = companyHolidayService.findHolidays(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDtoList, "공휴일 목록 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }
