@@ -195,4 +195,17 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
     List<MemberBalance> findForPromotion(
             @Param("companyId") UUID companyId,
             @Param("targetDate") LocalDate targetDate);
+
+    /**
+     * 오늘 만료될 연차 잔고 + 잔여 > 0 (전 회사 일괄 조회)
+     */
+    @Query("""
+   SELECT b FROM MemberBalance b
+   WHERE b.expirationDate = :today
+     AND b.balanceType = 'ANNUAL'
+     AND b.remaining > 0
+     AND b.isExpireYn = 'N'
+     AND b.delYn = 'N'
+   """)
+    List<MemberBalance> findExpiringAnnualWithRemaining(@Param("today") LocalDate today);
 }
