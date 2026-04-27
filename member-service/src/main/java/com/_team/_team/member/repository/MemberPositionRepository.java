@@ -87,6 +87,12 @@ public interface MemberPositionRepository extends JpaRepository<MemberPosition, 
 
     List<MemberPosition> findByOrganization_OrganizationIdAndDelYn(UUID organizationId, String delYn);
 
-
-
+    // 회사 직원 일괄 조회 시 활성 포지션 부서명 채우기 위한 용도
+    @Query("SELECT mp FROM MemberPosition mp " +
+            "JOIN FETCH mp.organization " +
+            "WHERE mp.member.memberId IN :memberIds " +
+            "AND mp.isActiveYn = 'YES' " +
+            "AND mp.delYn = 'NO'")
+    List<MemberPosition> findActivePositionsByMemberIds(
+            @Param("memberIds") java.util.Collection<UUID> memberIds);
 }

@@ -1716,15 +1716,36 @@ public class MemberService {
     }
 
     /**
-     * 회사별 재직 사원 조회 (배치용 내부 API)
-     * → salary-service의 연차 부여 배치에서 호출
+     * 회사별 재직 사원 조회
      */
     @Transactional(readOnly = true)
     public List<MemberResDto> findAllByCompanyIdForBatch(UUID companyId) {
-        return memberRepository
-                .findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE)
+        // 1 활성 직원 조회
+        List<Member> members = memberRepository
+                .findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE);
+        if (members.isEmpty()) return java.util.Collections.emptyList();
+
+        // 2 활성 포지션 일괄 조회
+        java.util.Set<UUID> memberIds = members.stream()
+                .map(Member::getMemberId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        java.util.Map<UUID, MemberPosition> positionByMember = memberPositionRepository
+                .findActivePositionsByMemberIds(memberIds)
                 .stream()
-                .map(MemberResDto::fromEntity)
+                .collect(java.util.stream.Collectors.toMap(
+                        mp -> mp.getMember().getMemberId(),
+                        mp -> mp,
+                        (a, b) -> a));
+
+        // 3 직원 매핑 활성 포지션 있으면 부서명 포함 없으면 기본 변환
+        return members.stream()
+                .map(m -> {
+                    MemberPosition mp = positionByMember.get(m.getMemberId());
+                    return mp != null
+                            ? MemberResDto.fromEntity(m, mp)
+                            : MemberResDto.fromEntity(m);
+                })
                 .toList();
     }
 
