@@ -1,6 +1,8 @@
+import logging
+
 from openai import OpenAI
 from app.config import settings
-import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -144,3 +146,4 @@ def detect_category(question: str) -> str | None:
     except Exception as e:
         logger.error(f"[detect_category] 실패: {e}")
         return None
+    

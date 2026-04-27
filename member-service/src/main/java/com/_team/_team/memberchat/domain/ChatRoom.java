@@ -44,6 +44,15 @@ public class ChatRoom extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean deleted = false;
 
+    /**
+     * 법적 보존(legal hold) 플래그.
+     * DB 스키마에 NOT NULL 로 잡혀 있어 엔티티에도 반드시 포함해야 INSERT 시 누락되지 않는다.
+     * 기본값은 false — 운영/감사 목적으로 별도 관리될 때만 true 로 전환.
+     */
+    @Builder.Default
+    @Column(name = "legal_hold", nullable = false)
+    private boolean legalHold = false;
+
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ChatParticipant> participants = new ArrayList<>();

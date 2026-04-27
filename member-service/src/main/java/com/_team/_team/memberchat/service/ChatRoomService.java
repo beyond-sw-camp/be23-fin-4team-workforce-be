@@ -4,8 +4,10 @@ import com._team._team.memberchat.domain.*;
 import com._team._team.memberchat.domain.enums.ChatParticipantStatus;
 import com._team._team.memberchat.domain.enums.ChatRoomRole;
 import com._team._team.memberchat.domain.enums.ChatRoomType;
+import com._team._team.memberchat.domain.enums.MessageType;
 import com._team._team.memberchat.dto.req.CreateDirectRoomRequest;
 import com._team._team.memberchat.dto.req.CreateGroupRoomRequest;
+import com._team._team.memberchat.dto.res.ChatMessageEvent;
 import com._team._team.memberchat.dto.res.ChatParticipantResponse;
 import com._team._team.memberchat.dto.res.ChatRoomResponse;
 import com._team._team.memberchat.dto.res.ChatSenderView;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +37,7 @@ public class ChatRoomService {
     private final ChatMessageRepository messageRepo;
     private final ChatAuthPolicy authPolicy;
     private final ChatMessageSenderEnricher senderEnricher;
+    private final RedisChatPubSubService pubsub;
 
     @Transactional
     public ChatRoomResponse getOrCreateDirectRoom(UUID me, UUID companyId, CreateDirectRoomRequest req) {
@@ -54,7 +58,7 @@ public class ChatRoomService {
                             .companyId(companyId)
                             .createdBy(me)
                             .build());
-                    persistParticipant(room, me, ChatRoomRole.OWNER);
+                    persistParticipant(room, me, ChatRoomRole.MEMBER);
                     persistParticipant(room, req.otherMemberId(), ChatRoomRole.MEMBER);
                     return toResponse(room, me);
                 });
@@ -69,7 +73,7 @@ public class ChatRoomService {
                 .createdBy(me)
                 .build());
 
-        persistParticipant(room, me, ChatRoomRole.OWNER);
+        persistParticipant(room, me, ChatRoomRole.MEMBER);
         req.memberIds().stream()
                 .distinct()
                 .filter(id -> !id.equals(me))
@@ -201,8 +205,11 @@ public class ChatRoomService {
             }
         }
 
+        String displayName = resolveDisplayName(room, me);
+
         return ChatRoomResponse.from(
                 room,
+                displayName,
                 participantCount,
                 unread,
                 lastMessageId,
@@ -220,12 +227,26 @@ public class ChatRoomService {
     public void addMember(UUID actor, long roomId, UUID target) {
         ChatParticipant me = participantRepo.findByChatRoomIdAndMemberId(roomId, actor)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.NOT_PARTICIPANT));
-        if (me.getRole() != ChatRoomRole.OWNER && me.getRole() != ChatRoomRole.MODERATOR) {
-            throw new ChatException(ChatErrorCode.ROLE_FORBIDDEN);
-        }
+        if (me.getStatus() != ChatParticipantStatus.JOINED) throw new ChatException(ChatErrorCode.NOT_PARTICIPANT);
         ChatRoom room = roomRepo.findById(roomId).orElseThrow(() -> new ChatException(ChatErrorCode.ROOM_NOT_FOUND));
         if (room.isDeleted()) throw new ChatException(ChatErrorCode.ROOM_DELETED);
+        if (room.getType() != ChatRoomType.GROUP) {
+            throw new ChatException(ChatErrorCode.VALIDATION_ERROR, "1:1 채팅방에는 참여자를 초대할 수 없습니다.");
+        }
         persistParticipant(room, target, ChatRoomRole.MEMBER);
+
+        // 그룹 채팅 초대 시스템 메시지
+        if (room.getType() == ChatRoomType.GROUP) {
+            Map<UUID, ChatSenderView> views = senderEnricher.loadSenders(room.getCompanyId(), Set.of(target));
+            String targetName = views.get(target) != null ? views.get(target).name() : "구성원";
+            ChatMessage system = messageRepo.save(ChatMessage.builder()
+                    .chatRoom(room)
+                    .senderId(actor)
+                    .type(MessageType.SYSTEM)
+                    .content(targetName + "님이 초대되었습니다.")
+                    .build());
+            pubsub.publish(roomId, ChatMessageEvent.created(system));
+        }
     }
 
     @Transactional
@@ -233,8 +254,21 @@ public class ChatRoomService {
         ChatParticipant p = participantRepo.findByChatRoomIdAndMemberId(roomId, me)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.NOT_PARTICIPANT));
         // 1:1 방은 HIDDEN(soft leave), 그룹은 LEFT
-        if (p.getChatRoom().getType() == ChatRoomType.DIRECT) p.hide();
-        else p.leave();
+        if (p.getChatRoom().getType() == ChatRoomType.DIRECT) {
+            p.hide();
+        } else {
+            p.leave();
+            ChatRoom room = p.getChatRoom();
+            Map<UUID, ChatSenderView> views = senderEnricher.loadSenders(room.getCompanyId(), Set.of(me));
+            String memberName = views.get(me) != null ? views.get(me).name() : "구성원";
+            ChatMessage system = messageRepo.save(ChatMessage.builder()
+                    .chatRoom(room)
+                    .senderId(me)
+                    .type(MessageType.SYSTEM)
+                    .content(memberName + "님이 채팅방을 나갔습니다.")
+                    .build());
+            pubsub.publish(roomId, ChatMessageEvent.created(system));
+        }
     }
 
     @Transactional
@@ -245,7 +279,7 @@ public class ChatRoomService {
         if (!adminOverride) {
             ChatParticipant p = participantRepo.findByChatRoomIdAndMemberId(roomId, actor)
                     .orElseThrow(() -> new ChatException(ChatErrorCode.NOT_PARTICIPANT));
-            if (p.getRole() != ChatRoomRole.OWNER) throw new ChatException(ChatErrorCode.ROLE_FORBIDDEN);
+            if (p.getStatus() != ChatParticipantStatus.JOINED) throw new ChatException(ChatErrorCode.NOT_PARTICIPANT);
         }
         room.softDelete();
     }
@@ -257,5 +291,28 @@ public class ChatRoomService {
                 .role(role)
                 .status(ChatParticipantStatus.JOINED)
                 .build());
+    }
+
+    private String resolveDisplayName(ChatRoom room, UUID me) {
+        if (room.getType() == ChatRoomType.DIRECT) {
+            return room.getName();
+        }
+        List<ChatParticipant> joined = participantRepo.findByChatRoomId(room.getId()).stream()
+                .filter(p -> p.getStatus() == ChatParticipantStatus.JOINED)
+                .toList();
+        if (joined.isEmpty()) return room.getName();
+        Set<UUID> ids = joined.stream().map(ChatParticipant::getMemberId).collect(Collectors.toSet());
+        Map<UUID, ChatSenderView> views = senderEnricher.loadSenders(room.getCompanyId(), ids);
+        List<String> names = joined.stream()
+                .map(ChatParticipant::getMemberId)
+                .map(id -> views.get(id) == null ? null : views.get(id).name())
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .toList();
+        if (names.isEmpty()) return room.getName();
+        if (names.size() == 1) return names.get(0);
+        if (names.size() == 2) return names.get(0) + ", " + names.get(1);
+        if (names.size() == 3) return names.get(0) + ", " + names.get(1) + ", " + names.get(2);
+        return names.get(0) + ", " + names.get(1) + ", " + names.get(2) + " 외 " + (names.size() - 3) + "명";
     }
 }
