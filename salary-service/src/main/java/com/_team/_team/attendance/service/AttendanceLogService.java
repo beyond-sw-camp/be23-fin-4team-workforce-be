@@ -57,7 +57,7 @@ public class AttendanceLogService {
      *
      * - 출근 로그 저장
      * - reqDto.toEntity()로 AttendanceLog 생성
-     * - EventType.CLOCK_IN, GPS 좌표, 기기 ID 포함
+     * - EventType.CLOCK_IN, 기기 ID 포함
      *
      * - DailyAttendance 갱신
      * - firstClockIn = 출근 시간 기록

@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 
 /**
  * 출퇴근 이벤트 생성 요청 DTO
- * - CLOCK_IN, CLOCK_OUT 공통 사용
- * - EventType은 서비스 메서드에서 직접 지정
+ *  CLOCK_IN CLOCK_OUT 공통 사용
+ *  EventType 은 서비스 메서드에서 직접 지정
  */
 @AllArgsConstructor
 @NoArgsConstructor
@@ -21,16 +21,10 @@ import java.time.LocalDateTime;
 @Data
 public class AttendanceLogCreateReqDto {
 
-    /** 이벤트 발생 시각 (null이면 서버 현재 시간 사용) */
+    /** 이벤트 발생 시각 null 이면 서버 현재 시간 사용 */
     private LocalDateTime eventTime;
 
-    /** GPS 위도 (nullable — 모바일 출퇴근 시 전달) */
-    private Double latitude;
-
-    /** GPS 경도 (nullable — 모바일 출퇴근 시 전달) */
-    private Double longitude;
-
-    /** 기기 식별자 (nullable — 앱/기기별 구분용) */
+    /** 기기 식별자 nullable 앱 기기별 구분용 */
     private String deviceId;
 
     public AttendanceLog toEntity(DailyAttendance daily, EventType eventType, LocalDateTime eventTime) {
@@ -39,8 +33,6 @@ public class AttendanceLogCreateReqDto {
                 .memberId(daily.getMemberId())
                 .eventType(eventType)
                 .eventTime(eventTime)
-                .latitude(this.latitude)
-                .longitude(this.longitude)
                 .deviceId(this.deviceId)
                 .isCorrectedYn("N")
                 .build();
