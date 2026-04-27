@@ -2,7 +2,6 @@ package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
-import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.dto.reqdto.SalaryPolicyUpdateReqDto;
 import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.persistence.*;
@@ -26,10 +25,6 @@ public class SalaryPolicy extends BaseTimeEntity {
 
     @Column(nullable = false)
     private String policyName;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PayType payType;
 
     @Column(nullable = false)
     private Integer payDay;
@@ -92,7 +87,6 @@ public class SalaryPolicy extends BaseTimeEntity {
     // 급여 정책 수정
     public void update(SalaryPolicyUpdateReqDto reqDto) {
         this.policyName = reqDto.getPolicyName();
-        this.payType = reqDto.getPayType();
         this.payDay = reqDto.getPayDay();
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();

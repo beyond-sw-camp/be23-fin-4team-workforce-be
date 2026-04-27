@@ -1,7 +1,6 @@
 package com._team._team.attendance.dto.resDto;
 
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 
 import java.time.LocalDate;
 
@@ -9,8 +8,10 @@ import java.time.LocalDate;
  * 직원 본인 주간 근무시간 요약
  * warningLevel 은 프론트가 percent 로 결정 (75% WARNING, 92% CRITICAL, 100% EXCEEDED)
  */
-@Getter
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder
+@Data
 public class WorkTimeSummaryResDto {
 
     private LocalDate weekStart;   // 월요일

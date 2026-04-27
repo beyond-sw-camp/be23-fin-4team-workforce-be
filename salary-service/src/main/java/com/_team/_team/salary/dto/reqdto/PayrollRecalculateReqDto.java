@@ -13,8 +13,8 @@ import java.time.LocalDate;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class PayrollRecalculateReqDto {
 
     /** 정산 연월일 - 없으면 정책 기준 다음 정산일 자동 */

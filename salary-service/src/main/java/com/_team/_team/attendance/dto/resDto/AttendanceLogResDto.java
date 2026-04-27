@@ -19,8 +19,6 @@ public class AttendanceLogResDto {
     private UUID attendanceLogId;
     private EventType eventType;
     private LocalDateTime eventTime;
-    private Double latitude;
-    private Double longitude;
     private String deviceId;
     private String isCorrectedYn;
 
@@ -29,8 +27,6 @@ public class AttendanceLogResDto {
                 .attendanceLogId(log.getAttendanceLogId())
                 .eventType(log.getEventType())
                 .eventTime(log.getEventTime())
-                .latitude(log.getLatitude())
-                .longitude(log.getLongitude())
                 .deviceId(log.getDeviceId())
                 .isCorrectedYn(log.getIsCorrectedYn())
                 .build();

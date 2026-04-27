@@ -28,9 +28,6 @@ public class LeavePolicyCreateReqDto {
     /** 최대 이월 일수 */
     private Integer carryoverDays;
 
-    /** 이월 동의 필요 여부 */
-    private String isCarryoverConsentYn;
-
     /** 미사용 수당 지급 여부 */
     private String isPayoutYn;
 
@@ -48,7 +45,6 @@ public class LeavePolicyCreateReqDto {
                 .promotion2ndBeforeDays(this.promotion2ndBeforeDays)
                 .isCarryoverYn(this.isCarryoverYn != null ? this.isCarryoverYn : "N")
                 .carryoverDays(this.carryoverDays)
-                .isCarryoverConsentYn(this.isCarryoverConsentYn != null ? this.isCarryoverConsentYn : "N")
                 .isPayoutYn(this.isPayoutYn != null ? this.isPayoutYn : "N")
                 .defaultAnnualDays(this.defaultAnnualDays != null ? this.defaultAnnualDays : 15.0)
                 .accrualBase(this.accrualBase)

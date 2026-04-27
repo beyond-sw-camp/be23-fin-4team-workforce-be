@@ -3,15 +3,16 @@ package com._team._team.salary.dto.reqdto;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 // 직원 수당 변경 신청, 결재 요청하는 PENDING 생성용
-@Getter
+@AllArgsConstructor
 @NoArgsConstructor
+@Builder
+@Data
 public class MemberAllowanceRequestReqDto {
 
     @NotNull(message = "수당 항목 ID 는 필수입니다.")

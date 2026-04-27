@@ -4,18 +4,17 @@ package com._team._team.attendance.dto.resDto;
 import com._team._team.attendance.domain.OvertimeRequest;
 import com._team._team.attendance.domain.enums.OvertimeApprovalStatus;
 import com._team._team.attendance.domain.enums.OvertimeRequestType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
-@Getter
-@Builder
 @AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@Data
 public class OvertimeRequestResDto {
 
     private UUID overtimeRequestId;

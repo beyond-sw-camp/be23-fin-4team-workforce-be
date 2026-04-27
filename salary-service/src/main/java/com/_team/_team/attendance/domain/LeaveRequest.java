@@ -2,6 +2,7 @@ package com._team._team.attendance.domain;
 
 import com._team._team.attendance.domain.enums.BalanceType;
 import com._team._team.attendance.domain.enums.LeaveApprovalStatus;
+import com._team._team.attendance.domain.enums.LeaveInitiator;
 import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -103,6 +104,12 @@ public class LeaveRequest extends BaseTimeEntity {
     @Column(length = 500)
     private String decisionNote;
 
+    /** 신청 주체 */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
+    private LeaveInitiator initiator = LeaveInitiator.SELF;
+
     @Column(nullable = false, length = 1)
     @Builder.Default
     private String delYn = "N";
@@ -140,12 +147,45 @@ public class LeaveRequest extends BaseTimeEntity {
         this.decisionNote = note;
     }
 
-    // 본인 철회
+    // 본인 철회 (관리자 강제 지정은 차단)
     public void cancel() {
+        if (this.initiator == LeaveInitiator.ADMIN_DESIGNATION) {
+            throw new IllegalStateException(
+                    "회사가 강제 지정한 연차는 취소할 수 없습니다. 관리자에게 문의하세요.");
+        }
         if (this.approvalStatus != LeaveApprovalStatus.PENDING) {
             throw new IllegalStateException("결재대기 상태에서만 취소 가능합니다.");
         }
         this.approvalStatus = LeaveApprovalStatus.CANCELLED;
+    }
+
+    /**
+     * 회사 강제 지정용
+     */
+    public static LeaveRequest createDesignated(UUID memberId,
+                                                UUID companyId,
+                                                UUID companyLeaveTypeId,
+                                                LocalDate startDate,
+                                                LocalDate endDate,
+                                                Double usageDays,
+                                                String reason,
+                                                UUID adminId) {
+        LeaveRequest req = LeaveRequest.builder()
+                .memberId(memberId)
+                .companyId(companyId)
+                .companyLeaveTypeId(companyLeaveTypeId)
+                .startDate(startDate)
+                .endDate(endDate)
+                .usageDays(usageDays)
+                .reason(reason)
+                .approvalStatus(LeaveApprovalStatus.APPROVED)
+                .initiator(LeaveInitiator.ADMIN_DESIGNATION)
+                .requestedBy(adminId)
+                .requestedAt(LocalDateTime.now())
+                .decidedBy(adminId)
+                .decidedAt(LocalDateTime.now())
+                .build();
+        return req;
     }
 
     public void softDelete() {

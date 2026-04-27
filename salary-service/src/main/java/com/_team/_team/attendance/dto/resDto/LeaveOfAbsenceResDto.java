@@ -3,15 +3,16 @@ package com._team._team.attendance.dto.resDto;
 import com._team._team.attendance.domain.MemberLeaveOfAbsence;
 import com._team._team.attendance.domain.enums.LeaveOfAbsenceApprovalStatus;
 import com._team._team.attendance.domain.enums.LeaveOfAbsenceType;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder
+@Data
 public class LeaveOfAbsenceResDto {
 
     private UUID leaveOfAbsenceId;

@@ -16,8 +16,8 @@ import java.util.UUID;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class TaxRateResDto {
     private UUID taxRateId;
     private TaxType taxType;

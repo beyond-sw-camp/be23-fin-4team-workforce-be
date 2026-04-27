@@ -14,15 +14,13 @@ import java.util.UUID;
 
 /**
  * 출퇴근 이벤트 로그
- * - 모든 근태 이벤트를 시간순으로 기록 (이벤트 소싱)
- * - daily_attendance의 자식 테이블 (N:1)
- * - GPS 좌표 + 디바이스 정보로 부정 출퇴근 검증 가능
- * - is_corrected_yn: 결재 통한 수정 건 구분
+ *  모든 근태 이벤트를 시간순으로 기록 이벤트 소싱
+ *  daily_attendance 자식 테이블 N 대 1
+ *  is_corrected_yn 결재 통한 수정 건 구분
  *
- * [인덱스 전략]
- * - (member_id, event_time): 특정 직원의 기간별 로그 조회 — 가장 빈번한 쿼리
- * - (daily_attendance_id): 일별 상세 로그 JOIN 조회
- * - 직원 500명 기준 하루 ~2,000건 INSERT 발생하는 고빈도 쓰기 테이블
+ * 인덱스 전략
+ *  member_id event_time 특정 직원 기간별 로그 조회 빈번
+ *  daily_attendance_id 일별 상세 로그 JOIN
  */
 @Entity
 @AllArgsConstructor
@@ -51,12 +49,6 @@ public class AttendanceLog extends BaseTimeEntity {
     /** 이벤트 발생 시각 - 인덱스 포함 컬럼 */
     @Column(nullable = false)
     private LocalDateTime eventTime;
-
-    /** GPS 위도 (모바일 출퇴근 시, nullable) */
-    private Double latitude;
-
-    /** GPS 경도 (모바일 출퇴근 시, nullable) */
-    private Double longitude;
 
     /** 기기 식별자 (모바일 앱에서 전송) */
     @Column(length = 100)

@@ -1,15 +1,16 @@
 package com._team._team.attendance.dto.reqDto;
 
 import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 /** 휴가 신청 DTO */
-@Getter
+@AllArgsConstructor
 @NoArgsConstructor
+@Builder
+@Data
 public class LeaveRequestSubmitReqDto {
 
     @NotNull(message = "휴가 종류는 필수입니다.")

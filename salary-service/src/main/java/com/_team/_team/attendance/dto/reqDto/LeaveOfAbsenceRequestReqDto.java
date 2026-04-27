@@ -2,16 +2,17 @@ package com._team._team.attendance.dto.reqDto;
 
 import com._team._team.attendance.domain.enums.LeaveOfAbsenceType;
 import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 
 /**
  * 직원 본인 휴직 신청 DTO
  */
-@Getter
+@AllArgsConstructor
 @NoArgsConstructor
+@Builder
+@Data
 public class LeaveOfAbsenceRequestReqDto {
 
     @NotNull(message = "휴직 종류는 필수입니다.")

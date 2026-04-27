@@ -54,6 +54,14 @@ public class Salary extends BaseTimeEntity {
     private LocalDate effectiveTo;
 
     /**
+     * 부양가족수 간이세액표 룩업 시 사용
+     * 기본 1 본인 만
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer dependentCount = 1;
+
+    /**
      * 급여 정보 수정
      */
     public void update(SalaryUpdateReqDto reqDto, long resolvedBaseSalary){
@@ -64,6 +72,7 @@ public class Salary extends BaseTimeEntity {
         this.jobTitleName = reqDto.getJobTitleName();
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();
+        this.dependentCount = reqDto.getDependentCount() == null ? 1 : reqDto.getDependentCount();
     }
 
     /**

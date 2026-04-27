@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,4 +38,19 @@ public interface SalaryRepository extends JpaRepository<Salary, UUID> {
     // 급여 계산 배치시 회사 ID 조회
     @Query("SELECT DISTINCT s.companyId FROM Salary s")
     List<UUID> findDistinctCompanyIds();
+
+    /**
+     * [배치용] 회사 + 직원들, 다건의 활성 Salary 한번에 조회.
+     */
+    @Query("""
+        SELECT s FROM Salary s
+        WHERE s.companyId = :companyId
+          AND s.memberId IN :memberIds
+          AND s.effectiveFrom <= :date
+          AND (s.effectiveTo IS NULL OR s.effectiveTo >= :date)
+        """)
+    List<Salary> findActiveSalariesByMemberIds(
+            @Param("companyId") UUID companyId,
+            @Param("memberIds") Collection<UUID> memberIds,
+            @Param("date") LocalDate date);
 }

@@ -52,11 +52,6 @@ public class LeavePolicy extends BaseTimeEntity {
     /** 최대 이월 일수 (isCarryoverYn = 'Y'일 때만 의미) */
     private Integer carryoverDays;
 
-    /** 이월 시 본인 동의 필요 여부 */
-    @Column(length = 1)
-    @Builder.Default
-    private String isCarryoverConsentYn = "N";
-
     /** 미사용 연차 수당 지급 여부 (salary-service에서 참조) */
     @Column(length = 1, nullable = false)
     @Builder.Default
@@ -94,9 +89,6 @@ public class LeavePolicy extends BaseTimeEntity {
         }
         if (reqDto.getCarryoverDays() != null) {
             this.carryoverDays = reqDto.getCarryoverDays();
-        }
-        if (reqDto.getIsCarryoverConsentYn() != null) {
-            this.isCarryoverConsentYn = reqDto.getIsCarryoverConsentYn();
         }
         if (reqDto.getIsPayoutYn() != null) {
             this.isPayoutYn = reqDto.getIsPayoutYn();

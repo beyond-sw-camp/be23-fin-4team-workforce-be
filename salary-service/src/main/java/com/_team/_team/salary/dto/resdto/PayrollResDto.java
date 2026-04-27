@@ -2,6 +2,7 @@ package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.Payroll;
 import com._team._team.salary.domain.enums.PayrollStatus;
+import com._team._team.salary.domain.enums.PayrollType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,8 +14,8 @@ import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class PayrollResDto {
 
     private UUID payrollId;
@@ -26,6 +27,7 @@ public class PayrollResDto {
     private Long totalDeduction;
     private Long netPay;
     private PayrollStatus payrollStatus;
+    private PayrollType payrollType;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -40,6 +42,7 @@ public class PayrollResDto {
                 .totalDeduction(payroll.getTotalDeduction())
                 .netPay(payroll.getNetPay())
                 .payrollStatus(payroll.getPayrollStatus())
+                .payrollType(payroll.getPayrollType())
                 .createdAt(payroll.getCreatedAt())
                 .updatedAt(payroll.getUpdatedAt())
                 .build();

@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.UUID;
 
 // 월 급여 일괄 산정 배치 워커
-// run() = 전체 회사 자동 배치 / runForCompany() = 셀프서비스 단건 재실행
 @Slf4j
 @Component
 public class PayrollCalculateWorker {
@@ -104,6 +103,7 @@ public class PayrollCalculateWorker {
                         PayrollCreateReqDto.builder()
                                 .memberId(member.getMemberId())
                                 .payrollYearMonthDay(settlement)
+                                .payrollType(com._team._team.salary.domain.enums.PayrollType.REGULAR_MONTHLY)
                                 .build());
                 c.ok++;
             } catch (BusinessException e) {

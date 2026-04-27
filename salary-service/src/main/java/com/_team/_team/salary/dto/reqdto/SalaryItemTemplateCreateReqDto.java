@@ -4,10 +4,7 @@ import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.domain.enums.ItemType;
 import com._team._team.salary.domain.enums.TaxCategory;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.UUID;
 
@@ -16,8 +13,8 @@ import java.util.UUID;
  */
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @Data
-@Getter
 public class SalaryItemTemplateCreateReqDto {
 
     @NotNull(message = "항목명은 필수입니다.")

@@ -1,6 +1,7 @@
 package com._team._team.attendance.service;
 
 import com._team._team.attendance.kafka.RagSyncAttendanceEventPublisher;
+import com._team._team.attendance.domain.enums.WorkType;
 import com._team._team.attendance.repository.WorkScheduleRepository;
 import com._team._team.attendance.domain.WorkSchedule;
 import com._team._team.attendance.dto.reqDto.WorkScheduleCreateReqDto;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +35,16 @@ public class WorkScheduleService {
 
     /** 스케줄 생성 */
     public WorkScheduleResDto createSchedule(UUID companyId, WorkScheduleCreateReqDto reqDto) {
+
+        if (reqDto.getWorkType() == WorkType.FIXED) {
+            if (reqDto.getStartTime() == null
+                    || reqDto.getEndTime() == null
+                    || reqDto.getWorkMinutes() == null) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "고정 근무제는 출퇴근 시각·근무시간이 필수입니다.");
+            }
+        }
+
         WorkSchedule workSchedule = reqDto.toEntity(companyId);
         WorkSchedule saveWorkSchedule = workScheduleRepository.save(workSchedule);
 
@@ -72,6 +84,25 @@ public class WorkScheduleService {
         WorkSchedule workSchedule = workScheduleRepository
                 .findByCompanyIdAndWorkScheduleIdAndDelYn(companyId, scheduleId, "N")
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "근무 스케줄을 찾을 수 없습니다."));
+
+        /*
+         * 결과 workType 이 FIXED 가 될 경우, 시간 정보가 not null 이어야 함
+         */
+        WorkType resultingWorkType =
+                reqDto.getWorkType() != null ? reqDto.getWorkType() : workSchedule.getWorkType();
+        if (resultingWorkType == WorkType.FIXED) {
+            LocalTime resultStart =
+                    reqDto.getStartTime() != null ? reqDto.getStartTime() : workSchedule.getStartTime();
+            LocalTime resultEnd =
+                    reqDto.getEndTime() != null ? reqDto.getEndTime() : workSchedule.getEndTime();
+            Integer resultMinutes =
+                    reqDto.getWorkMinutes() != null ? reqDto.getWorkMinutes() : workSchedule.getWorkMinutes();
+            if (resultStart == null || resultEnd == null || resultMinutes == null) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "고정 근무제는 출퇴근 시각·근무시간이 필수입니다.");
+            }
+        }
+
         workSchedule.update(reqDto);
 
         ragSyncAttendanceEventPublisher.publish(

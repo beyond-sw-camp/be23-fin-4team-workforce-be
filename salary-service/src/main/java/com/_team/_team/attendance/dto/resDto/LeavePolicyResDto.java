@@ -22,7 +22,6 @@ public class LeavePolicyResDto {
     private Integer promotion2ndBeforeDays;
     private String isCarryoverYn;
     private Integer carryoverDays;
-    private String isCarryoverConsentYn;
     private String isPayoutYn;
     private Double defaultAnnualDays;
     private AccrualBase accrualBase;
@@ -36,7 +35,6 @@ public class LeavePolicyResDto {
                 .promotion2ndBeforeDays(leavePolicy.getPromotion2ndBeforeDays())
                 .isCarryoverYn(leavePolicy.getIsCarryoverYn())
                 .carryoverDays(leavePolicy.getCarryoverDays())
-                .isCarryoverConsentYn(leavePolicy.getIsCarryoverConsentYn())
                 .isPayoutYn(leavePolicy.getIsPayoutYn())
                 .defaultAnnualDays(leavePolicy.getDefaultAnnualDays())
                 .accrualBase(leavePolicy.getAccrualBase())
