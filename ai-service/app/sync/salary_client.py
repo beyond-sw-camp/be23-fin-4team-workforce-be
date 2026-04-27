@@ -1,4 +1,4 @@
-"""salary-service API 호출 클라이언트"""
+"""salary-service + approval-service API 호출 클라이언트"""
 import httpx
 import logging
 
@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 GATEWAY_URL = "http://localhost:8080"
 
 
-# === 기존 함수들 ===
+# === 기존 함수들 (휴가/근태/급여) ===
 async def get_company_leave_types(company_id: str) -> list[dict]:
     url = f"{GATEWAY_URL}/attendance/leave-types/internal"
     return await _internal_get(url, company_id, "휴가 종류")
@@ -33,23 +33,26 @@ async def get_company_holidays(company_id: str) -> list[dict]:
     return await _internal_get(url, company_id, "공휴일")
 
 
-# === 신규 함수 (Phase 2-B) ===
 async def get_salary_item_templates(company_id: str) -> list[dict]:
-    """GET /salary/salary-item-templates/internal?companyId=xxx"""
     url = f"{GATEWAY_URL}/salary/salary-item-templates/internal"
     return await _internal_get(url, company_id, "급여 항목 템플릿")
 
 
 async def get_salary_policies(company_id: str) -> list[dict]:
-    """GET /salary/salary-policies/internal?companyId=xxx"""
     url = f"{GATEWAY_URL}/salary/salary-policies/internal"
     return await _internal_get(url, company_id, "급여 정책")
 
 
 async def get_pay_grade_tables(company_id: str) -> list[dict]:
-    """GET /salary/pay-grade-table/internal?companyId=xxx"""
     url = f"{GATEWAY_URL}/salary/pay-grade-table/internal"
     return await _internal_get(url, company_id, "호봉표")
+
+
+# === 신규 함수 (Phase 2-D 결재) ===
+async def get_approval_documents(company_id: str) -> list[dict]:
+    """GET /approval/documents/internal?companyId=xxx (활성 양식만)"""
+    url = f"{GATEWAY_URL}/approval/documents/internal"
+    return await _internal_get(url, company_id, "결재 양식")
 
 
 # === 공통 헬퍼 ===
