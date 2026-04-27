@@ -5,6 +5,7 @@ import com._team._team.member.domain.MemberPosition;
 import com._team._team.member.domain.enums.AccountStatus;
 import com._team._team.member.domain.enums.EmploymentType;
 import com._team._team.member.domain.enums.MemberStatus;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Data
 @NoArgsConstructor
@@ -76,10 +78,18 @@ public class MemberResDto {
                 .phoneNumber("YES".equals(member.getPhonePublicYn())
                         ? member.getPhoneNumber() : null)
                 .memberPositionId(position.getMemberPositionId())
-                .organizationName(position.getOrganization().getName())
-                .jobGradeName(position.getJobGrade().getName())
-                .jobTitleName(position.getJobTitle().getName())
-                .roleName(position.getRole().getName())
+                .organizationName(safeName(() -> position.getOrganization().getName()))
+                .jobGradeName(safeName(() -> position.getJobGrade().getName()))
+                .jobTitleName(safeName(() -> position.getJobTitle().getName()))
+                .roleName(safeName(() -> position.getRole().getName()))
                 .build();
+    }
+
+    private static String safeName(Supplier<String> nameSupplier) {
+        try {
+            return nameSupplier.get();
+        } catch (EntityNotFoundException | NullPointerException e) {
+            return null;
+        }
     }
 }
