@@ -56,7 +56,6 @@ public class AnnualLeaveGrantWorker {
             LeavePolicy policy, LocalDate grantDate, LocalDate expirationDate) {
 
         UUID companyId = policy.getCompanyId();
-        Double days = policy.getDefaultAnnualDays();
         AnnualLeaveGrantService.BatchResult batchResult = new AnnualLeaveGrantService.BatchResult();
 
         Set<UUID> grantedMemberIds = memberBalanceRepository.findGrantedMemberIds(
@@ -87,7 +86,8 @@ public class AnnualLeaveGrantWorker {
 
             // 근속 연수 = joinDate ~ grantDate 의 완성 연도
             int tenureYears = (int) ChronoUnit.YEARS.between(memberResDto.getJoinDate(), grantDate);
-            double grantDays = calculateAnnualDaysByTenure(days, tenureYears);
+            // 휴가 정책 공식 사용 정책 컬럼 (defaultAnnualDays / extraDaysPerInterval / extraIntervalYears / maxAnnualDays) 반영
+            double grantDays = policy.calculateAnnualDays(tenureYears);
 
             buffer.add(buildAnnualBalance(companyId, memberResDto.getMemberId(), grantDays, expirationDate));
 
@@ -112,7 +112,6 @@ public class AnnualLeaveGrantWorker {
             LeavePolicy policy, LocalDate baseDate) {
 
         UUID companyId = policy.getCompanyId();
-        Double days = policy.getDefaultAnnualDays();
         AnnualLeaveGrantService.BatchResult batchResult = new AnnualLeaveGrantService.BatchResult();
 
         LocalDate grantDate = baseDate;
@@ -153,7 +152,8 @@ public class AnnualLeaveGrantWorker {
                 continue;
             }
 
-            double grantDays = calculateAnnualDaysByTenure(days, years);
+            // 휴가 정책 공식 사용 정책 컬럼 반영
+            double grantDays = policy.calculateAnnualDays(years);
 
             buffer.add(buildAnnualBalance(companyId, memberResDto.getMemberId(), grantDays, expirationDate));
             batchResult.successCount++;
@@ -246,17 +246,4 @@ public class AnnualLeaveGrantWorker {
         return loa != null && !loa.getType().countsAsWorkday();
     }
 
-    /**
-     * 근로기준법 60조 근속별 연차 계산
-     * - 1-2년차: defaultAnnualDays (회사 정책 기본, 보통 15일)
-     * - 3년차부터 2년마다 +1일 가산
-     * - 최대 25일 상한
-     * 수식: min(baseDays + floor((years - 1) / 2), 25)
-     */
-    private double calculateAnnualDaysByTenure(Double policyBaseDays, int tenureYears) {
-        final int LEGAL_MAX = 25;
-        double base = policyBaseDays != null ? policyBaseDays : 15.0;
-        int added = Math.max(0, (tenureYears - 1) / 2);
-        return Math.min(base + added, LEGAL_MAX);
-    }
 }

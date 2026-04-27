@@ -34,9 +34,9 @@ public class CompanyLeaveTypeService {
 
     /**
      * 시스템 기본 휴가 추가
-     * - 기존 회사에도 신규 종류는 추가 가능
+     *  지정 시 해당 코드만 시드 (가입 마법사 / 기본 휴가 불러오기 선택)
      */
-    public void initializeDefaults(UUID companyId) {
+    public void initializeDefaults(UUID companyId, java.util.Set<String> selectedCodes) {
 
         List<DefaultSpec> specs = List.of(
                 // 기본 연차
@@ -45,29 +45,36 @@ public class CompanyLeaveTypeService {
                 new DefaultSpec("HALF_PM",          "반차(오후)",          BalanceType.ANNUAL, 0.5, "Y", null, "N", 3),
 
                 // 경조사
-                new DefaultSpec("BEREAVEMENT",      "경조휴가(일반)",       null,               1.0, "Y", null, "Y", 10),
+                new DefaultSpec("BEREAVEMENT",      "경조휴가(일반)",       null,               1.0, "Y", null, "Y", 4),
 
                 // 경조사
-                new DefaultSpec("MARRIAGE_SELF",    "결혼(본인)",          null,               1.0, "Y", 5.0,  "Y", 11),
-                new DefaultSpec("MARRIAGE_CHILD",   "결혼(자녀)",          null,               1.0, "Y", 1.0,  "Y", 12),
-                new DefaultSpec("BIRTH_SPOUSE",     "배우자 출산휴가",      null,               1.0, "Y", 10.0, "Y", 13),
-                new DefaultSpec("DEATH_PARENT",     "부모 사망",           null,               1.0, "Y", 5.0,  "Y", 14),
-                new DefaultSpec("DEATH_SPOUSE",     "배우자 사망",          null,               1.0, "Y", 5.0,  "Y", 15),
-                new DefaultSpec("DEATH_CHILD",      "자녀 사망",           null,               1.0, "Y", 3.0,  "Y", 16),
-                new DefaultSpec("DEATH_SIBLING",    "형제자매 사망",        null,               1.0, "Y", 3.0,  "Y", 17),
+                new DefaultSpec("MARRIAGE_SELF",    "결혼(본인)",          null,               1.0, "Y", 5.0,  "Y", 5),
+                new DefaultSpec("MARRIAGE_CHILD",   "결혼(자녀)",          null,               1.0, "Y", 1.0,  "Y", 6),
+                new DefaultSpec("BIRTH_SPOUSE",     "배우자 출산휴가",      null,               1.0, "Y", 10.0, "Y", 7),
+                new DefaultSpec("DEATH_PARENT",     "부모 사망",           null,               1.0, "Y", 5.0,  "Y", 8),
+                new DefaultSpec("DEATH_SPOUSE",     "배우자 사망",          null,               1.0, "Y", 5.0,  "Y", 9),
+                new DefaultSpec("DEATH_CHILD",      "자녀 사망",           null,               1.0, "Y", 3.0,  "Y", 10),
+                new DefaultSpec("DEATH_SIBLING",    "형제자매 사망",        null,               1.0, "Y", 3.0,  "Y", 11),
 
                 // 기타 법정
-                new DefaultSpec("PUBLIC",           "공가",                null,               1.0, "Y", null, "N", 20),
-                new DefaultSpec("SICK",             "병가",                null,               1.0, "Y", 15.0, "Y", 21),
-                new DefaultSpec("RESERVE_TRAINING", "예비군",              null,               1.0, "Y", null, "Y", 22),
-                new DefaultSpec("CIVIL_DEFENSE",    "민방위",              null,               1.0, "Y", null, "Y", 23),
+                new DefaultSpec("PUBLIC",           "공가",                null,               1.0, "Y", null, "N", 12),
+                new DefaultSpec("SICK",             "병가",                null,               1.0, "Y", 15.0, "Y", 13),
+                new DefaultSpec("RESERVE_TRAINING", "예비군",              null,               1.0, "Y", null, "Y", 14),
+                new DefaultSpec("CIVIL_DEFENSE",    "민방위",              null,               1.0, "Y", null, "Y", 15),
 
                 // 여성 보호
-                new DefaultSpec("MENSTRUATION",     "생리휴가",            null,               1.0, "N", 12.0, "N", 30)
+                new DefaultSpec("MENSTRUATION",     "생리휴가",            null,               1.0, "N", 12.0, "N", 16)
         );
+
+        boolean filterByCodes = selectedCodes != null && !selectedCodes.isEmpty();
 
         List<CompanyLeaveType> toSave = new ArrayList<>();
         for (DefaultSpec spec : specs) {
+            // 선택 시드 모드일 때 미선택 코드는 SKIP
+            if (filterByCodes && !selectedCodes.contains(spec.code())) {
+                continue;
+            }
+            // 이미 활성 행 존재 시 SKIP (사용자 수정 보존)
             if (repository.findByCompanyIdAndCodeAndDelYn(companyId, spec.code(), "N").isPresent()) {
                 continue;
             }
