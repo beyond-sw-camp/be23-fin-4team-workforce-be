@@ -26,6 +26,7 @@ public class SalaryResDto {
     private String jobTitleName;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
+    private Integer dependentCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -41,6 +42,7 @@ public class SalaryResDto {
                 .jobTitleName(salary.getJobTitleName())
                 .effectiveFrom(salary.getEffectiveFrom())
                 .effectiveTo(salary.getEffectiveTo())
+                .dependentCount(salary.getDependentCount())
                 .createdAt(salary.getCreatedAt())
                 .updatedAt(salary.getUpdatedAt())
                 .build();

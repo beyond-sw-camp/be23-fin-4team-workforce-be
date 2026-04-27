@@ -1,6 +1,8 @@
 package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.Salary;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -44,6 +46,11 @@ public class SalaryCreateReqDto {
     /** 적용 종료일 (null이면 현재 적용 중) */
     private LocalDate effectiveTo;
 
+    /** 부양가족수 간이세액표 룩업용 미입력 시 1 본인 만 */
+    @Min(value = 0, message = "부양가족수는 0 이상이어야 합니다.")
+    @Max(value = 11, message = "부양가족수는 11 이하여야 합니다.")
+    private Integer dependentCount;
+
     /**
      * DTO -> Entity 변환
      * - companyId는 Gateway 헤더에서 전달받으므로 파라미터로 받음
@@ -59,6 +66,7 @@ public class SalaryCreateReqDto {
                 .jobTitleName(jobTitleName)
                 .effectiveFrom(effectiveFrom)
                 .effectiveTo(effectiveTo)
+                .dependentCount(dependentCount == null ? 1 : dependentCount)
                 .build();
     }
 }
