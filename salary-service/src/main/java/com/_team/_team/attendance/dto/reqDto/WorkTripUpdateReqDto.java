@@ -18,9 +18,6 @@ import lombok.NoArgsConstructor;
 public class WorkTripUpdateReqDto {
     private WorkTripType workTripType;
     private String destination;
-    private Double destinationLat;
-    private Double destinationLng;
-    private Integer destinationRadiusMeters;
     private String purpose;
     private Long expenseAmount;
     private ExpenseType expenseType;

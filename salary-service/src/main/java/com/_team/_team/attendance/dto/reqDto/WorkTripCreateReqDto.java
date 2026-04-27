@@ -29,10 +29,6 @@ public class WorkTripCreateReqDto {
     private WorkTripType workTripType; // BUSINESS_TRIP(출장) / OUTSIDE_WORK(외근)
 
     private String destination; // 목적지 주소
-    private Double destinationLat; // 목적지 GPS 위도
-    private Double destinationLng; // 목적지 GPS 경도
-    /** 출장지 허용 반경 (미터, 선택). 미지정 시 200m */
-    private Integer destinationRadiusMeters;
     private String purpose; // 목적
 
     /** 경비 관련 (nullable — 경비 없는 외근도 있음) */
@@ -45,9 +41,6 @@ public class WorkTripCreateReqDto {
                 .companyId(companyId)
                 .workTripType(this.workTripType)
                 .destination(this.destination)
-                .destinationLat(this.destinationLat)
-                .destinationLng(this.destinationLng)
-                .destinationRadiusMeters(this.destinationRadiusMeters)
                 .purpose(this.purpose)
                 .expenseAmount(this.expenseAmount)
                 .expenseType(this.expenseType)

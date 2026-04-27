@@ -39,16 +39,6 @@ public class WorkTripDetail extends BaseTimeEntity {
     @Column
     private String destination;
 
-    /** 목적지 GPS 위도 */
-    private Double destinationLat;
-
-    /** 목적지 GPS 경도 */
-    private Double destinationLng;
-
-    /** 출장지 허용 반경 (미터). null 이면 기본 200m 사용 */
-    @Column
-    private Integer destinationRadiusMeters;
-
     /** 출장/외근 목적 */
     @Column
     private String purpose;
@@ -85,15 +75,6 @@ public class WorkTripDetail extends BaseTimeEntity {
         }
         if (reqDto.getDestination() != null) {
             this.destination = reqDto.getDestination();
-        }
-        if (reqDto.getDestinationLat() != null) {
-            this.destinationLat = reqDto.getDestinationLat();
-        }
-        if (reqDto.getDestinationLng() != null) {
-            this.destinationLng = reqDto.getDestinationLng();
-        }
-        if (reqDto.getDestinationRadiusMeters() != null) {
-            this.destinationRadiusMeters = reqDto.getDestinationRadiusMeters();
         }
         if (reqDto.getPurpose() != null) {
             this.purpose = reqDto.getPurpose();
