@@ -19,6 +19,9 @@ public interface RetirementPolicyRepository extends JpaRepository<RetirementPoli
     List<RetirementPolicy> findByCompanyIdAndDelYnOrderByEffectiveFromDesc(
             UUID companyId, String delYn);
 
+    /** 회사, 적용시작일 최대 1건 조회 */
+    Optional<RetirementPolicy> findByCompanyIdAndEffectiveFrom(UUID companyId, LocalDate effectiveFrom);
+
     // 특정 시점 활성 정책 단건 조회
     // 동시에 여러 개 활성이면 effectiveFrom 가장 최신 1건 반환
     @Query("SELECT rp FROM RetirementPolicy rp " +

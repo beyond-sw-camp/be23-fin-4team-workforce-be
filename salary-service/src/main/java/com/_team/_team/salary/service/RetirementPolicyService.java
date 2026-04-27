@@ -7,7 +7,6 @@ import com._team._team.salary.dto.reqdto.RetirementPolicyCreateReqDto;
 import com._team._team.salary.dto.reqdto.RetirementPolicyUpdateReqDto;
 import com._team._team.salary.dto.resdto.RetirementPolicyResDto;
 import com._team._team.salary.repository.RetirementPolicyRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -16,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 // 회사별 퇴직급여 제도 정책 관리
@@ -34,6 +34,22 @@ public class RetirementPolicyService {
     // 정책 등록 이전 활성 정책 자동 마감
     public RetirementPolicyResDto create(UUID companyId, RetirementPolicyCreateReqDto reqDto) {
         validatePeriod(reqDto.getEffectiveFrom(), reqDto.getEffectiveTo());
+
+        // uk(companyId, effectiveFrom) 가 delYn 을 보지 않아, 소프트 삭제만 하면 같은 시작일 재등록이 막힘
+        Optional<RetirementPolicy> sameKey =
+                retirementPolicyRepository.findByCompanyIdAndEffectiveFrom(companyId, reqDto.getEffectiveFrom());
+        if (sameKey.isPresent()) {
+            RetirementPolicy row = sameKey.get();
+            if ("Y".equals(row.getDelYn())) {
+                retirementPolicyRepository.delete(row);
+                retirementPolicyRepository.flush();
+                log.info("[RETIREMENT-POLICY] 삭제된 동일 적용시작일 행 물리 제거 후 재등록 허용 companyId={} policyId={} effectiveFrom={}",
+                        companyId, row.getRetirementPolicyId(), reqDto.getEffectiveFrom());
+            } else {
+                throw new BusinessException(HttpStatus.CONFLICT,
+                        "동일 적용 시작일의 퇴직급여 정책이 이미 있습니다. 기존 정책을 수정하거나 적용 시작일을 변경해 주세요.");
+            }
+        }
 
         retirementPolicyRepository.findActiveAt(companyId, reqDto.getEffectiveFrom())
                 .ifPresent(prev -> {
