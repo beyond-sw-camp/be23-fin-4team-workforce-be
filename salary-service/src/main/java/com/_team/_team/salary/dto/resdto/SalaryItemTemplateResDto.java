@@ -2,6 +2,7 @@ package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.domain.enums.ItemType;
+import com._team._team.salary.domain.enums.TaxCategory;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -23,11 +24,19 @@ public class SalaryItemTemplateResDto {
     private ItemType itemType;
     private Integer displayOrder;
     private String isTaxableYn;
+
+    // 세법 카테고리 카탈로그 기반 자동 복사 또는 관리자 선택
+    private TaxCategory taxCategory;
+
+    // 월 비과세 한도 카테고리에 따라 결정 한도 없음이면 null 일반 과세는 0
+    private Long monthlyNonTaxableLimit;
+
     private String delYn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public static SalaryItemTemplateResDto fromEntity(SalaryItemTemplate template) {
+        TaxCategory cat = template.getTaxCategory();
         return SalaryItemTemplateResDto.builder()
                 .salaryItemTemplateId(template.getSalaryItemTemplateId())
                 .companyId(template.getCompanyId())
@@ -35,6 +44,8 @@ public class SalaryItemTemplateResDto {
                 .itemType(template.getItemType())
                 .displayOrder(template.getDisplayOrder())
                 .isTaxableYn(template.getIsTaxableYn())
+                .taxCategory(cat)
+                .monthlyNonTaxableLimit(cat != null ? cat.getMonthlyNonTaxableLimit() : null)
                 .delYn(template.getDelYn())
                 .createdAt(template.getCreatedAt())
                 .updatedAt(template.getUpdatedAt())
