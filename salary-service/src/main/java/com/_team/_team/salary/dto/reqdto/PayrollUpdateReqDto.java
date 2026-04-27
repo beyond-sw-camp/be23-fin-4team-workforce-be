@@ -10,8 +10,8 @@ import java.time.LocalDate;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class PayrollUpdateReqDto {
 
     /** 정산 연월일 */

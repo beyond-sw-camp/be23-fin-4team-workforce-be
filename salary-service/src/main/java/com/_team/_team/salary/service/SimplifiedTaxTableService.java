@@ -3,6 +3,7 @@ package com._team._team.salary.service;
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.domain.SimplifiedTaxTable;
 import com._team._team.salary.repository.SimplifiedTaxTableRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @Transactional
 public class SimplifiedTaxTableService {
@@ -43,7 +45,6 @@ public class SimplifiedTaxTableService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "파일이 비어있습니다.");
         }
 
-        // 기존 연도 데이터 소프트 삭제, 재업로드 대응
         repository.softDeleteByYear(effectiveYear);
 
         List<SimplifiedTaxTable> rows = new ArrayList<>();
@@ -51,31 +52,69 @@ public class SimplifiedTaxTableService {
         try (InputStream is = file.getInputStream();
              Workbook workbook = new XSSFWorkbook(is)) {
 
-            Sheet sheet = workbook.getSheetAt(0);
+            // 시트 자동 매칭 산식 표지가 앞에 있고 데이터 표가 뒤에 있는 형식 대응
+            Sheet sheet = pickDataSheet(workbook);
+            log.info("[TAX-TABLE] 사용 시트 name={}", sheet.getSheetName());
             int lastRow = sheet.getLastRowNum();
 
-            for (int r = HEADER_ROW_COUNT; r <= lastRow; r++) {
+            // 헤더 자동 감지 첫 셀이 숫자인 행 찾기
+            int firstDataRow = -1;
+            for (int r = 0; r <= lastRow; r++) {
                 Row row = sheet.getRow(r);
                 if (row == null) continue;
+                Long maybe = readLong(row.getCell(COL_LOWER_BOUND));
+                if (maybe != null && maybe > 0) {
+                    firstDataRow = r;
+                    break;
+                }
+            }
+            if (firstDataRow < 0) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "데이터 행을 찾을 수 없습니다. 엑셀 형식 확인 필요");
+            }
+            log.info("[TAX-TABLE] 데이터 시작 행 firstDataRow={}", firstDataRow);
+
+            // 단위 감지 첫 데이터 행의 lower 값이 1만 미만이면 천원 단위
+            Row firstRow = sheet.getRow(firstDataRow);
+            Long firstLower = readLong(firstRow.getCell(COL_LOWER_BOUND));
+            boolean isThousandUnit = firstLower != null && firstLower < 10_000;
+            long unitMultiplier = isThousandUnit ? 1_000L : 1L;
+            log.info("[TAX-TABLE] 단위 감지 천원 여부={} firstLower={}", isThousandUnit, firstLower);
+
+            // 데이터 행 순회
+            int processed = 0;
+            int skipped = 0;
+            for (int r = firstDataRow; r <= lastRow; r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) { skipped++; continue; }
 
                 Long lower = readLong(row.getCell(COL_LOWER_BOUND));
                 Long upper = readLong(row.getCell(COL_UPPER_BOUND));
-                if (lower == null || upper == null) continue;
+                if (lower == null || upper == null) { skipped++; continue; }
 
-                // 부양가족수 0~11 열 순회, 각각 세액을 Row 로 저장
-                for (int d = 0; d <= DEPENDENT_MAX; d++) {
-                    Long tax = readLong(row.getCell(COL_DEPENDENT_START + d));
+                long realLower = lower * unitMultiplier;
+                long realUpper = upper * unitMultiplier;
+
+                // 부양가족 1 ~ 11 명 컬럼 12개 읽기
+                // 우리 dependentCount 매핑 1 = 본인 만 = 홈택스 컬럼 C
+                for (int d = 1; d <= DEPENDENT_MAX; d++) {
+                    int colIdx = COL_DEPENDENT_START + (d - 1);
+                    Long tax = readLong(row.getCell(colIdx));
                     if (tax == null) continue;
 
                     rows.add(SimplifiedTaxTable.builder()
                             .effectiveYear(effectiveYear)
-                            .salaryLowerBound(lower)
-                            .salaryUpperBound(upper)
+                            .salaryLowerBound(realLower)
+                            .salaryUpperBound(realUpper)
                             .dependentCount(d)
                             .monthlyTaxAmount(tax)
                             .build());
                 }
+                processed++;
             }
+
+            log.info("[TAX-TABLE] 파싱 완료 처리={} 건너뜀={} INSERT={}",
+                    processed, skipped, rows.size());
 
             repository.saveAll(rows);
             return rows.size();
@@ -84,6 +123,18 @@ public class SimplifiedTaxTableService {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "엑셀 파일 읽기 실패, " + e.getMessage());
         }
+    }
+
+    // 시트 자동 매칭 이름에 간이세액표 조견표 포함된 시트 우선 fallback 마지막 시트
+    private Sheet pickDataSheet(Workbook workbook) {
+        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+            Sheet s = workbook.getSheetAt(i);
+            String name = s.getSheetName();
+            if (name == null) continue;
+            if (name.contains("간이세액표") || name.contains("조견표")) return s;
+        }
+        // fallback 마지막 시트 일반적으로 산식 표지가 앞 데이터 표가 뒤
+        return workbook.getSheetAt(workbook.getNumberOfSheets() - 1);
     }
 
     // 셀에서 Long 안전 추출, 빈 셀이거나 숫자 아니면 null
@@ -109,5 +160,17 @@ public class SimplifiedTaxTableService {
         return repository.findTaxFor(year, monthlyTaxableSalary, dependents)
                 .map(SimplifiedTaxTable::getMonthlyTaxAmount)
                 .orElse(0L);
+    }
+
+    // 등록된 연도 목록 조회 화면 표시용
+    @Transactional(readOnly = true)
+    public List<Integer> listEffectiveYears() {
+        return repository.findDistinctYears();
+    }
+
+    // 연도별 등록 행 수
+    @Transactional(readOnly = true)
+    public long countByYear(int effectiveYear) {
+        return repository.countByEffectiveYearAndDelYn(effectiveYear, "N");
     }
 }

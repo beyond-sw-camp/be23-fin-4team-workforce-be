@@ -3,6 +3,8 @@ package com._team._team.salary.service;
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.domain.PayGradeTable;
 import com._team._team.salary.domain.SalaryPolicy;
+import com._team._team.salary.feignClients.MemberFeignClient;
+import com._team._team.salary.feignClients.dto.MemberResDto;
 import com._team._team.salary.repository.PayGradeTableRepository;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.repository.SalaryRepository;
@@ -10,15 +12,20 @@ import com._team._team.salary.domain.Salary;
 import com._team._team.salary.dto.reqdto.SalaryCreateReqDto;
 import com._team._team.salary.dto.reqdto.SalaryUpdateReqDto;
 import com._team._team.salary.dto.resdto.SalaryResDto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional
 public class SalaryService {
@@ -26,13 +33,17 @@ public class SalaryService {
     private final SalaryRepository salaryRepository;
     private final SalaryPolicyRepository salaryPolicyRepository;
     private final PayGradeTableRepository payGradeTableRepository;
+    private final MemberFeignClient memberFeignClient;
 
     @Autowired
     public SalaryService(SalaryRepository salaryRepository,
-                         SalaryPolicyRepository salaryPolicyRepository, PayGradeTableRepository payGradeTableRepository){
+                         SalaryPolicyRepository salaryPolicyRepository,
+                         PayGradeTableRepository payGradeTableRepository,
+                         MemberFeignClient memberFeignClient){
         this.salaryRepository = salaryRepository;
         this.salaryPolicyRepository = salaryPolicyRepository;
         this.payGradeTableRepository = payGradeTableRepository;
+        this.memberFeignClient = memberFeignClient;
     }
 
     // 급여 생성
@@ -92,11 +103,37 @@ public class SalaryService {
         return SalaryResDto.fromEntity(salary);
     }
 
-    // 회사별 급여 목록 조회
+    // 회사별 급여 목록 조회 직원 정보 결합 사번 이름 부서명 채움
     @Transactional(readOnly = true)
     public List<SalaryResDto> findByCompanyId(UUID companyId){
-        return salaryRepository.findByCompanyId(companyId).stream()
-                .map(SalaryResDto::fromEntity).toList();
+        List<Salary> salaries = salaryRepository.findByCompanyId(companyId);
+        if (salaries.isEmpty()) return Collections.emptyList();
+
+        Map<UUID, MemberResDto> memberMap = fetchMemberMap(companyId);
+
+        return salaries.stream()
+                .map(s -> {
+                    MemberResDto m = memberMap.get(s.getMemberId());
+                    String sabun  = m != null ? m.getSabun() : null;
+                    String name   = m != null ? m.getName() : null;
+                    String orgNm  = m != null ? m.getOrganizationName() : null;
+                    return SalaryResDto.fromEntity(s, sabun, name, orgNm);
+                })
+                .toList();
+    }
+
+    // 회사 직원 정보 일괄 조회
+    private Map<UUID, MemberResDto> fetchMemberMap(UUID companyId) {
+        try {
+            var res = memberFeignClient.getMembersByCompany(companyId);
+            if (res == null || res.getData() == null) return Collections.emptyMap();
+            return res.getData().stream()
+                    .collect(Collectors.toMap(
+                            MemberResDto::getMemberId, m -> m, (a, b) -> a));
+        } catch (Exception e) {
+            log.warn("[SALARY-LIST] 직원 조회 실패 companyId={} 빈 Map 반환", companyId, e);
+            return Collections.emptyMap();
+        }
     }
 
     // 직원별 급여 이력 조회

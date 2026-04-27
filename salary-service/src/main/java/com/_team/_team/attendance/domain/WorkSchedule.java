@@ -40,21 +40,33 @@ public class WorkSchedule extends BaseTimeEntity {
     @Column(nullable = false, length = 100)
     private String scheduleName;
 
-    /** 근무 유형 (FIXED: 고정 / FLEXIBLE: 유연 / SHIFT: 교대) */
+    /** 근무 유형 (FIXED: 고정 / FLEXIBLE: 유연 */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private WorkType workType;
 
-    /** 규정 출근 시각 */
-    @Column(nullable = false)
+    /**
+     * 규정 출근 시각.
+     * - FIXED: 필수
+     * - FLEXIBLE: null (실제 시간대는 FlexibleTimeSlot 에서 정의)
+     */
+    @Column
     private LocalTime startTime;
 
-    /** 규정 퇴근 시각 */
-    @Column(nullable = false)
+    /**
+     * 규정 퇴근 시각.
+     * - FIXED: 필수
+     * - FLEXIBLE: null
+     */
+    @Column
     private LocalTime endTime;
 
-    /** 하루 규정 근무시간(분) - overtime 계산 기준 */
-    @Column(nullable = false)
+    /**
+     * 하루 규정 근무시간(분) - overtime 계산 기준.
+     * - FIXED: 필수
+     * - FLEXIBLE: null (슬롯의 workMinutes 사용)
+     */
+    @Column
     private Integer workMinutes;
 
     /** 휴게시간(분) - 점심 등 근무에서 제외되는 시간 */
@@ -85,9 +97,20 @@ public class WorkSchedule extends BaseTimeEntity {
     public void update(WorkScheduleUpdateReqDto dto){
         if (dto.getScheduleName() != null) this.scheduleName = dto.getScheduleName();
         if (dto.getWorkType() != null) this.workType = dto.getWorkType();
-        if (dto.getStartTime() != null) this.startTime = dto.getStartTime();
-        if (dto.getEndTime() != null) this.endTime = dto.getEndTime();
-        if (dto.getWorkMinutes() != null) this.workMinutes = dto.getWorkMinutes();
+
+        /*
+         * 시간 필드는 최종 workType 에 따라 결정
+         */
+        if (this.workType == WorkType.FLEXIBLE) {
+            this.startTime = null;
+            this.endTime = null;
+            this.workMinutes = null;
+        } else {
+            if (dto.getStartTime() != null) this.startTime = dto.getStartTime();
+            if (dto.getEndTime() != null) this.endTime = dto.getEndTime();
+            if (dto.getWorkMinutes() != null) this.workMinutes = dto.getWorkMinutes();
+        }
+
         if (dto.getBreakMinutes() != null) this.breakMinutes = dto.getBreakMinutes();
         if (dto.getSelectionDeadlineDay() != null) this.selectionDeadlineDay = dto.getSelectionDeadlineDay();
         if (dto.getEffectiveFrom() != null) this.effectiveFrom = dto.getEffectiveFrom();

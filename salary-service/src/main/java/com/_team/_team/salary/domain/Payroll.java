@@ -2,6 +2,7 @@ package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.salary.domain.enums.PayrollStatus;
+import com._team._team.salary.domain.enums.PayrollType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -78,6 +79,12 @@ public class Payroll extends BaseTimeEntity {
     @Column(nullable = false)
     @Builder.Default
     private PayrollStatus payrollStatus = PayrollStatus.DRAFT;
+
+    /** 급여 구분 (정기급여 / 성과급 / 특별상여 / 소급분) */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    @Builder.Default
+    private PayrollType payrollType = PayrollType.REGULAR_MONTHLY;
 
     /** 급여대장 항목 목록 (1:N) */
     @OneToMany(mappedBy = "payroll", cascade = CascadeType.ALL, orphanRemoval = true)

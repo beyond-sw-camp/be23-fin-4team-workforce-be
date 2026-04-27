@@ -1,6 +1,8 @@
 package com._team._team.attendance.service;
 
 
+import com._team._team.attendance.domain.enums.LeaveApprovalStatus;
+import com._team._team.attendance.domain.enums.LeaveInitiator;
 import com._team._team.attendance.repository.AttendanceLogRepository;
 import com._team._team.attendance.domain.AttendanceLog;
 import com._team._team.attendance.domain.DailyAttendance;
@@ -9,6 +11,7 @@ import com._team._team.attendance.domain.enums.EventType;
 import com._team._team.attendance.dto.reqDto.AttendanceLogCreateReqDto;
 import com._team._team.attendance.dto.resDto.AttendanceLogResDto;
 import com._team._team.attendance.dto.resDto.DailyAttendanceResDto;
+import com._team._team.attendance.repository.LeaveRequestRepository;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,11 +39,13 @@ public class AttendanceLogService {
 
     private final AttendanceLogRepository attendanceLogRepository;
     private final DailyAttendanceService dailyAttendanceService;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     @Autowired
-    public AttendanceLogService(AttendanceLogRepository attendanceLogRepository, DailyAttendanceService dailyAttendanceService) {
+    public AttendanceLogService(AttendanceLogRepository attendanceLogRepository, DailyAttendanceService dailyAttendanceService, LeaveRequestRepository leaveRequestRepository) {
         this.attendanceLogRepository = attendanceLogRepository;
         this.dailyAttendanceService = dailyAttendanceService;
+        this.leaveRequestRepository = leaveRequestRepository;
     }
 
     /**
@@ -52,7 +57,7 @@ public class AttendanceLogService {
      *
      * - 출근 로그 저장
      * - reqDto.toEntity()로 AttendanceLog 생성
-     * - EventType.CLOCK_IN, GPS 좌표, 기기 ID 포함
+     * - EventType.CLOCK_IN, 기기 ID 포함
      *
      * - DailyAttendance 갱신
      * - firstClockIn = 출근 시간 기록
@@ -62,6 +67,16 @@ public class AttendanceLogService {
         // 출근 시간 결정 (서버 시간)
         LocalDateTime eventTime = resolveEventTime(reqDto.getEventTime());
         LocalDate today = eventTime.toLocalDate();
+
+        // 노무 수령 거부 가드 회사가 강제 지정한 연차일이면 출근 차단
+        boolean designatedToday = leaveRequestRepository.existsForcedDesignationOnDate(
+                memberId, companyId, today,
+                LeaveInitiator.ADMIN_DESIGNATION,
+                LeaveApprovalStatus.APPROVED);
+        if (designatedToday) {
+            throw new BusinessException(HttpStatus.FORBIDDEN,
+                    "오늘은 회사가 지정한 연차일입니다 노무 수령을 거부합니다");
+        }
 
         // 당일 DailyAttendance 조회 or 생성
         DailyAttendance dailyAttendance = dailyAttendanceService.findOrCreateDaily(companyId, memberId, today);

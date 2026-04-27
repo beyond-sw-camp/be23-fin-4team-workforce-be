@@ -1,15 +1,17 @@
 package com._team._team.salary.feignClients.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
-@Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@Data
 public class MemberResDto {
     private UUID memberId;
     private String name;
@@ -20,4 +22,5 @@ public class MemberResDto {
     private String bankAccount;
     private String phoneNumber;
     private String email;
+    private String organizationName;
 }

@@ -29,12 +29,17 @@ public class PayrollCalculationService {
     private final SalaryPolicyRepository salaryPolicyRepository;
     private final TaxRateRepository taxRateRepository;
     private final MonthlyAttendanceLedgerRepository monthlyAttendanceLedgerRepository;
+    private final SimplifiedTaxTableService simplifiedTaxTableService;
 
     @Autowired
-    public PayrollCalculationService(SalaryPolicyRepository salaryPolicyRepository, TaxRateRepository taxRateRepository, MonthlyAttendanceLedgerRepository monthlyAttendanceLedgerRepository) {
+    public PayrollCalculationService(SalaryPolicyRepository salaryPolicyRepository,
+                                     TaxRateRepository taxRateRepository,
+                                     MonthlyAttendanceLedgerRepository monthlyAttendanceLedgerRepository,
+                                     SimplifiedTaxTableService simplifiedTaxTableService) {
         this.salaryPolicyRepository = salaryPolicyRepository;
         this.taxRateRepository = taxRateRepository;
         this.monthlyAttendanceLedgerRepository = monthlyAttendanceLedgerRepository;
+        this.simplifiedTaxTableService = simplifiedTaxTableService;
     }
 
      // 1. 정산 기간 계산, 매월 1일 ~ 말일 고정
@@ -204,8 +209,11 @@ public class PayrollCalculationService {
     // 7. 세율 기반 공제 계산
     /**
      * 4대보험 + 소득세 + 지방소득세 자동 계산
+     * 소득세는 간이세액표 , 부양가족수 기준
      */
-    public List<AutoPayrollItem> calculateDeductions(long totalTaxableEarning, LocalDate payrollDate){
+    public List<AutoPayrollItem> calculateDeductions(long totalTaxableEarning,
+                                                     LocalDate payrollDate,
+                                                     int dependentCount){
 
         int year = payrollDate.getYear();
         List<TaxRate> taxRates = taxRateRepository.findByApplyYear(year);
@@ -250,9 +258,10 @@ public class PayrollCalculationService {
             deductions.add(new AutoPayrollItem("고용보험", ItemType.DEDUCTION, employmentInsurance, displayOrder++, "Y"));
         }
 
-        // 소득세
-        long incomeTax = calculateSingleDeduction(
-                rateMap, TaxType.INCOME_TAX, totalTaxableEarning);
+        // 소득세 간이세액표 , 한국 원천징수 방식
+        // 부양가족수 + 월 과세소득 기준 국세청 고시 표 사용
+        long incomeTax = simplifiedTaxTableService.findTax(
+                payrollDate.getYear(), totalTaxableEarning, dependentCount);
         if (incomeTax > 0) {
             deductions.add(new AutoPayrollItem("소득세", ItemType.DEDUCTION, incomeTax, displayOrder++, "Y"));
         }

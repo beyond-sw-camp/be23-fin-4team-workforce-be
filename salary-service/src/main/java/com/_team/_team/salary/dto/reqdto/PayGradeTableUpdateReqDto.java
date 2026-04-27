@@ -1,11 +1,12 @@
 package com._team._team.salary.dto.reqdto;
 
 import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-@Getter
+@AllArgsConstructor
 @NoArgsConstructor
+@Builder
+@Data
 public class PayGradeTableUpdateReqDto {
 
     @NotNull

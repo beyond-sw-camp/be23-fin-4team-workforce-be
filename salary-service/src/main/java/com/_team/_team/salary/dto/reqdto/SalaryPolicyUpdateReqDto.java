@@ -1,7 +1,6 @@
 package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.enums.PayDayShiftRule;
-import com._team._team.salary.domain.enums.PayType;
 import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -18,9 +17,6 @@ public class SalaryPolicyUpdateReqDto {
 
     @NotNull(message = "정책명은 필수입니다.")
     private String policyName;
-
-    @NotNull(message = "지급 유형은 필수입니다.")
-    private PayType payType;
 
     @NotNull(message = "지급일은 필수입니다.")
     @Min(value = 1, message = "지급일은 1이상이어야합니다.")

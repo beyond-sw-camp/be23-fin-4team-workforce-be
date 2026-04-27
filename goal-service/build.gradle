@@ -32,7 +32,7 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation 'com.4team:workforce-common:1.0.11'
+    implementation 'com.4team:workforce-common:1.0.12'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
     implementation 'org.springframework.boot:spring-boot-starter-web'

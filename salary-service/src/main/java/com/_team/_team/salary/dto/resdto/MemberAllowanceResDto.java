@@ -2,15 +2,16 @@ package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.MemberAllowance;
 import com._team._team.salary.domain.enums.AllowanceApprovalStatus;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder
+@Data
 public class MemberAllowanceResDto {
 
     private UUID memberAllowanceId;

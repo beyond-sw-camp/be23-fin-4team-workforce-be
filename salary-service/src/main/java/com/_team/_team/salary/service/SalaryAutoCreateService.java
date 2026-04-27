@@ -88,6 +88,7 @@ public class SalaryAutoCreateService {
                 .jobTitleName(e.getJobTitleName())
                 .effectiveFrom(e.getHireDate())
                 .effectiveTo(null)
+                .dependentCount(1)
                 .build();
         Salary saved = salaryRepository.save(salary);
 

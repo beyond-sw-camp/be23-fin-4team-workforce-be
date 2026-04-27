@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class PayrollRecalculateResDto {
 
     /** 신규 생성된 급여대장 수 */

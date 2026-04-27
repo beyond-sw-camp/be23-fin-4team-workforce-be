@@ -4,10 +4,7 @@ import com._team._team.salary.domain.TaxRate;
 import com._team._team.salary.domain.enums.TaxType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
 
@@ -18,7 +15,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@Getter
+@Data
 public class TaxRateCreateReqDto {
 
     @NotNull(message = "세금 유형은 필수 입니다.")

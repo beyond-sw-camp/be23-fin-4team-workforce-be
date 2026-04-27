@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CompanyLeaveTypeCreateReqDto {
 
-    @NotBlank(message = "코드는 필수입니다.")
     @Size(max = 50)
     @Pattern(regexp = "^[A-Z_]+$", message = "코드는 대문자와 언더스코어만 허용")
     private String code;

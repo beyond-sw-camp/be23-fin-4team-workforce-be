@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 시차출퇴근 슬롯 관리 API (관리자 전용)
+ * 시차출퇴근 스케줄 관리 API (관리자 전용)
  */
 @RestController
 @RequestMapping("/attendance/flexible-slots")
@@ -29,7 +29,7 @@ public class FlexibleTimeSlotController {
     }
 
     /**
-     * 슬롯 생성
+     * 스케줄 생성
      */
     @PostMapping
     public ResponseEntity<?> create(
@@ -43,7 +43,7 @@ public class FlexibleTimeSlotController {
     }
 
     /**
-     * 슬롯 수정
+     * 스케줄 수정
      */
     @PutMapping("/{slotId}")
     public ResponseEntity<?> update(
@@ -58,7 +58,7 @@ public class FlexibleTimeSlotController {
     }
 
     /**
-     * 슬롯 폐지 (소프트 삭제)
+     * 스케줄 폐지 (소프트 삭제)
      */
     @DeleteMapping("/{slotId}")
     public ResponseEntity<?> deactivate(
@@ -72,8 +72,8 @@ public class FlexibleTimeSlotController {
     }
 
     /**
-     * 기본 슬롯 지정
-     * 기존 기본 슬롯은 자동으로 해제됨
+     * 기본 스케줄 지정
+     * 기본 스케줄 자동으로 해제됨
      */
     @PutMapping("/{slotId}/default")
     public ResponseEntity<?> setAsDefault(
@@ -87,7 +87,7 @@ public class FlexibleTimeSlotController {
     }
 
     /**
-     * 슬롯 단건 조회
+     * 스케줄 단건 조회
      */
     @GetMapping("/{slotId}")
     public ResponseEntity<?> findById(
@@ -101,8 +101,8 @@ public class FlexibleTimeSlotController {
     }
 
     /**
-     * 특정 스케줄의 활성 슬롯 목록
-     * 직원 슬롯 선택 UI 에서 노출할 옵션 조회
+     * 특정 스케줄의 활성 목록
+     * 직원 스케줄 선택 UI 에서 노출할 옵션 조회
      */
     @GetMapping
     public ResponseEntity<?> findActiveByWorkSchedule(
