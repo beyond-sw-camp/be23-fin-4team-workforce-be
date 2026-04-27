@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -36,7 +37,7 @@ public class CompanyLeaveTypeService {
      * 시스템 기본 휴가 추가
      *  지정 시 해당 코드만 시드 (가입 마법사 / 기본 휴가 불러오기 선택)
      */
-    public void initializeDefaults(UUID companyId, java.util.Set<String> selectedCodes) {
+    public void initializeDefaults(UUID companyId, Set<String> selectedCodes) {
 
         List<DefaultSpec> specs = List.of(
                 // 기본 연차
@@ -263,10 +264,6 @@ public class CompanyLeaveTypeService {
      */
     public void delete(UUID companyId, UUID companyLeaveTypeId) {
         CompanyLeaveType entity = findActive(companyId, companyLeaveTypeId);
-        if (Boolean.TRUE.equals(entity.getIsSystemDefault())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "시스템 기본 휴가는 삭제할 수 없습니다.");
-        }
         entity.softDelete();
 
         // RAG 동기화 이벤트 발행
