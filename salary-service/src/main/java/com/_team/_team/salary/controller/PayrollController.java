@@ -10,6 +10,9 @@ import com._team._team.salary.dto.reqdto.PayrollItemCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemUpdateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollRecalculateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollUpdateReqDto;
+import com._team._team.salary.dto.resdto.BulkPayrollActionResDto;
+import com._team._team.salary.dto.resdto.MyAnnualSalaryResDto;
+import com._team._team.salary.dto.resdto.PayrollAdminListResDto;
 import com._team._team.salary.dto.resdto.PayrollRecalculateResDto;
 import com._team._team.salary.dto.resdto.TaxSummaryResDto;
 import java.time.YearMonth;
@@ -22,7 +25,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com._team._team.salary.domain.enums.TaxCategory;
+import com._team._team.salary.service.PayrollExportService;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -33,16 +39,32 @@ public class PayrollController {
     private final PayrollCalculateWorker payrollCalculateWorker;
     private final PayslipPdfService payslipPdfService;
     private final TaxSummaryService taxSummaryService;
+    private final PayrollExportService payrollExportService;
 
     @Autowired
     public PayrollController(PayrollService payrollService,
                              PayrollCalculateWorker payrollCalculateWorker,
                              PayslipPdfService payslipPdfService,
-                             TaxSummaryService taxSummaryService) {
+                             TaxSummaryService taxSummaryService, PayrollExportService payrollExportService) {
         this.payrollService = payrollService;
         this.payrollCalculateWorker = payrollCalculateWorker;
         this.payslipPdfService = payslipPdfService;
         this.taxSummaryService = taxSummaryService;
+        this.payrollExportService = payrollExportService;
+    }
+
+    // 직원 본인 연봉 조회 연도 합계 + 월별 + 항목별 누적
+    @GetMapping("/my/annual")
+    public ResponseEntity<?> findMyAnnual(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestParam(value = "year", required = false) Integer year) {
+
+        int targetYear = (year == null) ? java.time.Year.now().getValue() : year;
+        MyAnnualSalaryResDto data = payrollService.findMyAnnual(companyId, memberId, targetYear);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "연봉 조회 성공"),
+                HttpStatus.OK);
     }
 
     // 4대보험 + 원천세 월별 집계 한 번 호출로 두 섹션 채움
@@ -57,6 +79,98 @@ public class PayrollController {
         return new ResponseEntity<>(
                 ApiResponse.success(data, "세금 집계 조회 성공"),
                 HttpStatus.OK);
+    }
+
+    // 회사 월 단위 급여대장 전체 조회 메인 화면용 직원 정보 결합
+    @GetMapping("/admin/list")
+    public ResponseEntity<?> listByCompanyMonth(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestParam(value = "yearMonth", required = false) String yearMonthStr) {
+
+        YearMonth yearMonth = (yearMonthStr == null || yearMonthStr.isBlank())
+                ? YearMonth.now()
+                : YearMonth.parse(yearMonthStr);
+
+        List<PayrollAdminListResDto> data = payrollService.listByCompanyAndMonth(companyId, yearMonth);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "회사 월 단위 급여대장 조회 성공"),
+                HttpStatus.OK);
+    }
+
+    // 일괄 확정 다중 선택 payrollIds 한 번에 처리
+    @PostMapping("/bulk-confirm")
+    public ResponseEntity<?> bulkConfirm(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestBody Map<String, List<UUID>> body) {
+
+        List<UUID> payrollIds = body.getOrDefault("payrollIds", List.of());
+        BulkPayrollActionResDto data = payrollService.bulkConfirm(companyId, payrollIds);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "일괄 확정 처리 완료"),
+                HttpStatus.OK);
+    }
+
+    // 일괄 지급 처리
+    @PostMapping("/bulk-pay")
+    public ResponseEntity<?> bulkPay(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestBody Map<String, List<UUID>> body) {
+
+        List<UUID> payrollIds = body.getOrDefault("payrollIds", List.of());
+        BulkPayrollActionResDto data = payrollService.bulkPay(companyId, payrollIds);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "일괄 지급 처리 완료"),
+                HttpStatus.OK);
+    }
+
+    // 세금 4대보험 월별 집계 엑셀 다운로드 신고용 자료
+    @GetMapping("/tax-summary/export")
+    public ResponseEntity<byte[]> exportTaxSummary(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestParam(value = "yearMonth", required = false) String yearMonthStr) {
+
+        YearMonth yearMonth = (yearMonthStr == null || yearMonthStr.isBlank())
+                ? YearMonth.now()
+                : YearMonth.parse(yearMonthStr);
+
+        byte[] data = payrollExportService.exportTaxSummaryXlsx(companyId, yearMonth);
+
+        String filename = "tax-summary_" + yearMonth + ".xlsx";
+        String encoded = java.net.URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename*=UTF-8''" + encoded);
+        headers.setContentType(
+                MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+
+        return new ResponseEntity<>(data, headers, HttpStatus.OK);
+    }
+
+    // 회사 월 단위 급여대장 엑셀 다운로드
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportMonthlyPayroll(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestParam(value = "yearMonth", required = false) String yearMonthStr) {
+
+        YearMonth yearMonth = (yearMonthStr == null || yearMonthStr.isBlank())
+                ? YearMonth.now()
+                : YearMonth.parse(yearMonthStr);
+
+        byte[] data = payrollExportService.exportMonthlyXlsx(companyId, yearMonth);
+
+        String filename = "payroll_" + yearMonth + ".xlsx";
+        String encoded = java.net.URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename*=UTF-8''" + encoded);
+        headers.setContentType(
+                MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+
+        return new ResponseEntity<>(data, headers, HttpStatus.OK);
     }
 
     // ===================== 급여대장 =====================
