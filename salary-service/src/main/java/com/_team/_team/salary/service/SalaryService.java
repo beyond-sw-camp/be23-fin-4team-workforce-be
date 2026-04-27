@@ -22,6 +22,8 @@ import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,14 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class SalaryService {
+    private static final int STANDARD_MONTHLY_WORK_HOURS = 209;
+    /** 연도별 시급 기준 최저임금 (원) , 미등록 연도는 직전 연도 값 사용 */
+    private static final NavigableMap<Integer, Long> MINIMUM_WAGE_HOURLY_BY_YEAR = new TreeMap<>(
+            Map.of(
+                    2024, 9860L,
+                    2025, 10030L
+            )
+    );
 
     private final SalaryRepository salaryRepository;
     private final SalaryPolicyRepository salaryPolicyRepository;
@@ -73,6 +83,7 @@ public class SalaryService {
 
         long resolvedBaseSalary = resolveBaseSalary(
                 companyId, reqDto.getStep(), reqDto.getBaseSalary(), reqDto.getEffectiveFrom());
+        validateMinimumWage(resolvedBaseSalary, reqDto.getEffectiveFrom());
 
         Salary salary = Salary.builder()
                 .memberId(reqDto.getMemberId())
@@ -170,6 +181,7 @@ public class SalaryService {
 
         long resolvedBaseSalary = resolveBaseSalary(
                 companyId, reqDto.getStep(), reqDto.getBaseSalary(), reqDto.getEffectiveFrom());
+        validateMinimumWage(resolvedBaseSalary, reqDto.getEffectiveFrom());
 
         salary.update(reqDto, resolvedBaseSalary);
         return SalaryResDto.fromEntity(salary);
@@ -216,5 +228,23 @@ public class SalaryService {
                     "호봉을 지정하지 않으면 기본급을 직접 입력해야 합니다.");
         }
         return fallbackBase;
+    }
+
+    private void validateMinimumWage(long baseSalary, LocalDate effectiveFrom) {
+        int year = effectiveFrom != null ? effectiveFrom.getYear() : LocalDate.now().getYear();
+        Map.Entry<Integer, Long> floorEntry = MINIMUM_WAGE_HOURLY_BY_YEAR.floorEntry(year);
+        long hourlyMin = floorEntry != null
+                ? floorEntry.getValue()
+                : MINIMUM_WAGE_HOURLY_BY_YEAR.firstEntry().getValue();
+        long monthlyMin = hourlyMin * STANDARD_MONTHLY_WORK_HOURS;
+        if (baseSalary < monthlyMin) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST,
+                    "기본급이 최저임금 기준 월 환산액("
+                            + String.format("%,d", monthlyMin)
+                            + "원)보다 낮습니다. 기준연도: "
+                            + year
+            );
+        }
     }
 }
