@@ -81,7 +81,7 @@ public class CompanyLeaveType extends BaseTimeEntity {
 
     /**
      * 시스템 기본 휴가 수정 (연차, 반차는 수정 불가)
-     * 나머지 기본 휴가는 일수/유급/증빙도 수정 가능.
+     * 나머지 기본 휴가는 일수/유급/증빙도 수정 가능
      */
     public void update(String name, String isPaidYn, Double maxDaysPerYear,
                        String requireEvidenceYn, Integer displayOrder) {
@@ -110,6 +110,23 @@ public class CompanyLeaveType extends BaseTimeEntity {
 
     public void softDelete() {
         this.delYn = "Y";
+    }
+
+    /**
+     * 소프트 삭제된 동일 코드 행을 시스템 기본값으로 되살릴수 있음
+     */
+    public void restoreSystemDefault(String name, BalanceType balanceType, Double daysPerUse,
+                                     String isPaidYn, Double maxDaysPerYear, String requireEvidenceYn,
+                                     Integer displayOrder) {
+        this.delYn = "N";
+        this.name = name;
+        this.balanceType = balanceType;
+        this.daysPerUse = daysPerUse;
+        this.isSystemDefault = true;
+        this.isPaidYn = isPaidYn;
+        this.maxDaysPerYear = maxDaysPerYear;
+        this.requireEvidenceYn = requireEvidenceYn;
+        this.displayOrder = displayOrder;
     }
 
     /**

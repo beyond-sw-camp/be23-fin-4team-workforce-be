@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.Set;
 
@@ -52,24 +53,26 @@ public class CompanyLeaveTypeService {
                 new DefaultSpec("MARRIAGE_SELF",    "결혼(본인)",          null,               1.0, "Y", 5.0,  "Y", 5),
                 new DefaultSpec("MARRIAGE_CHILD",   "결혼(자녀)",          null,               1.0, "Y", 1.0,  "Y", 6),
                 new DefaultSpec("BIRTH_SPOUSE",     "배우자 출산휴가",      null,               1.0, "Y", 10.0, "Y", 7),
-                new DefaultSpec("DEATH_PARENT",     "부모 사망",           null,               1.0, "Y", 5.0,  "Y", 8),
-                new DefaultSpec("DEATH_SPOUSE",     "배우자 사망",          null,               1.0, "Y", 5.0,  "Y", 9),
-                new DefaultSpec("DEATH_CHILD",      "자녀 사망",           null,               1.0, "Y", 3.0,  "Y", 10),
-                new DefaultSpec("DEATH_SIBLING",    "형제자매 사망",        null,               1.0, "Y", 3.0,  "Y", 11),
+                new DefaultSpec("MATERNITY",        "출산휴가",            null,               1.0, "Y", 90.0, "Y", 8),
+                new DefaultSpec("DEATH_PARENT",     "부모 사망",           null,               1.0, "Y", 5.0,  "Y", 9),
+                new DefaultSpec("DEATH_SPOUSE",     "배우자 사망",          null,               1.0, "Y", 5.0,  "Y", 10),
+                new DefaultSpec("DEATH_CHILD",      "자녀 사망",           null,               1.0, "Y", 3.0,  "Y", 11),
+                new DefaultSpec("DEATH_SIBLING",    "형제자매 사망",        null,               1.0, "Y", 3.0,  "Y", 12),
 
                 // 기타 법정
-                new DefaultSpec("PUBLIC",           "공가",                null,               1.0, "Y", null, "N", 12),
-                new DefaultSpec("SICK",             "병가",                null,               1.0, "Y", 15.0, "Y", 13),
-                new DefaultSpec("RESERVE_TRAINING", "예비군",              null,               1.0, "Y", null, "Y", 14),
-                new DefaultSpec("CIVIL_DEFENSE",    "민방위",              null,               1.0, "Y", null, "Y", 15),
+                new DefaultSpec("PUBLIC",           "공가",                null,               1.0, "Y", null, "N", 13),
+                new DefaultSpec("SICK",             "병가",                null,               1.0, "Y", 15.0, "Y", 14),
+                new DefaultSpec("RESERVE_TRAINING", "예비군",              null,               1.0, "Y", null, "Y", 15),
+                new DefaultSpec("CIVIL_DEFENSE",    "민방위",              null,               1.0, "Y", null, "Y", 16),
 
                 // 여성 보호
-                new DefaultSpec("MENSTRUATION",     "생리휴가",            null,               1.0, "N", 12.0, "N", 16)
+                new DefaultSpec("MENSTRUATION",     "생리휴가",            null,               1.0, "N", 12.0, "N", 17)
         );
 
         boolean filterByCodes = selectedCodes != null && !selectedCodes.isEmpty();
 
         List<CompanyLeaveType> toSave = new ArrayList<>();
+        int restored = 0;
         for (DefaultSpec spec : specs) {
             // 선택 시드 모드일 때 미선택 코드는 SKIP
             if (filterByCodes && !selectedCodes.contains(spec.code())) {
@@ -77,6 +80,24 @@ public class CompanyLeaveTypeService {
             }
             // 이미 활성 행 존재 시 SKIP (사용자 수정 보존)
             if (repository.findByCompanyIdAndCodeAndDelYn(companyId, spec.code(), "N").isPresent()) {
+                continue;
+            }
+            // 소프트 삭제만 된 행 기본값으로 복구
+            Optional<CompanyLeaveType> tombstone =
+                    repository.findByCompanyIdAndCode(companyId, spec.code());
+            if (tombstone.isPresent()) {
+                CompanyLeaveType row = tombstone.get();
+                if ("Y".equals(row.getDelYn())) {
+                    row.restoreSystemDefault(
+                            spec.name(),
+                            spec.balanceType(),
+                            spec.daysPerUse(),
+                            spec.isPaidYn(),
+                            spec.maxDaysPerYear(),
+                            spec.requireEvidenceYn(),
+                            spec.displayOrder());
+                    restored++;
+                }
                 continue;
             }
             toSave.add(CompanyLeaveType.builder()
@@ -94,8 +115,9 @@ public class CompanyLeaveTypeService {
         }
         if (!toSave.isEmpty()) {
             repository.saveAll(toSave);
-
-            // 기본 휴가 시드 후 RAG 동기화 이벤트 발행
+        }
+        if (!toSave.isEmpty() || restored > 0) {
+            // 기본 휴가 시드 또는 삭제분 복구 후 RAG 동기화 이벤트 발행
             ragSyncLeaveEventPublisher.publish(
                     RagSyncLeaveEvent.builder()
                             .eventId(UUID.randomUUID())
