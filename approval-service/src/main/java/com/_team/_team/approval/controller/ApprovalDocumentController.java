@@ -122,6 +122,12 @@ public class ApprovalDocumentController {
                 HttpStatus.OK
         );
     }
-
-
+    // 내부 통신용
+    @GetMapping("/internal")
+    public ResponseEntity<?> findActiveByCompanyIdInternal(@RequestParam UUID companyId) {
+        List<ApprovalDocumentResDto> result = approvalDocumentService.findActiveByCompanyId(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "활성 결재 양식 목록 조회 (내부)"),
+                HttpStatus.OK);
+    }
 }

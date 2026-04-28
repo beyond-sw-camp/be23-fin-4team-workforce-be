@@ -95,4 +95,12 @@ public class WorkScheduleController {
                 HttpStatus.OK
         );
     }
+    // 내부 통신용
+    @GetMapping("/internal")
+    public ResponseEntity<?> findSchedulesInternal(@RequestParam UUID companyId) {
+        List<WorkScheduleResDto> resDtoList = workScheduleService.findSchedules(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDtoList, "스케줄 목록 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }

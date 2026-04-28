@@ -25,8 +25,7 @@ import java.util.UUID;
  * (전년도 ANNUAL 의 remaining 이 아직 살아있어야 읽을 수 있음)
  * - 처리 조건
  * 1. LeavePolicy.isCarryoverYn = 'Y'  인 회사만 대상
- * 2. isCarryoverConsentYn = 'N' (동의 불필요) 인 정책만 자동 처리
- * 3. 전년도 ANNUAL.remaining > 0 인 사원
+ * 2. 전년도 ANNUAL.remaining > 0 인 사원
  */
 @Slf4j
 @Component
@@ -53,11 +52,10 @@ public class CarryoverLeaveWorker {
     public void run(LocalDate baseDate) {
         log.info("CarryoverLeaveWorker start baseDate={}", baseDate);
 
-        // 이월 허용 + 이월 동의서 사용 불필요 정책만 자동 처리
+        // 이월 허용 정책만 자동 처리 (동의 흐름 없음)
         List<LeavePolicy> targetPolicies = leavePolicyRepository.findAll().stream()
                 .filter(p -> "N".equals(p.getDelYn()))
                 .filter(p -> "Y".equals(p.getIsCarryoverYn()))
-                .filter(p -> "N".equals(p.getIsCarryoverConsentYn()))
                 .filter(p -> p.getCarryoverDays() != null && p.getCarryoverDays() > 0)
                 .toList();
 

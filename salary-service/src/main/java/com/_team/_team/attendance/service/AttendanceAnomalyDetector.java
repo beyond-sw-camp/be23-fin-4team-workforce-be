@@ -103,6 +103,13 @@ public class AttendanceAnomalyDetector {
             // 지각/조퇴는 스케줄 있어야 판정 가능
             if (schedule == null) continue;
 
+            /*
+             * FLEXIBLE 스케줄은 startTime/endTime/workMinutes 가 null
+             */
+            if (schedule.getStartTime() == null
+                    || schedule.getEndTime() == null
+                    || schedule.getWorkMinutes() == null) continue;
+
             // 반차인 경우 스케줄을 반쪽만 기준으로 재계산
             LocalTime effectiveStart = schedule.getStartTime();
             LocalTime effectiveEnd = schedule.getEndTime();

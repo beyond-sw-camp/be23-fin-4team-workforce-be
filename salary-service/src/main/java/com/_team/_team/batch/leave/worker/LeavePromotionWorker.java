@@ -3,6 +3,7 @@ package com._team._team.batch.leave.worker;
 import com._team._team.attendance.domain.LeavePolicy;
 import com._team._team.attendance.domain.LeavePromotionLog;
 import com._team._team.attendance.domain.MemberBalance;
+import com._team._team.attendance.domain.enums.PromotionLogStatus;
 import com._team._team.attendance.domain.enums.PromotionStage;
 import com._team._team.attendance.repository.LeavePolicyRepository;
 import com._team._team.attendance.repository.LeavePromotionLogRepository;
@@ -15,8 +16,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 연차사용촉진제 알림 배치 (근로기준법 61조)
@@ -71,11 +74,21 @@ public class LeavePromotionWorker {
                 .findForPromotion(policy.getCompanyId(), targetExpiration);
 
         for (MemberBalance b : balances) {
+            // 이미 같은 단계 발송 이력 있으면 스킵
             if (promotionLogRepository.existsByMemberBalanceIdAndStage(
                     b.getMemberBalanceId(), stage)) {
                 result.skipped++;
                 continue;
             }
+
+            // 추가 가드 1차에서 이미 회신 받은 잔고는 2차 발송 안 함
+            // 직원이 회신했다면 회사 면책 완료 추가 통지 불필요
+            if (stage == PromotionStage.SECOND
+                    && hasAcknowledgedFirst(b.getMemberBalanceId())) {
+                result.skipped++;
+                continue;
+            }
+
             publishPromotion(b, stage);
             promotionLogRepository.save(LeavePromotionLog.builder()
                     .memberBalanceId(b.getMemberBalanceId())
@@ -83,12 +96,20 @@ public class LeavePromotionWorker {
                     .companyId(b.getCompanyId())
                     .stage(stage)
                     .sentOn(today)
+                    .status(PromotionLogStatus.SENT)
                     .build());
             if (stage == PromotionStage.FIRST) result.firstSent++;
             else result.secondSent++;
         }
     }
 
+    // 같은 잔고 1차 통보가 ACKNOWLEDGED 상태인지 검사
+    private boolean hasAcknowledgedFirst(UUID memberBalanceId) {
+        return promotionLogRepository
+                .findByMemberBalanceIdAndStatus(memberBalanceId, PromotionLogStatus.ACKNOWLEDGED)
+                .stream()
+                .anyMatch(l -> l.getStage() == PromotionStage.FIRST);
+    }
     private void publishPromotion(MemberBalance b, PromotionStage stage) {
         NotificationType type = stage == PromotionStage.FIRST
                 ? NotificationType.LEAVE_PROMOTION_FIRST

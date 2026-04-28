@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 시차출퇴근 스케줄 슬롯 선택
+ * 시차출퇴근 스케줄 선택
  */
 @RestController
 @RequestMapping("/attendance/schedule-selections")
@@ -32,7 +32,7 @@ public class MemberScheduleSelectionController {
     }
 
     /**
-     * 슬롯 선택 제출 (PENDING)
+     * 스케줄 선택 제출 (PENDING)
      * 최초 선택과 월 중 변경 요청 모두 동일
      */
     @PostMapping("/my")
@@ -63,7 +63,7 @@ public class MemberScheduleSelectionController {
     }
 
     /**
-     * 내 현재 적용 슬롯 조회
+     * 내 현재 적용 스케줄 조회
      */
     @GetMapping("/my/current")
     public ResponseEntity<?> findMyCurrent(

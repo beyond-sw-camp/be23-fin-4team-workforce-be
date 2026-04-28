@@ -1,13 +1,14 @@
 package com._team._team.attendance.dto.reqDto;
 
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.UUID;
 
-@Getter
+@AllArgsConstructor
 @NoArgsConstructor
+@Builder
+@Data
 public class LeaveRequestLinkApprovalReqDto {
 
     @NotNull(message = "결재 요청 ID 는 필수입니다.")

@@ -12,8 +12,8 @@ import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class SalaryResDto {
 
     private UUID salaryId;
@@ -26,6 +26,13 @@ public class SalaryResDto {
     private String jobTitleName;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
+    private Integer dependentCount;
+
+    // member-service Feign 결합
+    private String sabun;
+    private String name;
+    private String organizationName;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -41,9 +48,21 @@ public class SalaryResDto {
                 .jobTitleName(salary.getJobTitleName())
                 .effectiveFrom(salary.getEffectiveFrom())
                 .effectiveTo(salary.getEffectiveTo())
+                .dependentCount(salary.getDependentCount())
                 .createdAt(salary.getCreatedAt())
                 .updatedAt(salary.getUpdatedAt())
                 .build();
     }
 
+    // 직원 정보 결합 버전 회사 단위 목록 화면용
+    public static SalaryResDto fromEntity(Salary salary,
+                                          String sabun,
+                                          String name,
+                                          String organizationName) {
+        SalaryResDto base = fromEntity(salary);
+        base.setSabun(sabun);
+        base.setName(name);
+        base.setOrganizationName(organizationName);
+        return base;
+    }
 }

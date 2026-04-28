@@ -17,6 +17,7 @@ public enum NotificationType {
     // 연차 사용 촉진 (근기법 61조)
     LEAVE_PROMOTION_FIRST,    // 연차 촉진 1차 (만료 N일 전)
     LEAVE_PROMOTION_SECOND,   // 연차 촉진 2차 (만료 M일 전)
+    LEAVE_DESIGNATION,   // 회사 강제 지정 통지 노무수령 거부
 
 
     // 결재

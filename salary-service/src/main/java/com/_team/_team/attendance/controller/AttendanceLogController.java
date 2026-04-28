@@ -7,7 +7,6 @@ import com._team._team.attendance.dto.resDto.AttendanceLogResDto;
 import com._team._team.attendance.dto.resDto.DailyAttendanceResDto;
 import com._team._team.dto.ApiResponse;
 import com._team._team.dto.BusinessException;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -17,8 +16,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com._team._team.attendance.service.CompanyIpWhitelistService;
-import com._team._team.attendance.service.AttendanceLocationValidator;
 
 
 import java.time.LocalDate;
@@ -47,32 +44,25 @@ public class AttendanceLogController {
 
     private final AttendanceLogService attendanceLogService;
     private final DailyAttendanceService dailyAttendanceService;
-    private final AttendanceContextResolver attendanceContextResolver;
     private final LaborLawValidator laborLawValidator;
-    private final CompanyIpWhitelistService companyIpWhitelistService;
-    private final AttendanceLocationValidator attendanceLocationValidator;
 
     @Autowired
     public AttendanceLogController(AttendanceLogService attendanceLogService,
                                    DailyAttendanceService dailyAttendanceService,
-                                   AttendanceContextResolver attendanceContextResolver, LaborLawValidator laborLawValidator, CompanyIpWhitelistService companyIpWhitelistService, AttendanceLocationValidator attendanceLocationValidator) {
+                                   LaborLawValidator laborLawValidator) {
         this.attendanceLogService = attendanceLogService;
         this.dailyAttendanceService = dailyAttendanceService;
-        this.attendanceContextResolver = attendanceContextResolver;
         this.laborLawValidator = laborLawValidator;
-        this.companyIpWhitelistService = companyIpWhitelistService;
-        this.attendanceLocationValidator = attendanceLocationValidator;
     }
 
-    // 출근 처리 - IP/UA/좌표 → 주소 태그 붙여서 서비스 넘김
+    // 출근 처리
     @PostMapping("/clock-in")
     public ResponseEntity<?> clockIn(
             @RequestHeader("X-User-CompanyId")UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
-            @Valid @RequestBody AttendanceLogCreateReqDto reqDto,
-            HttpServletRequest httpRequest){
-        tagContext("CLOCK_IN", companyId, memberId, reqDto, httpRequest);
-        DailyAttendanceResDto resDto = attendanceLogService.clockIn(companyId, memberId, reqDto);
+            @RequestBody(required = false) AttendanceLogCreateReqDto reqDto){
+        DailyAttendanceResDto resDto = attendanceLogService.clockIn(companyId, memberId,
+                reqDto != null ? reqDto : new AttendanceLogCreateReqDto());
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "출근 처리되었습니다."),
                 HttpStatus.CREATED
@@ -84,46 +74,16 @@ public class AttendanceLogController {
     public ResponseEntity<?> clockOut(
             @RequestHeader("X-User-CompanyId")UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
-            @Valid @RequestBody AttendanceLogCreateReqDto reqDto,
-            HttpServletRequest httpRequest) {
-        tagContext("CLOCK_OUT", companyId, memberId, reqDto, httpRequest);
-        DailyAttendanceResDto resDto = attendanceLogService.clockOut(companyId, memberId, reqDto);
+            @RequestBody(required = false) AttendanceLogCreateReqDto reqDto) {
+
+        DailyAttendanceResDto resDto = attendanceLogService.clockOut(companyId, memberId,
+                reqDto != null ? reqDto : new AttendanceLogCreateReqDto());
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "퇴근 처리되었습니다."),
                 HttpStatus.CREATED
         );
     }
 
-    // 이벤트의 부가 정보(IP, User-Agent, 위치 주소 등)를 수집·가공
-    private void tagContext(String eventType,
-                            UUID companyId,
-                            UUID memberId,
-                            AttendanceLogCreateReqDto reqDto,
-                            HttpServletRequest httpRequest) {
-        AttendanceContextResolver.Context ctx = attendanceContextResolver.resolve(
-                httpRequest,
-                reqDto.getDeviceId(),
-                reqDto.getLatitude(),
-                reqDto.getLongitude());
-
-        // 출퇴근 위치 검증, IP + GPS (출장)
-        AttendanceLocationValidator.LocationResult result = attendanceLocationValidator.validate(
-                companyId,
-                memberId,
-                java.time.LocalDate.now(),
-                ctx.ip(),
-                reqDto.getLatitude(),
-                reqDto.getLongitude()
-        );
-
-        if (!result.allowed()) {
-            throw new BusinessException(HttpStatus.FORBIDDEN,
-                    result.detail() + " (현재 IP: " + ctx.ip() + ")");
-        }
-
-        reqDto.setDeviceId(ctx.packedDeviceId());
-        attendanceContextResolver.writeAuditLog(eventType, memberId, ctx);
-    }
 
     // ==================== 개인 조회 ====================
 

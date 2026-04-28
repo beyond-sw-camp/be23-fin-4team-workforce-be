@@ -1,6 +1,7 @@
 package com._team._team.attendance.controller;
 
 import com._team._team.attendance.dto.reqDto.CompanyLeaveTypeCreateReqDto;
+import com._team._team.attendance.dto.reqDto.CompanyLeaveTypeInitDefaultsReqDto;
 import com._team._team.attendance.dto.reqDto.CompanyLeaveTypeUpdateReqDto;
 import com._team._team.attendance.dto.resDto.CompanyLeaveTypeResDto;
 import com._team._team.attendance.service.CompanyLeaveTypeService;
@@ -89,9 +90,23 @@ public class CompanyLeaveTypeController {
                 HttpStatus.OK);
     }
 
-    // 내부용, 회사 생성 시 기본 휴가 종류 자동 생성
+    // 회사 가입 시 또는 [기본 휴가 불러오기] 시 호출
     @PostMapping("/init")
-    public void initDefaults(@RequestParam UUID companyId) {
-        service.initializeDefaults(companyId);
+    public void initDefaults(
+            @RequestParam UUID companyId,
+            @RequestBody(required = false) CompanyLeaveTypeInitDefaultsReqDto req) {
+        service.initializeDefaults(companyId, req != null ? req.getCodes() : null);
+    }
+
+
+    // ai-service 서비스 간 내부 호출용 - 회사 휴가 종류 전체 조회
+    @GetMapping("/internal")
+    public ResponseEntity<?> findAllInternal(@RequestParam UUID companyId) {
+        List<CompanyLeaveTypeResDto> list = service.findAll(companyId).stream()
+                .map(CompanyLeaveTypeResDto::fromEntity)
+                .toList();
+        return new ResponseEntity<>(
+                ApiResponse.success(list, "휴가 목록 조회 성공 (내부)"),
+                HttpStatus.OK);
     }
 }

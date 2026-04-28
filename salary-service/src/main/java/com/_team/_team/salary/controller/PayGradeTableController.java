@@ -93,4 +93,15 @@ public class PayGradeTableController {
                         "신규 " + result.created() + "건, 교체 " + result.replaced() + "건 반영"),
                 HttpStatus.OK);
     }
+    // 내부 통신용
+    @GetMapping("/internal")
+    public ResponseEntity<?> findAllInternal(@RequestParam UUID companyId) {
+        List<PayGradeTableResDto> list = service.findAllByCompany(companyId)
+                .stream()
+                .map(PayGradeTableResDto::fromEntity)
+                .toList();
+        return new ResponseEntity<>(
+                ApiResponse.success(list, "호봉표 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }

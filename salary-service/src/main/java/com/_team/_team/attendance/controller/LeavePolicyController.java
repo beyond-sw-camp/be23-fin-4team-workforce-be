@@ -83,4 +83,13 @@ public class LeavePolicyController {
                 HttpStatus.OK
         );
     }
+
+    /** ai-service 서비스 간 내부 호출용 - 연차 정책 목록 조회 */
+    @GetMapping("/internal")
+    public ResponseEntity<?> findPoliciesInternal(@RequestParam UUID companyId) {
+        List<LeavePolicyResDto> resDtoList = leavePolicyService.findPolicies(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDtoList, "연차 정책 목록 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }

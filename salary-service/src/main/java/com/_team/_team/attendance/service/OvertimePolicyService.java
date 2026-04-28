@@ -4,13 +4,16 @@ import com._team._team.attendance.domain.OvertimePolicy;
 import com._team._team.attendance.dto.reqDto.OvertimePolicyCreateReqDto;
 import com._team._team.attendance.dto.reqDto.OvertimePolicyUpdateReqDto;
 import com._team._team.attendance.dto.resDto.OvertimePolicyResDto;
+import com._team._team.attendance.kafka.RagSyncAttendanceEventPublisher;
 import com._team._team.attendance.repository.OvertimePolicyRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.event.RagSyncAttendanceEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,10 +25,13 @@ import java.util.stream.Collectors;
 @Transactional
 public class OvertimePolicyService {
     private final OvertimePolicyRepository overtimePolicyRepository;
+    private final RagSyncAttendanceEventPublisher ragSyncAttendanceEventPublisher;
 
     @Autowired
-    public OvertimePolicyService(OvertimePolicyRepository overtimePolicyRepository) {
+    public OvertimePolicyService(OvertimePolicyRepository overtimePolicyRepository,
+                                 RagSyncAttendanceEventPublisher ragSyncAttendanceEventPublisher) {
         this.overtimePolicyRepository = overtimePolicyRepository;
+        this.ragSyncAttendanceEventPublisher = ragSyncAttendanceEventPublisher;
     }
 
     /**
@@ -45,6 +51,20 @@ public class OvertimePolicyService {
                 .ifPresent(existing -> existing.close(reqDto.getEffectiveFrom().minusDays(1)));
 
         OvertimePolicy saved = overtimePolicyRepository.save(reqDto.toEntity(companyId));
+
+        // RAG 동기화 이벤트 발행
+        ragSyncAttendanceEventPublisher.publish(
+                RagSyncAttendanceEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("CREATED")
+                        .resourceType("OVERTIME_POLICY")
+                        .resourceId(saved.getOvertimePolicyId())
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return OvertimePolicyResDto.fromEntity(saved);
     }
 
@@ -76,6 +96,20 @@ public class OvertimePolicyService {
                 reqDto.getNightEndTime(),
                 reqDto.getHolidayWorkRequiresApproval()
         );
+
+        // RAG 동기화 이벤트 발행
+        ragSyncAttendanceEventPublisher.publish(
+                RagSyncAttendanceEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("UPDATED")
+                        .resourceType("OVERTIME_POLICY")
+                        .resourceId(policyId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return OvertimePolicyResDto.fromEntity(policy);
     }
 

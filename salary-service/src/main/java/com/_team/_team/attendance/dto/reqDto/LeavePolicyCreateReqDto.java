@@ -28,14 +28,20 @@ public class LeavePolicyCreateReqDto {
     /** 최대 이월 일수 */
     private Integer carryoverDays;
 
-    /** 이월 동의 필요 여부 */
-    private String isCarryoverConsentYn;
-
     /** 미사용 수당 지급 여부 */
     private String isPayoutYn;
 
     /** 기본 부여 일수 (회사 커스텀, null이면 15.0) */
     private Double defaultAnnualDays;
+
+    /** 근속별 추가 부여 단위 null 이면 1.0 */
+    private Double extraDaysPerInterval;
+
+    /** 근속별 추가 부여 주기 null 이면 2 */
+    private Integer extraIntervalYears;
+
+    /** 연차 상한 null 이면 25.0 */
+    private Double maxAnnualDays;
 
     @NotNull(message = "연차 발생 기준은 필수 입니다.")
     private AccrualBase accrualBase;
@@ -48,9 +54,13 @@ public class LeavePolicyCreateReqDto {
                 .promotion2ndBeforeDays(this.promotion2ndBeforeDays)
                 .isCarryoverYn(this.isCarryoverYn != null ? this.isCarryoverYn : "N")
                 .carryoverDays(this.carryoverDays)
-                .isCarryoverConsentYn(this.isCarryoverConsentYn != null ? this.isCarryoverConsentYn : "N")
                 .isPayoutYn(this.isPayoutYn != null ? this.isPayoutYn : "N")
                 .defaultAnnualDays(this.defaultAnnualDays != null ? this.defaultAnnualDays : 15.0)
+                .extraDaysPerInterval(this.extraDaysPerInterval != null ? this.extraDaysPerInterval : 1.0)
+                .extraIntervalYears(
+                        (this.extraIntervalYears != null && this.extraIntervalYears > 0)
+                                ? this.extraIntervalYears : 2)
+                .maxAnnualDays(this.maxAnnualDays != null ? this.maxAnnualDays : 25.0)
                 .accrualBase(this.accrualBase)
                 .build();
     }

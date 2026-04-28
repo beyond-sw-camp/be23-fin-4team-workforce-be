@@ -5,14 +5,17 @@ import com._team._team.approval.domain.enums.RequestType;
 import com._team._team.approval.dto.reqdto.ApprovalDocumentCreateReqDto;
 import com._team._team.approval.dto.reqdto.ApprovalDocumentUpdateReqDto;
 import com._team._team.approval.dto.resdto.ApprovalDocumentResDto;
+import com._team._team.approval.publisher.RagSyncApprovalEventPublisher;
 import com._team._team.approval.repository.ApprovalDocumentRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.event.RagSyncApprovalEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -26,11 +29,15 @@ public class ApprovalDocumentService {
 
     private final ApprovalDocumentRepository approvalDocumentRepository;
     private final ObjectMapper objectMapper;
+    private final RagSyncApprovalEventPublisher ragSyncApprovalEventPublisher;
 
     @Autowired
-    public ApprovalDocumentService(ApprovalDocumentRepository approvalDocumentRepository, ObjectMapper objectMapper) {
+    public ApprovalDocumentService(ApprovalDocumentRepository approvalDocumentRepository,
+                                   ObjectMapper objectMapper,
+                                   RagSyncApprovalEventPublisher ragSyncApprovalEventPublisher) {
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.objectMapper = objectMapper;
+        this.ragSyncApprovalEventPublisher = ragSyncApprovalEventPublisher;
     }
 
     public void initDefaultDocuments(UUID companyId) {
@@ -89,7 +96,7 @@ public class ApprovalDocumentService {
                       "type": "select",
                       "required": true,
                       "options": ["사전","사후"]
-                    },                    
+                    },
                     {
                       "name": "workType",
                       "label": "근무구분",
@@ -365,6 +372,19 @@ public class ApprovalDocumentService {
                 }
             """)
                 .build());
+
+        // RAG 동기화 이벤트 발행 (BULK)
+        ragSyncApprovalEventPublisher.publish(
+                RagSyncApprovalEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("BULK")
+                        .resourceType("APPROVAL_DOCUMENT")
+                        .resourceId(null)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
     }
 
     // 결재 양식 생성
@@ -383,6 +403,20 @@ public class ApprovalDocumentService {
                 reqDto.getCalendarDisplayName(), reqDto.getCalendarStartField());
 
         ApprovalDocument saved = approvalDocumentRepository.save(document);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncApprovalEventPublisher.publish(
+                RagSyncApprovalEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("CREATED")
+                        .resourceType("APPROVAL_DOCUMENT")
+                        .resourceId(saved.getDocumentId())
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return ApprovalDocumentResDto.fromEntity(saved);
     }
 
@@ -414,6 +448,19 @@ public class ApprovalDocumentService {
                     reqDto.getCalendarEndField(),
                     reqDto.getCalendarTitleField());
         }
+
+        // RAG 동기화 이벤트 발행
+        ragSyncApprovalEventPublisher.publish(
+                RagSyncApprovalEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("UPDATED")
+                        .resourceType("APPROVAL_DOCUMENT")
+                        .resourceId(documentId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
 
         return ApprovalDocumentResDto.fromEntity(document);
     }
@@ -517,7 +564,6 @@ public class ApprovalDocumentService {
     }
 
 
-
     // 결재 양식 단건 조회
     @Transactional(readOnly = true)
     public ApprovalDocumentResDto findById(UUID companyId, UUID documentId) {
@@ -563,6 +609,20 @@ public class ApprovalDocumentService {
         }
 
         document.activate();
+
+        // RAG 동기화 이벤트 발행 (활성화는 RAG에 추가)
+        ragSyncApprovalEventPublisher.publish(
+                RagSyncApprovalEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("UPDATED")
+                        .resourceType("APPROVAL_DOCUMENT")
+                        .resourceId(documentId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return ApprovalDocumentResDto.fromEntity(document);
     }
 
@@ -577,6 +637,20 @@ public class ApprovalDocumentService {
         }
 
         document.deactivate();
+
+        // RAG 동기화 이벤트 발행 (비활성화는 RAG에서 삭제)
+        ragSyncApprovalEventPublisher.publish(
+                RagSyncApprovalEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("DELETED")
+                        .resourceType("APPROVAL_DOCUMENT")
+                        .resourceId(documentId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return ApprovalDocumentResDto.fromEntity(document);
     }
 }

@@ -24,9 +24,6 @@ public class WorkTripResDto {
     private UUID memberId;
     private WorkTripType workTripType;
     private String destination;
-    private Double destinationLat;
-    private Double destinationLng;
-    private Integer destinationRadiusMeters;
     private String purpose;
     private Long expenseAmount;
     private ExpenseType expenseType;
@@ -40,9 +37,6 @@ public class WorkTripResDto {
                 .memberId(detail.getMemberId())
                 .workTripType(detail.getWorkTripType())
                 .destination(detail.getDestination())
-                .destinationLat(detail.getDestinationLat())
-                .destinationLng(detail.getDestinationLng())
-                .destinationRadiusMeters(detail.getDestinationRadiusMeters())
                 .purpose(detail.getPurpose())
                 .expenseAmount(detail.getExpenseAmount())
                 .expenseType(detail.getExpenseType())

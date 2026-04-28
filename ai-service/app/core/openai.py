@@ -1,7 +1,9 @@
 from __future__ import annotations
+import logging
+
 from openai import OpenAI
 from app.config import settings
-import logging
+
 
 logger = logging.getLogger(__name__)
 

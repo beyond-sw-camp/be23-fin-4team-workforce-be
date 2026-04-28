@@ -1,6 +1,7 @@
 package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.Payroll;
+import com._team._team.salary.domain.enums.PayrollType;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,8 +18,8 @@ import java.util.UUID;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
+@Data
 public class PayrollCreateReqDto {
 
     /** 대상 직원 ID */
@@ -28,6 +29,9 @@ public class PayrollCreateReqDto {
     /** 정산 연월일 (예: 2026-03-25) */
     @NotNull(message = "정산 연월일은 필수 입니다.")
     private LocalDate payrollYearMonthDay;
+
+    /** 급여 구분 미지정 시 정기급여 */
+    private PayrollType payrollType;
 
     /**
      * DTO → Payroll 엔티티 변환
@@ -40,6 +44,7 @@ public class PayrollCreateReqDto {
                 .salaryId(salaryId)
                 .memberId(this.memberId)
                 .payrollYearMonthDay(this.payrollYearMonthDay)
+                .payrollType(this.payrollType != null ? this.payrollType : PayrollType.REGULAR_MONTHLY)
                 .totalPayment(0L)
                 .totalDeduction(0L)
                 .netPay(0L)

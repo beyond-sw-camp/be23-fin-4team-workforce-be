@@ -12,10 +12,10 @@ import lombok.NoArgsConstructor;
 import java.util.UUID;
 
 /**
- * 연차 정책 (회사별 1건)
+ * 연차 정책
  * - 촉진제도: 연차 소진 독려 알림 기한 설정 (근로기준법 제61조)
  * - 이월: 미사용 연차 다음 해 이월 여부/일수
- * - 미사용 수당: 소멸 연차에 대한 수당 지급 여부 (salary-service 연동)
+ * - 미사용 수당: 소멸 연차에 대한 수당 지급 여부
  * - accrualBase: 연차 발생 기준 (회계연도 vs 입사일)
  */
 
@@ -52,12 +52,7 @@ public class LeavePolicy extends BaseTimeEntity {
     /** 최대 이월 일수 (isCarryoverYn = 'Y'일 때만 의미) */
     private Integer carryoverDays;
 
-    /** 이월 시 본인 동의 필요 여부 */
-    @Column(length = 1)
-    @Builder.Default
-    private String isCarryoverConsentYn = "N";
-
-    /** 미사용 연차 수당 지급 여부 (salary-service에서 참조) */
+    /** 미사용 연차 수당 지급 여부 */
     @Column(length = 1, nullable = false)
     @Builder.Default
     private String isPayoutYn = "N";
@@ -70,6 +65,31 @@ public class LeavePolicy extends BaseTimeEntity {
     @Builder.Default
     private Double defaultAnnualDays = 15.0;
 
+    /**
+     * 근속별 추가 부여 단위 근로기준법 60조 매 N년마다 + 이 만큼
+     * 근로기준법 디폴트 = 1.0 일
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Double extraDaysPerInterval = 1.0;
+
+    /**
+     * 근속별 추가 부여 주기 근로기준법 60조 매 2년마다
+     * 근로기준법 디폴트 = 2 년
+     * 0 또는 음수 입력 방지는 서비스 검증에서 처리
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer extraIntervalYears = 2;
+
+    /**
+     * 연차 상한 근로기준법 25일
+     * 회사가 더 후하게 줄 수는 있어도 25 미만으로 줄일 수는 없음
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Double maxAnnualDays = 25.0;
+
     /** 연차 발생 기준 (FISCAL: 회계연도 1/1 / HIRE_DATE: 입사일 기준) */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -78,6 +98,23 @@ public class LeavePolicy extends BaseTimeEntity {
     @Column(length = 1, nullable = false)
     @Builder.Default
     private String delYn = "N";
+
+    /**
+     * 근속 N년 시점의 연차 일수 계산
+     *  근로기준법 60조 공식: defaultAnnualDays + floor((years-1)/interval) × extra
+     *  결과는 maxAnnualDays 로 cap
+     *  yearsOfService < 1 일 때는 월차 별도 처리 호출자가 분기
+     */
+    public double calculateAnnualDays(int yearsOfService) {
+        if (yearsOfService < 1) return 0.0;
+        int interval = (extraIntervalYears == null || extraIntervalYears <= 0) ? 2 : extraIntervalYears;
+        double extra = (extraDaysPerInterval == null) ? 1.0 : extraDaysPerInterval;
+        double base = (defaultAnnualDays == null) ? 15.0 : defaultAnnualDays;
+        double cap = (maxAnnualDays == null) ? 25.0 : maxAnnualDays;
+        int extraSteps = Math.max(0, (yearsOfService - 1) / interval);
+        double days = base + extraSteps * extra;
+        return Math.min(days, cap);
+    }
 
     public void update(LeavePolicyUpdateReqDto reqDto) {
         if (reqDto.getIsPromotionYn() != null) {
@@ -95,14 +132,20 @@ public class LeavePolicy extends BaseTimeEntity {
         if (reqDto.getCarryoverDays() != null) {
             this.carryoverDays = reqDto.getCarryoverDays();
         }
-        if (reqDto.getIsCarryoverConsentYn() != null) {
-            this.isCarryoverConsentYn = reqDto.getIsCarryoverConsentYn();
-        }
         if (reqDto.getIsPayoutYn() != null) {
             this.isPayoutYn = reqDto.getIsPayoutYn();
         }
         if (reqDto.getDefaultAnnualDays() != null) {
             this.defaultAnnualDays = reqDto.getDefaultAnnualDays();
+        }
+        if (reqDto.getExtraDaysPerInterval() != null) {
+            this.extraDaysPerInterval = reqDto.getExtraDaysPerInterval();
+        }
+        if (reqDto.getExtraIntervalYears() != null && reqDto.getExtraIntervalYears() > 0) {
+            this.extraIntervalYears = reqDto.getExtraIntervalYears();
+        }
+        if (reqDto.getMaxAnnualDays() != null) {
+            this.maxAnnualDays = reqDto.getMaxAnnualDays();
         }
         if (reqDto.getAccrualBase() != null) {
             this.accrualBase = reqDto.getAccrualBase();

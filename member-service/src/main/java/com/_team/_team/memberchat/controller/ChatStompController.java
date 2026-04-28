@@ -5,6 +5,7 @@ import com._team._team.memberchat.dto.req.ChatSendRequest;
 import com._team._team.memberchat.error.ChatErrorCode;
 import com._team._team.memberchat.error.ChatException;
 import com._team._team.memberchat.service.ChatMessageService;
+import com._team._team.memberchat.service.ChatPresenceService;
 import com._team._team.memberchat.service.ReadReceiptService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class ChatStompController {
 
     private final ChatMessageService chatMessageService;
     private final ReadReceiptService readReceiptService;
+    private final ChatPresenceService chatPresenceService;
 
     // STOMP 연결의 Principal에서 사용자 정보 추출
     private static AuthPrincipal requireAuthPrincipal(Principal principal) {
@@ -87,5 +89,14 @@ public class ChatStompController {
         AuthPrincipal p = requireAuthPrincipal(principal);
         String deviceId = payload == null ? "" : String.valueOf(payload.getOrDefault("deviceId", ""));
         readReceiptService.ackLatest(p.userId(), roomId, deviceId);
+    }
+
+    // 타이핑 인디케이터 — 영속화 X, Redis pub-sub 만 fan-out.
+    // 클라이언트는 본인 메시지를 senderId 로 필터링한다.
+    @MessageMapping("/room/{roomId}/typing")
+    public void typing(@DestinationVariable Long roomId,
+                       Principal principal) {
+        AuthPrincipal p = requireAuthPrincipal(principal);
+        chatPresenceService.handleTyping(p.userId(), roomId);
     }
 }

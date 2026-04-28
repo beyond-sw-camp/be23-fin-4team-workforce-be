@@ -2,13 +2,14 @@ package com._team._team.attendance.dto.resDto;
 
 import com._team._team.attendance.domain.CompanyLeaveType;
 import com._team._team.attendance.domain.enums.BalanceType;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 
 import java.util.UUID;
 
-@Getter
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder
+@Data
 public class CompanyLeaveTypeResDto {
 
     private UUID companyLeaveTypeId;

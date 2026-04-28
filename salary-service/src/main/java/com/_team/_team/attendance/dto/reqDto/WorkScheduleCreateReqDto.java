@@ -29,13 +29,10 @@ public class WorkScheduleCreateReqDto {
     @NotNull(message = "근무 유형은 필수입니다.")
     private WorkType workType;
 
-    @NotNull(message = "출근 시각은 필수입니다.")
     private LocalTime startTime;
 
-    @NotNull(message = "퇴근 시각은 필수입니다.")
     private LocalTime endTime;
 
-    @NotNull(message = "근무시간(분)은 필수입니다.")
     private Integer workMinutes;
 
     private Integer breakMinutes;

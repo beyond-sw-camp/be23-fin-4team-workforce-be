@@ -22,9 +22,11 @@ public class LeavePolicyResDto {
     private Integer promotion2ndBeforeDays;
     private String isCarryoverYn;
     private Integer carryoverDays;
-    private String isCarryoverConsentYn;
     private String isPayoutYn;
     private Double defaultAnnualDays;
+    private Double extraDaysPerInterval;
+    private Integer extraIntervalYears;
+    private Double maxAnnualDays;
     private AccrualBase accrualBase;
 
     public static LeavePolicyResDto fromEntity(LeavePolicy leavePolicy){
@@ -36,9 +38,11 @@ public class LeavePolicyResDto {
                 .promotion2ndBeforeDays(leavePolicy.getPromotion2ndBeforeDays())
                 .isCarryoverYn(leavePolicy.getIsCarryoverYn())
                 .carryoverDays(leavePolicy.getCarryoverDays())
-                .isCarryoverConsentYn(leavePolicy.getIsCarryoverConsentYn())
                 .isPayoutYn(leavePolicy.getIsPayoutYn())
                 .defaultAnnualDays(leavePolicy.getDefaultAnnualDays())
+                .extraDaysPerInterval(leavePolicy.getExtraDaysPerInterval())
+                .extraIntervalYears(leavePolicy.getExtraIntervalYears())
+                .maxAnnualDays(leavePolicy.getMaxAnnualDays())
                 .accrualBase(leavePolicy.getAccrualBase())
                 .build();
     }

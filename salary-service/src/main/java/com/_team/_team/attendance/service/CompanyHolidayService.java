@@ -5,15 +5,18 @@ import com._team._team.attendance.dto.reqDto.CompanyHolidayCreateReqDto;
 import com._team._team.attendance.dto.reqDto.CompanyHolidayUpdateReqDto;
 import com._team._team.attendance.dto.resDto.CompanyHolidayResDto;
 import com._team._team.attendance.feignClients.MemberCalendarClient;
+import com._team._team.attendance.kafka.RagSyncAttendanceEventPublisher;
 import com._team._team.attendance.repository.CompanyHolidayRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.attendance.dto.resDto.LegalHolidayResDto;
+import com._team._team.event.RagSyncAttendanceEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -25,17 +28,19 @@ public class CompanyHolidayService {
 
     private final CompanyHolidayRepository companyHolidayRepository;
     private final MemberCalendarClient memberCalendarClient;
+    private final RagSyncAttendanceEventPublisher ragSyncAttendanceEventPublisher;
 
     @Autowired
-    public CompanyHolidayService(CompanyHolidayRepository companyHolidayRepository, MemberCalendarClient memberCalendarClient) {
+    public CompanyHolidayService(CompanyHolidayRepository companyHolidayRepository,
+                                 MemberCalendarClient memberCalendarClient,
+                                 RagSyncAttendanceEventPublisher ragSyncAttendanceEventPublisher) {
         this.companyHolidayRepository = companyHolidayRepository;
         this.memberCalendarClient = memberCalendarClient;
+        this.ragSyncAttendanceEventPublisher = ragSyncAttendanceEventPublisher;
     }
 
     /**
      * 공휴일 등록
-     * 같은 회사, 같은 날짜 이미 등록된 공휴일이 있으면 409 에러
-     * 기본값 isPaidYn='Y', isLegalYn='N' (커스텀 휴일)
      */
     public CompanyHolidayResDto createHoliday(UUID companyId, CompanyHolidayCreateReqDto reqDto) {
         boolean duplicated = companyHolidayRepository
@@ -48,10 +53,24 @@ public class CompanyHolidayService {
 
         CompanyHoliday holiday = reqDto.toEntity(companyId);
         CompanyHoliday saved = companyHolidayRepository.save(holiday);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncAttendanceEventPublisher.publish(
+                RagSyncAttendanceEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("CREATED")
+                        .resourceType("HOLIDAY")
+                        .resourceId(saved.getCompanyHolidayId())
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return CompanyHolidayResDto.fromEntity(saved);
     }
 
-    /** 공휴일 전체 목록 조회, 법정 + 커스텀 모두 포함 */
+    /** 공휴일 전체 목록 조회 */
     @Transactional(readOnly = true)
     public List<CompanyHolidayResDto> findHolidays(UUID companyId) {
         List<CompanyHoliday> holidays = companyHolidayRepository
@@ -62,8 +81,7 @@ public class CompanyHolidayService {
     }
 
     /**
-     * 공휴일 수정, 커스텀만 수정 허용
-     * - 공휴일명, 날짜, 유급여부 부분 업데이트
+     * 공휴일 수정 (커스텀만)
      */
     public CompanyHolidayResDto updateHoliday(UUID companyId, UUID companyHolidayId, CompanyHolidayUpdateReqDto reqDto) {
         CompanyHoliday holiday = findActive(companyId, companyHolidayId);
@@ -74,11 +92,25 @@ public class CompanyHolidayService {
         }
 
         holiday.update(reqDto);
+
+        // RAG 동기화 이벤트 발행
+        ragSyncAttendanceEventPublisher.publish(
+                RagSyncAttendanceEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("UPDATED")
+                        .resourceType("HOLIDAY")
+                        .resourceId(companyHolidayId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+
         return CompanyHolidayResDto.fromEntity(holiday);
     }
 
     /**
-     * 공휴일 삭제, 커스텀만 삭제 허용
+     * 공휴일 삭제 (커스텀만)
      */
     public void deleteHoliday(UUID companyId, UUID companyHolidayId) {
         CompanyHoliday holiday = findActive(companyId, companyHolidayId);
@@ -88,9 +120,20 @@ public class CompanyHolidayService {
                     "법정 공휴일은 삭제할 수 없습니다. 필요시 새로고침으로 재수집하세요.");
         }
         holiday.delete();
-    }
 
-    // 법정 공휴일 연동
+        // RAG 동기화 이벤트 발행
+        ragSyncAttendanceEventPublisher.publish(
+                RagSyncAttendanceEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("DELETED")
+                        .resourceType("HOLIDAY")
+                        .resourceId(companyHolidayId)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
+    }
 
     /**
      * 회사 가입 시 법정 공휴일 일괄 복사, 올해 + 내년
@@ -99,12 +142,23 @@ public class CompanyHolidayService {
         int currentYear = LocalDate.now().getYear();
         importYear(companyId, currentYear);
         importYear(companyId, currentYear + 1);
+
+        // RAG 동기화 이벤트 발행 (BULK)
+        ragSyncAttendanceEventPublisher.publish(
+                RagSyncAttendanceEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .companyId(companyId)
+                        .action("BULK")
+                        .resourceType("HOLIDAY")
+                        .resourceId(null)
+                        .timestamp(Instant.now())
+                        .triggeredBy("system")
+                        .build()
+        );
     }
 
-
     /**
-     * 관리자 수동 새로고침, 지정 연도 법정 공휴일 재수집
-     * isLegalYn='Y' 만 하드 삭제 후 재삽입, 커스텀 휴일은 건드리지 않음
+     * 관리자 수동 새로고침
      */
     public int refreshLegalHolidays(UUID companyId, int year) {
         LocalDate yearStart = LocalDate.of(year, 1, 1);
@@ -145,6 +199,22 @@ public class CompanyHolidayService {
         companyHolidayRepository.saveAll(toSave);
         log.info("법정 공휴일 새로고침 완료 companyId={}, year={}, count={}",
                 companyId, year, toSave.size());
+
+        // RAG 동기화 이벤트 발행 (BULK, 실제 저장된 경우만)
+        if (!toSave.isEmpty()) {
+            ragSyncAttendanceEventPublisher.publish(
+                    RagSyncAttendanceEvent.builder()
+                            .eventId(UUID.randomUUID())
+                            .companyId(companyId)
+                            .action("BULK")
+                            .resourceType("HOLIDAY")
+                            .resourceId(null)
+                            .timestamp(Instant.now())
+                            .triggeredBy("system")
+                            .build()
+            );
+        }
+
         return toSave.size();
     }
 
@@ -162,7 +232,7 @@ public class CompanyHolidayService {
                             .holidayDate(h.getHolidayDate())
                             .holidayName(h.getHolidayName())
                             .isPaidYn("Y")
-                            .isLegalYn("Y")              // 법정 태그
+                            .isLegalYn("Y")
                             .build())
                     .toList();
 

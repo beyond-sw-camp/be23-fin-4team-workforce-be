@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,11 +25,22 @@ public interface SimplifiedTaxTableRepository extends JpaRepository<SimplifiedTa
             @Param("salary") Long salary,
             @Param("dependents") Integer dependents);
 
-    // 연도별 삭제, 재업로드 시 기존 데이터 소프트 삭제
+    // 연도별 삭제, 재업로드 시 기존 데이터 삭제
     @org.springframework.data.jpa.repository.Modifying
     @Query("""
            UPDATE SimplifiedTaxTable t SET t.delYn = 'Y'
            WHERE t.effectiveYear = :year AND t.delYn = 'N'
            """)
     int softDeleteByYear(@Param("year") Integer year);
+
+    // 등록된 연도 목록 화면 표시용
+    @Query("""
+           SELECT DISTINCT t.effectiveYear FROM SimplifiedTaxTable t
+           WHERE t.delYn = 'N'
+           ORDER BY t.effectiveYear DESC
+           """)
+    List<Integer> findDistinctYears();
+
+    // 연도별 행 수 카운트
+    long countByEffectiveYearAndDelYn(Integer effectiveYear, String delYn);
 }

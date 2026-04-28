@@ -16,8 +16,14 @@ import com._team._team.salary.dto.reqdto.PayrollCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollItemUpdateReqDto;
 import com._team._team.salary.dto.reqdto.PayrollUpdateReqDto;
+import com._team._team.salary.dto.resdto.BulkPayrollActionResDto;
+import com._team._team.salary.dto.resdto.MyAnnualSalaryResDto;
+import com._team._team.salary.dto.resdto.PayrollAdminListResDto;
 import com._team._team.salary.dto.resdto.PayrollItemResDto;
 import com._team._team.salary.dto.resdto.PayrollResDto;
+import com._team._team.salary.feignClients.MemberFeignClient;
+import com._team._team.salary.feignClients.dto.MemberResDto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -33,6 +39,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.Map;
@@ -40,6 +48,7 @@ import java.util.stream.Collectors;
 import java.time.temporal.ChronoUnit;
 
 
+@Slf4j
 @Service
 @Transactional
 public class PayrollService {
@@ -52,13 +61,18 @@ public class PayrollService {
     private final MemberAllowanceService memberAllowanceService;
     private final MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final MemberFeignClient memberFeignClient;
 
     @Autowired
     public PayrollService(PayrollRepository payrollRepository,
                           PayrollItemRepository payrollItemRepository,
                           SalaryRepository salaryRepository,
                           SalaryItemTemplateRepository salaryItemTemplateRepository,
-                          PayrollCalculationService payrollCalculationService, MemberAllowanceService memberAllowanceService, MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository, ApplicationEventPublisher eventPublisher){
+                          PayrollCalculationService payrollCalculationService,
+                          MemberAllowanceService memberAllowanceService,
+                          MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository,
+                          ApplicationEventPublisher eventPublisher,
+                          MemberFeignClient memberFeignClient){
         this.payrollRepository = payrollRepository;
         this.payrollItemRepository = payrollItemRepository;
         this.salaryRepository = salaryRepository;
@@ -67,6 +81,7 @@ public class PayrollService {
         this.memberAllowanceService = memberAllowanceService;
         this.memberLeaveOfAbsenceRepository = memberLeaveOfAbsenceRepository;
         this.eventPublisher = eventPublisher;
+        this.memberFeignClient = memberFeignClient;
     }
 
     /**
@@ -251,7 +266,9 @@ public class PayrollService {
          * totalTaxableEarning: 비과세 제외 -> 실제 과세 대상 금액
          */
         List<AutoPayrollItem> deductionItems = payrollCalculationService.calculateDeductions(
-                totalTaxableEarning, reqDto.getPayrollYearMonthDay());
+                totalTaxableEarning,
+                reqDto.getPayrollYearMonthDay(),
+                salary.getDependentCount() == null ? 1 : salary.getDependentCount());
 
         for(AutoPayrollItem deduction : deductionItems){
             PayrollItem payrollItem = buildPayrollItem(saved ,deduction);
@@ -383,6 +400,204 @@ public class PayrollService {
                 .build());
 
         return PayrollResDto.fromEntity(payroll);
+    }
+
+    // 회사 월 단위 급여대장 전체 조회 직원 정보 결합
+    @Transactional(readOnly = true)
+    public List<PayrollAdminListResDto> listByCompanyAndMonth(UUID companyId, YearMonth ym) {
+        LocalDate from = ym.atDay(1);
+        LocalDate to = ym.atEndOfMonth();
+
+        List<Payroll> payrolls = payrollRepository.findInMonthFetchItems(companyId, from, to);
+        if (payrolls.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<UUID, MemberResDto> memberMap = fetchMemberMap(companyId);
+
+        return payrolls.stream()
+                .map(p -> {
+                    MemberResDto m = memberMap.get(p.getMemberId());
+                    String sabun = m != null ? m.getSabun() : null;
+                    String name = m != null ? m.getName() : null;
+                    String orgName = m != null ? m.getOrganizationName() : null;
+                    return PayrollAdminListResDto.fromEntity(p, sabun, name, orgName);
+                })
+                .toList();
+    }
+
+    // 일괄 확정 행별 try catch 한 명 실패해도 다른 행 진행
+    public BulkPayrollActionResDto bulkConfirm(UUID companyId, List<UUID> payrollIds) {
+        int success = 0;
+        int fail = 0;
+        List<String> failures = new ArrayList<>();
+
+        for (UUID id : payrollIds) {
+            try {
+                confirmPayroll(companyId, id);
+                success++;
+            } catch (BusinessException e) {
+                fail++;
+                failures.add(id + " - " + e.getMessage());
+            } catch (Exception e) {
+                fail++;
+                failures.add(id + " - 예상치 못한 오류");
+            }
+        }
+
+        log.info("[PAYROLL-BULK-CONFIRM] companyId={} success={} fail={}",
+                companyId, success, fail);
+
+        return BulkPayrollActionResDto.builder()
+                .success(success)
+                .fail(fail)
+                .failures(failures)
+                .build();
+    }
+
+    // 일괄 지급 처리
+    public BulkPayrollActionResDto bulkPay(UUID companyId, List<UUID> payrollIds) {
+        int success = 0;
+        int fail = 0;
+        List<String> failures = new ArrayList<>();
+
+        for (UUID id : payrollIds) {
+            try {
+                payPayroll(companyId, id);
+                success++;
+            } catch (BusinessException e) {
+                fail++;
+                failures.add(id + " - " + e.getMessage());
+            } catch (Exception e) {
+                fail++;
+                failures.add(id + " - 예상치 못한 오류");
+            }
+        }
+
+        log.info("[PAYROLL-BULK-PAY] companyId={} success={} fail={}",
+                companyId, success, fail);
+
+        return BulkPayrollActionResDto.builder()
+                .success(success)
+                .fail(fail)
+                .failures(failures)
+                .build();
+    }
+
+    // 직원 본인 연간 급여 집계 연봉조회 화면용
+    // 월별 행 12개 고정 (없는 달은 0)
+    // 항목별 누적 (지급 / 공제 분리)
+    @Transactional(readOnly = true)
+    public MyAnnualSalaryResDto findMyAnnual(UUID companyId, UUID memberId, int year) {
+        LocalDate from = LocalDate.of(year, 1, 1);
+        LocalDate to = LocalDate.of(year, 12, 31);
+
+        List<Payroll> payrolls = payrollRepository
+                .findInYearByMemberFetchItems(companyId, memberId, from, to);
+
+        // 월별 행 1 ~ 12 빈 슬롯 먼저 생성
+        Map<Integer, MyAnnualSalaryResDto.MonthlyRow> monthly = new LinkedHashMap<>();
+        for (int m = 1; m <= 12; m++) {
+            monthly.put(m, MyAnnualSalaryResDto.MonthlyRow.builder()
+                    .month(m)
+                    .payrollId(null)
+                    .payrollYearMonthDay(null)
+                    .payrollStatus(null)
+                    .totalPayment(0L)
+                    .totalDeduction(0L)
+                    .netPay(0L)
+                    .build());
+        }
+
+        // 항목 누적 LinkedHashMap 사용 화면 표시 순서 유지
+        Map<String, Long> earnSum = new LinkedHashMap<>();
+        Map<String, Long> dedSum = new LinkedHashMap<>();
+
+        long totalPayment = 0L;
+        long totalDeduction = 0L;
+        long netPay = 0L;
+        int payrollCount = 0;
+
+        for (Payroll p : payrolls) {
+            int month = p.getPayrollYearMonthDay().getMonthValue();
+            long pay = nz(p.getTotalPayment());
+            long ded = nz(p.getTotalDeduction());
+            long net = nz(p.getNetPay());
+
+            // 같은 달 여러 건이면 누적
+            MyAnnualSalaryResDto.MonthlyRow prev = monthly.get(month);
+            MyAnnualSalaryResDto.MonthlyRow merged = MyAnnualSalaryResDto.MonthlyRow.builder()
+                    .month(month)
+                    .payrollId(p.getPayrollId() != null ? p.getPayrollId().toString() : null)
+                    .payrollYearMonthDay(p.getPayrollYearMonthDay() != null
+                            ? p.getPayrollYearMonthDay().toString() : null)
+                    .payrollStatus(p.getPayrollStatus())
+                    .totalPayment(prev.getTotalPayment() + pay)
+                    .totalDeduction(prev.getTotalDeduction() + ded)
+                    .netPay(prev.getNetPay() + net)
+                    .build();
+            monthly.put(month, merged);
+
+            totalPayment += pay;
+            totalDeduction += ded;
+            netPay += net;
+            payrollCount++;
+
+            if (p.getPayrollItemList() != null) {
+                for (PayrollItem item : p.getPayrollItemList()) {
+                    if (item == null || "Y".equals(item.getDelYn())) continue;
+                    long amt = nz(item.getAmount());
+                    if (item.getItemType() == ItemType.EARNING) {
+                        earnSum.merge(item.getItemName(), amt, Long::sum);
+                    } else if (item.getItemType() == ItemType.DEDUCTION) {
+                        dedSum.merge(item.getItemName(), amt, Long::sum);
+                    }
+                }
+            }
+        }
+
+        long monthlyAverage = payrollCount > 0 ? netPay / payrollCount : 0L;
+
+        return MyAnnualSalaryResDto.builder()
+                .year(year)
+                .monthly(new ArrayList<>(monthly.values()))
+                .earnings(toBreakdown(earnSum))
+                .deductions(toBreakdown(dedSum))
+                .totalPayment(totalPayment)
+                .totalDeduction(totalDeduction)
+                .netPay(netPay)
+                .monthlyAverage(monthlyAverage)
+                .payrollCount(payrollCount)
+                .build();
+    }
+
+    private static long nz(Long v) {
+        return v != null ? v : 0L;
+    }
+
+    private static List<MyAnnualSalaryResDto.ItemBreakdown> toBreakdown(Map<String, Long> sum) {
+        List<MyAnnualSalaryResDto.ItemBreakdown> rows = new ArrayList<>();
+        for (Map.Entry<String, Long> e : sum.entrySet()) {
+            rows.add(MyAnnualSalaryResDto.ItemBreakdown.builder()
+                    .itemName(e.getKey())
+                    .totalAmount(e.getValue())
+                    .build());
+        }
+        return rows;
+    }
+
+    // 회사 직원 정보 일괄 조회 헬퍼
+    private Map<UUID, MemberResDto> fetchMemberMap(UUID companyId) {
+        try {
+            var res = memberFeignClient.getMembersByCompany(companyId);
+            if (res == null || res.getData() == null) return Collections.emptyMap();
+            return res.getData().stream()
+                    .collect(Collectors.toMap(
+                            MemberResDto::getMemberId, m -> m, (a, b) -> a));
+        } catch (Exception e) {
+            log.warn("[PAYROLL-LIST] 직원 조회 실패 companyId={} 빈 Map 반환", companyId, e);
+            return Collections.emptyMap();
+        }
     }
 
     // 급여대장 항목

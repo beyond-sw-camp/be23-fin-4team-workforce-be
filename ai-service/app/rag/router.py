@@ -1,14 +1,13 @@
-from fastapi import APIRouter, Header, Depends
+from fastapi import APIRouter, Header
 from app.rag import service
 from app.rag.schema import RagSearchRequest, RagSearchResponse
 
-router = APIRouter()
+router = APIRouter(prefix="/rag", tags=["rag"])
 
-@router.post("/rag/search", response_model=RagSearchResponse)
-async def rag_search(
+
+@router.post("/search", response_model=RagSearchResponse)
+async def search(
         request: RagSearchRequest,
-        x_user_company_id: str = Header(..., alias="X-User-CompanyId"),
-        x_user_uuid: str = Header(..., alias="X-User-UUID")):
-    return await service.rag_search(
-        request.question,
-        x_user_company_id)
+        x_user_company_id: str = Header(..., alias="X-User-CompanyId")):
+    result = await service.rag_search(request.question, x_user_company_id)
+    return result

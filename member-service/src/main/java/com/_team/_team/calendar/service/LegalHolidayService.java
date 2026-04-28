@@ -53,40 +53,59 @@ public class LegalHolidayService {
 
     // 공공 API 에서 공휴일 수집 후 RDB + Redis 저장
     public void collectAndSaveHolidays(int year) {
-        try {
-            List<LegalHoliday> holidays = new ArrayList<>();
+        List<LegalHoliday> holidays = new ArrayList<>();
+        int monthSuccessCount = 0;
+        int monthFailCount = 0;
+        Exception lastError = null;
 
-            for (int month = 1; month <= 12; month++) {
+        /*
+         * 월별로 try-catch 분리, 한 달 실패해도 나머지 달은 계속 시도
+         */
+        for (int month = 1; month <= 12; month++) {
+            try {
                 String url = String.format(
-                        "%s?solYear=%d&solMonth=%02d&ServiceKey=%s&numOfRows=50",
+                        "%s?solYear=%d&solMonth=%02d&ServiceKey=%s&numOfRows=50&_type=json",
                         API_URL, year, month, apiKey);
 
                 String response = restTemplate.getForObject(url, String.class);
-                log.info("공공 API 응답: {}", response);
+                log.debug("공공 API 응답 year={} month={}: {}", year, month, response);
                 List<LegalHoliday> monthHolidays = parseHolidays(response, year);
                 holidays.addAll(monthHolidays);
-
+                monthSuccessCount++;
+            } catch (Exception e) {
+                monthFailCount++;
+                lastError = e;
+                log.warn("공휴일 수집 실패 year={} month={} error={}", year, month, e.getMessage());
             }
-
-            // RDB 저장 (기존 데이터 삭제 후 재저장)
-            legalHolidayRepository.deleteByYear(year);
-            legalHolidayRepository.saveAll(holidays);
-
-            // Redis 캐싱 (TTL 400일)
-            List<LegalHolidayResDto> resDtos = holidays.stream()
-                    .map(LegalHolidayResDto::fromEntity)
-                    .collect(Collectors.toList());
-
-            redisTemplate.opsForValue().set(
-                    REDIS_KEY_PREFIX + year,
-                    resDtos,
-                    400, TimeUnit.DAYS);
-
-            log.info("공휴일 수집 완료 year: {} count: {}", year, holidays.size());
-
-        } catch (Exception e) {
-            log.error("공휴일 수집 실패 year: {} error: {}", year, e.getMessage());
         }
+
+        // 12개월 모두 실패면 호출자가 인지할 수 있게 예외 전파
+        if (monthSuccessCount == 0 && monthFailCount > 0) {
+            log.error("공휴일 수집 전체 실패 year: {}", year, lastError);
+            throw new RuntimeException(
+                    "공공 데이터포털 호출에 모두 실패했습니다 (year=" + year + "): "
+                            + (lastError != null ? lastError.getMessage() : "알 수 없는 오류"),
+                    lastError);
+        }
+
+        // RDB 저장 (기존 데이터 삭제 후 재저장),  일부 월만 성공한 경우에도 부분 반영
+        legalHolidayRepository.deleteByYear(year);
+        if (!holidays.isEmpty()) {
+            legalHolidayRepository.saveAll(holidays);
+        }
+
+        // Redis 캐싱 (TTL 400일)
+        List<LegalHolidayResDto> resDtos = holidays.stream()
+                .map(LegalHolidayResDto::fromEntity)
+                .collect(Collectors.toList());
+
+        redisTemplate.opsForValue().set(
+                REDIS_KEY_PREFIX + year,
+                resDtos,
+                400, TimeUnit.DAYS);
+
+        log.info("공휴일 수집 완료 year={} count={} successMonths={} failMonths={}",
+                year, holidays.size(), monthSuccessCount, monthFailCount);
     }
 
     // 공휴일 조회 (Redis → RDB → 공공 API 순서)

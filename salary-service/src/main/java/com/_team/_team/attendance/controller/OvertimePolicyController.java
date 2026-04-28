@@ -97,4 +97,12 @@ public class OvertimePolicyController {
                 ApiResponse.success(resDto, "연장근로 정책 이력 조회 성공"),
                 HttpStatus.OK);
     }
+    // 내부통신용
+    @GetMapping("/internal")
+    public ResponseEntity<?> findHistoryInternal(@RequestParam UUID companyId) {
+        List<OvertimePolicyResDto> resDto = overtimePolicyService.findHistory(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "연장근로 정책 이력 조회 성공 (내부)"),
+                HttpStatus.OK);
+    }
 }
