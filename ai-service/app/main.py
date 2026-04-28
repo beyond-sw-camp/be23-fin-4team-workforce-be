@@ -16,16 +16,6 @@ logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="AI Service",
-    description="HR AI 서비스",
-    version="1.0.0"
-)
-
-app.include_router(document_router, prefix="/ai")
-app.include_router(rag_router, prefix="/ai")
-app.include_router(transcribe_router, prefix="/ai") #
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Eureka
@@ -74,6 +64,7 @@ app.include_router(document_router, prefix="/ai")
 app.include_router(rag_router, prefix="/ai")
 app.include_router(platform_router, prefix="/ai")
 app.include_router(sync_router, prefix="/ai")
+app.include_router(transcribe_router, prefix="/ai")
 
 
 @app.get("/health")
