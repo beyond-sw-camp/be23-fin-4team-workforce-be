@@ -125,7 +125,10 @@ public class PayrollService {
 
         /** 3-1. 무급 휴직 일수 기반 기본급 비례율 계산 */
         int unpaidLeaveDays = calculateUnpaidLeaveDays(companyId, reqDto.getMemberId(), period);
-        double paidRatio = calculatePaidRatio(period, salary, unpaidLeaveDays);
+        // 활성 급여정책 조회 일할계산 방식 / 월 소정근로시간 같이 결정
+        SalaryPolicy activePolicyForRatio = payrollCalculationService.findActivePolicy(
+                companyId, reqDto.getPayrollYearMonthDay());
+        double paidRatio = calculatePaidRatio(period, salary, unpaidLeaveDays, activePolicyForRatio);
 
         /** 4. Payroll 생성 (금액은 0으로 초기화, 항목 생성 후 재계산) */
         Payroll payroll = reqDto.toEntity(companyId, salary.getSalaryId());
@@ -153,6 +156,8 @@ public class PayrollService {
         long totalPayment = 0L;
         long totalTaxableEarning = 0L;   // 과세 대상 EARNING 합계 (4대보험/소득세 기준액)
         long totalDeduction = 0L;
+        // 통상임금 합계 시급 환산 기준 가산수당 base
+        long ordinaryWage = (long) Math.floor(salary.getBaseSalary() * paidRatio);
         List<PayrollItem> payrollItems = new ArrayList<>();
 
         for (SalaryItemTemplate template : templates) {
@@ -175,6 +180,11 @@ public class PayrollService {
             // EARNING/DEDUCTION 분류하여 합계 누적
             if (template.getItemType() == ItemType.EARNING) {
                 totalPayment += amount;
+                // 통상임금 플래그 Y 면 시급 환산 기준에 합산 기본급은 이미 포함되어 있어 중복 가산 방지
+                if ("Y".equals(template.getIsOrdinaryWageYn())
+                        && !"기본급".equals(template.getItemName())) {
+                    ordinaryWage += amount;
+                }
                 // 과세 항목만 과세 총액에 누적 (비과세 식대, 비과세 교통비 등 제외)
                 if ("Y".equals(template.getIsTaxableYn())) {
                     // 전액 과세
@@ -200,14 +210,13 @@ public class PayrollService {
         MonthlyAttendanceLedger ledger = payrollCalculationService.findLedger(
                 reqDto.getMemberId(), targetMonth);
 
-        /** 7. 활성 급여정책 조회 (포괄, 비포괄 + fixed OT) */
-        SalaryPolicy activePolicy = payrollCalculationService.findActivePolicy(
-                companyId, reqDto.getPayrollYearMonthDay());
+        /** 7. 활성 급여정책 재사용 (위에서 일할 계산용으로 이미 조회) */
+        SalaryPolicy activePolicy = activePolicyForRatio;
 
         /** 7-1. 초과근무수당 자동 계산 */
         AutoPayrollItem overtimeItem = payrollCalculationService.calculateOvertimePay(
                 ledger,
-                salary.getBaseSalary(),
+                ordinaryWage,
                 activePolicy);
 
         if (overtimeItem != null){
@@ -222,7 +231,7 @@ public class PayrollService {
 
         /** 8. 공휴일근무수당 자동 계산 */
         AutoPayrollItem holidayItem = payrollCalculationService.calculateHolidayWorkPay(
-                ledger, salary.getBaseSalary());
+                ledger, ordinaryWage, activePolicy);
 
         if(holidayItem != null){
             PayrollItem payrollItem = buildPayrollItem(saved, holidayItem);
@@ -236,7 +245,7 @@ public class PayrollService {
 
         /** 8-1. 야간근무수당 자동 계산 (가산분 0.5배) */
         AutoPayrollItem nightItem = payrollCalculationService.calculateNightWorkPay(
-                ledger, salary.getBaseSalary());
+                ledger, ordinaryWage, activePolicy);
 
         if(nightItem != null){
             PayrollItem payrollItem = buildPayrollItem(saved, nightItem);
@@ -249,11 +258,24 @@ public class PayrollService {
         }
 
         /**
+         * 8-2-pre. 지각·조퇴 공제 자동 계산
+         * 분 단위 정밀 차감 4대보험 base 는 기본급 유지
+         */
+        AutoPayrollItem tardyItem = payrollCalculationService.calculateTardyEarlyLeaveDeduction(
+                ledger, ordinaryWage, activePolicy);
+
+        if (tardyItem != null) {
+            PayrollItem payrollItem = buildPayrollItem(saved, tardyItem);
+            payrollItems.add(payrollItem);
+            totalDeduction += tardyItem.amount();
+        }
+
+        /**
          * 8-2. 결근 공제, 주휴수당 포함
          * 4대보험 계산 전에 공제하여 명세서에 명시적 표시, 4대보험 base 는 기본급 유지
          */
         AutoPayrollItem absentItem = payrollCalculationService.calculateAbsentDeduction(
-                ledger, salary.getBaseSalary());
+                ledger, ordinaryWage, activePolicy);
 
         if (absentItem != null) {
             PayrollItem payrollItem = buildPayrollItem(saved, absentItem);
@@ -748,12 +770,19 @@ public class PayrollService {
     }
 
     /**
-     * 실근무일 비율, 정산기간 대비 근무일 / 총일수
-     * - Salary.effectiveFrom 이 period 시작 후 → 중도 입사 일할
-     * - Salary.effectiveTo 가 period 종료 전 → 중도 퇴사 일할
-     * - 무급휴직일 추가 차감
+     * 실근무일 비율 정산기간 대비 근무일 / 분모
+     *  - Salary.effectiveFrom 이 period 시작 후 중도 입사 일할
+     *  - Salary.effectiveTo 가 period 종료 전 중도 퇴사 일할
+     *  - 무급휴직일 추가 차감
+     *  - 분모는 정책 ProrationMethod 따라 분기
+     *    DAYS_IN_MONTH 해당월 일수 (28~31)
+     *    FIXED_30 30일 고정 (통상임금 표준)
+     *    WORKING_DAYS 월 소정근로일 (간이 22일 사용 회사 영업일 카운트는 향후 보강)
      */
-    private double calculatePaidRatio(SettlementPeriod period, Salary salary, int unpaidLeaveDays) {
+    private double calculatePaidRatio(SettlementPeriod period,
+                                      Salary salary,
+                                      int unpaidLeaveDays,
+                                      SalaryPolicy policy) {
         LocalDate periodStart = period.from();
         LocalDate periodEnd = period.to();
         int periodDays = (int) ChronoUnit.DAYS.between(periodStart, periodEnd) + 1;
@@ -772,6 +801,22 @@ public class PayrollService {
         int workDays = (int) ChronoUnit.DAYS.between(workStart, workEnd) + 1;
         workDays = Math.max(0, workDays - unpaidLeaveDays);
 
-        return (double) workDays / periodDays;
+        // 정책 분기 분모 결정
+        com._team._team.salary.domain.enums.ProrationMethod method =
+                policy != null && policy.getProrationMethod() != null
+                        ? policy.getProrationMethod()
+                        : com._team._team.salary.domain.enums.ProrationMethod.DAYS_IN_MONTH;
+
+        int denominator;
+        switch (method) {
+            case FIXED_30 -> denominator = 30;
+            case WORKING_DAYS -> denominator = 22;  // 간이 22일 향후 회사 영업일 캘린더 연동
+            case DAYS_IN_MONTH -> denominator = periodDays;
+            default -> denominator = periodDays;
+        }
+
+        // 비율은 1.0 을 넘지 않도록 캡 (FIXED_30 에서 31일 월에 발생할 수 있음)
+        double ratio = (double) workDays / denominator;
+        return Math.min(ratio, 1.0);
     }
 }
