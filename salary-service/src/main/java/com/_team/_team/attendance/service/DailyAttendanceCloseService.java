@@ -48,7 +48,15 @@ public class DailyAttendanceCloseService {
             DailyAttendanceRepository dailyAttendanceRepository,
             WorkScheduleRepository workScheduleRepository,
             ApprovalServiceClient approvalServiceClient,
-            AttendanceAnomalyDetector anomalyDetector, ScheduleResolver scheduleResolver, WorkTimeClassifier workTimeClassifier, CompanyHolidayRepository companyHolidayRepository, OvertimeRequestRepository overtimeRequestRepository, OvertimePolicyRepository overtimePolicyRepository, LeaveAttendanceReflector leaveAttendanceReflector, LeaveOfAbsenceAttendanceReflector leaveOfAbsenceAttendanceReflector, MemberLeaveOfAbsenceService memberLeaveOfAbsenceService) {
+            AttendanceAnomalyDetector anomalyDetector,
+            ScheduleResolver scheduleResolver,
+            WorkTimeClassifier workTimeClassifier,
+            CompanyHolidayRepository companyHolidayRepository,
+            OvertimeRequestRepository overtimeRequestRepository,
+            OvertimePolicyRepository overtimePolicyRepository,
+            LeaveAttendanceReflector leaveAttendanceReflector,
+            LeaveOfAbsenceAttendanceReflector leaveOfAbsenceAttendanceReflector,
+            MemberLeaveOfAbsenceService memberLeaveOfAbsenceService) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.workScheduleRepository = workScheduleRepository;
         this.approvalServiceClient = approvalServiceClient;
@@ -123,7 +131,7 @@ public class DailyAttendanceCloseService {
             return;
         }
 
-    // 스케줄 해석 + 재계산
+        // 스케줄 해석 + 재계산
         ResolvedSchedule schedule = scheduleResolver.resolve(
                 da.getMemberId(), da.getCompanyId(), da.getAttendanceDate());
 
@@ -232,6 +240,45 @@ public class DailyAttendanceCloseService {
         da.transitionClosure(ClosureStatus.FINALIZED);
 
         return autoClockOutApplied;
+    }
+
+    /**
+     * 정정 신청 승인 시 재계산 + FINALIZED 직행
+     * - UNDER_REVIEW 상태 DA 만 처리
+     * - draftOne / finalizeOne 과 동일한 분류 로직을 거쳐 workedMinutes / overtimeMinutes 갱신
+     * - 자동 퇴근 채움은 안 함 (정정 시 직원이 시각을 명시했음)
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recalculateAndFinalize(UUID dailyAttendanceId) {
+        DailyAttendance da = dailyAttendanceRepository.findById(dailyAttendanceId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "출근 기록이 없습니다 : " + dailyAttendanceId));
+
+        if (da.getClosureStatus() != ClosureStatus.UNDER_REVIEW) {
+            throw new IllegalStateException(
+                    "검토 대기(UNDER_REVIEW) 상태가 아닙니다. status=" + da.getClosureStatus());
+        }
+
+        ResolvedSchedule schedule = scheduleResolver.resolve(
+                da.getMemberId(), da.getCompanyId(), da.getAttendanceDate());
+
+        boolean isHoliday = companyHolidayRepository.existsByCompanyIdAndHolidayDate(
+                da.getCompanyId(), da.getAttendanceDate());
+
+        Integer approvedOt = overtimeRequestRepository.sumApprovedMinutes(
+                da.getMemberId(), da.getAttendanceDate());
+        int approvedMinutes = approvedOt == null ? 0 : approvedOt;
+
+        OvertimePolicy otPolicy = overtimePolicyRepository
+                .findEffective(da.getCompanyId(), da.getAttendanceDate())
+                .orElseThrow(() -> new IllegalStateException(
+                        "OvertimePolicy not found. companyId=" + da.getCompanyId()));
+
+        WorkTimeBreakdown breakdown = workTimeClassifier.classify(
+                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeFloorMinutes());
+
+        da.applyWorkResult(breakdown.totalPayableMinutes(), breakdown.overtimeMinutes());
+        da.transitionClosure(ClosureStatus.FINALIZED);
     }
 
     // 자동 퇴근시각 결정 (승인된 OT > 스케줄 end > 출근+8h)
