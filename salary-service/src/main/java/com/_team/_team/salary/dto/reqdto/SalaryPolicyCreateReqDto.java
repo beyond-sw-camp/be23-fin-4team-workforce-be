@@ -2,6 +2,7 @@ package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
+import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -43,6 +44,17 @@ public class SalaryPolicyCreateReqDto {
     @Min(value = 0, message = "고정 오버타임시간(분)은 0 이상이어야 합니다.")
     private Integer fixedOvertimeMinutes;
 
+    // 월 소정근로시간 시급 환산 기준
+    // 한국 표준 209h 주 35h 회사 183h 등 회사별 다름
+    @Min(value = 1, message = "월 소정근로시간은 1 이상이어야 합니다.")
+    @Max(value = 300, message = "월 소정근로시간은 300 이하여야 합니다.")
+    @Builder.Default
+    private Integer monthlyOrdinaryHours = 209;
+
+    // 일할계산 방식 입사 / 퇴사 / 기간변경 월 적용
+    @Builder.Default
+    private ProrationMethod prorationMethod = ProrationMethod.DAYS_IN_MONTH;
+
     @NotNull(message = "적용 시작일은 필수입니다.")
     private LocalDate effectiveFrom;
 
@@ -62,6 +74,16 @@ public class SalaryPolicyCreateReqDto {
                         wageSystemType == WageSystemType.NON_COMPREHENSIVE
                                 ? 0
                                 : (fixedOvertimeMinutes == null ? 0 : fixedOvertimeMinutes)
+                )
+                .monthlyOrdinaryHours(
+                        monthlyOrdinaryHours == null || monthlyOrdinaryHours <= 0
+                                ? 209
+                                : monthlyOrdinaryHours
+                )
+                .prorationMethod(
+                        prorationMethod == null
+                                ? ProrationMethod.DAYS_IN_MONTH
+                                : prorationMethod
                 )
                 .build();
     }
