@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pinecone import Pinecone
 from app.config import settings
 import logging

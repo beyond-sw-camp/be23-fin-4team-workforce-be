@@ -9,12 +9,22 @@ from app.sync.kafka_consumer import start_consumer_thread
 from app.database import Base, engine
 from app.config import settings
 import py_eureka_client.eureka_client as eureka_client
+from app.transcribe.router import router as transcribe_router #
 import logging
 
 logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 
+app = FastAPI(
+    title="AI Service",
+    description="HR AI 서비스",
+    version="1.0.0"
+)
+
+app.include_router(document_router, prefix="/ai")
+app.include_router(rag_router, prefix="/ai")
+app.include_router(transcribe_router, prefix="/ai") #
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
