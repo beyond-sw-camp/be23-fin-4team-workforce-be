@@ -79,4 +79,14 @@ public interface AbsenceProxyRepository extends JpaRepository<AbsenceProxy, UUID
             @Param("companyId") UUID companyId,
             @Param("substituteId") UUID substituteId,
             @Param("now") LocalDateTime now);
+
+    // memberId로 현재 활성 대결자 조회 (알림용 — companyId 불필요)
+    @Query("SELECT ap FROM AbsenceProxy ap " +
+            "WHERE ap.memberId = :memberId " +
+            "AND ap.isActiveYn = 'Y' " +
+            "AND ap.startDate <= :now " +
+            "AND ap.endDate >= :now")
+    Optional<AbsenceProxy> findActiveProxyByMemberId(
+            @Param("memberId") UUID memberId,
+            @Param("now") LocalDateTime now);
 }

@@ -1,28 +1,18 @@
 <div align="center">
 <img width="845" alt="WORKFORCE" src="https://github.com/user-attachments/assets/a8d3b7b8-4880-491f-9073-0dad92340ea5" />
+
+### 기록하는 HR &rarr; 예측하는 HR
+
+중소기업을 위한 **데이터 기반 All-in-One 스마트 HRMS**<br>
+인사 데이터를 중앙화하고 AI로 선제적 인사이트를 제공하는 HR 담당자의 **'Second Brain'**
+
+`2025.XX ~ 2025.XX` &nbsp;|&nbsp; 4명
+
 </div>
-
-<hr>
-
-## 목차
-- [팀 소개 및 프로젝트 소개](#팀-소개-및-프로젝트-소개)
-- [주요 기능](#주요-모듈-기능-요약)
-- [기획서](#기획서)
-- [기술 스택](#기술-스택)
-- [시스템 아키텍처](#시스템-아키텍처)
-- [요구사항 명세서](#요구사항-명세서)
-- [WBS](#wbs)
-- [ERD](#erd)
-- [화면설계서](#화면설계서)
-- [프로그램 사양서 및 단위테스트결과서](#프로그램-사양서-및-단위테스트결과서)
-- [단위 테스트](#단위-테스트)
-- [UI / UX 테스트](#ui--ux-단위-테스트)
-- [CI / CD 계획서](#ci--cd-계획서)
-- [프로젝트 회고](#프로젝트-회고)
 
 ---
 
-## 팀 소개 및 프로젝트 소개
+## 팀원 소개
 
 <div align="center">
 
@@ -32,34 +22,55 @@
 
 </div>
 
-"기록하는 HR → 예측하는 HR" 비전의 **데이터 기반 All-in-One 스마트 HRMS**입니다. 중소기업 HR 담당자의 **'Second Brain'** 역할을 수행하며, 인사 데이터를 중앙화하고 AI로 선제적 인사이트를 제공합니다.
+---
 
-<br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
+## 목차
 
-## 주요 모듈 기능 요약
+1. [프로젝트 배경 & 기획 의도](#프로젝트-배경--기획-의도)
+2. [주요 기능](#주요-기능)
+3. [시스템 아키텍처](#시스템-아키텍처)
+4. [기술 스택](#기술-스택)
+5. [화면 설계 & 주요 화면](#화면-설계--주요-화면)
+6. [AI 기능](#ai-기능)
+7. [트러블슈팅](#트러블슈팅)
+8. [CI / CD & 배포](#ci--cd--배포)
+9. [테스트](#테스트)
+10. [프로젝트 회고](#프로젝트-회고)
 
-<br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
+---
 
-## 기획서
+## 프로젝트 배경 & 기획 의도
 
 - [Figma 기획서 보기](https://www.figma.com/proto/6suak3PIQpHGzS3UBatOF1/%ED%95%9C%ED%99%94-BEYOND-SW-CAMP-23%EA%B8%B0?node-id=618-102&viewport=696%2C533%2C0.2&t=o5woH0kckAYE5DgS-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=618%3A102&page-id=612%3A67)
 - [기획서 PDF 다운로드](docs/WORKFORCE_프로젝트_기획서.pdf)
 
+<!-- TODO: 프로젝트 배경, 문제 정의, 솔루션 방향 작성 -->
+
 <br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## 주요 기능
+
+<!-- TODO: 모듈별 핵심 기능 요약 + 스크린샷/GIF -->
+
+<br>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## 시스템 아키텍처
+
+<!-- TODO: 아키텍처 다이어그램 이미지 -->
+
+<br>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
 
 ## 기술 스택
+
 ### Backend - Spring
 ![Java](https://img.shields.io/badge/java-007396?style=for-the-badge&logo=java&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/spring%20boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
@@ -108,66 +119,71 @@
 ![Figma](https://img.shields.io/badge/figma-F24E1E?style=for-the-badge&logo=figma&logoColor=white)
 
 <br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
+<div align="right"><a href="#목차">맨 위로</a></div>
 
-## 요구사항 명세서
-- [요구사항 명세서 보기](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=63147339#gid=63147339)
+---
 
-<img width="845" alt="WORKFORCE 요구사항 명세서" src="./docs/WORKFORCE_요구사항명세서.png" />
-
-<br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
-
-## WBS
-- [WBS 보기](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=395838842#gid=395838842)
-
-<img width="845" alt="WORKFORCE WBS" src="./docs/WORKFORCE_WBS.png" />
-
-<br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
-
-## ERD
-
-- [ERD 전체 보기](https://www.erdcloud.com/d/Er4amBY2KpweBcKTk)
-
-<img width="1302" alt="WORKFORCE ERD" src="./docs/WORKFORCE_ERD.png" />
-
-<br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
-
-## 화면설계서
+## 화면 설계 & 주요 화면
 
 - [Figma 전체 보기](https://www.figma.com/design/FftNc7FU8cuQZS2VnKm3NR/be23-fin-team4-workforce?node-id=0-1&t=AZ9PaJjekutgn9fR-1)
 
-<img width="1302" alt="WORKFORCE ERD" src="" />
+<!-- TODO: 주요 화면 스크린샷/GIF 추가 -->
 
 <br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
+<div align="right"><a href="#목차">맨 위로</a></div>
 
+---
 
-## 프로그램 사양서 및 단위테스트결과서
+## AI 기능
 
-- 🔗 [프로그램 사양서 및 단위테스트결과서](https://documenter.getpostman.com/view/51059789/2sBXqDrNZT)
-
-<img width="1302" alt="WORKFORCE ERD" src="여기에_이미지_URL_넣기" />
+<!-- TODO: RAG 챗봇, 결재 초안 자동 생성 등 AI 기능 소개 -->
 
 <br>
-<div align="right">
-  <a href="#목차">🔝 맨 위로</a>
-</div>
-<hr>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## 트러블슈팅
+
+<!-- TODO: 주요 기술적 문제 → 원인 → 해결 사례 3개 정도 -->
+
+<br>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## CI / CD & 배포
+
+<!-- TODO: GitHub Actions 파이프라인, AWS 배포 구성도 -->
+
+<br>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## 테스트
+
+<!-- TODO: 단위 테스트, UI/UX 테스트 결과 -->
+
+<br>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## 프로젝트 회고
+
+<!-- TODO: 배운 점, 아쉬운 점, 추후 개선 계획 -->
+
+<br>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## 부록
+
+- [ERD 전체 보기](https://www.erdcloud.com/d/Er4amBY2KpweBcKTk)
+- [프로그램 사양서 및 단위테스트결과서](https://documenter.getpostman.com/view/51059789/2sBXqDrNZT)
+- [요구사항 명세서](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=63147339#gid=63147339)
+- [WBS](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=395838842#gid=395838842)
+- [Figma 기획서](https://www.figma.com/proto/6suak3PIQpHGzS3UBatOF1/%ED%95%9C%ED%99%94-BEYOND-SW-CAMP-23%EA%B8%B0?node-id=618-102&viewport=696%2C533%2C0.2&t=o5woH0kckAYE5DgS-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=618%3A102&page-id=612%3A67)
+- [기획서 PDF](docs/WORKFORCE_프로젝트_기획서.pdf)

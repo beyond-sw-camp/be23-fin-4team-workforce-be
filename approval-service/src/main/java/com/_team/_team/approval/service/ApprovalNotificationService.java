@@ -4,6 +4,7 @@ import com._team._team.approval.domain.Approval;
 import com._team._team.approval.domain.ApprovalRequest;
 import com._team._team.approval.domain.ApprovalViewer;
 import com._team._team.approval.domain.enums.ViewerType;
+import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.dto.NotificationMessage;
 import com._team._team.notification.NotificationType;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -24,13 +26,15 @@ public class ApprovalNotificationService {
     private static final String OFFICIAL_TOPIC = "official-approved";
     private final ApplicationEventPublisher eventPublisher;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final AbsenceProxyRepository absenceProxyRepository;
 
 
     @Autowired
     public ApprovalNotificationService(ApplicationEventPublisher eventPublisher,
-                                       KafkaTemplate<String, Object> kafkaTemplate) {
+                                       KafkaTemplate<String, Object> kafkaTemplate, AbsenceProxyRepository absenceProxyRepository) {
         this.eventPublisher = eventPublisher;
         this.kafkaTemplate = kafkaTemplate;
+        this.absenceProxyRepository = absenceProxyRepository;
     }
 
     // 공문 최종 승인 도메인 이벤트 (별도 토픽)
@@ -67,6 +71,9 @@ public class ApprovalNotificationService {
                 title + " 결재 요청이 도착했습니다.",
                 requestId);
 
+        // ★ 첫 결재자에게 활성 위임이 있으면 수임자에게도 알림
+        notifyProxyIfExists(firstApproverId, requesterId, title, requestId);
+
         //        참조자 알림 (요청자/첫 결재자 본인 제외)
         Set<UUID> notified = new HashSet<>();
         notified.add(requesterId);
@@ -92,6 +99,9 @@ public class ApprovalNotificationService {
         publish(nextApproval.getApproverMemberId(), senderId, NotificationType.APPROVAL_REQUESTED,
                 title + "대기 중인 결재가 있습니다.",
                 request.getRequestId());
+
+        // ★ 다음 결재자에게 활성 위임이 있으면 수임자에게도 알림
+        notifyProxyIfExists(nextApproval.getApproverMemberId(), senderId, title, request.getRequestId());
     }
 
     //    최종 승인 완료
@@ -233,6 +243,21 @@ public class ApprovalNotificationService {
                 .targetId(targetId)
                 .targetType(TARGET_TYPE)
                 .build());
+    }
+
+    /**
+     * 결재자에게 활성 위임이 있으면 수임자에게도 알림 전송
+     */
+    private void notifyProxyIfExists(UUID approverMemberId, UUID senderId,
+                                     String title, UUID requestId) {
+        absenceProxyRepository
+                .findActiveProxyByMemberId(approverMemberId, LocalDateTime.now())
+                .ifPresent(proxy -> {
+                    publish(proxy.getSubstituteId(), senderId,
+                            NotificationType.APPROVAL_REQUESTED,
+                            title + " 대결 결재 요청이 도착했습니다.",
+                            requestId);
+                });
     }
 
     private String title(ApprovalRequest request){

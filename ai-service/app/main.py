@@ -4,6 +4,7 @@ from app.rag.router import router as rag_router
 from app.database import Base, engine
 from app.config import settings
 import py_eureka_client.eureka_client as eureka_client
+from app.transcribe.router import router as transcribe_router #
 
 Base.metadata.create_all(bind=engine)
 
@@ -15,6 +16,7 @@ app = FastAPI(
 
 app.include_router(document_router, prefix="/ai")
 app.include_router(rag_router, prefix="/ai")
+app.include_router(transcribe_router, prefix="/ai") #
 
 @app.get("/health")
 def health_check():

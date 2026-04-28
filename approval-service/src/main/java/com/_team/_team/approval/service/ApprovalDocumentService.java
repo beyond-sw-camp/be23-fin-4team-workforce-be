@@ -100,7 +100,7 @@ public class ApprovalDocumentService {
                     { "name": "workDate",      "label": "근무일자",  "type": "date",     "required": true },
                     { "name": "startTime",     "label": "시작시간",  "type": "time",     "required": true },
                     { "name": "endTime",       "label": "종료시간",  "type": "time",     "required": true },
-                    { "name": "requestReason", "label": "신청 사유", "type": "textarea"                  }
+                    { "name": "requestReason", "label": "신청 사유", "type": "textarea"                  },
                     { "name": "overtimeRequestId", "label": "salary 연결 ID", "type": "hidden"          }
                   ]
                 }
@@ -314,6 +314,37 @@ public class ApprovalDocumentService {
                     { "name": "title",      "label": "제목",      "type": "text",     "required": true },
                     { "name": "reportDate", "label": "보고일",    "type": "date",     "required": true },
                     { "name": "content",    "label": "보고 내용", "type": "textarea", "required": true }
+                  ]
+                }
+            """)
+                .build());
+
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("회의록")
+                .requestType(RequestType.GENERAL)
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",       "label": "제목",         "type": "text",     "required": true },
+                    { "name": "meetingDate", "label": "회의일자",     "type": "date",     "required": true },
+                    { "name": "meetingTime", "label": "회의시각",     "type": "time"                       },
+                    { "name": "location",    "label": "장소",         "type": "text"                       },
+                    { "name": "attendees",   "label": "참석자",       "type": "textarea", "required": true },
+                    {
+                      "name": "audio",
+                      "label": "녹음 받아쓰기",
+                      "type": "ai_transcribe",
+                      "config": {
+                        "fillTranscript": "transcript",
+                        "fillSummary": "summary",
+                        "attachAudio": true,
+                        "language": "ko"
+                      }
+                    },
+                    { "name": "transcript",  "label": "원본 받아쓰기","type": "textarea"                   },
+                    { "name": "summary",     "label": "AI 회의록",    "type": "textarea", "required": true },
+                    { "name": "note",        "label": "비고",         "type": "textarea"                   }
                   ]
                 }
             """)
