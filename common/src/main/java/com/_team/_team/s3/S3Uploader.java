@@ -95,7 +95,8 @@ public class S3Uploader {
         // 허용 확장자 체크
         String originalName = file.getOriginalFilename();
 //        if (originalName == null || !originalName.matches(".*\\.(jpg|jpeg|png|gif|pdf|docx)$")) {
-        if (originalName == null || !originalName.matches(".*\\.(jpg|jpeg|png|gif|pdf|docx|doc|xlsx|xls|pptx|ppt|hwp|hwpx|txt|csv|zip)$")) {
+//        if (originalName == null || !originalName.matches(".*\\.(jpg|jpeg|png|gif|pdf|docx|doc|xlsx|xls|pptx|ppt|hwp|hwpx|txt|csv|zip)$")) {
+        if (originalName == null || !originalName.matches(".*\\.(jpg|jpeg|png|gif|pdf|docx|doc|xlsx|xls|pptx|ppt|hwp|hwpx|txt|csv|zip|webm|m4a|mp3|wav|ogg)$")) {
             throw new IllegalArgumentException("허용되지 않는 파일 형식입니다: " + originalName);
         }
     }
