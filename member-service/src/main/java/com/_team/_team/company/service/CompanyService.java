@@ -130,7 +130,7 @@ public class CompanyService {
     public void onboarding(CompanyOnboardingReqDto reqDto) {
 
         // 1. 사업자번호 검증 (국세청 API) - 로컬 테스트용 주석처리
-        // ntsApiService.validate(reqDto.getBusinessNumber());
+        ntsApiService.validate(reqDto.getBusinessNumber());
 
         // 2. 사업자번호 중복 체크
         if (companyRepository.existsByBusinessNumber(reqDto.getBusinessNumber())) {
@@ -140,13 +140,13 @@ public class CompanyService {
         }
 
         // 3. 이메일 인증 여부 확인 - 로컬 테스트용 주석처리
-        // String verified = emailRedisTemplate.opsForValue()
-        //         .get("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
-        // if (!"YES".equals(verified)) {
-        //     throw new BusinessException(
-        //             HttpStatus.BAD_REQUEST, "이메일 인증이 필요합니다."
-        //     );
-        // }
+         String verified = emailRedisTemplate.opsForValue()
+                 .get("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
+         if (!"YES".equals(verified)) {
+             throw new BusinessException(
+                     HttpStatus.BAD_REQUEST, "이메일 인증이 필요합니다."
+             );
+         }
 
         // 4. 비밀번호 확인
         if (!reqDto.getAdminPassword().equals(reqDto.getAdminPasswordCheck())) {
@@ -173,7 +173,7 @@ public class CompanyService {
         esgService.createDefaultConfig(company);
 
         // 10. 인증 정보 삭제 - 로컬 테스트용 주석처리
-        // emailRedisTemplate.delete("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
+         emailRedisTemplate.delete("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
 
         // 기본 결재양식 생성 (approval-service 호출)
         try {
