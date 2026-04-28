@@ -25,6 +25,9 @@ public class SalaryItemTemplateResDto {
     private Integer displayOrder;
     private String isTaxableYn;
 
+    // 통상임금 포함 여부 시급 환산 기준
+    private String isOrdinaryWageYn;
+
     // 세법 카테고리 카탈로그 기반 자동 복사 또는 관리자 선택
     private TaxCategory taxCategory;
 
@@ -44,6 +47,7 @@ public class SalaryItemTemplateResDto {
                 .itemType(template.getItemType())
                 .displayOrder(template.getDisplayOrder())
                 .isTaxableYn(template.getIsTaxableYn())
+                .isOrdinaryWageYn(template.getIsOrdinaryWageYn())
                 .taxCategory(cat)
                 .monthlyNonTaxableLimit(cat != null ? cat.getMonthlyNonTaxableLimit() : null)
                 .delYn(template.getDelYn())
