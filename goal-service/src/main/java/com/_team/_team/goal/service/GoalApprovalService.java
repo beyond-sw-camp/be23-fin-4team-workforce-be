@@ -16,6 +16,7 @@ import com._team._team.goal.feignclients.MemberServiceClient;
 import com._team._team.goal.repository.GoalApprovalBundleRepository;
 import com._team._team.goal.repository.GoalRepository;
 import com._team._team.goal.util.CycleKeyResolver;
+import com._team._team.notification.NotificationType;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,13 +37,16 @@ public class GoalApprovalService {
     private final GoalRepository goalRepository;
     private final GoalApprovalBundleRepository bundleRepository;
     private final MemberServiceClient memberServiceClient;
+    private final GoalNotificationService goalNotificationService;
 
     public GoalApprovalService(GoalRepository goalRepository,
                                GoalApprovalBundleRepository bundleRepository,
-                               MemberServiceClient memberServiceClient) {
+                               MemberServiceClient memberServiceClient,
+                               GoalNotificationService goalNotificationService) {
         this.goalRepository = goalRepository;
         this.bundleRepository = bundleRepository;
         this.memberServiceClient = memberServiceClient;
+        this.goalNotificationService = goalNotificationService;
     }
 
     @Transactional
@@ -144,6 +148,7 @@ public class GoalApprovalService {
 
         GoalApprovalBundle saved = bundleRepository.save(bundle);
         draftGoals.forEach(Goal::markPending);
+        notifyBundleRequested(saved);
         return BundleResDto.from(saved);
     }
 
@@ -154,6 +159,7 @@ public class GoalApprovalService {
 
         bundle.approve(dto.getComment());
         goalRepository.findAllById(bundle.getGoalIds()).forEach(goal -> goal.activate(approverId));
+        notifyBundleApproved(bundle, approverId);
         return BundleResDto.from(bundle);
     }
 
@@ -164,6 +170,7 @@ public class GoalApprovalService {
 
         bundle.reject(dto.getReason(), dto.getAffectedGoalIds());
         goalRepository.findAllById(bundle.getGoalIds()).forEach(Goal::reject);
+        notifyBundleRejected(bundle, approverId, dto.getReason());
         return BundleResDto.from(bundle);
     }
 
@@ -175,6 +182,7 @@ public class GoalApprovalService {
         }
         bundle.withdraw();
         goalRepository.findAllById(bundle.getGoalIds()).forEach(Goal::withdraw);
+        notifyBundleWithdrawn(bundle, requesterId);
         return BundleResDto.from(bundle);
     }
 
@@ -186,6 +194,7 @@ public class GoalApprovalService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Only pending bundles can be delegated.");
         }
         bundle.delegateTo(dto.getDelegateApproverId());
+        notifyBundleDelegated(bundle, approverId, dto.getDelegateApproverId());
         return BundleResDto.from(bundle);
     }
 
@@ -248,6 +257,62 @@ public class GoalApprovalService {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private void notifyBundleRequested(GoalApprovalBundle bundle) {
+        goalNotificationService.publish(
+                bundle.getApproverId(),
+                bundle.getRequestedBy(),
+                NotificationType.GOAL_BUNDLE_REQUESTED,
+                "목표 승인 요청이 도착했습니다. (" + bundle.getCycleKey() + ", 목표 " + bundle.getGoalIds().size() + "개)",
+                bundle.getBundleId(),
+                "GOAL_BUNDLE"
+        );
+    }
+
+    private void notifyBundleApproved(GoalApprovalBundle bundle, UUID actorId) {
+        goalNotificationService.publish(
+                bundle.getRequestedBy(),
+                actorId,
+                NotificationType.GOAL_BUNDLE_APPROVED,
+                "목표 승인 요청이 승인되었습니다. (" + bundle.getCycleKey() + ")",
+                bundle.getBundleId(),
+                "GOAL_BUNDLE"
+        );
+    }
+
+    private void notifyBundleRejected(GoalApprovalBundle bundle, UUID actorId, String reason) {
+        String suffix = isBlank(reason) ? "" : " 사유: " + reason;
+        goalNotificationService.publish(
+                bundle.getRequestedBy(),
+                actorId,
+                NotificationType.GOAL_BUNDLE_REJECTED,
+                "목표 승인 요청이 반려되었습니다. (" + bundle.getCycleKey() + ")" + suffix,
+                bundle.getBundleId(),
+                "GOAL_BUNDLE"
+        );
+    }
+
+    private void notifyBundleWithdrawn(GoalApprovalBundle bundle, UUID requesterId) {
+        goalNotificationService.publish(
+                bundle.getApproverId(),
+                requesterId,
+                NotificationType.GOAL_BUNDLE_WITHDRAWN,
+                "목표 승인 요청이 회수되었습니다. (" + bundle.getCycleKey() + ")",
+                bundle.getBundleId(),
+                "GOAL_BUNDLE"
+        );
+    }
+
+    private void notifyBundleDelegated(GoalApprovalBundle bundle, UUID actorId, UUID delegateApproverId) {
+        goalNotificationService.publish(
+                delegateApproverId,
+                actorId,
+                NotificationType.GOAL_BUNDLE_DELEGATED,
+                "목표 승인 요청이 위임되었습니다. (" + bundle.getCycleKey() + ")",
+                bundle.getBundleId(),
+                "GOAL_BUNDLE"
+        );
     }
 
     static CycleKeyParsed parseCycleKey(String cycleKey) {
