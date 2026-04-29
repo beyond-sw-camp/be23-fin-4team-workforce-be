@@ -11,6 +11,7 @@ import com._team._team.salary.dto.resdto.PayrollPrecheckResDto;
 import com._team._team.salary.dto.resdto.SalaryResDto;
 import com._team._team.salary.feignClients.MemberFeignClient;
 import com._team._team.salary.feignClients.dto.MemberResDto;
+import com._team._team.salary.repository.MemberAllowanceRepository;
 import com._team._team.salary.repository.PayGradeTableRepository;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.repository.SalaryRepository;
@@ -47,16 +48,19 @@ public class SalaryService {
     private final SalaryRepository salaryRepository;
     private final SalaryPolicyRepository salaryPolicyRepository;
     private final PayGradeTableRepository payGradeTableRepository;
+    private final MemberAllowanceRepository memberAllowanceRepository;
     private final MemberFeignClient memberFeignClient;
 
     @Autowired
     public SalaryService(SalaryRepository salaryRepository,
                          SalaryPolicyRepository salaryPolicyRepository,
                          PayGradeTableRepository payGradeTableRepository,
+                         MemberAllowanceRepository memberAllowanceRepository,
                          MemberFeignClient memberFeignClient){
         this.salaryRepository = salaryRepository;
         this.salaryPolicyRepository = salaryPolicyRepository;
         this.payGradeTableRepository = payGradeTableRepository;
+        this.memberAllowanceRepository = memberAllowanceRepository;
         this.memberFeignClient = memberFeignClient;
     }
 
@@ -270,11 +274,25 @@ public class SalaryService {
         validateMinimumWage(resolvedBaseSalary, reqDto.getEffectiveFrom());
 
         salary.update(reqDto, resolvedBaseSalary);
+
+        // 적용 종료일이 새로 설정/변경되었으면 해당 직원의 활성 수당 effectiveTo 도 동기화 (cap).
+        // null -> 종료일 지정 시: 진행중 수당이 같은 날 종료
+        // 더 늦게 끝나던 수당: 종료일에 맞춰 잘라냄 (이미 더 일찍 끝나는 행은 그대로)
+        if (reqDto.getEffectiveTo() != null && salary.getMemberId() != null) {
+            int touched = memberAllowanceRepository.syncEffectiveToByMember(
+                    salary.getMemberId(), companyId, reqDto.getEffectiveTo());
+            if (touched > 0) {
+                log.info("[SALARY-UPDATE-CASCADE] memberId={} salaryId={} effectiveTo={} 로 수당 {}건 동기화",
+                        salary.getMemberId(), salaryId, reqDto.getEffectiveTo(), touched);
+            }
+        }
+
         return SalaryResDto.fromEntity(salary);
     }
 
     // 급여 삭제 , 기본은 현재 적용 중인 급여 삭제 불가
     // force=true 시 활성 검사 우회 (관리자가 잘못 등록한 행을 즉시 정리할 때)
+    // 삭제 후 해당 직원에게 남은 Salary 행이 없으면 MemberAllowance 도 함께 cascade 소프트 삭제 (orphan 정리)
     public void delete(UUID companyId, UUID salaryId, boolean force){
         Salary salary = salaryRepository.findById(salaryId)
                 .orElseThrow(()-> new BusinessException(HttpStatus.NOT_FOUND, "급여 정보를 찾을 수 없습니다."));
@@ -287,7 +305,22 @@ public class SalaryService {
             throw new BusinessException(HttpStatus.BAD_REQUEST,"현재 적용 중인 급여는 삭제 불가합니다.");
         }
 
+        UUID memberId = salary.getMemberId();
         salaryRepository.delete(salary);
+        salaryRepository.flush(); // 이후 count 쿼리에 반영되도록 강제 flush
+
+        // 직원의 Salary 가 모두 사라졌으면 - 정산 대상에서 빠지므로 남은 수당도 의미 없음 -> 일괄 소프트 삭제
+        if (memberId != null) {
+            List<Salary> remaining = salaryRepository.findByMemberIdAndCompanyId(memberId, companyId);
+            if (remaining.isEmpty()) {
+                int closed = memberAllowanceRepository.softDeleteAllByMember(memberId, companyId);
+                if (closed > 0) {
+                    log.info("[SALARY-DELETE-CASCADE] memberId={} companyId={} 잔여 Salary 0건 -> "
+                                    + "MemberAllowance {} 건 소프트 삭제",
+                            memberId, companyId, closed);
+                }
+            }
+        }
     }
 
     // force 미지정 시 false
