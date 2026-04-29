@@ -127,19 +127,6 @@ public class SalaryNegotiationController {
                 HttpStatus.OK);
     }
 
-    @PatchMapping("/{negotiationId}/reject")
-    public ResponseEntity<?> reject(
-            @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader("X-User-UUID") UUID approverId,
-            @PathVariable UUID negotiationId,
-            @RequestBody(required = false) Map<String, String> body) {
-        String note = body != null ? body.get("note") : null;
-        SalaryNegotiationResDto data = service.reject(companyId, negotiationId, approverId, note);
-        return new ResponseEntity<>(
-                ApiResponse.success(data, "협상이 반려되었습니다."),
-                HttpStatus.OK);
-    }
-
     @PatchMapping("/{negotiationId}/apply")
     public ResponseEntity<?> apply(
             @RequestHeader("X-User-CompanyId") UUID companyId,

@@ -135,12 +135,6 @@ public class SalaryNegotiationService {
         return SalaryNegotiationResDto.fromEntity(neg);
     }
 
-    public SalaryNegotiationResDto reject(UUID companyId, UUID negotiationId, UUID approverId, String note) {
-        SalaryNegotiation neg = findOrThrow(companyId, negotiationId);
-        neg.reject(approverId, note);
-        return SalaryNegotiationResDto.fromEntity(neg);
-    }
-
     /**
      * 적용 처리
      */
