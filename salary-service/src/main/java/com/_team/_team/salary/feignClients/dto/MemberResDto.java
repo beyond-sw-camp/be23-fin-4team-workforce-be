@@ -23,4 +23,6 @@ public class MemberResDto {
     private String phoneNumber;
     private String email;
     private String organizationName;
+    private String jobGradeName;
+    private String jobTitleName;
 }
