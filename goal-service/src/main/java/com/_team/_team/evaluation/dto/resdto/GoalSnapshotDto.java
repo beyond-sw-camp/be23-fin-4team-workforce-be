@@ -1,11 +1,8 @@
 package com._team._team.evaluation.dto.resdto;
 
 import com._team._team.goal.domain.Goal;
-import com._team._team.goal.domain.enums.GoalKind;
 import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.domain.enums.KpiCycle;
-import com._team._team.goal.domain.enums.MeasureType;
-import com._team._team.goal.domain.enums.UnitType;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,27 +31,17 @@ public class GoalSnapshotDto {
     private UUID goalId;
     private String title;
     private String description;
-    private GoalKind goalKind;
     private GoalStatus statusAtSnapshot;
     private KpiCycle cycle;
-    private MeasureType measureType;
-    private UnitType unitType;
-    private String unitLabel;
-
-    private BigDecimal baseline;
-    private BigDecimal targetValue;
     private BigDecimal actualValueAtSnapshot;
     private BigDecimal achievementPctAtSnapshot;
     private BigDecimal rolledAchievementPctAtSnapshot;
     private BigDecimal weightPct;
-    private BigDecimal contributionPct;
 
     private LocalDate startDate;
     private LocalDate endDate;
 
     private UUID ownerId;
-    private UUID kpiTemplateId;
-
     /** 스냅샷이 생성된 시점 (시즌 시작 또는 materialize 시점). */
     private String snapshotTakenAt;
 
@@ -64,23 +51,15 @@ public class GoalSnapshotDto {
                 .goalId(goal.getGoalId())
                 .title(goal.getTitle())
                 .description(goal.getDescription())
-                .goalKind(goal.getGoalKind())
                 .statusAtSnapshot(goal.getStatus())
                 .cycle(goal.getCycle())
-                .measureType(goal.getMeasureType())
-                .unitType(goal.getUnitType())
-                .unitLabel(goal.getUnitLabel())
-                .baseline(goal.getBaseline())
-                .targetValue(goal.getTargetValue())
                 .actualValueAtSnapshot(goal.getActualValue())
                 .achievementPctAtSnapshot(goal.getAchievementPct())
                 .rolledAchievementPctAtSnapshot(goal.getRolledAchievementPct())
-                .weightPct(goal.getWeightPct())
-                .contributionPct(goal.getContributionPct())
-                .startDate(goal.getStartDate())
-                .endDate(goal.getEndDate())
+                .weightPct(BigDecimal.valueOf(goal.getWeightPct()))
+                .startDate(goal.getCycleStartDate())
+                .endDate(goal.getCycleEndDate())
                 .ownerId(goal.getOwnerId())
-                .kpiTemplateId(goal.getKpiTemplate() != null ? goal.getKpiTemplate().getKpiTemplateId() : null)
                 .snapshotTakenAt(takenAtIso)
                 .build();
     }

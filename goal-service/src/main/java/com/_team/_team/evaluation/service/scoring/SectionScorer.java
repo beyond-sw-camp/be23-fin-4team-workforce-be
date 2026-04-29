@@ -264,22 +264,11 @@ public class SectionScorer {
     // ─────────────────────────── 헬퍼 ───────────────────────────
 
     /**
-     * kpiFilter 문자열 규칙 (Phase C MVP):
-     *   - null / "ALL"        → 모든 스냅샷
-     *   - "TEMPLATE_ONLY"     → kpiTemplateId 가 있는 스냅샷만
-     *   - 그 외 문자열         → 해당 문자열을 kpiTemplateId 로 보고 필터
+     * 최종 모델에서는 템플릿 기반 KPI 분기를 사용하지 않는다.
+     * kpiFilter 값은 입력되어도 무시하고 전체 스냅샷을 사용한다.
      */
     private List<GoalSnapshotDto> applyKpiFilter(String filter, List<GoalSnapshotDto> all) {
-        if (filter == null || filter.isBlank() || "ALL".equalsIgnoreCase(filter)) {
-            return all;
-        }
-        if ("TEMPLATE_ONLY".equalsIgnoreCase(filter)) {
-            return all.stream().filter(s -> s.getKpiTemplateId() != null).toList();
-        }
-        String f = filter.trim();
-        return all.stream()
-                .filter(s -> s.getKpiTemplateId() != null && f.equals(s.getKpiTemplateId().toString()))
-                .toList();
+        return all;
     }
 
     /**

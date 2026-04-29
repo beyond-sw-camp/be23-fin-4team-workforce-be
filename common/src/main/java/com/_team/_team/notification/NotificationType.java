@@ -35,7 +35,12 @@ public enum NotificationType {
     SALARY_PAID,             // 급여 지급 완료 (계좌 입금)
 
     // 목표
-    GOAL_EVALUATED,          // 목표 평가 완료
+    GOAL_EVALUATED,               // 목표 평가 완료
+    GOAL_BUNDLE_REQUESTED,        // 목표 승인 번들 요청
+    GOAL_BUNDLE_APPROVED,         // 목표 승인 번들 승인
+    GOAL_BUNDLE_REJECTED,         // 목표 승인 번들 반려
+    GOAL_BUNDLE_WITHDRAWN,        // 목표 승인 번들 회수
+    GOAL_BUNDLE_DELEGATED,        // 목표 승인 번들 위임
 
     // 평가
     EVALUATION_REMINDER,     // 미제출 평가 리마인드

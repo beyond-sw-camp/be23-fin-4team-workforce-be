@@ -43,7 +43,7 @@ public class EvaluationSection {
 
     /**
      * KPI_SCORE 섹션 전용 — 어떤 KPI 를 집계할지 필터.
-     * "ALL" / "TEMPLATE_ONLY" / 특정 kpiTemplateId 등 스펙은 Phase C 에서 확정.
+     * 최종 모델에서는 템플릿 분기 없이 goal snapshot 집합 기준으로만 처리한다.
      */
     private String kpiFilter;
 

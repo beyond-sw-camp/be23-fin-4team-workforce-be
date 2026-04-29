@@ -1,92 +1,137 @@
 package com._team._team.goal.controller;
 
-import com._team._team.annotation.Action;
-import com._team._team.annotation.CheckPermission;
-import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
-import com._team._team.goal.dto.reqdto.GoalApprovalDecisionReqDto;
-import com._team._team.goal.dto.reqdto.GoalApprovalRequestCreateReqDto;
-import com._team._team.goal.dto.reqdto.GoalApprovalWatchersReqDto;
-import com._team._team.goal.dto.resdto.GoalApprovalResDto;
+import com._team._team.goal.dto.reqdto.BundleApproveReqDto;
+import com._team._team.goal.dto.reqdto.BundleDelegateReqDto;
+import com._team._team.goal.dto.reqdto.BundleRejectReqDto;
+import com._team._team.goal.dto.reqdto.SubmitCycleReqDto;
+import com._team._team.goal.dto.resdto.BundleResDto;
 import com._team._team.goal.service.GoalApprovalService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
-// 목표 승인 처리
+/**
+ * GoalApprovalController — Phase 3
+ *
+ *  엔드포인트:
+ *    POST   /goal/approval/cycles/{cycleKey}/submit       — 일괄 승인 요청
+ *    POST   /goal/approval-bundles/{bundleId}/approve     — 승인
+ *    POST   /goal/approval-bundles/{bundleId}/reject      — 반려
+ *    POST   /goal/approval-bundles/{bundleId}/withdraw    — 회수
+ *    POST   /goal/approval-bundles/{bundleId}/delegate    — 위임
+ *    GET    /goal/approval-bundles/{bundleId}             — 단건
+ *    GET    /goal/approval-bundles/me/requested           — 내가 요청한
+ *    GET    /goal/approval-bundles/me/queue               — 내가 처리해야 할 (PENDING)
+ */
 @RestController
-@RequestMapping("/goal")
 public class GoalApprovalController {
 
-    private final GoalApprovalService goalApprovalService;
+    private final GoalApprovalService approvalService;
 
-    public GoalApprovalController(GoalApprovalService goalApprovalService) {
-        this.goalApprovalService = goalApprovalService;
+    public GoalApprovalController(GoalApprovalService approvalService) {
+        this.approvalService = approvalService;
     }
 
-    // 목표 승인 요청
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PostMapping("/{goalId}/approval/request")
-    public ApiResponse<GoalApprovalResDto> request(
-            @PathVariable UUID goalId,
+    // -----------------------------------------------------------------
+    //  Submit
+    // -----------------------------------------------------------------
+    @PostMapping("/goal/approval/cycles/{cycleKey}/submit")
+    public ApiResponse<BundleResDto> submitCycle(
+            @PathVariable String cycleKey,
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
-            @Valid @RequestBody GoalApprovalRequestCreateReqDto dto) {
+            @RequestBody @Valid SubmitCycleReqDto dto) {
         return ApiResponse.success(
-                goalApprovalService.request(goalId, UUID.fromString(memberId), UUID.fromString(companyId), dto),
-                "목표 승인 요청 생성 성공");
+                approvalService.submitCycle(
+                        UUID.fromString(memberId),
+                        UUID.fromString(companyId),
+                        cycleKey,
+                        dto),
+                "승인 요청이 등록되었습니다."
+        );
     }
 
-    // 목표 승인 조회 (가시성 또는 번들 요청자·승인자·워처)
-    @GetMapping("/{goalId}/approval")
-    public ApiResponse<GoalApprovalResDto> get(
-            @PathVariable UUID goalId,
+    // -----------------------------------------------------------------
+    //  Decision
+    // -----------------------------------------------------------------
+    @PostMapping("/goal/approval-bundles/{bundleId}/approve")
+    public ApiResponse<BundleResDto> approve(
+            @PathVariable UUID bundleId,
+            @RequestHeader("X-User-UUID") String approverId,
+            @RequestBody(required = false) @Valid BundleApproveReqDto dto) {
+        BundleApproveReqDto safe = dto != null ? dto : BundleApproveReqDto.builder().build();
+        return ApiResponse.success(
+                approvalService.approve(bundleId, UUID.fromString(approverId), safe),
+                "승인되었습니다."
+        );
+    }
+
+    @PostMapping("/goal/approval-bundles/{bundleId}/reject")
+    public ApiResponse<BundleResDto> reject(
+            @PathVariable UUID bundleId,
+            @RequestHeader("X-User-UUID") String approverId,
+            @RequestBody @Valid BundleRejectReqDto dto) {
+        return ApiResponse.success(
+                approvalService.reject(bundleId, UUID.fromString(approverId), dto),
+                "반려되었습니다."
+        );
+    }
+
+    @PostMapping("/goal/approval-bundles/{bundleId}/withdraw")
+    public ApiResponse<BundleResDto> withdraw(
+            @PathVariable UUID bundleId,
+            @RequestHeader("X-User-UUID") String memberId) {
+        return ApiResponse.success(
+                approvalService.withdraw(bundleId, UUID.fromString(memberId)),
+                "회수되었습니다."
+        );
+    }
+
+    @PostMapping("/goal/approval-bundles/{bundleId}/delegate")
+    public ApiResponse<BundleResDto> delegate(
+            @PathVariable UUID bundleId,
+            @RequestHeader("X-User-UUID") String approverId,
+            @RequestBody @Valid BundleDelegateReqDto dto) {
+        return ApiResponse.success(
+                approvalService.delegate(bundleId, UUID.fromString(approverId), dto),
+                "위임되었습니다."
+        );
+    }
+
+    // -----------------------------------------------------------------
+    //  조회
+    // -----------------------------------------------------------------
+    @GetMapping("/goal/approval-bundles/{bundleId}")
+    public ApiResponse<BundleResDto> get(
+            @PathVariable UUID bundleId,
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
-                goalApprovalService.get(goalId, UUID.fromString(companyId), UUID.fromString(memberId)),
-                "목표 승인 조회 성공");
+                approvalService.get(bundleId, UUID.fromString(memberId), UUID.fromString(companyId)),
+                "bundle 조회 성공"
+        );
     }
 
-    // 목표 승인 처리
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PostMapping("/{goalId}/approval/{requestId}/approve")
-    public ApiResponse<GoalApprovalResDto> approve(
-            @PathVariable UUID goalId,
-            @PathVariable UUID requestId,
+    @GetMapping("/goal/approval-bundles/me/requested")
+    public ApiResponse<List<BundleResDto>> myRequested(
             @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestBody GoalApprovalDecisionReqDto dto) {
+            @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
-                goalApprovalService.approve(goalId, requestId, UUID.fromString(memberId), UUID.fromString(companyId), dto),
-                "목표 승인 처리 성공");
+                approvalService.listMyRequested(UUID.fromString(memberId), UUID.fromString(companyId)),
+                "내가 요청한 승인 목록"
+        );
     }
 
-    // 목표 반려 처리
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PostMapping("/{goalId}/approval/{requestId}/reject")
-    public ApiResponse<GoalApprovalResDto> reject(
-            @PathVariable UUID goalId,
-            @PathVariable UUID requestId,
+    @GetMapping("/goal/approval-bundles/me/queue")
+    public ApiResponse<List<BundleResDto>> myQueue(
             @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestBody GoalApprovalDecisionReqDto dto) {
+            @RequestHeader("X-User-CompanyId") String companyId) {
         return ApiResponse.success(
-                goalApprovalService.reject(goalId, requestId, UUID.fromString(memberId), UUID.fromString(companyId), dto),
-                "목표 반려 처리 성공");
-    }
-
-    // 승인 참조자 등록
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PostMapping("/{goalId}/approval/{requestId}/watchers")
-    public ApiResponse<GoalApprovalResDto> addWatchers(
-            @PathVariable UUID goalId,
-            @PathVariable UUID requestId,
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @Valid @RequestBody GoalApprovalWatchersReqDto dto) {
-        return ApiResponse.success(
-                goalApprovalService.addWatchers(goalId, requestId, UUID.fromString(companyId), dto),
-                "승인 참조자 등록 성공");
+                approvalService.listMyApprovalQueue(UUID.fromString(memberId), UUID.fromString(companyId)),
+                "내가 처리해야 할 승인 목록"
+        );
     }
 }

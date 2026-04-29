@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/evaluation/evaluation-seasons/{seasonId}/groups")
+@RequestMapping("/evaluation/seasons/{seasonId}/groups")
 public class EvaluationGroupController {
 
     private final EvaluationGroupService groupService;
@@ -84,7 +84,7 @@ public class EvaluationGroupController {
             @RequestHeader("X-User-CompanyId") String companyId,
             @PathVariable UUID groupId,
             @RequestBody EvaluatorMapUpdateReqDto dto) {
-        GroupResDto result = groupService.updateEvaluatorMaps(groupId, UUID.fromString(companyId), dto.getEvaluatorMapsJson());
+        GroupResDto result = groupService.updateEvaluatorMaps(groupId, UUID.fromString(companyId), dto.getEvaluatorMaps());
         return ResponseEntity.ok(ApiResponse.success(result, "평가자 매핑이 수정되었습니다."));
     }
 }

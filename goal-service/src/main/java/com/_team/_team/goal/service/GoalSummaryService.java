@@ -27,8 +27,8 @@ public class GoalSummaryService {
     @Transactional(readOnly = true)
     public List<GoalOrgSummaryResDto> summarizeByOrg(UUID companyId, LocalDate periodStart, LocalDate periodEnd) {
         List<Goal> goals = goalRepository.findByCompanyId(companyId).stream()
-                .filter(g -> periodStart == null || !g.getStartDate().isBefore(periodStart))
-                .filter(g -> periodEnd == null || !g.getEndDate().isAfter(periodEnd))
+                .filter(g -> periodStart == null || !g.getCycleStartDate().isBefore(periodStart))
+                .filter(g -> periodEnd == null || !g.getCycleEndDate().isAfter(periodEnd))
                 .toList();
 
         Map<UUID, List<Goal>> byOrg = goals.stream().collect(Collectors.groupingBy(Goal::getOwnerId));

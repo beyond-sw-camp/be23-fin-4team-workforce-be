@@ -2,11 +2,11 @@ package com._team._team.evaluation.scheduler;
 
 import com._team._team.evaluation.domain.EvaluationResponse;
 import com._team._team.evaluation.domain.EvaluationSeason;
-import com._team._team.evaluation.domain.enums.EvaluationStatus;
+import com._team._team.evaluation.domain.enums.EvaluationStage;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
-import com._team._team.evaluation.service.EvaluationResponseService;
+import com._team._team.evaluation.service.EvaluationSeasonService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,9 +22,14 @@ import java.util.List;
  *  - status = ACTIVE
  *  - resultsPublishedAt == null (아직 미공개)
  *  - resultPublishDate != null && resultPublishDate <= today()
- *  - 해당 시즌의 모든 응답이 SUBMITTED
+ *  - 해당 시즌의 **모든 응답이 종료 상태(CONFIRMED 또는 SKIPPED_LEAVER)**
  *
- * 하나라도 미제출 응답이 있으면 공개를 보류하고 다음 주기에 다시 시도합니다.
+ * 자기평가만 제출된 단계(SELF_SUBMITTED), calibration 진행 중(CALIBRATION_OPEN/LOCKED),
+ * 옵션 단계(PEER_OPEN / UPWARD_OPEN / DOWNWARD_OPEN) 등이 남아 있으면 공개를 보류하고
+ * 다음 주기에 다시 시도합니다.
+ *
+ * 공개 자체는 EvaluationSeasonService.publishResults() 가 수행하며,
+ * 동일 트랜잭션에서 피드백 면담도 자동 생성됩니다.
  */
 @Component
 public class EvaluationAutoPublishScheduler {
@@ -33,14 +38,14 @@ public class EvaluationAutoPublishScheduler {
 
     private final EvaluationSeasonRepository seasonRepository;
     private final EvaluationResponseRepository responseRepository;
-    private final EvaluationResponseService responseService;
+    private final EvaluationSeasonService seasonService;
 
     public EvaluationAutoPublishScheduler(EvaluationSeasonRepository seasonRepository,
                                            EvaluationResponseRepository responseRepository,
-                                           EvaluationResponseService responseService) {
+                                           EvaluationSeasonService seasonService) {
         this.seasonRepository = seasonRepository;
         this.responseRepository = responseRepository;
-        this.responseService = responseService;
+        this.seasonService = seasonService;
     }
 
     /**
@@ -63,12 +68,14 @@ public class EvaluationAutoPublishScheduler {
 
         for (EvaluationSeason season : candidates) {
             try {
-                if (hasUnsubmittedResponses(season)) {
-                    log.info("[auto-publish] skip season={} ({}) — 미제출 응답 존재",
-                            season.getSeasonId(), season.getName());
+                int unfinished = countUnfinishedResponses(season);
+                if (unfinished > 0) {
+                    log.info("[auto-publish] skip season={} ({}) — 미확정 응답 {}건",
+                            season.getSeasonId(), season.getName(), unfinished);
                     continue;
                 }
-                responseService.publishResults(season.getSeasonId(), season.getCompanyId());
+                // publishResults 가 동일 트랜잭션에서 면담 생성까지 수행
+                seasonService.publishResults(season.getSeasonId(), season.getCompanyId());
                 log.info("[auto-publish] published season={} ({})",
                         season.getSeasonId(), season.getName());
             } catch (Exception e) {
@@ -78,10 +85,17 @@ public class EvaluationAutoPublishScheduler {
         }
     }
 
-    private boolean hasUnsubmittedResponses(EvaluationSeason season) {
+    /**
+     * 종료되지 않은 응답 수를 반환.
+     *  - 종료 상태: CONFIRMED, SKIPPED_LEAVER
+     *  - 그 외 모든 단계(SELF_PENDING / SELF_SUBMITTED / *_OPEN / CALIBRATION_*)는 미확정으로 간주
+     */
+    private int countUnfinishedResponses(EvaluationSeason season) {
         List<EvaluationResponse> all = responseRepository.findByGroup_Season_SeasonId(season.getSeasonId());
-        return all.stream()
+        return (int) all.stream()
                 .filter(r -> r.getCompanyId().equals(season.getCompanyId()))
-                .anyMatch(r -> r.getStatus() != EvaluationStatus.SUBMITTED);
+                .filter(r -> r.getStage() != EvaluationStage.CONFIRMED
+                          && r.getStage() != EvaluationStage.SKIPPED_LEAVER)
+                .count();
     }
 }

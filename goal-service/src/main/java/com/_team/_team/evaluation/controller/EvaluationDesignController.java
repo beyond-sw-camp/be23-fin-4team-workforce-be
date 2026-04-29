@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/evaluation/evaluation-designs")
+@RequestMapping("/evaluation/designs")
 public class EvaluationDesignController {
 
     private final EvaluationDesignService designService;

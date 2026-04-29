@@ -1,8 +1,11 @@
 package com._team._team.meeting.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.evaluation.domain.EvaluationCalibration;
 import com._team._team.evaluation.domain.EvaluationResponse;
-import com._team._team.evaluation.domain.enums.EvalType;
+import com._team._team.evaluation.domain.enums.CalibrationRole;
+import com._team._team.evaluation.domain.enums.EvaluationStage;
+import com._team._team.evaluation.repository.EvaluationCalibrationRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
 import com._team._team.meeting.domain.MeetingRecord;
 import com._team._team.meeting.domain.enums.RepeatCycle;
@@ -12,6 +15,8 @@ import com._team._team.meeting.dto.reqdto.MeetingRecordUpdateReqDto;
 import com._team._team.meeting.dto.reqdto.MemberReactionReqDto;
 import com._team._team.meeting.dto.resdto.MeetingRecordResDto;
 import com._team._team.meeting.repository.MeetingRecordRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,46 +32,67 @@ import java.util.stream.Collectors;
 @Service
 public class MeetingRecordService {
 
+    private static final Logger log = LoggerFactory.getLogger(MeetingRecordService.class);
+
     final MeetingRecordRepository meetingRecordRepository;
     final EvaluationResponseRepository evaluationResponseRepository;
+    final EvaluationCalibrationRepository evaluationCalibrationRepository;
 
     @Autowired
     public MeetingRecordService(MeetingRecordRepository meetingRecordRepository,
-                                EvaluationResponseRepository evaluationResponseRepository) {
+                                EvaluationResponseRepository evaluationResponseRepository,
+                                EvaluationCalibrationRepository evaluationCalibrationRepository) {
         this.meetingRecordRepository = meetingRecordRepository;
         this.evaluationResponseRepository = evaluationResponseRepository;
+        this.evaluationCalibrationRepository = evaluationCalibrationRepository;
     }
 
     /**
-     * 평가 결과가 공개(PUBLISHED)된 직후, 해당 시즌의 DOWNWARD 응답을 순회하면서
-     * 대상 멤버별로 "평가 결과 피드백 면담" 을 한 건씩 자동 생성합니다.
+     * 평가 결과 공개 직후, 해당 시즌의 CONFIRMED 응답마다 "평가 결과 피드백 면담" 을 자동 생성.
      *
-     * <p>원칙:</p>
+     * <p>설계 (단일 응답 모델, OKR-style v3):</p>
      * <ul>
-     *     <li>대상 직원 1명에 대해 한 시즌에 피드백 면담 1건만 생성.</li>
-     *     <li>매니저는 DOWNWARD 평가의 평가자(evaluatorId) 로 추정. DOWNWARD 응답이 없으면
-     *         멤버의 직속 매니저를 알 수 없으므로 스킵하고 관리자가 수동 생성하도록 안내.</li>
-     *     <li>예약 시점은 호출 시점 + 3일 로 임시 설정 — 관리자가 이후 수정 가능.</li>
+     *     <li>응답은 멤버당 1건(SELF). 다면 perspectives 는 EvaluationCalibration 의 LEAD/ASSISTANT role 로 보관.</li>
+     *     <li>매니저(LEAD)는 EvaluationCalibration where role=LEAD 의 evaluatorId 로 결정.
+     *         LEAD calibration 이 없으면 fallback 으로 response.evaluatorId(=시즌 활성화 시점의 Lead) 사용.</li>
+     *     <li>대상 직원 1명당 한 시즌에 피드백 면담 1건만 생성 (멱등성).</li>
+     *     <li>예약 시점은 호출 시점 + 3일. 관리자가 이후 수정 가능.</li>
+     *     <li>CONFIRMED 가 아닌 응답(SELF_PENDING / CALIBRATION_OPEN / SKIPPED_LEAVER 등)은 면담 생성에서 제외.</li>
      * </ul>
      */
     @Transactional
     public void createFeedbackMeetingsForSeason(UUID seasonId, UUID companyId) {
-        // 멱등성: 이미 해당 시즌에 피드백 면담이 생성되어 있으면 중복 생성하지 않음
-        if (meetingRecordRepository.existsByRelatedSeasonIdAndCompanyId(seasonId, companyId)) {
-            return;
-        }
-
+        // v4: 멱등성을 "시즌 내 멤버 단위" 로 강화 — 이미 어느 멤버에 면담이 생성됐어도
+        //     다른 멤버 응답이 추가 CONFIRMED 되면 추가 생성. 같은 멤버에 중복 생성 방지.
         Set<UUID> alreadyScheduled = new HashSet<>();
+        meetingRecordRepository.findByRelatedSeasonIdAndCompanyId(seasonId, companyId)
+                .forEach(m -> alreadyScheduled.add(m.getMemberId()));
+        int created = 0;
+        int skipped = 0;
 
         List<EvaluationResponse> responses = evaluationResponseRepository.findByGroup_Season_SeasonId(seasonId);
         for (EvaluationResponse response : responses) {
             if (!response.getCompanyId().equals(companyId)) continue;
-            if (response.getEvaluationType() != EvalType.DOWNWARD) continue;
+            // CONFIRMED 가 아닌 응답은 피드백 면담 대상 아님 (계측만)
+            if (response.getStage() != EvaluationStage.CONFIRMED) {
+                skipped++;
+                continue;
+            }
 
             UUID memberId = response.getTargetMemberId();
-            UUID managerId = response.getEvaluatorId();
-            if (memberId == null || managerId == null) continue;
+            if (memberId == null) continue;
             if (!alreadyScheduled.add(memberId)) continue;
+
+            UUID managerId = resolveLeadEvaluatorId(response);
+            if (managerId == null) {
+                log.warn("[feedback-meeting] LEAD 평가자 미정 — 면담 스킵 responseId={}", response.getResponseId());
+                continue;
+            }
+            if (managerId.equals(memberId)) {
+                // 본인이 LEAD 인 비정상 케이스 방어
+                log.warn("[feedback-meeting] member==manager, 면담 스킵 memberId={}", memberId);
+                continue;
+            }
 
             MeetingRecord feedback = MeetingRecord.builder()
                     .memberId(memberId)
@@ -78,7 +104,7 @@ public class MeetingRecordService {
                     .relatedSeasonId(seasonId)
                     .companyId(companyId)
                     .build();
-            // [D-5] targetGoalIdsJson 제거됨. goalSnapshotJson 에서 goalId 목록만 추출해 링크.
+            // goalSnapshotJson 에서 goalId 목록 추출 → 면담에 연결
             String snap = response.getGoalSnapshotJson();
             if (snap != null && !snap.isBlank()) {
                 try {
@@ -99,7 +125,52 @@ public class MeetingRecordService {
                 }
             }
             meetingRecordRepository.save(feedback);
+            created++;
         }
+        log.info("[feedback-meeting] season={} created={} skipped(non-confirmed)={}",
+                seasonId, created, skipped);
+    }
+
+    /**
+     * v4 — 운영자 수동 재생성 (멱등). 누락된 멤버에 대해서만 추가 생성.
+     *  publishResults 트랜잭션에서 면담 생성이 실패했거나, 부분 누락 발생 시 복구용.
+     */
+    @Transactional
+    public void regenerateFeedbackMeetingsForSeason(UUID seasonId, UUID companyId) {
+        createFeedbackMeetingsForSeason(seasonId, companyId);
+    }
+
+    /**
+     * v4 — 시즌별 면담 진행 현황 (운영자 대시보드).
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Integer> getSeasonStatus(UUID seasonId, UUID companyId) {
+        List<MeetingRecord> meetings = meetingRecordRepository
+                .findByRelatedSeasonIdAndCompanyId(seasonId, companyId);
+        int created = meetings.size();
+        int completed = (int) meetings.stream().filter(m -> m.getCompletedAt() != null).count();
+        int unscheduled = (int) meetings.stream().filter(m -> m.getScheduledAt() == null).count();
+        java.util.Map<String, Integer> status = new java.util.LinkedHashMap<>();
+        status.put("createdCount", created);
+        status.put("completedCount", completed);
+        status.put("uncompletedCount", created - completed);
+        status.put("unscheduledCount", unscheduled);
+        return status;
+    }
+
+    /**
+     * 응답의 LEAD 평가자 결정.
+     *  1) EvaluationCalibration where role=LEAD → evaluatorId
+     *  2) fallback : response.evaluatorId (시즌 활성화 시점에 Lead 로 매핑된 값)
+     */
+    private UUID resolveLeadEvaluatorId(EvaluationResponse response) {
+        EvaluationCalibration lead = evaluationCalibrationRepository
+                .findByResponseIdAndRole(response.getResponseId(), CalibrationRole.LEAD)
+                .orElse(null);
+        if (lead != null && lead.getEvaluatorId() != null) {
+            return lead.getEvaluatorId();
+        }
+        return response.getEvaluatorId();
     }
 
     @Transactional

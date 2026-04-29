@@ -1,6 +1,7 @@
 package com._team._team.dto;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.util.NoSuchElementException;
 
@@ -85,6 +87,25 @@ public class CommonExceptionHandler {
         CommonErrorDto dto = CommonErrorDto.builder()
                 .status_code(400)
                 .error_message(e.getMessage())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(dto);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> httpMessageNotReadable(HttpMessageNotReadableException e) {
+        e.printStackTrace();
+        String errorMessage = "요청 본문 형식이 올바르지 않습니다.";
+        Throwable cause = e.getCause();
+        if (cause instanceof InvalidFormatException ife && ife.getPath() != null && !ife.getPath().isEmpty()) {
+            String path = ife.getPath().stream()
+                    .map(ref -> ref.getFieldName() != null ? ref.getFieldName() : "[" + ref.getIndex() + "]")
+                    .reduce((a, b) -> a + "." + b)
+                    .orElse("body");
+            errorMessage = "요청 본문 형식이 올바르지 않습니다: " + path;
+        }
+        CommonErrorDto dto = CommonErrorDto.builder()
+                .status_code(400)
+                .error_message(errorMessage)
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(dto);
     }
