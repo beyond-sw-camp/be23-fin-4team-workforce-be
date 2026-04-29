@@ -148,4 +148,28 @@ public class MemberAllowanceService {
         return repository.findByCompanyIdAndApprovalStatusAndDelYnOrderByRequestedAtDesc(
                 companyId, status, "N");
     }
+
+    /**
+     * 관리자 - 회사 전체 수당 조회
+     */
+    @Transactional(readOnly = true)
+    public List<MemberAllowance> findCompanyActiveInMonth(
+            UUID companyId, AllowanceApprovalStatus status, java.time.YearMonth ym) {
+        java.time.LocalDate start = ym.atDay(1);
+        java.time.LocalDate end = ym.atEndOfMonth();
+        return status == null
+                ? repository.findCompanyAllowancesActiveInMonth(companyId, start, end)
+                : repository.findCompanyAllowancesActiveInMonthByStatus(companyId, status, start, end);
+    }
+
+    /**
+     * 관리자 - 특정 직원 활성 수당 조회
+     */
+    @Transactional(readOnly = true)
+    public List<MemberAllowance> findMemberActiveInMonth(
+            UUID memberId, UUID companyId, java.time.YearMonth ym) {
+        java.time.LocalDate start = ym.atDay(1);
+        java.time.LocalDate end = ym.atEndOfMonth();
+        return repository.findMemberAllowancesActiveInMonth(memberId, companyId, start, end);
+    }
 }

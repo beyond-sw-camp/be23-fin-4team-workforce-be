@@ -62,4 +62,56 @@ public interface MemberAllowanceRepository extends JpaRepository<MemberAllowance
     // 회사 전체 수당 상태별 조회 (관리자)
     List<MemberAllowance> findByCompanyIdAndApprovalStatusAndDelYnOrderByRequestedAtDesc(
             UUID companyId, AllowanceApprovalStatus status, String delYn);
+
+    /**
+     * 회사 전체 수당
+     */
+    @Query("""
+           SELECT a FROM MemberAllowance a
+            WHERE a.companyId = :companyId
+              AND a.delYn = 'N'
+              AND a.effectiveFrom <= :monthEnd
+              AND (a.effectiveTo IS NULL OR a.effectiveTo >= :monthStart)
+            ORDER BY a.requestedAt DESC
+           """)
+    List<MemberAllowance> findCompanyAllowancesActiveInMonth(
+            @Param("companyId") UUID companyId,
+            @Param("monthStart") LocalDate monthStart,
+            @Param("monthEnd") LocalDate monthEnd);
+
+    /** 동일 조건 + 특정 status 만 조회 */
+    @Query("""
+           SELECT a FROM MemberAllowance a
+            WHERE a.companyId = :companyId
+              AND a.delYn = 'N'
+              AND a.approvalStatus = :status
+              AND a.effectiveFrom <= :monthEnd
+              AND (a.effectiveTo IS NULL OR a.effectiveTo >= :monthStart)
+            ORDER BY a.requestedAt DESC
+           """)
+    List<MemberAllowance> findCompanyAllowancesActiveInMonthByStatus(
+            @Param("companyId") UUID companyId,
+            @Param("status") AllowanceApprovalStatus status,
+            @Param("monthStart") LocalDate monthStart,
+            @Param("monthEnd") LocalDate monthEnd);
+
+    /**
+     * 직원 1명의 활성 수당 조회
+     * 결재 상태는 APPROVED / AUTO 만 (정산에 실제 반영되는 것)
+     */
+    @Query("""
+           SELECT a FROM MemberAllowance a
+            WHERE a.memberId = :memberId
+              AND a.companyId = :companyId
+              AND a.delYn = 'N'
+              AND a.approvalStatus IN ('APPROVED', 'AUTO')
+              AND a.effectiveFrom <= :monthEnd
+              AND (a.effectiveTo IS NULL OR a.effectiveTo >= :monthStart)
+            ORDER BY a.effectiveFrom DESC
+           """)
+    List<MemberAllowance> findMemberAllowancesActiveInMonth(
+            @Param("memberId") UUID memberId,
+            @Param("companyId") UUID companyId,
+            @Param("monthStart") LocalDate monthStart,
+            @Param("monthEnd") LocalDate monthEnd);
 }
