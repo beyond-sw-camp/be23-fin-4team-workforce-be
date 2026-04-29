@@ -29,6 +29,10 @@ public class SalaryItemTemplateCreateReqDto {
     @NotNull(message = "과세 여부는 필수입니다.")
     private String isTaxableYn;
 
+    // 통상임금 포함 여부 Y면 시급 환산 기준에 포함
+    // 정기 일률 고정 지급 항목만 Y 변동성 수당 및 비과세 실비 N
+    private String isOrdinaryWageYn;
+
     public SalaryItemTemplate toEntity(UUID companyId) {
         return SalaryItemTemplate.builder()
                 .companyId(companyId)
@@ -36,6 +40,7 @@ public class SalaryItemTemplateCreateReqDto {
                 .itemType(itemType)
                 .displayOrder(displayOrder)
                 .isTaxableYn(isTaxableYn)
+                .isOrdinaryWageYn("Y".equalsIgnoreCase(isOrdinaryWageYn) ? "Y" : "N")
                 // 커스텀 등록 시 자동 매핑
                 .taxCategory("Y".equals(isTaxableYn)
                         ? TaxCategory.TAXABLE

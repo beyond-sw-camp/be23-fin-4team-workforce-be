@@ -53,7 +53,7 @@ public class CompanyLeaveTypeController {
                 HttpStatus.OK);
     }
 
-    // 휴가 삭제 (시스템 기본 제외)
+    // 휴가 삭제 (연차 제외)
     @DeleteMapping("/{companyLeaveTypeId}")
     public ResponseEntity<?> delete(
             @RequestHeader("X-User-CompanyId") UUID companyId,

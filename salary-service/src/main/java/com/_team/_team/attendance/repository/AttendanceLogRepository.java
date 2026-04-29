@@ -3,9 +3,13 @@ package com._team._team.attendance.repository;
 import com._team._team.attendance.domain.AttendanceLog;
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.enums.EventType;
+import com._team._team.attendance.domain.enums.SourceType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,4 +43,29 @@ public interface AttendanceLogRepository extends JpaRepository<AttendanceLog, UU
      */
     Optional<AttendanceLog> findTop1ByDailyAttendanceAndEventTypeOrderByEventTimeDesc(
             DailyAttendance dailyAttendance, EventType eventType);
+
+    /**
+     * 정정 채널(ADMIN_MANUAL) 로 들어온 특정 이벤트의 가장 최근 로그
+     * 정정 신청 시 기존 정정 로그 갱신 / 반려 시 정정 로그 식별 용도
+     */
+    Optional<AttendanceLog> findTop1ByDailyAttendanceAndEventTypeAndSourceTypeOrderByEventTimeDesc(
+            DailyAttendance dailyAttendance, EventType eventType, SourceType sourceType);
+
+    /**
+     * 원본 채널(WEB/MOBILE/READER) 의 특정 이벤트 가장 최근 로그
+     * 반려 시 firstClockIn / lastClockOut 복구용
+     */
+    Optional<AttendanceLog> findTop1ByDailyAttendanceAndEventTypeAndSourceTypeNotOrderByEventTimeDesc(
+            DailyAttendance dailyAttendance, EventType eventType, SourceType excludedSourceType);
+
+    /**
+     * 근태 검증 (ADMIN_MANUAL) 로그 일괄 조회
+     */
+    @Query("""
+       SELECT log FROM AttendanceLog log
+       WHERE log.dailyAttendance.dailyAttendanceId IN :daIds
+         AND log.sourceType = com._team._team.attendance.domain.enums.SourceType.ADMIN_MANUAL
+       """)
+    List<AttendanceLog> findAdminManualByDailyAttendanceIds(
+            @Param("daIds") Collection<UUID> daIds);
 }

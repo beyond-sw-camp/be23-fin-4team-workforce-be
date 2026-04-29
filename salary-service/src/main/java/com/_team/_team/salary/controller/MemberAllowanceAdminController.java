@@ -16,7 +16,7 @@ import java.util.UUID;
 
 // 관리자, 신규 직원 수당 등록 및 회사 전체 수당 조회
 @RestController
-@RequestMapping("/api/salary/admin/allowances")
+@RequestMapping("/salary/admin/allowances")
 public class MemberAllowanceAdminController {
 
     private final MemberAllowanceService memberAllowanceService;

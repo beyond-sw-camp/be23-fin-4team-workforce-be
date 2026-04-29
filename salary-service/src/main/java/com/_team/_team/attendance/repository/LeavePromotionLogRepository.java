@@ -30,4 +30,8 @@ public interface LeavePromotionLogRepository extends JpaRepository<LeavePromotio
     // 결과 잔고 ID 가 acknowledged 처리된 것이면 발송 대상에서 제외
     List<LeavePromotionLog> findByMemberBalanceIdAndStatus(UUID memberBalanceId,
                                                            PromotionLogStatus status);
+
+    /** 회사 + 상태 조회 — 회신/강제지정 이력 화면용 */
+    List<LeavePromotionLog> findByCompanyIdAndStatusOrderBySentOnDesc(UUID companyId,
+                                                                       PromotionLogStatus status);
 }

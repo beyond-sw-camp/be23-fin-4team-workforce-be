@@ -202,7 +202,7 @@ public class PayrollController {
     public ResponseEntity<?> downloadPayslipPdf(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestHeader("X-User-UUID") UUID requesterMemberId,
-            @RequestHeader("X-User-MemberPositionId") UUID requesterPositionId,
+            @RequestHeader(value = "X-User-MemberPositionId", required = false) UUID requesterPositionId,
             @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin,
             @PathVariable UUID payrollId) {
 

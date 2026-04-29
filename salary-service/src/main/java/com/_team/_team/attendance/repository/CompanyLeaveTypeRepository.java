@@ -17,6 +17,9 @@ public interface CompanyLeaveTypeRepository extends JpaRepository<CompanyLeaveTy
     Optional<CompanyLeaveType> findByCompanyIdAndCodeAndDelYn(
             UUID companyId, String code, String delYn);
 
+    /** 소프트 삭제 행 복구용 */
+    Optional<CompanyLeaveType> findByCompanyIdAndCode(UUID companyId, String code);
+
     // 휴가종류 반환
     Optional<CompanyLeaveType> findByCompanyLeaveTypeIdAndCompanyIdAndDelYn(
             UUID companyLeaveTypeId, UUID companyId, String delYn);

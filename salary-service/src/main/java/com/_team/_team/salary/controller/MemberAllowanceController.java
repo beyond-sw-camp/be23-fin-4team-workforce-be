@@ -15,7 +15,7 @@ import java.util.UUID;
 
 // 직원 본인의 수당 신청, 철회, 결재 연결, 이력 조회
 @RestController
-@RequestMapping("/api/salary/me/allowances")
+@RequestMapping("/salary/me/allowances")
 public class MemberAllowanceController {
 
     private final MemberAllowanceService memberAllowanceService;
