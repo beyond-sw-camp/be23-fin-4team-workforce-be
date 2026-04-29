@@ -5,8 +5,11 @@ import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.enums.EventType;
 import com._team._team.attendance.domain.enums.SourceType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,4 +57,15 @@ public interface AttendanceLogRepository extends JpaRepository<AttendanceLog, UU
      */
     Optional<AttendanceLog> findTop1ByDailyAttendanceAndEventTypeAndSourceTypeNotOrderByEventTimeDesc(
             DailyAttendance dailyAttendance, EventType eventType, SourceType excludedSourceType);
+
+    /**
+     * 근태 검증 (ADMIN_MANUAL) 로그 일괄 조회
+     */
+    @Query("""
+       SELECT log FROM AttendanceLog log
+       WHERE log.dailyAttendance.dailyAttendanceId IN :daIds
+         AND log.sourceType = com._team._team.attendance.domain.enums.SourceType.ADMIN_MANUAL
+       """)
+    List<AttendanceLog> findAdminManualByDailyAttendanceIds(
+            @Param("daIds") Collection<UUID> daIds);
 }

@@ -67,7 +67,7 @@ public class AttendanceCorrectionController {
                 HttpStatus.CREATED);
     }
 
-    /** 관리자: 정정 검토 큐 — UNDER_REVIEW 상태 DA 전체 */
+    /** 관리자: 정정 검토 큐 , UNDER_REVIEW 상태 DA 전체 */
     @GetMapping("/pending")
     public ResponseEntity<?> findPending(
             @RequestHeader("X-User-CompanyId") UUID companyId,
