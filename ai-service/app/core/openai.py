@@ -149,9 +149,9 @@ def detect_category(question: str) -> str | None:
       - 결재: 결재양식, 문서번호, 승인, 반려 등
       - 목표: 목표 설정, KR, KPI 등
       - 평가: 평가 시즌, 자기평가, 동료평가 등
-      - 기타: 위에 해당하지 않거나 액션 가이드 질문
+      - 기타: 위에 해당하지 않는 경우
 
-    카테고리를 명확히 판단할 수 없거나 액션 가이드 질문이면 None 반환하여 전체 검색 수행.
+    카테고리를 명확히 판단할 수 없으면 None 반환하여 전체 검색 수행.
     """
     try:
         response = client.chat.completions.create(

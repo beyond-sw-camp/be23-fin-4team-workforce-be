@@ -4,6 +4,7 @@ import com._team._team.attendance.domain.FlexibleTimeSlot;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +20,24 @@ public interface FlexibleTimeSlotRepository extends JpaRepository<FlexibleTimeSl
 
     // 슬롯 코드 중복 체크 (생성 시 검증)
     boolean existsByWorkScheduleIdAndSlotCode(UUID workScheduleId, String slotCode);
+
+    long countByWorkScheduleIdAndActiveYn(UUID workScheduleId, String activeYn);
+
+    // 같은 스케줄 내 시작/종료 시간 중복 체크
+    boolean existsByWorkScheduleIdAndStartTimeAndEndTimeAndActiveYn(
+            UUID workScheduleId,
+            LocalTime startTime,
+            LocalTime endTime,
+            String activeYn
+    );
+
+    boolean existsByWorkScheduleIdAndStartTimeAndEndTimeAndActiveYnAndSlotIdNot(
+            UUID workScheduleId,
+            LocalTime startTime,
+            LocalTime endTime,
+            String activeYn,
+            UUID slotId
+    );
 
     // 회사 범위 내에서만 조회
     Optional<FlexibleTimeSlot> findBySlotIdAndCompanyId(UUID slotId, UUID companyId);

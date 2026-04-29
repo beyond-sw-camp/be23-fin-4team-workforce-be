@@ -9,12 +9,12 @@ from app.sync.kafka_consumer import start_consumer_thread
 from app.database import Base, engine
 from app.config import settings
 import py_eureka_client.eureka_client as eureka_client
+from app.transcribe.router import router as transcribe_router #
 import logging
 
 logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,6 +64,7 @@ app.include_router(document_router, prefix="/ai")
 app.include_router(rag_router, prefix="/ai")
 app.include_router(platform_router, prefix="/ai")
 app.include_router(sync_router, prefix="/ai")
+app.include_router(transcribe_router, prefix="/ai")
 
 
 @app.get("/health")

@@ -24,8 +24,7 @@ public class FlexibleTimeSlotCreateReqDto {
     @NotNull
     private UUID workScheduleId;
 
-    /** 시스템 식별 코드 */
-    @NotBlank
+    /** 시스템 식별 코드 (미입력 시 서버가 자동 생성) */
     @Size(max = 30)
     private String slotCode;
 
