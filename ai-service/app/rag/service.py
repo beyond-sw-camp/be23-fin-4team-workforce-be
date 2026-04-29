@@ -19,7 +19,7 @@ LAYER_PRIORITY = {
 LAYER_BOOST = {
     "db_sync": 0.10,        # +10% 가산
     "hr_uploaded": 0.0,     # 기준
-    "platform": -0.05,      # -5% 감산
+    "platform": 0.10,      # +10% 가산
 }
 
 
@@ -89,28 +89,36 @@ def apply_layer_priority(matches, final_top_k=5):
 
 async def rag_search(
         question: str,
-        company_id: str) -> dict:
+        company_id: str,
+        conversation_history: str = "") -> dict:
     logger.info(f"[rag_search] ========================================")
     logger.info(f"[rag_search] Q: '{question}'")
+
+    if conversation_history:
+        logger.info(f"[rag_search] 이전 대화 있음 ({len(conversation_history)}자)")
 
     if not question or not question.strip():
         return {"context": NO_CONTEXT_MARKER, "sources": []}
 
     category = await asyncio.to_thread(detect_category, question)
-    expanded_question = await asyncio.to_thread(expand_query, question)
+    expanded_question = await asyncio.to_thread(
+        expand_query,
+        question,
+        conversation_history
+    )
     query_vector = await asyncio.to_thread(get_embedding, expanded_question)
 
     matches = []
     if category:
-        logger.info(f"[rag_search] 카테고리 필터 검색: {category}")
+        logger.info(f"[rag_search] 카테고리 필터 검색: {category} (가이드 제외)")
         raw_matches = await asyncio.to_thread(
             search_vectors,
             query_vector,
             company_id,
             top_k=10,
-            min_score=0.35,
+            min_score=0.30,
             category=category,
-            include_platform=True
+            include_platform=False  # 정책 정보 질문이므로 가이드 제외
         )
 
         # layer 우선순위 재정렬
@@ -129,7 +137,7 @@ async def rag_search(
             query_vector,
             company_id,
             top_k=10,
-            min_score=0.35,
+            min_score=0.30,
             category=None,
             include_platform=True
         )

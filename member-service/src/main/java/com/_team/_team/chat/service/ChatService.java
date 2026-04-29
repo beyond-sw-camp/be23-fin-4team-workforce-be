@@ -13,6 +13,11 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.stream.Collectors;
 
 import java.util.List;
 import java.util.Map;
@@ -46,22 +51,25 @@ public class ChatService {
                            UUID memberPositionId, String authorization,
                            ChatReqDto reqDto) {
         try {
-            // 1. SemanticMemory KNN 검색
-            String cachedAnswer = semanticMemoryService.findBotReplyWithKnn(
-                    companyId.toString(),
-                    memberId.toString(),
-                    reqDto.getQuestion());
+//            // 1. SemanticMemory KNN 검색
+//            String cachedAnswer = semanticMemoryService.findBotReplyWithKnn(
+//                    companyId.toString(),
+//                    memberId.toString(),
+//                    reqDto.getQuestion());
+//
+//            if (cachedAnswer != null) {
+//                log.info("SemanticMemory 캐시 히트");
+//                chatHistoryRepository.save(ChatHistory.builder()
+//                        .memberId(memberId)
+//                        .companyId(companyId)
+//                        .question(reqDto.getQuestion())
+//                        .answer(cachedAnswer)
+//                        .build());
+//                return ChatResDto.builder().answer(cachedAnswer).build();
+//            }
 
-            if (cachedAnswer != null) {
-                log.info("SemanticMemory 캐시 히트");
-                chatHistoryRepository.save(ChatHistory.builder()
-                        .memberId(memberId)
-                        .companyId(companyId)
-                        .question(reqDto.getQuestion())
-                        .answer(cachedAnswer)
-                        .build());
-                return ChatResDto.builder().answer(cachedAnswer).build();
-            }
+            // 1.5. 최근 대화 이력 조회 (최근 5턴, 30분 이내)
+            String conversationHistory = buildConversationHistory(memberId, companyId);
 
             // 2. n8n 호출
             ChatN8nReqDto n8nReqDto = ChatN8nReqDto.builder()
@@ -70,7 +78,9 @@ public class ChatService {
                     .companyId(companyId.toString())
                     .memberPositionId(memberPositionId.toString())
                     .accessToken(authorization.replace("Bearer ", ""))
+                    .conversationHistory(conversationHistory)
                     .build();
+
 
             ResponseEntity<String> response =
                     restTemplate.postForEntity(
@@ -143,5 +153,30 @@ public class ChatService {
     // 대화 이력 삭제
     public void deleteChatHistory(UUID memberId, UUID companyId) {
         chatHistoryRepository.deleteByMemberIdAndCompanyId(memberId, companyId);
+    }
+
+    /**
+     * 최근 5턴 + 30분 이내 대화 이력을 LLM 컨텍스트용 문자열로 변환
+     */
+    private String buildConversationHistory(UUID memberId, UUID companyId) {
+        LocalDateTime since = LocalDateTime.now().minusMinutes(30);
+        Pageable pageable = PageRequest.of(0, 5);
+
+        List<ChatHistory> recent = chatHistoryRepository.findRecentHistory(
+                memberId,
+                companyId,
+                since,
+                pageable
+        );
+
+        if (recent.isEmpty()) {
+            return "";
+        }
+
+        Collections.reverse(recent);
+
+        return recent.stream()
+                .map(h -> String.format("Q: %s\nA: %s", h.getQuestion(), h.getAnswer()))
+                .collect(Collectors.joining("\n---\n"));
     }
 }

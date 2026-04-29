@@ -107,11 +107,7 @@ def _format_earning_section(earnings: list) -> str:
 - 국외 근로소득: 월 100만원까지 비과세
 
 ■ 관련 키워드
-지급 항목, 수당, 기본급, 식대, 교통비, 보육수당, 비과세, 과세, 급여, 봉급
-
-■ 관련 메뉴
-관련 메뉴: /admin/salary/items
-화면명: 급여 항목 관리"""
+지급 항목, 수당, 기본급, 식대, 교통비, 보육수당, 비과세, 과세, 급여, 봉급"""
 
 
 def _format_deduction_section(deductions: list) -> str:
@@ -147,11 +143,7 @@ def _format_deduction_section(deductions: list) -> str:
 (세부 요율은 매년 변경되며 공제 항목명만 위 목록 기준입니다)
 
 ■ 관련 키워드
-공제 항목, 4대보험, 국민연금, 건강보험, 고용보험, 산재보험, 소득세, 지방소득세, 장기요양
-
-■ 관련 메뉴
-관련 메뉴: /admin/salary/items
-화면명: 급여 항목 관리"""
+공제 항목, 4대보험, 국민연금, 건강보험, 고용보험, 산재보험, 소득세, 지방소득세, 장기요양"""
 
 
 # ============================================
@@ -209,11 +201,7 @@ def format_salary_policy_to_rag(policy: dict) -> str:
 {details_str}
 
 ■ 관련 키워드
-{keywords_str}
-
-■ 관련 메뉴
-관련 메뉴: /ess/salary
-화면명: 급여 명세서"""
+{keywords_str}"""
 
 
 # ============================================
@@ -225,7 +213,6 @@ def format_pay_grade_table_to_rag(grades: list) -> str:
     if not grades:
         return ""
 
-    # step 순으로 정렬
     sorted_grades = sorted(
         grades,
         key=lambda g: g.get("step", 0)
@@ -237,7 +224,6 @@ def format_pay_grade_table_to_rag(grades: list) -> str:
         base_salary = g.get("baseSalary", 0)
         description = g.get("description", "")
 
-        # 천 단위 콤마
         base_salary_str = f"{base_salary:,}원" if base_salary else "0원"
 
         if description:
@@ -256,11 +242,7 @@ def format_pay_grade_table_to_rag(grades: list) -> str:
 {grades_str}
 
 ■ 관련 키워드
-호봉, 호봉표, 기본급, 호봉제, 연봉, 직급, 임금테이블
-
-■ 관련 메뉴
-관련 메뉴: /admin/salary/pay-grade
-화면명: 호봉표 관리"""
+호봉, 호봉표, 기본급, 호봉제, 연봉, 직급, 임금테이블"""
 
 
 # ============================================

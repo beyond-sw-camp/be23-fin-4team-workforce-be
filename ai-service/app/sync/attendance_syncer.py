@@ -39,50 +39,65 @@ def format_work_schedule_to_rag(schedule: dict) -> str:
     selection_deadline_day = schedule.get("selectionDeadlineDay")
 
     work_hours = work_minutes / 60 if work_minutes else 0
-    break_hours = break_minutes / 60 if break_minutes else 0
 
     scope = "회사 기본 스케줄" if not member_id else "개인별 스케줄"
 
-    details = []
-    details.append(f"- 근무 유형: {work_type_name}")
-    details.append(f"- 적용 범위: {scope}")
-    details.append(f"- 시작 시간: {start_time}")
-    details.append(f"- 종료 시간: {end_time}")
-    details.append(f"- 일 근무 시간: {work_hours:g}시간")
-    details.append(f"- 점심/휴게 시간: {break_hours:g}시간")
-
+    flexible_note = ""
     if work_type == "FLEXIBLE" and selection_deadline_day:
-        details.append(
-            f"- 시차출퇴근 슬롯 선택 마감일: 매월 {selection_deadline_day}일"
-        )
+        flexible_note = f"\n- 시차출퇴근 슬롯 선택 마감일: 매월 {selection_deadline_day}일"
 
-    details_str = "\n".join(details)
+    return f"""[근무] 출근 시간 / 퇴근 시간 / 점심 시간 안내
 
-    keywords_list = [
-        schedule_name, "근무시간", "출퇴근", "퇴근시간", "출근시간",
-        "근무", "점심시간", "휴게시간", work_type_name
-    ]
-    if work_type == "FLEXIBLE":
-        keywords_list.extend(["유연근무", "시차출퇴근", "탄력근무"])
-    elif work_type == "FIXED":
-        keywords_list.extend(["고정근무", "정규근무"])
+■ 출근 시간 / 퇴근 시간
+- 출근 시간: {start_time}
+- 퇴근 시간: {end_time}
+- 일 근무 시간: {work_hours:g}시간
 
-    keywords_str = ", ".join(set(keywords_list))
+■ 점심 시간 / 휴게 시간
+- 점심 시간: {break_minutes}분
+- 휴게 시간: {break_minutes}분 ({break_minutes / 60:g}시간)
 
-    return f"""[근무] {schedule_name}
+■ 근무 유형
+- {work_type_name}
+- 적용 범위: {scope}{flexible_note}
 
-■ 설명
-{work_type_name}로 운영되는 {scope}입니다.
+■ 자주 묻는 질문
+질문: 출근 시간 몇 시?
+답변: {start_time}
 
-■ 상세 내용
-{details_str}
+질문: 출근 몇 시까지 가야 해?
+답변: {start_time}까지
+
+질문: 퇴근 시간 언제?
+답변: {end_time}
+
+질문: 퇴근 몇 시?
+답변: {end_time}
+
+질문: 점심 시간 몇 분?
+답변: {break_minutes}분
+
+질문: 휴게 시간 얼마?
+답변: {break_minutes}분
+
+질문: 일 근무 시간 몇 시간?
+답변: {work_hours:g}시간
+
+질문: 근무 유형이 뭐야?
+답변: {work_type_name}
 
 ■ 관련 키워드
-{keywords_str}
+출근시간, 출근 시간, 퇴근시간, 퇴근 시간,
+출근, 퇴근, 출퇴근, 출근 몇 시, 퇴근 몇 시,
+점심시간, 점심 시간, 휴게시간, 휴게 시간,
+근무시간, 근무 시간, 일 근무, 근무 유형,
+{work_type_name}, 회사 출근, 회사 퇴근,
+{schedule_name}, 몇시 출근, 몇시 퇴근,
+출근 언제, 퇴근 언제, 점심 몇분
 
 ■ 관련 메뉴
-관련 메뉴: /ess/attendance
-화면명: 근태 관리"""
+관련 메뉴: /app/attendance
+화면명: 내 근태"""
 
 
 # ============================================
@@ -90,7 +105,7 @@ def format_work_schedule_to_rag(schedule: dict) -> str:
 # ============================================
 
 def format_overtime_policy_to_rag(policy: dict) -> str:
-    """연장근로 정책을 RAG 문서로 변환"""
+    """연장근로 정책을 RAG 문서로 변환 (관리자/내부 정책 - 라우팅 없음)"""
     overtime_floor = policy.get("overtimeFloorMinutes", 30)
     approval_mode = policy.get("approvalMode", "HYBRID")
     approval_desc = APPROVAL_MODE_DESCRIPTIONS.get(approval_mode, approval_mode)
@@ -127,7 +142,6 @@ def format_overtime_policy_to_rag(policy: dict) -> str:
         f"- 휴일 근무 결재: {'필수' if holiday_approval else '불필요'}"
     )
 
-    # 수당 배수 (근로기준법 표준)
     rate_section = """
 ■ 수당 배수 (근로기준법 표준)
 - 연장근로 수당: 통상임금의 1.5배
@@ -146,11 +160,7 @@ def format_overtime_policy_to_rag(policy: dict) -> str:
 {rate_section}
 
 ■ 관련 키워드
-연장근로, 야근, 야간근로, 휴일근로, 초과근무, 수당, 52시간, 가산수당, 1.5배
-
-■ 관련 메뉴
-관련 메뉴: /ess/attendance/overtime
-화면명: 연장근무 신청"""
+연장근로, 야근, 야간근로, 휴일근로, 초과근무, 수당, 52시간, 가산수당, 1.5배, 야근 수당, 휴일근무 수당"""
 
 
 # ============================================
@@ -162,49 +172,96 @@ def format_company_holidays_to_rag(holidays: list) -> str:
     if not holidays:
         return ""
 
-    # 날짜순 정렬
     sorted_holidays = sorted(
         holidays,
         key=lambda h: h.get("holidayDate", "")
     )
 
-    # 연도별 그룹화
-    by_year = {}
+    legal_by_year = {}
+    company_by_year = {}
+
     for h in sorted_holidays:
         date_str = h.get("holidayDate", "")
         try:
             year = datetime.strptime(date_str, "%Y-%m-%d").year
         except ValueError:
             year = "기타"
-        by_year.setdefault(year, []).append(h)
 
+        # DB의 isLegalYn 필드로 정확하게 분류
+        is_legal = h.get("isLegalYn", "Y") == "Y"
+
+        if is_legal:
+            legal_by_year.setdefault(year, []).append(h)
+        else:
+            company_by_year.setdefault(year, []).append(h)
+
+    # 분기 섹션 생성
     sections = []
-    for year, items in sorted(by_year.items()):
-        lines = [f"\n[{year}년]"]
-        for h in items:
-            date = h.get("holidayDate", "")
-            name = h.get("holidayName", "")
-            paid = h.get("isPaidYn", "Y") == "Y"
-            paid_label = "유급" if paid else "무급"
-            lines.append(f"- {date} {name} ({paid_label})")
-        sections.append("\n".join(lines))
+
+    if legal_by_year:
+        sections.append("\n■ 법정 공휴일 (국가 지정)")
+        for year, items in sorted(legal_by_year.items()):
+            lines = [f"\n[{year}년] (총 {len(items)}일)"]
+            for h in items:
+                date = h.get("holidayDate", "")
+                name = h.get("holidayName", "")
+                paid = h.get("isPaidYn", "Y") == "Y"
+                paid_label = "유급" if paid else "무급"
+                lines.append(f"- {date} {name} ({paid_label})")
+            sections.append("\n".join(lines))
+
+    if company_by_year:
+        sections.append("\n■ 회사 자체 지정 휴일")
+        for year, items in sorted(company_by_year.items()):
+            lines = [f"\n[{year}년] (총 {len(items)}일)"]
+            for h in items:
+                date = h.get("holidayDate", "")
+                name = h.get("holidayName", "")
+                paid = h.get("isPaidYn", "Y") == "Y"
+                paid_label = "유급" if paid else "무급"
+                lines.append(f"- {date} {name} ({paid_label})")
+            sections.append("\n".join(lines))
+    else:
+        sections.append("\n■ 회사 자체 지정 휴일\n현재 회사가 별도로 지정한 휴일은 없습니다.")
 
     holidays_str = "\n".join(sections)
+
+    total_count = len(sorted_holidays)
+    legal_count = sum(len(v) for v in legal_by_year.values())
+    company_count = sum(len(v) for v in company_by_year.values())
+
+    summary = (
+        f"총 {total_count}일 "
+        f"(법정 공휴일 {legal_count}일, 회사 지정 {company_count}일)"
+    )
 
     return f"""[근무] 회사 공휴일
 
 ■ 설명
-회사가 지정한 휴무일입니다. 법정 공휴일과 회사 자체 지정 휴일이 모두 포함됩니다.
+회사 휴일은 두 가지로 구분됩니다.
+1. 법정 공휴일: 국가가 지정한 공휴일 (신정, 설날, 추석, 대체공휴일 등)
+2. 회사 자체 지정 휴일: 인사팀/관리자가 별도로 지정한 휴일
 
-■ 공휴일 목록
+■ 요약
+{summary}
 {holidays_str}
 
+■ 자주 묻는 질문
+- 올해 공휴일 며칠? → 위 법정 공휴일 목록 참고
+- 회사 휴일 언제? → 위 법정 + 회사 지정 휴일 목록 참고
+- 회사가 지정한 휴일 있어? → 위 회사 자체 지정 휴일 섹션 참고
+- 빨간날 며칠? → 법정 공휴일 + 회사 지정 휴일 합산
+
 ■ 관련 키워드
-공휴일, 휴무일, 휴일, 빨간날, 명절, 법정공휴일, 임시공휴일, 회사 휴일
+공휴일, 휴무일, 휴일, 빨간날, 명절, 법정공휴일, 임시공휴일,
+대체공휴일, 회사 휴일, 회사 지정 휴일, 법정 공휴일, 국경일,
+신정, 설날, 추석, 어린이날, 광복절, 개천절, 한글날,
+성탄절, 기독탄신일, 노동절, 근로자의 날, 제헌절,
+삼일절, 부처님오신날, 현충일, 전국동시지방선거
 
 ■ 관련 메뉴
-관련 메뉴: /ess/attendance
-화면명: 근태 관리"""
+관련 메뉴: /app/calendar
+화면명: 캘린더"""
 
 
 # ============================================
