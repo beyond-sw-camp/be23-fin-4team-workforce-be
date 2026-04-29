@@ -1,6 +1,7 @@
 package com._team._team.goal.service;
 
 import com._team._team.dto.BusinessException;
+import com._team._team.dto.NotificationMessage;
 import com._team._team.goal.domain.Goal;
 import com._team._team.goal.domain.GoalApprovalBundle;
 import com._team._team.goal.domain.enums.BundleApprovalStatus;
@@ -17,6 +18,7 @@ import com._team._team.goal.repository.GoalApprovalBundleRepository;
 import com._team._team.goal.repository.GoalRepository;
 import com._team._team.goal.util.CycleKeyResolver;
 import com._team._team.notification.NotificationType;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,16 +39,16 @@ public class GoalApprovalService {
     private final GoalRepository goalRepository;
     private final GoalApprovalBundleRepository bundleRepository;
     private final MemberServiceClient memberServiceClient;
-    private final GoalNotificationService goalNotificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public GoalApprovalService(GoalRepository goalRepository,
                                GoalApprovalBundleRepository bundleRepository,
                                MemberServiceClient memberServiceClient,
-                               GoalNotificationService goalNotificationService) {
+                               ApplicationEventPublisher eventPublisher) {
         this.goalRepository = goalRepository;
         this.bundleRepository = bundleRepository;
         this.memberServiceClient = memberServiceClient;
-        this.goalNotificationService = goalNotificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -260,59 +262,71 @@ public class GoalApprovalService {
     }
 
     private void notifyBundleRequested(GoalApprovalBundle bundle) {
-        goalNotificationService.publish(
+        publishGoalBundleNotification(
                 bundle.getApproverId(),
                 bundle.getRequestedBy(),
-                NotificationType.GOAL_BUNDLE_REQUESTED,
                 "목표 승인 요청이 도착했습니다. (" + bundle.getCycleKey() + ", 목표 " + bundle.getGoalIds().size() + "개)",
                 bundle.getBundleId(),
-                "GOAL_BUNDLE"
+                "GOAL_BUNDLE_REQUESTED"
         );
     }
 
     private void notifyBundleApproved(GoalApprovalBundle bundle, UUID actorId) {
-        goalNotificationService.publish(
+        publishGoalBundleNotification(
                 bundle.getRequestedBy(),
                 actorId,
-                NotificationType.GOAL_BUNDLE_APPROVED,
                 "목표 승인 요청이 승인되었습니다. (" + bundle.getCycleKey() + ")",
                 bundle.getBundleId(),
-                "GOAL_BUNDLE"
+                "GOAL_BUNDLE_APPROVED"
         );
     }
 
     private void notifyBundleRejected(GoalApprovalBundle bundle, UUID actorId, String reason) {
         String suffix = isBlank(reason) ? "" : " 사유: " + reason;
-        goalNotificationService.publish(
+        publishGoalBundleNotification(
                 bundle.getRequestedBy(),
                 actorId,
-                NotificationType.GOAL_BUNDLE_REJECTED,
                 "목표 승인 요청이 반려되었습니다. (" + bundle.getCycleKey() + ")" + suffix,
                 bundle.getBundleId(),
-                "GOAL_BUNDLE"
+                "GOAL_BUNDLE_REJECTED"
         );
     }
 
     private void notifyBundleWithdrawn(GoalApprovalBundle bundle, UUID requesterId) {
-        goalNotificationService.publish(
+        publishGoalBundleNotification(
                 bundle.getApproverId(),
                 requesterId,
-                NotificationType.GOAL_BUNDLE_WITHDRAWN,
                 "목표 승인 요청이 회수되었습니다. (" + bundle.getCycleKey() + ")",
                 bundle.getBundleId(),
-                "GOAL_BUNDLE"
+                "GOAL_BUNDLE_WITHDRAWN"
         );
     }
 
     private void notifyBundleDelegated(GoalApprovalBundle bundle, UUID actorId, UUID delegateApproverId) {
-        goalNotificationService.publish(
+        publishGoalBundleNotification(
                 delegateApproverId,
                 actorId,
-                NotificationType.GOAL_BUNDLE_DELEGATED,
                 "목표 승인 요청이 위임되었습니다. (" + bundle.getCycleKey() + ")",
                 bundle.getBundleId(),
-                "GOAL_BUNDLE"
+                "GOAL_BUNDLE_DELEGATED"
         );
+    }
+
+    private void publishGoalBundleNotification(UUID receiverId,
+                                               UUID senderId,
+                                               String content,
+                                               UUID targetId,
+                                               String targetType) {
+        if (receiverId == null) return;
+        eventPublisher.publishEvent(NotificationMessage.builder()
+                .receiverId(receiverId)
+                .senderId(senderId)
+                // workforce-common:1.0.13 에서는 GOAL_EVALUATED 만 존재. 세부 이벤트는 targetType 으로 구분.
+                .notificationType(NotificationType.GOAL_EVALUATED)
+                .content(content)
+                .targetId(targetId)
+                .targetType(targetType)
+                .build());
     }
 
     static CycleKeyParsed parseCycleKey(String cycleKey) {
