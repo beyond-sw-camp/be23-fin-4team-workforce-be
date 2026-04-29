@@ -17,6 +17,7 @@ public class WorkScheduleUpdateReqDto {
     private LocalTime startTime;
     private LocalTime endTime;
     private Integer workMinutes;
+    /** FIXED 정책의 점심·휴게 시간(분). FLEXIBLE 은 무시 */
     private Integer breakMinutes;
     private Integer selectionDeadlineDay;
     private LocalDate effectiveFrom;

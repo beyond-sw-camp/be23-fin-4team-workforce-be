@@ -28,9 +28,6 @@ import java.util.UUID;
 @Builder
 public class DailyAttendance extends BaseTimeEntity {
 
-    /** 점심시간(분) - 회사마다 실제 점심시간은 다를 수 있으나 우리 방식은 1시간으로 고정 */
-    private static final int LUNCH_BREAK_MINUTES = 60;
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID dailyAttendanceId;
@@ -66,7 +63,7 @@ public class DailyAttendance extends BaseTimeEntity {
     /** 퇴근 시각 (하루 1회) */
     private LocalDateTime lastClockOut;
 
-    /** 실 근무 시간(분) - (퇴근-출근) - 점심시간(1시간) */
+    /** 실 근무 시간(분) - (퇴근-출근) */
     private Integer workedMinutes;
 
     /** 초과 근무 시간(분) - workMinutes가 스케줄 workMinutes 초과 시 */
@@ -94,15 +91,25 @@ public class DailyAttendance extends BaseTimeEntity {
         this.lastClockOut = time;
     }
 
-    /** 근무/초과 시간 재계산
-     * 근무시간 = (퇴근 - 출근) - 점심시간(1시간 고정)
-     * 체류시간이 점심시간보다 짧은 경우(조퇴 등) 0으로 처리
+    /** 퇴근 취소 — 잘못 누른 경우 직원 본인이 OPEN 상태일 때만 호출 가능.
+     *  lastClockOut 만 null 로 되돌리고 근무/연장 분도 초기화. */
+    public void cancelClockOut() {
+        this.lastClockOut = null;
+        this.workedMinutes = 0;
+        this.overtimeMinutes = 0;
+    }
+
+    /** 근무/초과 시간 재계산.
+     * 근무시간 = (퇴근 - 출근) - 휴게시간(분).
+     * - FIXED 직원: 회사 정책 점심시간(WorkSchedule.breakMinutes)
+     * - FLEXIBLE 직원: 직원이 매월 선택한 점심시간(MemberScheduleSelection.breakMinutes)
+     * 호출자가 둘 중 적절한 값을 ScheduleResolver 로 결정해서 넘김.
      */
-    public void recalculateMinutes(int scheduleWorkMinutes){
+    public void recalculateMinutes(int scheduleWorkMinutes, int breakMinutes){
         if(firstClockIn == null || lastClockOut == null) return;
 
         long totalMinutes = Duration.between(firstClockIn, lastClockOut).toMinutes();
-        this.workedMinutes = (int) Math.max(0, totalMinutes - LUNCH_BREAK_MINUTES);
+        this.workedMinutes = (int) Math.max(0, totalMinutes - breakMinutes);
 
         if(this.workedMinutes > scheduleWorkMinutes){
             this.overtimeMinutes = this.workedMinutes - scheduleWorkMinutes;

@@ -196,22 +196,6 @@ public class DailyAttendanceService {
 
     /**
      * 해당 날짜에 유효한 WorkSchedule의 기준 근무시간(분) 조회
-     *
-     * 퇴근 시 recalculateMinutes(scheduleWorkMinutes)를 호출하는데
-     *  이때 "이 사원이 오늘 몇 분 근무해야 정상인지" 기준값이 필요
-     *  예: 8시간 근무 스케줄 → 480분, 이 이상이면 overtimeMinutes로 잡힘
-     *
-     * ===== 스케줄 우선순위 =====
-     * findActiveSchedules() 결과가 memberId DESC NULLS LAST로 정렬되어 있어서:
-     * 1순위: 개인 스케줄 (memberId != null) → 이 사원 전용 근무시간
-     * 2순위: 회사 기본 스케줄 (memberId = null) → 전사 공통 근무시간
-     * 둘 다 없으면: 법정 기준 480분(8시간) 적용
-     *
-     * ===== 호출 시점 =====
-     * AttendanceLogService.clockOut() 내
-     * → 퇴근 시간 기록 후
-     * → 이 메서드로 기준 근무시간 조회
-     * → daily.recalculateMinutes(기준시간) 호출
      */
     @Transactional(readOnly = true)
     public int getScheduleWorkMinutes(UUID companyId, UUID memberId, LocalDate date){
@@ -223,9 +207,10 @@ public class DailyAttendanceService {
             return 480;
         }
 
-        // 첫 번째 = 최우선 스케줄 (개인 > 회사기본)
-        return workSchedules.get(0).getWorkMinutes();
-
+        // 첫 번째 = 최우선 스케줄 (개인 > 회사기본).
+        // workMinutes 가 null 인 스케줄(레거시 행)도 안전하게 처리, 480분
+        Integer mins = workSchedules.get(0).getWorkMinutes();
+        return mins != null ? mins : 480;
     }
 
     /**
