@@ -123,4 +123,36 @@ public class MeetingRecordController {
             @RequestBody PrivateMemoUpdateReqDto dto) {
         return ApiResponse.success(meetingRecordService.updatePrivateMemo(meetingRecordId, UUID.fromString(requesterId), dto.getPrivateMemo()), "비공개 메모가 수정되었습니다.");
     }
+
+    // =================================================================
+    //  v4 — 운영자 (HR / 평가관리자)
+    // =================================================================
+
+    /**
+     * 시즌 피드백 면담 멱등 재생성. publishResults 가 면담 생성에 부분 실패했거나
+     * Lead reassignment / SKIPPED_LEAVER 전이 후 신규 CONFIRMED 가 생긴 경우 복구용.
+     */
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
+    @PostMapping("/feedback/regenerate/{seasonId}")
+    public ApiResponse<Void> regenerateFeedbackMeetings(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        meetingRecordService.regenerateFeedbackMeetingsForSeason(seasonId, UUID.fromString(companyId));
+        return ApiResponse.success(null, "피드백 면담 멱등 재생성 완료");
+    }
+
+    /**
+     * 시즌별 면담 진행 현황 — 운영자 대시보드.
+     *  반환: { createdCount, completedCount, uncompletedCount, unscheduledCount }
+     */
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/seasons/{seasonId}/status")
+    public ApiResponse<java.util.Map<String, Integer>> seasonStatus(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                meetingRecordService.getSeasonStatus(seasonId, UUID.fromString(companyId)),
+                "시즌 면담 현황 조회 성공"
+        );
+    }
 }
