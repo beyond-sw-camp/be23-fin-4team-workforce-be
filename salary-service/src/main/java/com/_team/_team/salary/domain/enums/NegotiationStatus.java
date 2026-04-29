@@ -12,6 +12,5 @@ public enum NegotiationStatus {
     DRAFT,
     SUBMITTED,
     APPROVED,
-    REJECTED,
     APPLIED
 }
