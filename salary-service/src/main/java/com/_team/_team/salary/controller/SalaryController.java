@@ -105,12 +105,13 @@ public class SalaryController {
         );
     }
 
-    /** 급여 삭제 */
+    /** 급여 삭제 - force=true 면 현재 적용 중이어도 강제 삭제 (잘못 등록한 행 정리용) */
     @DeleteMapping("/{salaryId}")
     public ResponseEntity<?> delete(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @PathVariable UUID salaryId){
-        salaryService.delete(companyId, salaryId);
+            @PathVariable UUID salaryId,
+            @RequestParam(value = "force", required = false, defaultValue = "false") boolean force){
+        salaryService.delete(companyId, salaryId, force);
         return new ResponseEntity<>(
                 ApiResponse.success(null, "급여가 삭제되었습니다."),
                 HttpStatus.OK

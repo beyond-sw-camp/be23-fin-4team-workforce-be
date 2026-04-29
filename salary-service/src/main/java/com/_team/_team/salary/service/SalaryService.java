@@ -70,8 +70,15 @@ public class SalaryService {
 
         // 이전 급여가 있었을 경우, 이전 급여의 effectiveTo를 자동으로 닫아줌
         // 새 급여 시작일 전날로 이전 급여 종료
+        // 같은 effectiveFrom 으로 등록 요청이 오면 기존 행을 닫는 로직이 effectiveTo=시작일-1 로
         salaryRepository.findActiveSalary(reqDto.getMemberId(), companyId, reqDto.getEffectiveFrom())
                 .ifPresent(prevSalary -> {
+                    if (prevSalary.getEffectiveFrom() != null
+                            && prevSalary.getEffectiveFrom().equals(reqDto.getEffectiveFrom())) {
+                        throw new BusinessException(HttpStatus.CONFLICT,
+                                "이미 같은 적용 시작일(" + reqDto.getEffectiveFrom()
+                                        + ")로 등록된 급여가 있습니다. 기존 이력을 수정하거나 다른 시작일을 사용하세요.");
+                    }
                     prevSalary.closeEffectivePeriod(reqDto.getEffectiveFrom().minusDays(1));
                 });
 
@@ -187,8 +194,9 @@ public class SalaryService {
         return SalaryResDto.fromEntity(salary);
     }
 
-    // 급여 삭제 (현재 적용 중인 급여는 삭제 불가)
-    public void delete(UUID companyId, UUID salaryId){
+    // 급여 삭제 , 기본은 현재 적용 중인 급여 삭제 불가
+    // force=true 시 활성 검사 우회 (관리자가 잘못 등록한 행을 즉시 정리할 때)
+    public void delete(UUID companyId, UUID salaryId, boolean force){
         Salary salary = salaryRepository.findById(salaryId)
                 .orElseThrow(()-> new BusinessException(HttpStatus.NOT_FOUND, "급여 정보를 찾을 수 없습니다."));
 
@@ -196,11 +204,16 @@ public class SalaryService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
         }
 
-        if(salary.isActive()) {
+        if(!force && salary.isActive()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,"현재 적용 중인 급여는 삭제 불가합니다.");
         }
 
         salaryRepository.delete(salary);
+    }
+
+    // force 미지정 시 false
+    public void delete(UUID companyId, UUID salaryId){
+        delete(companyId, salaryId, false);
     }
 
     // 적용 종료일이 시작일보다 빠른지 검증
