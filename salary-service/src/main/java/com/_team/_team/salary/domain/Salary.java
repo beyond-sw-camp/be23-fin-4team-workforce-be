@@ -68,8 +68,12 @@ public class Salary extends BaseTimeEntity {
         this.salaryPolicyId = reqDto.getSalaryPolicyId();
         this.baseSalary = resolvedBaseSalary;
         this.step = reqDto.getStep();
-        this.jobGradeName = reqDto.getJobGradeName();
-        this.jobTitleName = reqDto.getJobTitleName();
+        if (reqDto.getJobGradeName() != null && !reqDto.getJobGradeName().isBlank()) {
+            this.jobGradeName = reqDto.getJobGradeName();
+        }
+        if (reqDto.getJobTitleName() != null && !reqDto.getJobTitleName().isBlank()) {
+            this.jobTitleName = reqDto.getJobTitleName();
+        }
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();
         this.dependentCount = reqDto.getDependentCount() == null ? 1 : reqDto.getDependentCount();

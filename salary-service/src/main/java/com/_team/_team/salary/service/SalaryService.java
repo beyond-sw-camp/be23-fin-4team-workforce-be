@@ -71,16 +71,18 @@ public class SalaryService {
         // 이전 급여가 있었을 경우, 이전 급여의 effectiveTo를 자동으로 닫아줌
         // 새 급여 시작일 전날로 이전 급여 종료
         // 같은 effectiveFrom 으로 등록 요청이 오면 기존 행을 닫는 로직이 effectiveTo=시작일-1 로
-        salaryRepository.findActiveSalary(reqDto.getMemberId(), companyId, reqDto.getEffectiveFrom())
-                .ifPresent(prevSalary -> {
-                    if (prevSalary.getEffectiveFrom() != null
-                            && prevSalary.getEffectiveFrom().equals(reqDto.getEffectiveFrom())) {
-                        throw new BusinessException(HttpStatus.CONFLICT,
-                                "이미 같은 적용 시작일(" + reqDto.getEffectiveFrom()
-                                        + ")로 등록된 급여가 있습니다. 기존 이력을 수정하거나 다른 시작일을 사용하세요.");
-                    }
-                    prevSalary.closeEffectivePeriod(reqDto.getEffectiveFrom().minusDays(1));
-                });
+        Salary prevSalaryRef = salaryRepository
+                .findActiveSalary(reqDto.getMemberId(), companyId, reqDto.getEffectiveFrom())
+                .orElse(null);
+        if (prevSalaryRef != null) {
+            if (prevSalaryRef.getEffectiveFrom() != null
+                    && prevSalaryRef.getEffectiveFrom().equals(reqDto.getEffectiveFrom())) {
+                throw new BusinessException(HttpStatus.CONFLICT,
+                        "이미 같은 적용 시작일(" + reqDto.getEffectiveFrom()
+                                + ")로 등록된 급여가 있습니다. 기존 이력을 수정하거나 다른 시작일을 사용하세요.");
+            }
+            prevSalaryRef.closeEffectivePeriod(reqDto.getEffectiveFrom().minusDays(1));
+        }
 
         // 호봉제 여부에 따라 step 필수 검증
         if ("Y".equals(policy.getUsePayGradeYn()) && reqDto.getStep() == null) {
@@ -92,16 +94,25 @@ public class SalaryService {
                 companyId, reqDto.getStep(), reqDto.getBaseSalary(), reqDto.getEffectiveFrom());
         validateMinimumWage(resolvedBaseSalary, reqDto.getEffectiveFrom());
 
+        // 직급/직책
+        MemberResDto m = fetchMemberMap(companyId).get(reqDto.getMemberId());
+        String resolvedJobGradeName = m.getJobGradeName();
+        String resolvedJobTitleName = m.getJobTitleName();
+
+        // 부양가족수
+        Integer resolvedDependentCount = reqDto.getDependentCount();
+
         Salary salary = Salary.builder()
                 .memberId(reqDto.getMemberId())
                 .companyId(companyId)
                 .salaryPolicyId(policy.getSalaryPolicyId())
                 .baseSalary(resolvedBaseSalary)
                 .step(reqDto.getStep())
-                .jobGradeName(reqDto.getJobGradeName())
-                .jobTitleName(reqDto.getJobTitleName())
+                .jobGradeName(resolvedJobGradeName)
+                .jobTitleName(resolvedJobTitleName)
                 .effectiveFrom(reqDto.getEffectiveFrom())
                 .effectiveTo(reqDto.getEffectiveTo())
+                .dependentCount(resolvedDependentCount)
                 .build();
 
         Salary saved = salaryRepository.save(salary);
@@ -214,6 +225,15 @@ public class SalaryService {
     // force 미지정 시 false
     public void delete(UUID companyId, UUID salaryId){
         delete(companyId, salaryId, false);
+    }
+
+    /** 첫 번째로 비어있지 않은(blank 아닌) 값을 반환, 모두 비어있으면 null */
+    private static String firstNonBlank(String... values) {
+        if (values == null) return null;
+        for (String v : values) {
+            if (v != null && !v.isBlank()) return v;
+        }
+        return null;
     }
 
     // 적용 종료일이 시작일보다 빠른지 검증
