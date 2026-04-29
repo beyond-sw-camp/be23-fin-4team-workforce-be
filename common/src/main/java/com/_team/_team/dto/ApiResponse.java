@@ -23,4 +23,9 @@ public class ApiResponse<T> {
     public static <T> ApiResponse<T> fail(String message) {
         return new ApiResponse<>(false, message, null);
     }
+
+    /** Failure with optional diagnostic payload (e.g. season activation member lists). */
+    public static <T> ApiResponse<T> fail(String message, T data) {
+        return new ApiResponse<>(false, message, data);
+    }
 }
