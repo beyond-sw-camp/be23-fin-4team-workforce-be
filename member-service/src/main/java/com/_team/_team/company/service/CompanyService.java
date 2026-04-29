@@ -185,6 +185,16 @@ public class CompanyService {
             }
         }
 
+        // 기본 계약서 템플릿 생성 (approval-service 호출)
+        try {
+            approvalServiceClient.initDefaultContractTemplates(company.getCompanyId());
+        } catch (Exception e) {
+            log.info("기본 계약서 템플릿 생성 실패: {}", e.getMessage());
+            if (e instanceof FeignException fe) {
+                log.error("응답 body: {}", fe.contentUTF8());
+            }
+        }
+
         // 기본 휴가 종류 생성 (salary-service 호출)
         try {
             salaryServiceClient.initDefaultLeaveTypes(company.getCompanyId());
