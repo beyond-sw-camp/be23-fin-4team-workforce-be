@@ -2,6 +2,7 @@ package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
+import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.domain.enums.WageSystemType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,10 @@ public class SalaryPolicyResDto {
     private String usePayGradeYn;
     private WageSystemType wageSystemType;
     private Integer fixedOvertimeMinutes;
+    // 월 소정근로시간 시급 환산 기준 한국 표준 209
+    private Integer monthlyOrdinaryHours;
+    // 일할계산 방식
+    private ProrationMethod prorationMethod;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
     private LocalDateTime createdAt;
@@ -40,6 +45,8 @@ public class SalaryPolicyResDto {
                 .usePayGradeYn(salaryPolicy.getUsePayGradeYn())
                 .wageSystemType(salaryPolicy.getWageSystemType())
                 .fixedOvertimeMinutes(salaryPolicy.getFixedOvertimeMinutes())
+                .monthlyOrdinaryHours(salaryPolicy.getMonthlyOrdinaryHours())
+                .prorationMethod(salaryPolicy.getProrationMethod())
                 .effectiveFrom(salaryPolicy.getEffectiveFrom())
                 .effectiveTo(salaryPolicy.getEffectiveTo())
                 .createdAt(salaryPolicy.getCreatedAt())

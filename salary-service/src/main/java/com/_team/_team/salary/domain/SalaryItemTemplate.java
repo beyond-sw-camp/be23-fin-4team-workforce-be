@@ -26,7 +26,7 @@ public class SalaryItemTemplate extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID salaryItemTemplateId;
 
-    /** 소속 회사 ID (Gateway 헤더에서 전달받음) */
+    /** 소속 회사 ID */
     @Column(nullable = false)
     private UUID companyId;
 
@@ -53,6 +53,13 @@ public class SalaryItemTemplate extends BaseTimeEntity {
     @Column(nullable = false, length = 1)
     private String isTaxableYn;
 
+    // 통상임금 포함 여부 Y면 시급 환산 기준에 포함
+    // 정기·일률·고정 지급 항목만 Y (직책수당 자격수당 등)
+    // 변동성 수당 (성과급 비정기상여) 및 비과세 실비 (식대 자가운전) 는 N
+    @Column(nullable = false, length = 1)
+    @Builder.Default
+    private String isOrdinaryWageYn = "N";
+
     /** 표시 순서 */
     @Column(nullable = false)
     private Integer displayOrder;
@@ -69,6 +76,9 @@ public class SalaryItemTemplate extends BaseTimeEntity {
         this.itemName = reqDto.getItemName();
         this.itemType = reqDto.getItemType();
         this.isTaxableYn = reqDto.getIsTaxableYn();
+        if (reqDto.getIsOrdinaryWageYn() != null) {
+            this.isOrdinaryWageYn = reqDto.getIsOrdinaryWageYn();
+        }
         this.displayOrder = reqDto.getDisplayOrder();
     }
 

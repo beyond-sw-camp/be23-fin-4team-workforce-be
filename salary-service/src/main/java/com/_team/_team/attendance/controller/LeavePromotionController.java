@@ -2,6 +2,7 @@ package com._team._team.attendance.controller;
 
 import com._team._team.attendance.dto.reqDto.LeavePromotionDesignateReqDto;
 import com._team._team.attendance.dto.reqDto.LeavePromotionRespondReqDto;
+import com._team._team.attendance.dto.resDto.LeavePromotionHistoryResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionMyResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionNoResponseResDto;
 import com._team._team.attendance.service.LeavePromotionResponseService;
@@ -56,6 +57,15 @@ public class LeavePromotionController {
         List<LeavePromotionNoResponseResDto> data = service.findNoResponse(companyId, LocalDate.now());
         return new ResponseEntity<>(
                 ApiResponse.success(data, "무응답자 조회 성공"),
+                HttpStatus.OK);
+    }
+
+    // 관리자 — 통보 이력 (회신 완료 + 강제 지정)
+    @GetMapping("/admin/history")
+    public ResponseEntity<?> findHistory(@RequestHeader("X-User-CompanyId") UUID companyId) {
+        List<LeavePromotionHistoryResDto> data = service.findHistory(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "촉진 이력 조회 성공"),
                 HttpStatus.OK);
     }
 

@@ -89,6 +89,21 @@ public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUI
        """)
     List<LeaveRequest> findAllActiveOnDate(@Param("date") LocalDate date);
 
+    /**
+     * 본인의 기간과 겹치는 모든 승인 휴가
+     */
+    @Query("""
+       SELECT l FROM LeaveRequest l
+       WHERE l.memberId = :memberId
+         AND l.approvalStatus = 'APPROVED'
+         AND l.startDate <= :to
+         AND l.endDate >= :from
+         AND l.delYn = 'N'
+       """)
+    List<LeaveRequest> findApprovedOverlapping(@Param("memberId") UUID memberId,
+                                                @Param("from") LocalDate from,
+                                                @Param("to") LocalDate to);
+
     // 회사가 강제 지정한 연차가 해당 일자에 존재하는지
     @Query("""
     SELECT COUNT(r) > 0 FROM LeaveRequest r

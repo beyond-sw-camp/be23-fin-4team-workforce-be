@@ -1,10 +1,14 @@
 package com._team._team.attendance.service;
 
+import com._team._team.attendance.domain.AttendanceLog;
+import com._team._team.attendance.repository.AttendanceLogRepository;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
 import com._team._team.attendance.repository.WorkScheduleRepository;
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.WorkSchedule;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
+import com._team._team.attendance.domain.enums.ClosureStatus;
+import com._team._team.attendance.domain.enums.CorrectionState;
 import com._team._team.attendance.dto.resDto.DailyAttendanceResDto;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +19,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -25,11 +33,15 @@ import java.util.UUID;
 public class DailyAttendanceService {
     private final DailyAttendanceRepository dailyAttendanceRepository;
     private final WorkScheduleRepository workScheduleRepository;
+    private final AttendanceLogRepository attendanceLogRepository;
 
     @Autowired
-    public DailyAttendanceService(DailyAttendanceRepository dailyAttendanceRepository, WorkScheduleRepository workScheduleRepository) {
+    public DailyAttendanceService(DailyAttendanceRepository dailyAttendanceRepository,
+                                  WorkScheduleRepository workScheduleRepository,
+                                  AttendanceLogRepository attendanceLogRepository) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.workScheduleRepository = workScheduleRepository;
+        this.attendanceLogRepository = attendanceLogRepository;
     }
 
     /**
@@ -95,12 +107,15 @@ public class DailyAttendanceService {
     /**
      * 개인 월간 근태 조회 (페이징)
      * - 사원 본인이 한 달 근태 내역 확인
+     * - correctionState 채워서 응답 (정정 컬럼 분기에 사용)
      */
     @Transactional(readOnly = true)
     public Page<DailyAttendanceResDto> findMonthlyByMember(UUID companyId, UUID memberId, LocalDate from, LocalDate to, Pageable pageable) {
-        return dailyAttendanceRepository
-                .findMonthlyByMember(memberId, from, to, pageable)
-                .map(DailyAttendanceResDto::fromEntity);
+        Page<DailyAttendance> page = dailyAttendanceRepository
+                .findMonthlyByMember(memberId, from, to, pageable);
+        Map<UUID, CorrectionState> stateMap = computeCorrectionStates(page.getContent());
+        return page.map(da -> DailyAttendanceResDto.fromEntity(
+                da, stateMap.getOrDefault(da.getDailyAttendanceId(), CorrectionState.NORMAL)));
     }
 
     /**
@@ -109,9 +124,11 @@ public class DailyAttendanceService {
      */
     @Transactional(readOnly = true)
     public Page<DailyAttendanceResDto> findDailyByCompany(UUID companyId, LocalDate date, Pageable pageable) {
-        return dailyAttendanceRepository
-                .findDailyByCompany(companyId, date, pageable)
-                .map(DailyAttendanceResDto::fromEntity);
+        Page<DailyAttendance> page = dailyAttendanceRepository
+                .findDailyByCompany(companyId, date, pageable);
+        Map<UUID, CorrectionState> stateMap = computeCorrectionStates(page.getContent());
+        return page.map(da -> DailyAttendanceResDto.fromEntity(
+                da, stateMap.getOrDefault(da.getDailyAttendanceId(), CorrectionState.NORMAL)));
     }
 
     /**
@@ -121,9 +138,60 @@ public class DailyAttendanceService {
      */
     @Transactional(readOnly = true)
     public Page<DailyAttendanceResDto> findMonthlyByCompany(UUID companyId, LocalDate from, LocalDate to, Pageable pageable) {
-        return dailyAttendanceRepository
-                .findMonthlyByCompany(companyId, from, to, pageable)
-                .map(DailyAttendanceResDto::fromEntity);
+        Page<DailyAttendance> page = dailyAttendanceRepository
+                .findMonthlyByCompany(companyId, from, to, pageable);
+        Map<UUID, CorrectionState> stateMap = computeCorrectionStates(page.getContent());
+        return page.map(da -> DailyAttendanceResDto.fromEntity(
+                da, stateMap.getOrDefault(da.getDailyAttendanceId(), CorrectionState.NORMAL)));
+    }
+
+    /**
+     * 페이지의 모든 DA 에 대한 CorrectionState 일괄 계산 (N+1 회피)
+     *
+     *  PENDING    closureStatus = UNDER_REVIEW
+     *  COMPLETED  ADMIN_MANUAL 정정 로그 중 isCorrectedYn=Y + correctedBy not null 1건이라도 있음
+     *  ABNORMAL   status = NORMAL + 과거 일자 + clock 한쪽 이상 누락
+     *  NORMAL     그 외
+     */
+    private Map<UUID, CorrectionState> computeCorrectionStates(List<DailyAttendance> page) {
+        Map<UUID, CorrectionState> result = new HashMap<>();
+        if (page == null || page.isEmpty()) return result;
+
+        // ADMIN_MANUAL 로그를 가진 DA 중 "관리자 승인된 정정" 보유 daId 모음
+        Set<UUID> daIds = new HashSet<>();
+        for (DailyAttendance da : page) daIds.add(da.getDailyAttendanceId());
+
+        List<AttendanceLog> adminManual = attendanceLogRepository
+                .findAdminManualByDailyAttendanceIds(daIds);
+        Set<UUID> completedDaIds = new HashSet<>();
+        for (AttendanceLog log : adminManual) {
+            if ("Y".equals(log.getIsCorrectedYn()) && log.getCorrectedBy() != null) {
+                completedDaIds.add(log.getDailyAttendance().getDailyAttendanceId());
+            }
+        }
+
+        LocalDate today = LocalDate.now();
+        for (DailyAttendance da : page) {
+            UUID daId = da.getDailyAttendanceId();
+            if (da.getClosureStatus() == ClosureStatus.UNDER_REVIEW) {
+                result.put(daId, CorrectionState.PENDING);
+            } else if (completedDaIds.contains(daId)) {
+                result.put(daId, CorrectionState.COMPLETED);
+            } else if (isAbnormal(da, today)) {
+                result.put(daId, CorrectionState.ABNORMAL);
+            } else {
+                result.put(daId, CorrectionState.NORMAL);
+            }
+        }
+        return result;
+    }
+
+    /** 과거 일자 + 정상 출근 상태인데 clock 한 쪽 이상 누락 = 이상 */
+    private boolean isAbnormal(DailyAttendance da, LocalDate today) {
+        if (da.getAttendanceDate() == null) return false;
+        if (da.getAttendanceDate().isAfter(today.minusDays(1))) return false;  // 미래·오늘 제외
+        if (da.getStatus() != AttendanceStatus.NORMAL) return false;            // 휴가·결근 제외
+        return da.getFirstClockIn() == null || da.getLastClockOut() == null;
     }
 
     /**

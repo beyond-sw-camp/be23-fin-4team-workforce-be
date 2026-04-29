@@ -6,7 +6,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * 시차출퇴근 슬롯 선택 결재 이벤트 발행
+ * 시차출퇴근 스케줄 선택 결재 이벤트 발행
  * approval-service 에서 승인·반려·취소 시점에 salary-service 로 쏘는 Kafka publisher
  */
 @Slf4j

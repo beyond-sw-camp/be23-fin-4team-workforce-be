@@ -10,6 +10,7 @@ import com._team._team.attendance.domain.enums.PromotionStage;
 import com._team._team.attendance.dto.reqDto.LeavePromotionDesignateReqDto;
 import com._team._team.attendance.dto.reqDto.LeavePromotionRespondReqDto;
 import com._team._team.attendance.dto.reqDto.MemberBalanceUseReqDto;
+import com._team._team.attendance.dto.resDto.LeavePromotionHistoryResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionMyResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionNoResponseResDto;
 import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
@@ -21,6 +22,7 @@ import com._team._team.dto.NotificationMessage;
 import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,7 +70,8 @@ public class LeavePromotionResponseService {
         this.companyLeaveTypeRepository = companyLeaveTypeRepository;
         this.memberBalanceService = memberBalanceService;
         this.eventPublisher = eventPublisher;
-        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     // 직원 본인이 받은 촉진 통보 목록 응답 필요한 것 우선
@@ -217,5 +220,49 @@ public class LeavePromotionResponseService {
             log.error("dates serialize fail", e);
             return "[]";
         }
+    }
+
+    private List<String> deserializeDateList(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(json, objectMapper.getTypeFactory()
+                    .constructCollectionType(List.class, String.class));
+        } catch (Exception e) {
+            log.warn("dates deserialize fail json={}", json);
+            return List.of();
+        }
+    }
+
+    /**
+     * 관리자 — 촉진 통보 이력 (회신 완료 + 강제 지정)
+     *  - 회신완료 / 강제지정 모두 한 번에 조회 후 프론트에서 탭 분리
+     */
+    @Transactional(readOnly = true)
+    public List<LeavePromotionHistoryResDto> findHistory(UUID companyId) {
+        List<LeavePromotionLog> ackLogs = promotionLogRepository
+                .findByCompanyIdAndStatusOrderBySentOnDesc(companyId, PromotionLogStatus.ACKNOWLEDGED);
+        List<LeavePromotionLog> desigLogs = promotionLogRepository
+                .findByCompanyIdAndStatusOrderBySentOnDesc(companyId, PromotionLogStatus.DESIGNATED);
+
+        List<LeavePromotionLog> all = new ArrayList<>();
+        all.addAll(ackLogs);
+        all.addAll(desigLogs);
+
+        List<LeavePromotionHistoryResDto> result = new ArrayList<>();
+        for (LeavePromotionLog log : all) {
+            MemberBalance bal = memberBalanceRepository
+                    .findById(log.getMemberBalanceId()).orElse(null);
+            LocalDate expiry = bal != null ? bal.getExpirationDate() : null;
+            Double remaining = bal != null ? bal.getRemaining() : null;
+
+            result.add(LeavePromotionHistoryResDto.from(
+                    log,
+                    expiry,
+                    remaining,
+                    deserializeDateList(log.getPlannedDates()),
+                    deserializeDateList(log.getDesignatedDates())));
+        }
+        result.sort(Comparator.comparing(LeavePromotionHistoryResDto::getSentOn).reversed());
+        return result;
     }
 }

@@ -381,7 +381,10 @@ public class ApprovalService {
         publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
         publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId,
                 LeaveOfAbsenceApprovalEvent.Action.REJECT, reqDto.getComment());
-        publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.REJECT);
+
+        // 반려 시 REJECT 이벤트 발행
+        publishLeaveEventIfApplicable(request, actualMemberId,
+                LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
 
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 
@@ -635,7 +638,7 @@ public class ApprovalService {
     }
 
     /**
-     * 시차출퇴근 슬롯 선택 문서일 때만 schedule 이벤트 발행
+     * 시차출퇴근 스케줄 선택 문서일 때만 schedule 이벤트 발행
      */
     private void publishScheduleEventIfApplicable(ApprovalRequest request,
                                                   ScheduleApprovalEvent.Action action) {

@@ -8,7 +8,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 /**
- * 개인별 월 단위 시차출퇴근 슬롯 선택 이력
+ * 개인별 월 단위 시차출퇴근 스케줄 선택 이력
  */
 @Entity
 @AllArgsConstructor
@@ -49,7 +49,7 @@ public class MemberScheduleSelection extends BaseTimeEntity {
     private String targetYearMonth;
 
     /**
-     * 선택한 슬롯 ID
+     * 선택한 스케줄 ID
      */
     @Column(nullable = false)
     private UUID slotId;

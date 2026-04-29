@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * 스케줄 슬롯 선택 결재 완료 이벤트
+ * 스케줄 스케줄 선택 결재 완료 이벤트
  */
 @AllArgsConstructor
 @NoArgsConstructor
