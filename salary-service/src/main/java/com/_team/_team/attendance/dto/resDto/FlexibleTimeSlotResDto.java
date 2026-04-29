@@ -25,7 +25,6 @@ public class FlexibleTimeSlotResDto {
     private LocalTime startTime;
     private LocalTime endTime;
     private Integer workMinutes;
-    private Integer breakMinutes;
     private Boolean isDefault;
     private String activeYn;
 
@@ -38,7 +37,6 @@ public class FlexibleTimeSlotResDto {
                 .startTime(slot.getStartTime())
                 .endTime(slot.getEndTime())
                 .workMinutes(slot.getWorkMinutes())
-                .breakMinutes(slot.getBreakMinutes())
                 .isDefault(slot.getIsDefault())
                 .activeYn(slot.getActiveYn())
                 .build();

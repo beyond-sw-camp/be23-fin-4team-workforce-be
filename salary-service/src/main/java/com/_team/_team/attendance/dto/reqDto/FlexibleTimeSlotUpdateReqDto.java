@@ -25,7 +25,4 @@ public class FlexibleTimeSlotUpdateReqDto {
 
     @Positive
     private Integer workMinutes;
-
-    @PositiveOrZero
-    private Integer breakMinutes;
 }

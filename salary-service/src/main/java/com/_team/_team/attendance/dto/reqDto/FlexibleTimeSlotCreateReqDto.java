@@ -43,10 +43,6 @@ public class FlexibleTimeSlotCreateReqDto {
     @Positive
     private Integer workMinutes;
 
-    @NotNull
-    @PositiveOrZero
-    private Integer breakMinutes;
-
     /**
      * 기본 슬롯 여부
      */
@@ -61,7 +57,6 @@ public class FlexibleTimeSlotCreateReqDto {
                 .startTime(startTime)
                 .endTime(endTime)
                 .workMinutes(workMinutes)
-                .breakMinutes(breakMinutes)
                 .isDefault(isDefault != null && isDefault)
                 .activeYn("Y")
                 .build();

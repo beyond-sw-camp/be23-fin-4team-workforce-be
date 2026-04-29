@@ -77,7 +77,6 @@ public class FlexibleTimeSlotService {
                         .startTime(reqDto.getStartTime())
                         .endTime(reqDto.getEndTime())
                         .workMinutes(reqDto.getWorkMinutes())
-                        .breakMinutes(reqDto.getBreakMinutes())
                         .isDefault(shouldBeDefault)
                         .activeYn(ACTIVE)
                         .build()
@@ -107,8 +106,7 @@ public class FlexibleTimeSlotService {
                 reqDto.getSlotLabel(),
                 reqDto.getStartTime(),
                 reqDto.getEndTime(),
-                reqDto.getWorkMinutes(),
-                reqDto.getBreakMinutes()
+                reqDto.getWorkMinutes()
         );
         return FlexibleTimeSlotResDto.fromEntity(slot);
     }
