@@ -1,15 +1,20 @@
 package com._team._team.attendance.service;
 
 import com._team._team.attendance.domain.AttendanceLog;
+import com._team._team.attendance.domain.MemberScheduleSelection;
 import com._team._team.attendance.repository.AttendanceLogRepository;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
+import com._team._team.attendance.repository.MemberScheduleSelectionRepository;
 import com._team._team.attendance.repository.WorkScheduleRepository;
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.WorkSchedule;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
 import com._team._team.attendance.domain.enums.ClosureStatus;
 import com._team._team.attendance.domain.enums.CorrectionState;
+import com._team._team.attendance.domain.enums.WorkType;
 import com._team._team.attendance.dto.resDto.DailyAttendanceResDto;
+
+import java.time.format.DateTimeFormatter;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
@@ -34,18 +39,26 @@ public class DailyAttendanceService {
     private final DailyAttendanceRepository dailyAttendanceRepository;
     private final WorkScheduleRepository workScheduleRepository;
     private final AttendanceLogRepository attendanceLogRepository;
+    private final MemberScheduleSelectionRepository memberScheduleSelectionRepository;
+
+    private static final DateTimeFormatter YM = DateTimeFormatter.ofPattern("yyyy-MM");
 
     @Autowired
     public DailyAttendanceService(DailyAttendanceRepository dailyAttendanceRepository,
                                   WorkScheduleRepository workScheduleRepository,
-                                  AttendanceLogRepository attendanceLogRepository) {
+                                  AttendanceLogRepository attendanceLogRepository,
+                                  MemberScheduleSelectionRepository memberScheduleSelectionRepository) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.workScheduleRepository = workScheduleRepository;
         this.attendanceLogRepository = attendanceLogRepository;
+        this.memberScheduleSelectionRepository = memberScheduleSelectionRepository;
     }
 
+    /** 근무, 휴게 분 쌍 - 퇴근 시 recalculate 호출에 사용 */
+    public record WorkBreakMinutes(int workMinutes, int breakMinutes) {}
+
     /**
-     * 해당 날짜의 DailyAttendance 조회, 없으면 새로 생성
+     * 해당 날짜의 일일 근태 조회, 없으면 새로 생성
      * - 출근(clockIn) 시 호출되어 당일 근태 레코드를 보장
      */
     public DailyAttendance findOrCreateDaily(UUID companyId, UUID memberId, LocalDate date){
@@ -63,9 +76,7 @@ public class DailyAttendanceService {
 
         /**
         * 2-2. DailyAttendance 생성
-        * status = ABSENT: 아직 출근 로그가 안 찍힌 상태
-        * -> 이후 clockIn()에서 NORMAL로 즉시 변경됨
-        * workScheduleId: 이 사원에게 적용되는 스케줄 (overtime 계산 기준)
+        * status = ABSENT: 아직 출근 로그가 안 찍힌 상태, 이후 clockIn()에서 NORMAL로 즉시 변경됨
         */
         DailyAttendance dailyAttendance = DailyAttendance.builder()
                 .companyId(companyId)
@@ -74,13 +85,11 @@ public class DailyAttendanceService {
                 .status(AttendanceStatus.ABSENT)
                 .workScheduleId(scheduleId)        // 개인 스케줄 우선, 없으면 회사 기본
                 .build();
-
         return dailyAttendanceRepository.save(dailyAttendance);
     }
 
     /**
      * 해당 날짜의 DailyAttendance 조회 (없으면 예외)
-     * 퇴근시 사용 (clockOut에서 호출)
      * 출근 기록 없이 호출되면 에러 (퇴근은 "출근한 상태"에서만 가능)
      */
     @Transactional(readOnly = true)
@@ -107,7 +116,6 @@ public class DailyAttendanceService {
     /**
      * 개인 월간 근태 조회 (페이징)
      * - 사원 본인이 한 달 근태 내역 확인
-     * - correctionState 채워서 응답 (정정 컬럼 분기에 사용)
      */
     @Transactional(readOnly = true)
     public Page<DailyAttendanceResDto> findMonthlyByMember(UUID companyId, UUID memberId, LocalDate from, LocalDate to, Pageable pageable) {
@@ -120,7 +128,6 @@ public class DailyAttendanceService {
 
     /**
      * 회사 전체 특정일 근태 조회 - 관리자 대시보드 (페이징)
-     * - 오늘 출근 현황, 결근자 파악
      */
     @Transactional(readOnly = true)
     public Page<DailyAttendanceResDto> findDailyByCompany(UUID companyId, LocalDate date, Pageable pageable) {
@@ -146,8 +153,7 @@ public class DailyAttendanceService {
     }
 
     /**
-     * 페이지의 모든 DA 에 대한 CorrectionState 일괄 계산 (N+1 회피)
-     *
+     * 페이지의 모든 DA 에 대한 CorrectionState 일괄 계산
      *  PENDING    closureStatus = UNDER_REVIEW
      *  COMPLETED  ADMIN_MANUAL 정정 로그 중 isCorrectedYn=Y + correctedBy not null 1건이라도 있음
      *  ABNORMAL   status = NORMAL + 과거 일자 + clock 한쪽 이상 누락
@@ -195,7 +201,7 @@ public class DailyAttendanceService {
     }
 
     /**
-     * 해당 날짜에 유효한 WorkSchedule의 기준 근무시간(분) 조회
+     * 해당 날짜에 유효한 스케줄 기준 근무시간(분) 조회
      */
     @Transactional(readOnly = true)
     public int getScheduleWorkMinutes(UUID companyId, UUID memberId, LocalDate date){
@@ -214,9 +220,34 @@ public class DailyAttendanceService {
     }
 
     /**
-     * 출근 시점에 유효한 WorkScheduleID 결정
-     * DailyAttendance를 생성할 때 workScheduleId를 넣어두면,
-     * 나중에 퇴근 시 getScheduleWorkMinutes()에서 또 스케줄 조회 안 해도 됨.
+     * 근무시간 + 휴게시간 한 번에 조회 - 퇴근 처리 시 recalculate 호출용
+     * 스케줄 자체가 없으면 480분 일한걸로
+     */
+    @Transactional(readOnly = true)
+    public WorkBreakMinutes getScheduleWorkAndBreak(UUID companyId, UUID memberId, LocalDate date){
+        List<WorkSchedule> workSchedules = workScheduleRepository
+                .findActiveSchedules(companyId, memberId, date);
+        if (workSchedules.isEmpty()) {
+            return new WorkBreakMinutes(480, 0);
+        }
+        WorkSchedule schedule = workSchedules.get(0);
+        int workMinutes = schedule.getWorkMinutes() != null ? schedule.getWorkMinutes() : 480;
+
+        if (schedule.getWorkType() == WorkType.FIXED) {
+            return new WorkBreakMinutes(workMinutes, schedule.computeBreakMinutes());
+        }
+
+        // FLEXIBLE — 직원이 선택한 점심시간 사용
+        String yearMonth = date.format(YM);
+        int memberBreakMin = memberScheduleSelectionRepository
+                .findCurrentActive(memberId, yearMonth)
+                .map(MemberScheduleSelection::computeBreakMinutes)
+                .orElse(0);
+        return new WorkBreakMinutes(workMinutes, memberBreakMin);
+    }
+
+    /**
+     * 출근 시점에 유효한 스케줄 결정
      */
     private UUID resolveWorkScheduleId(UUID companyId, UUID memberId, LocalDate date) {
         List<WorkSchedule> schedules = workScheduleRepository

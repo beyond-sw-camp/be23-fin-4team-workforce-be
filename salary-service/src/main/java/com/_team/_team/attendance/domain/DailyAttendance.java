@@ -99,11 +99,8 @@ public class DailyAttendance extends BaseTimeEntity {
         this.overtimeMinutes = 0;
     }
 
-    /** 근무/초과 시간 재계산.
-     * 근무시간 = (퇴근 - 출근) - 휴게시간(분).
-     * - FIXED 직원: 회사 정책 점심시간(WorkSchedule.breakMinutes)
-     * - FLEXIBLE 직원: 직원이 매월 선택한 점심시간(MemberScheduleSelection.breakMinutes)
-     * 호출자가 둘 중 적절한 값을 ScheduleResolver 로 결정해서 넘김.
+    /** 근무/초과 시간 재계산
+     * 근무시간 = (퇴근 - 출근) - 휴게시간(분)
      */
     public void recalculateMinutes(int scheduleWorkMinutes, int breakMinutes){
         if(firstClockIn == null || lastClockOut == null) return;
