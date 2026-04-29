@@ -1,8 +1,6 @@
 package com._team._team.salary.controller;
 
 import com._team._team.dto.ApiResponse;
-import com._team._team.event.MemberHiredEvent;
-import com._team._team.salary.service.SalaryAutoCreateService;
 import com._team._team.salary.service.SalaryService;
 import com._team._team.salary.dto.reqdto.SalaryCreateReqDto;
 import com._team._team.salary.dto.reqdto.SalaryUpdateReqDto;
@@ -12,7 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @RestController
@@ -20,13 +17,10 @@ import java.util.UUID;
 public class SalaryController {
 
     private final SalaryService salaryService;
-    private final SalaryAutoCreateService salaryAutoCreateService;
 
     @Autowired
-    public SalaryController(SalaryService salaryService,
-                            SalaryAutoCreateService salaryAutoCreateService){
+    public SalaryController(SalaryService salaryService){
         this.salaryService = salaryService;
-        this.salaryAutoCreateService = salaryAutoCreateService;
     }
 
     /** 급여 생성 */
@@ -37,27 +31,6 @@ public class SalaryController {
         return new ResponseEntity<>(
                 ApiResponse.success(salaryService.createSalary(companyId, reqDto), "급여가 생성되었습니다."),
                 HttpStatus.CREATED
-        );
-    }
-
-    // 새 직원이 입사하면 자동으로 급여가 만들어지는 시스템이 오류날 때, 관리자가 수동으로 급여 생성
-    @PostMapping("/bootstrap")
-    public ResponseEntity<?> bootstrap(
-            @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestBody MemberHiredEvent body) {
-        MemberHiredEvent e = MemberHiredEvent.builder()
-                .memberId(body.getMemberId())
-                .companyId(companyId)
-                .jobGradeId(body.getJobGradeId())
-                .jobGradeName(body.getJobGradeName())
-                .jobTitleName(body.getJobTitleName())
-                .hireDate(body.getHireDate())
-                .eventTime(Instant.now())
-                .build();
-        salaryAutoCreateService.bootstrapSalary(e);
-        return new ResponseEntity<>(
-                ApiResponse.success(null, "Salary bootstrap 요청 처리됨"),
-                HttpStatus.OK
         );
     }
 
