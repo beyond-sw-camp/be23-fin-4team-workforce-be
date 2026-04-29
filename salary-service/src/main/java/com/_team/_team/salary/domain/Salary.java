@@ -1,7 +1,9 @@
 package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
+import com._team._team.salary.domain.enums.TaxReductionType;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -62,7 +64,38 @@ public class Salary extends BaseTimeEntity {
     private Integer dependentCount = 1;
 
     /**
+     * 8세 이상 20세 이하 자녀 수
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer childUnder20Count = 0;
+
+    /**
+     * 소득세 감면 유형 - 조세특례제한법 등
+     * NONE 이 기본, YOUTH_SME (청년 중소기업) / DISABLED / FOREIGNER / ETC
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private TaxReductionType taxReductionType = TaxReductionType.NONE;
+
+    /**
+     * 감면율 (0.00 ~ 1.00), 예: 청년 중소기업 5년 첫 90% 감면 → 0.90
+     * NONE 이면 0.00 으로 저장
+     */
+    @Column(precision = 4, scale = 2)
+    private BigDecimal taxReductionRate;
+
+    /**
+     * 감면 종료일, 청년 SME 감면은 5년 한정 등 기간 제약이 있어 종료일 도래 후엔 감면 미적용
+     * null = 무기한 (실제로는 거의 없으니 항상 입력 권장)
+     */
+    private LocalDate taxReductionEffectiveTo;
+
+    /**
      * 급여 정보 수정
+     * 직급명/직책명이 reqDto 에 비어 있으면 기존 값 보존
+     * 세무 추가 필드(자녀수·감면)도 reqDto 에 들어오면 갱신, null 이면 기본값 적용
      */
     public void update(SalaryUpdateReqDto reqDto, long resolvedBaseSalary){
         this.salaryPolicyId = reqDto.getSalaryPolicyId();
@@ -77,6 +110,24 @@ public class Salary extends BaseTimeEntity {
         this.effectiveFrom = reqDto.getEffectiveFrom();
         this.effectiveTo = reqDto.getEffectiveTo();
         this.dependentCount = reqDto.getDependentCount() == null ? 1 : reqDto.getDependentCount();
+        this.childUnder20Count = reqDto.getChildUnder20Count() == null ? 0 : reqDto.getChildUnder20Count();
+        this.taxReductionType = reqDto.getTaxReductionType() == null
+                ? TaxReductionType.NONE
+                : reqDto.getTaxReductionType();
+        this.taxReductionRate = reqDto.getTaxReductionRate();
+        this.taxReductionEffectiveTo = reqDto.getTaxReductionEffectiveTo();
+    }
+
+    /**
+     * 정산 시점에 소득세 감면이 적용되는지 판정.
+     * - taxReductionType != NONE
+     * - taxReductionRate > 0
+     * - taxReductionEffectiveTo == null 이거나 정산일이 effectiveTo 이전·당일
+     */
+    public boolean isTaxReductionApplicableAt(LocalDate date) {
+        if (taxReductionType == null || taxReductionType == TaxReductionType.NONE) return false;
+        if (taxReductionRate == null || taxReductionRate.signum() <= 0) return false;
+        return taxReductionEffectiveTo == null || !taxReductionEffectiveTo.isBefore(date);
     }
 
     /**

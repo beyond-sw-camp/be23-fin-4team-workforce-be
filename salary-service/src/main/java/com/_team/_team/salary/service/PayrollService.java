@@ -292,10 +292,17 @@ public class PayrollService {
          * 9. 과세 총지급액 기준 4대보험 + 세금 자동 공제
          * totalTaxableEarning: 비과세 제외 -> 실제 과세 대상 금액
          */
+        // 정산 시점에 감면 기간이 만료됐는지도 함께 판정 - 만료 후엔 감면율 0 으로 적용.
+        java.math.BigDecimal effectiveReductionRate =
+                salary.isTaxReductionApplicableAt(reqDto.getPayrollYearMonthDay())
+                        ? salary.getTaxReductionRate()
+                        : null;
         List<AutoPayrollItem> deductionItems = payrollCalculationService.calculateDeductions(
                 totalTaxableEarning,
                 reqDto.getPayrollYearMonthDay(),
-                salary.getDependentCount() == null ? 1 : salary.getDependentCount());
+                salary.getDependentCount() == null ? 1 : salary.getDependentCount(),
+                salary.getChildUnder20Count() == null ? 0 : salary.getChildUnder20Count(),
+                effectiveReductionRate);
 
         for(AutoPayrollItem deduction : deductionItems){
             PayrollItem payrollItem = buildPayrollItem(saved ,deduction);

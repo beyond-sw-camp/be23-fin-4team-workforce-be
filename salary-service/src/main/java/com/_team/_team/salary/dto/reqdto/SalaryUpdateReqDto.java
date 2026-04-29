@@ -1,5 +1,8 @@
 package com._team._team.salary.dto.reqdto;
 
+import com._team._team.salary.domain.enums.TaxReductionType;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -10,6 +13,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -41,4 +45,20 @@ public class SalaryUpdateReqDto {
     @Min(value = 0, message = "부양가족수는 0 이상이어야 합니다.")
     @Max(value = 11, message = "부양가족수는 11 이하여야 합니다.")
     private Integer dependentCount;
+
+    /** 8세 이상 20세 이하 자녀 수 */
+    @Min(value = 0)
+    @Max(value = 11)
+    private Integer childUnder20Count;
+
+    /** 소득세 감면 유형 */
+    private TaxReductionType taxReductionType;
+
+    /** 감면율 0.00 ~ 1.00 */
+    @DecimalMin(value = "0.00")
+    @DecimalMax(value = "1.00")
+    private BigDecimal taxReductionRate;
+
+    /** 감면 종료일 */
+    private LocalDate taxReductionEffectiveTo;
 }

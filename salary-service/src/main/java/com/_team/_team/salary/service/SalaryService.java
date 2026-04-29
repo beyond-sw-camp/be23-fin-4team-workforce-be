@@ -2,16 +2,18 @@ package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.domain.PayGradeTable;
+import com._team._team.salary.domain.Salary;
 import com._team._team.salary.domain.SalaryPolicy;
+import com._team._team.salary.domain.enums.TaxReductionType;
+import com._team._team.salary.dto.reqdto.SalaryCreateReqDto;
+import com._team._team.salary.dto.reqdto.SalaryUpdateReqDto;
+import com._team._team.salary.dto.resdto.PayrollPrecheckResDto;
+import com._team._team.salary.dto.resdto.SalaryResDto;
 import com._team._team.salary.feignClients.MemberFeignClient;
 import com._team._team.salary.feignClients.dto.MemberResDto;
 import com._team._team.salary.repository.PayGradeTableRepository;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.repository.SalaryRepository;
-import com._team._team.salary.domain.Salary;
-import com._team._team.salary.dto.reqdto.SalaryCreateReqDto;
-import com._team._team.salary.dto.reqdto.SalaryUpdateReqDto;
-import com._team._team.salary.dto.resdto.SalaryResDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -19,10 +21,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -94,13 +98,21 @@ public class SalaryService {
                 companyId, reqDto.getStep(), reqDto.getBaseSalary(), reqDto.getEffectiveFrom());
         validateMinimumWage(resolvedBaseSalary, reqDto.getEffectiveFrom());
 
-        // 직급/직책
+        // 직급/직책 - member-service 인사정보에서 lookup
         MemberResDto m = fetchMemberMap(companyId).get(reqDto.getMemberId());
-        String resolvedJobGradeName = m.getJobGradeName();
-        String resolvedJobTitleName = m.getJobTitleName();
+        String resolvedJobGradeName = m != null ? m.getJobGradeName() : null;
+        String resolvedJobTitleName = m != null ? m.getJobTitleName() : null;
 
         // 부양가족수
         Integer resolvedDependentCount = reqDto.getDependentCount();
+
+        // 자녀수, 감면
+        Integer resolvedChildUnder20Count = reqDto.getChildUnder20Count() == null
+                ? 0
+                : reqDto.getChildUnder20Count();
+        TaxReductionType resolvedReductionType = reqDto.getTaxReductionType() == null
+                ? TaxReductionType.NONE
+                : reqDto.getTaxReductionType();
 
         Salary salary = Salary.builder()
                 .memberId(reqDto.getMemberId())
@@ -113,6 +125,10 @@ public class SalaryService {
                 .effectiveFrom(reqDto.getEffectiveFrom())
                 .effectiveTo(reqDto.getEffectiveTo())
                 .dependentCount(resolvedDependentCount)
+                .childUnder20Count(resolvedChildUnder20Count)
+                .taxReductionType(resolvedReductionType)
+                .taxReductionRate(reqDto.getTaxReductionRate())
+                .taxReductionEffectiveTo(reqDto.getTaxReductionEffectiveTo())
                 .build();
 
         Salary saved = salaryRepository.save(salary);
@@ -149,6 +165,58 @@ public class SalaryService {
                     return SalaryResDto.fromEntity(s, sabun, name, orgNm);
                 })
                 .toList();
+    }
+
+    /**
+     * 급여대장 생성 직전 사전 검증 - 활성 Salary 미등록 직원 + 계좌 미등록 직원을 분리 반환
+     * 정산 시 0원/이체 누락 사고를 사전에 막기 위한 화면 알림용
+     */
+    @Transactional(readOnly = true)
+    public PayrollPrecheckResDto precheckPayroll(UUID companyId) {
+        Map<UUID, MemberResDto> memberMap = fetchMemberMap(companyId);
+        LocalDate today = LocalDate.now();
+
+        // 회사의 활성 Salary 매핑 - memberId -> 활성 baseSalary>0 행이 있으면 OK
+        Set<UUID> hasActiveSalary = salaryRepository.findByCompanyId(companyId).stream()
+                .filter(s -> {
+                    if (s.getEffectiveFrom() == null) return false;
+                    boolean started = !s.getEffectiveFrom().isAfter(today);
+                    boolean notEnded = s.getEffectiveTo() == null || !s.getEffectiveTo().isBefore(today);
+                    boolean hasBase = s.getBaseSalary() != null && s.getBaseSalary() > 0;
+                    return started && notEnded && hasBase;
+                })
+                .map(Salary::getMemberId)
+                .collect(Collectors.toSet());
+
+        List<PayrollPrecheckResDto.MemberRef> missingSalary = new ArrayList<>();
+        List<PayrollPrecheckResDto.MemberRef> missingBank = new ArrayList<>();
+
+        for (MemberResDto m : memberMap.values()) {
+            if (!hasActiveSalary.contains(m.getMemberId())) {
+                missingSalary.add(buildMemberRef(m));
+            }
+            if (m.getBank() == null || m.getBank().isBlank()
+                    || m.getBankAccount() == null || m.getBankAccount().isBlank()) {
+                missingBank.add(buildMemberRef(m));
+            }
+        }
+
+        return PayrollPrecheckResDto.builder()
+                .totalActiveMembers(memberMap.size())
+                .missingSalaryCount(missingSalary.size())
+                .missingSalary(missingSalary)
+                .missingBankAccountCount(missingBank.size())
+                .missingBankAccount(missingBank)
+                .build();
+    }
+
+    private PayrollPrecheckResDto.MemberRef buildMemberRef(MemberResDto m) {
+        return PayrollPrecheckResDto.MemberRef.builder()
+                .memberId(m.getMemberId())
+                .name(m.getName())
+                .sabun(m.getSabun())
+                .organizationName(m.getOrganizationName())
+                .build();
     }
 
     // 회사 직원 정보 일괄 조회
@@ -225,15 +293,6 @@ public class SalaryService {
     // force 미지정 시 false
     public void delete(UUID companyId, UUID salaryId){
         delete(companyId, salaryId, false);
-    }
-
-    /** 첫 번째로 비어있지 않은(blank 아닌) 값을 반환, 모두 비어있으면 null */
-    private static String firstNonBlank(String... values) {
-        if (values == null) return null;
-        for (String v : values) {
-            if (v != null && !v.isBlank()) return v;
-        }
-        return null;
     }
 
     // 적용 종료일이 시작일보다 빠른지 검증

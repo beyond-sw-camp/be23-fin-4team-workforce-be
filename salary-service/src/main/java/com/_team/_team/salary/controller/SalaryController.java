@@ -82,6 +82,18 @@ public class SalaryController {
         );
     }
 
+    /**
+     * 급여대장 생성 직전 사전 검증 , 활성 Salary 미등록 / 계좌 미등록 직원 카운트, 목록 반환
+     */
+    @GetMapping("/precheck")
+    public ResponseEntity<?> precheckPayroll(
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(salaryService.precheckPayroll(companyId), "급여대장 사전 검증 완료"),
+                HttpStatus.OK
+        );
+    }
+
     /** 직원별 급여 이력 조회 */
     @GetMapping("/member/{memberId}")
     public ResponseEntity<?> findByMemberId(

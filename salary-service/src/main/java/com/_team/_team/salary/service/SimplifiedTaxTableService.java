@@ -154,12 +154,40 @@ public class SimplifiedTaxTableService {
         }
     }
 
-    // 급여 계산 시 호출, 간이세액표 조회
+    // 급여 계산 시 호출, 간이세액표 조회 (자녀세액공제 미반영)
     @Transactional(readOnly = true)
     public Long findTax(int year, long monthlyTaxableSalary, int dependents) {
         return repository.findTaxFor(year, monthlyTaxableSalary, dependents)
                 .map(SimplifiedTaxTable::getMonthlyTaxAmount)
                 .orElse(0L);
+    }
+
+    /**
+     * 간이세액표 lookup 후 8~20세 자녀세액공제까지 차감한 월 간이세액
+     *
+     * 한국 간이세액표는 부양가족수만 차원으로 갖고, 자녀세액공제는 별도로 차감
+     * 매월 원천징수 기준이므로 연말정산과는 차이가 있을 수 있음 (단순 월 환산)
+     */
+    @Transactional(readOnly = true)
+    public Long findTaxWithChildDeduction(int year,
+                                          long monthlyTaxableSalary,
+                                          int dependents,
+                                          int childUnder20Count) {
+        long base = findTax(year, monthlyTaxableSalary, dependents);
+        long childCredit = monthlyChildTaxCredit(childUnder20Count);
+        return Math.max(0L, base - childCredit);
+    }
+
+    /**
+     * 8세 이상 20세 이하 자녀세액공제 월 환산액
+     * 연 기준 - 1명 150,000원 / 2명 350,000원 / 3명부터는 1명당 추가 300,000원
+     * 매월 간이세액에서 1/12 만큼 차감
+     */
+    public long monthlyChildTaxCredit(int childUnder20Count) {
+        if (childUnder20Count <= 0) return 0L;
+        if (childUnder20Count == 1) return 12_500L;
+        if (childUnder20Count == 2) return 29_166L;
+        return 29_166L + (childUnder20Count - 2) * 25_000L;
     }
 
     // 등록된 연도 목록 조회 화면 표시용
