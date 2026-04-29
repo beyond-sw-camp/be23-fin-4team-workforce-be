@@ -326,6 +326,37 @@ public class ApprovalDocumentService {
             """)
                 .build());
 
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("회의록")
+                .requestType(RequestType.GENERAL)
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",       "label": "제목",         "type": "text",     "required": true },
+                    { "name": "meetingDate", "label": "회의일자",     "type": "date",     "required": true },
+                    { "name": "meetingTime", "label": "회의시각",     "type": "time"                       },
+                    { "name": "location",    "label": "장소",         "type": "text"                       },
+                    { "name": "attendees",   "label": "참석자",       "type": "textarea", "required": true },
+                    {
+                      "name": "audio",
+                      "label": "녹음 받아쓰기",
+                      "type": "ai_transcribe",
+                      "config": {
+                        "fillTranscript": "transcript",
+                        "fillSummary": "summary",
+                        "attachAudio": true,
+                        "language": "ko"
+                      }
+                    },
+                    { "name": "transcript",  "label": "원본 받아쓰기","type": "textarea"                   },
+                    { "name": "summary",     "label": "AI 회의록",    "type": "textarea", "required": true },
+                    { "name": "note",        "label": "비고",         "type": "textarea"                   }
+                  ]
+                }
+            """)
+                .build());
+
         // ========== OFFICIAL ==========
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)

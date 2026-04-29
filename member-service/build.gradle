@@ -32,7 +32,7 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation 'com.4team:workforce-common:1.0.12'
+    implementation 'com.4team:workforce-common:1.0.13'
 
     // Lombok (compileOnly + annotationProcessor 필수 세트)
     compileOnly 'org.projectlombok:lombok'
@@ -67,6 +67,9 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.awaitility:awaitility:4.2.0'
+
+    implementation 'io.github.openfeign.form:feign-form:3.8.0' // Feign 클라이언트에서 multipart/form-data 전송 지원
+    implementation 'io.github.openfeign.form:feign-form-spring:3.8.0' // Spring 환경에서 Feign multipart 업로드 연동 (SpringFormEncoder)
 }
 
 def querydslGenerated = "$buildDir/generated/sources/annotationProcessor/java/main"

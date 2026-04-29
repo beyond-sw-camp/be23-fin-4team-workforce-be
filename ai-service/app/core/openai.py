@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 
 from openai import OpenAI
@@ -146,4 +147,3 @@ def detect_category(question: str) -> str | None:
     except Exception as e:
         logger.error(f"[detect_category] 실패: {e}")
         return None
-    
