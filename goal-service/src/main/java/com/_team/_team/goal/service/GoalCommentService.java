@@ -50,7 +50,7 @@ public class GoalCommentService {
 
     @Transactional(readOnly = true)
     public List<GoalCommentResDto> list(UUID goalId, UUID requesterId, UUID companyId) {
-        goalService.requireReadableGoal(goalId, requesterId, companyId);
+        goalService.requireReadable(goalId, requesterId, companyId);
         return goalCommentRepository.findByGoal_GoalIdOrderByCreatedAtAsc(goalId).stream()
                 .map(GoalCommentResDto::from)
                 .toList();
