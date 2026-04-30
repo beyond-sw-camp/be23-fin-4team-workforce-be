@@ -2,6 +2,7 @@ package com._team._team.attendance.repository;
 import com._team._team.attendance.domain.MemberScheduleSelection;
 import com._team._team.attendance.domain.enums.ScheduleApprovalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -45,4 +46,22 @@ public interface MemberScheduleSelectionRepository  extends JpaRepository<Member
     // 직원 월별 이력 전체 (PENDING, APPROVED, REJECTED, CANCELLED 모두 포함)
     List<MemberScheduleSelection> findAllByMemberIdAndTargetYearMonth(
             UUID memberId, String targetYearMonth);
+
+    /**
+     * 퇴직 cascade
+     * 일괄 CANCELLED 로 전환. 이미 지난 월은 history 로 보존.
+     */
+    @Modifying
+    @Query("""
+           UPDATE MemberScheduleSelection s
+              SET s.approvalStatus = :cancelled
+            WHERE s.memberId = :memberId
+              AND s.targetYearMonth > :retireYearMonth
+              AND s.approvalStatus IN :targetStatuses
+           """)
+    int cancelFutureSelectionsByMember(
+            @Param("memberId") UUID memberId,
+            @Param("retireYearMonth") String retireYearMonth,
+            @Param("cancelled") ScheduleApprovalStatus cancelled,
+            @Param("targetStatuses") List<ScheduleApprovalStatus> targetStatuses);
 }

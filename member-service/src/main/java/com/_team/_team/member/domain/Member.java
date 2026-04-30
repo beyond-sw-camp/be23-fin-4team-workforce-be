@@ -104,6 +104,9 @@ public class Member extends BaseTimeEntity {
     @Builder.Default
     private String isEmailVerifiedYn = "NO";
 
+    @Column
+    private LocalDate retireDate;  // 퇴직일 (사직서 승인 시 자동 설정)
+
     @Column(nullable = false)
     @Builder.Default
     private String delYn = "NO";
@@ -203,6 +206,12 @@ public class Member extends BaseTimeEntity {
 
     public void completeOnboarding() {
         this.isOnboardingYn = "NO";
+    }
+
+    // 비즈 메서드 추가
+    public void markResigned(LocalDate retireDate) {
+        this.memberStatus = MemberStatus.LEAVE;
+        this.retireDate = retireDate;
     }
 
 }

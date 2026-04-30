@@ -2,6 +2,7 @@ package com._team._team.salary.repository;
 
 import com._team._team.salary.domain.Salary;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -51,4 +52,20 @@ public interface SalaryRepository extends JpaRepository<Salary, UUID> {
             @Param("companyId") UUID companyId,
             @Param("memberIds") Collection<UUID> memberIds,
             @Param("date") LocalDate date);
+
+    /**
+     * 퇴직 - 직원의 활성/미래 Salary 행을 retireDate 로 일괄 종료
+     */
+    @Modifying
+    @Query("""
+        UPDATE Salary s
+           SET s.effectiveTo = :retireDate
+         WHERE s.memberId = :memberId
+           AND s.companyId = :companyId
+           AND (s.effectiveTo IS NULL OR s.effectiveTo > :retireDate)
+        """)
+    int closeActiveByMemberOnRetire(
+            @Param("memberId") UUID memberId,
+            @Param("companyId") UUID companyId,
+            @Param("retireDate") LocalDate retireDate);
 }
