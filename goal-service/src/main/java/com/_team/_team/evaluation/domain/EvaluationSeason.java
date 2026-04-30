@@ -3,13 +3,31 @@ package com._team._team.evaluation.domain;
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.domain.enums.SeasonType;
+import com._team._team.goal.domain.enums.KpiCycle;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * EvaluationSeason (확장)
+ *
+ *  추가:
+ *   - targetCycle : 이 시즌이 평가할 목표 cycle 종류 (QUARTERLY/HALF_YEARLY/YEARLY)
+ *                   목표 cycle ≠ 평가 cycle 분리 원칙
+ *
+ *  ACTIVE 전이 시점에:
+ *   - 대상 멤버 EvaluationResponse 자동 생성
+ *   - goalSnapshotJson 봉인
+ *   - 가중치 100% 미달 멤버 존재 시 SeasonActivationBlockedException
+ *   - 모든 ACTIVE goal → COMPLETED 자동
+ */
 @Entity
 @Table(name = "evaluation_season")
 @Getter
@@ -30,8 +48,17 @@ public class EvaluationSeason extends BaseTimeEntity {
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @Column(name = "type", nullable = false, length = 32)
     private SeasonType type;
+
+    /** 신규 — 평가 대상 목표의 cycle 종류 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_cycle", length = 32)
+    private KpiCycle targetCycle;
+
+    /** 신규 — 평가 대상 cycle 의 시작일 (예: 2026-04-01 = 2026-Q2). goal 조회 키. */
+    @Column(name = "target_cycle_start")
+    private LocalDate targetCycleStart;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
@@ -40,23 +67,13 @@ public class EvaluationSeason extends BaseTimeEntity {
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 32)
     @Builder.Default
     private SeasonStatus status = SeasonStatus.DRAFT;
-
-    // [T-1] phase / phase_updated_at 컬럼은 더 이상 엔티티에 매핑하지 않음.
-    // DB 마이그레이션에서 DROP:
-    //   ALTER TABLE evaluation_season DROP COLUMN phase;
-    //   ALTER TABLE evaluation_season DROP COLUMN phase_updated_at;
-    // 기존 데이터는 status + results_published_at 로 모두 표현됨.
 
     @Column(name = "result_publish_date")
     private LocalDate resultPublishDate;
 
-    /**
-     * 결과가 피평가자에게 공개된 시각. null 이면 비공개 상태.
-     * 관리자의 "결과 공개" 액션 또는 resultPublishDate 에 의해 스케줄러가 세팅합니다.
-     */
     @Column(name = "results_published_at")
     private LocalDateTime resultsPublishedAt;
 
@@ -76,9 +93,6 @@ public class EvaluationSeason extends BaseTimeEntity {
         this.status = SeasonStatus.CLOSED;
     }
 
-    /**
-     * 결과 공개 (피평가자에게 노출). 이미 공개된 시즌에 재호출은 무시.
-     */
     public void markResultsPublished() {
         if (this.resultsPublishedAt == null) {
             this.resultsPublishedAt = LocalDateTime.now();
@@ -89,26 +103,26 @@ public class EvaluationSeason extends BaseTimeEntity {
         return this.resultsPublishedAt != null;
     }
 
-    /**
-     * 구성원이 응답 입력(저장/제출) 가능한 상태인지 여부.
-     * ACTIVE 이면서 아직 결과가 공개되지 않은 경우에만 허용.
-     */
     public boolean isResponseEditable() {
         return this.status == SeasonStatus.ACTIVE && this.resultsPublishedAt == null;
     }
 
-    /**
-     * 캘리브레이션 조정이 가능한 상태인지 여부.
-     * ACTIVE 이면서 결과 공개 전에만 조정 가능.
-     */
     public boolean canCalibrate() {
         return this.status == SeasonStatus.ACTIVE && this.resultsPublishedAt == null;
     }
 
-    public void update(String name, SeasonType type, LocalDate startDate, LocalDate endDate,
-                       LocalDate resultPublishDate, String scheduleJson) {
+    public void update(String name,
+                       SeasonType type,
+                       KpiCycle targetCycle,
+                       LocalDate targetCycleStart,
+                       LocalDate startDate,
+                       LocalDate endDate,
+                       LocalDate resultPublishDate,
+                       String scheduleJson) {
         this.name = name;
         this.type = type;
+        this.targetCycle = targetCycle;
+        this.targetCycleStart = targetCycleStart;
         this.startDate = startDate;
         this.endDate = endDate;
         this.resultPublishDate = resultPublishDate;

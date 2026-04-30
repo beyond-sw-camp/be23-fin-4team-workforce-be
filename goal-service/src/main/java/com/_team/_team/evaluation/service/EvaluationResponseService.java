@@ -1,1260 +1,348 @@
 package com._team._team.evaluation.service;
 
 import com._team._team.dto.BusinessException;
-import com._team._team.evaluation.domain.CalibrationHistory;
-import com._team._team.evaluation.domain.EvaluationGroup;
+import com._team._team.evaluation.domain.EvaluationCalibration;
 import com._team._team.evaluation.domain.EvaluationResponse;
-import com._team._team.evaluation.domain.EvaluationSeason;
-import com._team._team.evaluation.domain.converter.GradeConfig;
-import com._team._team.evaluation.domain.enums.EvalType;
-import com._team._team.evaluation.domain.enums.EvaluationStatus;
-import com._team._team.evaluation.domain.enums.SeasonStatus;
-import com._team._team.evaluation.dto.reqdto.CalibrationAdjustReqDto;
-import com._team._team.evaluation.dto.reqdto.ResponseSaveReqDto;
-import com._team._team.evaluation.dto.resdto.CalibrationOverviewResDto;
-import com._team._team.evaluation.dto.resdto.GoalSnapshotDto;
-import com._team._team.evaluation.dto.resdto.GoalSummaryCardResDto;
-import com._team._team.evaluation.dto.resdto.RelativeDistributionPreviewResDto;
+import com._team._team.evaluation.domain.enums.CalibrationRole;
+import com._team._team.evaluation.domain.enums.EvaluationStage;
+import com._team._team.evaluation.dto.reqdto.SelfAnswersReqDto;
+import com._team._team.evaluation.dto.resdto.EvaluationResponseResDto;
 import com._team._team.evaluation.dto.resdto.ResponseResDto;
-import com._team._team.evaluation.repository.CalibrationHistoryRepository;
+import com._team._team.evaluation.repository.EvaluationCalibrationRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
-import com._team._team.evaluation.repository.EvaluationSeasonRepository;
-import com._team._team.evaluation.service.scoring.ScoreBreakdown;
-import com._team._team.evaluation.service.scoring.SectionScorer;
-import com._team._team.goal.domain.Goal;
-import com._team._team.goal.domain.enums.GoalStatus;
-import com._team._team.goal.repository.GoalRepository;
-import com._team._team.goal.service.GoalNotificationService;
-import com._team._team.meeting.service.MeetingRecordService;
-import com._team._team.notification.NotificationType;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * EvaluationResponseService — 자기평가 단계 담당.
+ *
+ *  본인이 자기평가 입력 → 임시저장(saveSelf) / 제출(submitSelf).
+ *  마감 후 자동 SUBMITTED(empty) 처리는 autoSubmitEmpty (Scheduler 가 호출).
+ */
 @Service
 public class EvaluationResponseService {
 
     private final EvaluationResponseRepository responseRepository;
-    private final EvaluationSeasonRepository seasonRepository;
-    private final CalibrationHistoryRepository calibrationHistoryRepository;
-    private final GoalRepository goalRepository;
+    private final EvaluationCalibrationRepository calibrationRepository;
     private final ObjectMapper objectMapper;
-    private final MeetingRecordService meetingRecordService;
-    private final EvaluationSeasonService evaluationSeasonService;
-    private final com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient;
-    private final SectionScorer sectionScorer;
-    private final GoalNotificationService notificationService;
 
     public EvaluationResponseService(EvaluationResponseRepository responseRepository,
-                                      EvaluationSeasonRepository seasonRepository,
-                                      CalibrationHistoryRepository calibrationHistoryRepository,
-                                      GoalRepository goalRepository,
-                                      ObjectMapper objectMapper,
-                                      MeetingRecordService meetingRecordService,
-                                      EvaluationSeasonService evaluationSeasonService,
-                                      com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient,
-                                      SectionScorer sectionScorer,
-                                      GoalNotificationService notificationService) {
+                                     EvaluationCalibrationRepository calibrationRepository,
+                                     ObjectMapper objectMapper) {
         this.responseRepository = responseRepository;
-        this.seasonRepository = seasonRepository;
-        this.calibrationHistoryRepository = calibrationHistoryRepository;
-        this.goalRepository = goalRepository;
+        this.calibrationRepository = calibrationRepository;
         this.objectMapper = objectMapper;
-        this.meetingRecordService = meetingRecordService;
-        this.evaluationSeasonService = evaluationSeasonService;
-        this.memberServiceClient = memberServiceClient;
-        this.sectionScorer = sectionScorer;
-        this.notificationService = notificationService;
+    }
+
+    @Transactional
+    public List<EvaluationResponseResDto> listMine(UUID memberId, UUID companyId) {
+        return responseRepository
+                .findByCompanyIdAndTargetMemberIdOrderByCreatedAtDesc(companyId, memberId)
+                .stream().map(EvaluationResponseResDto::from).collect(Collectors.toList());
     }
 
     /**
-     * 응답 리스트를 DTO 로 매핑하면서 대상자/평가자 이름·소속·프로필을 일괄 주입한다.
-     * N+1 방지를 위해 Feign 호출 1회로 모든 프로필을 가져온다.
-     * member-service 장애 시 이름은 null 로 두고 계속 진행.
+     * 내가 LEAD/ASSISTANT 로 배정된 평가 응답 목록 (부하·동료 대상).
+     * 평가 진행 화면에서 자기평가 목록과 별도로 노출하기 위함.
      */
-    private List<ResponseResDto> mapResponsesWithNames(List<EvaluationResponse> responses) {
-        if (responses.isEmpty()) return java.util.Collections.emptyList();
-        java.util.Set<UUID> ids = new java.util.HashSet<>();
-        for (EvaluationResponse r : responses) {
-            if (r.getTargetMemberId() != null) ids.add(r.getTargetMemberId());
-            if (r.getEvaluatorId() != null) ids.add(r.getEvaluatorId());
-        }
-        java.util.Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> profiles;
-        try {
-            profiles = memberServiceClient.getProfilesByIds(new java.util.ArrayList<>(ids));
-        } catch (Exception e) {
-            profiles = java.util.Collections.emptyMap();
-        }
-        List<ResponseResDto> out = new java.util.ArrayList<>(responses.size());
-        for (EvaluationResponse r : responses) {
-            ResponseResDto dto = ResponseResDto.from(r);
-            var target = profiles.get(r.getTargetMemberId());
-            if (target != null) {
-                dto.setTargetMemberName(target.getName());
-                dto.setTargetMemberDepartment(target.getDepartment());
-                dto.setTargetMemberProfileUrl(target.getProfileUrl());
+    @Transactional
+    public List<EvaluationResponseResDto> listMyEvaluatorAssignments(UUID memberId, UUID companyId) {
+        List<EvaluationCalibration> mine = calibrationRepository.findByEvaluatorId(memberId);
+        List<EvaluationResponseResDto> out = new ArrayList<>();
+        Set<UUID> seen = new HashSet<>();
+        for (EvaluationCalibration cal : mine) {
+            UUID rid = cal.getResponseId();
+            if (!seen.add(rid)) {
+                continue;
             }
-            var evaluator = profiles.get(r.getEvaluatorId());
-            if (evaluator != null) {
-                dto.setEvaluatorName(evaluator.getName());
-                dto.setEvaluatorDepartment(evaluator.getDepartment());
-                dto.setEvaluatorProfileUrl(evaluator.getProfileUrl());
+            EvaluationResponse r = responseRepository.findById(rid).orElse(null);
+            if (r == null || !companyId.equals(r.getCompanyId())) {
+                continue;
             }
-            dto.setScoreBreakdown(computeBreakdownForResponse(r));
-            out.add(dto);
+            if (r.getStage() == EvaluationStage.SKIPPED_LEAVER) {
+                continue;
+            }
+            if (cal.getRole() == CalibrationRole.ASSISTANT) {
+                out.add(EvaluationResponseResDto.fromForAssistant(r));
+            } else {
+                ensureLeadCalibrationExists(r);
+                out.add(EvaluationResponseResDto.from(r));
+            }
         }
+        for (EvaluationResponse r : responseRepository.findByCompanyIdAndEvaluatorIdOrderByCreatedAtDesc(companyId, memberId)) {
+            if (!seen.add(r.getResponseId())) {
+                continue;
+            }
+            if (r.getStage() == EvaluationStage.SKIPPED_LEAVER) {
+                continue;
+            }
+            ensureLeadCalibrationExists(r);
+            out.add(EvaluationResponseResDto.from(r));
+        }
+        out.sort(Comparator.comparing(EvaluationResponseResDto::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
         return out;
     }
 
     /**
-     * [L-1 / Phase D] 응답의 섹션별 채점 breakdown 을 재계산한다.
-     * 저장하지 않고 매 조회마다 design·answers·snapshot 으로부터 만들어낸다.
-     * design 이 없거나 섹션이 없으면 null.
+     * 내가 받은(평가 대상) 응답 중 "공개된 시즌의 CONFIRMED" 만 반환.
      *
-     * PEER_FEEDBACK 섹션이 하나라도 존재하면, 같은 시즌·같은 대상자의 다른 응답들 answersJson 을
-     * 모아 질문별 동료 평균을 계산해 scorer 에 넘긴다. (자기 자신 응답은 제외)
-     */
-    private ScoreBreakdown computeBreakdownForResponse(EvaluationResponse r) {
-        var group = r.getGroup();
-        if (group == null || group.getDesign() == null) return null;
-        var design = group.getDesign();
-        var sections = design.getSections();
-        if (sections == null || sections.isEmpty()) return null;
-
-        java.util.Map<String, java.util.List<BigDecimal>> peerScores = null;
-        boolean hasPeerSection = sections.stream()
-                .anyMatch(s -> s.resolveType() == com._team._team.evaluation.domain.enums.SectionType.PEER_FEEDBACK);
-        if (hasPeerSection && group.getSeason() != null && r.getTargetMemberId() != null) {
-            UUID seasonId = group.getSeason().getSeasonId();
-            List<String> peerAnswersJson = responseRepository
-                    .findByGroup_Season_SeasonIdAndTargetMemberId(seasonId, r.getTargetMemberId())
-                    .stream()
-                    .filter(other -> !other.getResponseId().equals(r.getResponseId()))
-                    .filter(other -> other.getEvaluationType() == EvalType.PEER)
-                    .filter(other -> other.getStatus() == EvaluationStatus.SUBMITTED)
-                    .map(EvaluationResponse::getAnswersJson)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            peerScores = sectionScorer.aggregatePeerScores(peerAnswersJson);
-        }
-
-        return sectionScorer.score(
-                sections,
-                r.getAnswersJson(),
-                sectionScorer.parseGoalSnapshots(r.getGoalSnapshotJson()),
-                peerScores);
-    }
-
-    /**
-     * 단건 응답 DTO에 대상자/평가자 프로필(이름·소속·프로필 URL)을 주입한다.
-     * member-service 조회 실패 시 기본 DTO를 그대로 반환한다.
-     */
-    private ResponseResDto mapResponseWithNames(EvaluationResponse response) {
-        ResponseResDto dto = ResponseResDto.from(response);
-        java.util.Set<UUID> ids = new java.util.HashSet<>();
-        if (response.getTargetMemberId() != null) ids.add(response.getTargetMemberId());
-        if (response.getEvaluatorId() != null) ids.add(response.getEvaluatorId());
-        if (ids.isEmpty()) return dto;
-        try {
-            java.util.Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> profiles =
-                    memberServiceClient.getProfilesByIds(new java.util.ArrayList<>(ids));
-            var target = profiles.get(response.getTargetMemberId());
-            if (target != null) {
-                dto.setTargetMemberName(target.getName());
-                dto.setTargetMemberDepartment(target.getDepartment());
-                dto.setTargetMemberProfileUrl(target.getProfileUrl());
-            }
-            var evaluator = profiles.get(response.getEvaluatorId());
-            if (evaluator != null) {
-                dto.setEvaluatorName(evaluator.getName());
-                dto.setEvaluatorDepartment(evaluator.getDepartment());
-                dto.setEvaluatorProfileUrl(evaluator.getProfileUrl());
-            }
-        } catch (Exception ignored) {
-            // member-service 장애 시 이름 주입을 생략하고 기본 DTO 반환
-        }
-        dto.setScoreBreakdown(computeBreakdownForResponse(response));
-        return dto;
-    }
-
-    @Transactional(readOnly = true)
-    public List<ResponseResDto> listMyResponses(UUID evaluatorId) {
-        return mapResponsesWithNames(responseRepository.findByEvaluatorId(evaluatorId));
-    }
-
-    /**
-     * 본인(피평가자)이 받은 평가 응답 목록.
-     * 결과가 공개된(PUBLISHED) 시즌에 한해서만 반환하여, 결과 공개 이전의 평가 내용이 유출되지 않도록 한다.
-     * 일반 사원도 접근 가능 — 컨트롤러에서 @CheckPermission 을 걸지 않는다.
+     *  공개 게이트:
+     *    1) stage == CONFIRMED (확정된 결과만)
+     *    2) season.resultsPublishedAt != null  (공식 공개일이 지난 시즌만)
+     *
+     *  Lead 가 confirm 만 해도 공식 공개 전에는 직원이 결과를 미리 보지 못하도록 차단.
+     *  공개 자체는 EvaluationSeasonService.publishResults() 가 수행하며,
+     *  동일 트랜잭션에서 피드백 면담이 자동 생성됨 → 공개 시점 = 면담 예약 시점.
      */
     @Transactional(readOnly = true)
-    public List<ResponseResDto> listMyReceivedResults(UUID memberId, UUID companyId) {
-        List<EvaluationResponse> list = responseRepository.findByTargetMemberId(memberId).stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getGroup() != null && r.getGroup().getSeason() != null)
-                .filter(r -> r.getGroup().getSeason().isResultsPublished())
+    public List<EvaluationResponseResDto> listMyReceived(UUID memberId, UUID companyId) {
+        return responseRepository
+                .findByCompanyIdAndTargetMemberIdOrderByCreatedAtDesc(companyId, memberId)
+                .stream()
+                .filter(r -> r.getStage() == EvaluationStage.CONFIRMED)
+                .filter(r -> r.getGroup() != null
+                          && r.getGroup().getSeason() != null
+                          && r.getGroup().getSeason().getResultsPublishedAt() != null)
+                .map(EvaluationResponseResDto::from)
                 .collect(Collectors.toList());
-        return mapResponsesWithNames(list);
     }
 
-    /**
-     * 본인(피평가자)이 받은 특정 시즌의 평가 응답 목록.
-     * 결과가 공개된(PUBLISHED) 시즌만 조회 허용 — 그렇지 않으면 400.
-     */
+    @Transactional
+    public EvaluationResponseResDto saveSelf(UUID responseId,
+                                             UUID memberId,
+                                             SelfAnswersReqDto dto) {
+        EvaluationResponse r = mustGet(responseId);
+        ensureSelf(r, memberId);
+        r.saveSelfAnswers(serialize(dto));
+        return EvaluationResponseResDto.from(r);
+    }
+
+    @Transactional
+    public EvaluationResponseResDto submitSelf(UUID responseId,
+                                               UUID memberId,
+                                               SelfAnswersReqDto dto) {
+        EvaluationResponse r = mustGet(responseId);
+        ensureSelf(r, memberId);
+        r.submitSelf(serialize(dto));
+        return EvaluationResponseResDto.from(r);
+    }
+
+    /** 자기평가 마감 시점에 일괄 호출 — Scheduler 진입점 */
+    @Transactional
+    public int autoSubmitEmptyForCompany(UUID companyId) {
+        List<EvaluationResponse> pending = responseRepository
+                .findByCompanyIdAndStageOrderByCreatedAtDesc(companyId, EvaluationStage.SELF_PENDING);
+        pending.forEach(EvaluationResponse::autoSubmitEmpty);
+        return pending.size();
+    }
+
     @Transactional(readOnly = true)
     public List<ResponseResDto> listMySeasonResult(UUID seasonId, UUID memberId, UUID companyId) {
-        EvaluationSeason season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다."));
-        if (!season.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다.");
-        }
-        if (!season.isResultsPublished()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "아직 결과가 공개되지 않은 시즌입니다.");
-        }
-        List<EvaluationResponse> list = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getTargetMemberId().equals(memberId))
+        return responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> companyId.equals(r.getCompanyId()))
+                .filter(r -> memberId.equals(r.getTargetMemberId()))
+                .map(ResponseResDto::from)
                 .collect(Collectors.toList());
-        return mapResponsesWithNames(list);
+    }
+
+    private EvaluationResponse mustGet(UUID responseId) {
+        return responseRepository.findById(responseId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
+    }
+
+    private void ensureSelf(EvaluationResponse r, UUID memberId) {
+        if (!r.getTargetMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인의 자기평가만 입력 가능합니다.");
+        }
+    }
+
+    private String serialize(SelfAnswersReqDto dto) {
+        try {
+            return objectMapper.writeValueAsString(dto);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "자기평가 직렬화 실패");
+        }
+    }
+
+    private void ensureLeadCalibrationExists(EvaluationResponse response) {
+        if (response.getEvaluatorId() == null) {
+            return;
+        }
+        if (calibrationRepository.findByResponseIdAndRole(response.getResponseId(), CalibrationRole.LEAD).isPresent()) {
+            return;
+        }
+        calibrationRepository.save(EvaluationCalibration.builder()
+                .responseId(response.getResponseId())
+                .evaluatorId(response.getEvaluatorId())
+                .role(CalibrationRole.LEAD)
+                .build());
+    }
+
+    // =================================================================
+    //  v4 — 운영 시나리오 (HR / 본인)
+    // =================================================================
+
+    /**
+     * v4 — 평가자(LEAD/ASSISTANT) 가 평가 대상 응답 조회.
+     *  ASSISTANT 는 자기평가 원문(answersJson) 마스킹된 DTO 를 반환받는다.
+     *  LEAD / 본인 / HR(권한자) 는 마스킹 없는 원문 노출.
+     *
+     *  권한 검증:
+     *    - 본인(targetMemberId) : 항상 가능
+     *    - calibration entry 보유자 : role 기반 마스킹
+     *    - 그 외 : 403
+     */
+    @Transactional
+    public EvaluationResponseResDto viewAsEvaluator(UUID responseId, UUID requesterId) {
+        EvaluationResponse r = mustGet(responseId);
+        if (r.getTargetMemberId().equals(requesterId)) {
+            // 본인은 자기 응답 그대로 노출 (자기평가 원문 가시)
+            return EvaluationResponseResDto.from(r);
+        }
+        if (r.getEvaluatorId() != null && r.getEvaluatorId().equals(requesterId)) {
+            ensureLeadCalibrationExists(r);
+            return EvaluationResponseResDto.from(r);
+        }
+        EvaluationCalibration entry = calibrationRepository
+                .findByResponseIdAndEvaluatorId(responseId, requesterId)
+                .orElse(null);
+        if (entry == null) {
+            throw new BusinessException(HttpStatus.FORBIDDEN,
+                    "이 응답에 배정된 평가자가 아닙니다.");
+        }
+        if (entry.getRole() == CalibrationRole.LEAD) {
+            return EvaluationResponseResDto.from(r);
+        }
+        // ASSISTANT : 자기평가 원문 마스킹
+        return EvaluationResponseResDto.fromForAssistant(r);
     }
 
     /**
-     * 시즌 시작 이후에 평가자 매핑이 추가·변경된 경우, 기존에는 JSON만 갱신되고 {@link EvaluationResponse} 행이
-     * 생기지 않아 평가자 목록에 안 보이던 문제를 해소합니다. (startSeason 시점에만 생성되던 동작 보완)
+     * Lead 재할당 — HR 운영. EvaluationResponse.evaluatorId 변경 + LEAD calibration 의 evaluatorId 도 동시 변경.
+     * 시즌 활성화 후 인사 이동 / 매니저 변경에 대응.
      */
     @Transactional
-    public void materializeMissingResponsesForGroup(EvaluationGroup group) {
-        // [D-3] 타입 세이프 List<EvaluatorMapping> 직접 순회. raw JSON 파싱 제거.
-        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> maps = group.getEvaluatorMaps();
-        if (maps == null || maps.isEmpty()) return;
+    public EvaluationResponseResDto reassignLead(UUID responseId, UUID newLeadId, UUID actorId, String reason) {
+        EvaluationResponse r = mustGet(responseId);
+        r.reassignLead(newLeadId, actorId, reason);
 
-        UUID companyId = group.getCompanyId();
-        UUID groupId = group.getGroupId();
-        List<EvaluationResponse> toSave = new ArrayList<>();
-        for (com._team._team.evaluation.domain.converter.EvaluatorMapping em : maps) {
-            UUID targetMemberId = em.getTargetMemberId();
-            UUID evaluatorId = em.getEvaluatorId();
-            EvalType evalType = em.getEvaluationType();
-            if (targetMemberId == null || evaluatorId == null || evalType == null) continue;
-            if (evalType != EvalType.SELF && targetMemberId.equals(evaluatorId)) {
-                continue;
-            }
-            if (responseRepository.existsByGroup_GroupIdAndTargetMemberIdAndEvaluatorIdAndEvaluationType(
-                    groupId, targetMemberId, evaluatorId, evalType)) {
-                continue;
-            }
-            EvaluationSeasonService.MemberGoalSnapshots snaps =
-                    evaluationSeasonService.captureMemberGoalSnapshotsAtNow(companyId, targetMemberId);
-            toSave.add(EvaluationResponse.builder()
-                    .companyId(companyId)
-                    .group(group)
-                    .targetMemberId(targetMemberId)
-                    .evaluatorId(evaluatorId)
-                    .evaluationType(evalType)
-                    .goalSnapshotJson(snaps.goalSnapshotJson())
+        EvaluationCalibration leadEntry = calibrationRepository
+                .findByResponseIdAndRole(responseId, CalibrationRole.LEAD)
+                .orElse(null);
+        if (leadEntry != null) {
+            // LEAD entry 의 evaluator_id 를 새 Lead 로 갱신 — unique(response_id, evaluator_id) 충돌 시
+            // 기존 동일 ID ASSISTANT 가 있을 수 있어 사전 정리 후 재배치 필요
+            calibrationRepository.findByResponseIdAndEvaluatorId(responseId, newLeadId)
+                    .ifPresent(existing -> {
+                        if (existing.getRole() != CalibrationRole.LEAD) {
+                            calibrationRepository.delete(existing);
+                            calibrationRepository.flush();
+                        }
+                    });
+            calibrationRepository.delete(leadEntry);
+            calibrationRepository.flush();
+            calibrationRepository.save(EvaluationCalibration.builder()
+                    .responseId(responseId)
+                    .evaluatorId(newLeadId)
+                    .role(CalibrationRole.LEAD)
                     .build());
-        }
-        if (!toSave.isEmpty()) {
-            responseRepository.saveAll(toSave);
-        }
-    }
-
-    @Transactional(readOnly = true)
-    public ResponseResDto getResponse(UUID responseId, UUID requesterId) {
-        EvaluationResponse response = responseRepository.findById(responseId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
-        // 컨트롤러의 @CheckPermission 을 제거한 대신, 서비스에서 본인(평가자) 여부를 검증해 타인 응답 열람을 차단한다.
-        if (!response.getEvaluatorId().equals(requesterId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 조회할 수 있습니다.");
-        }
-        return mapResponseWithNames(response);
-    }
-
-    @Transactional
-    public ResponseResDto saveResponse(UUID responseId, UUID requesterId, ResponseSaveReqDto dto) {
-        EvaluationResponse response = responseRepository.findById(responseId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
-        if (!response.getEvaluatorId().equals(requesterId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 수정할 수 있습니다.");
-        }
-        if (response.getStatus() == EvaluationStatus.SUBMITTED) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 제출된 평가는 수정할 수 없습니다.");
-        }
-        // 작성 화면에서는 평가자 본인 응답을 항상 저장 가능하게 둔다.
-        // 시즌 phase 제어는 운영 UI(시즌 전이)와 관리자 정책에서 관리한다.
-        response.saveAnswers(dto.getAnswersJson());
-        return mapResponseWithNames(response);
-    }
-
-    @Transactional
-    public ResponseResDto submitResponse(UUID responseId, UUID requesterId) {
-        EvaluationResponse response = responseRepository.findById(responseId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
-        if (!response.getEvaluatorId().equals(requesterId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 제출할 수 있습니다.");
-        }
-        if (response.getStatus() == EvaluationStatus.SUBMITTED) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 제출된 평가입니다.");
-        }
-        // 평가자 본인 응답은 시즌 phase와 무관하게 제출 허용.
-        if (response.getAnswersJson() == null || response.getAnswersJson().isBlank()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "응답 내용이 비어있어 제출할 수 없습니다.");
-        }
-        response.submit();
-        // [L-1] 제출 시점에 섹션 타입별 채점으로 정규화 점수 산출.
-        //   - design.sections 에 KPI_SCORE 섹션이 있으면 goalSnapshot.achievementPctAtSnapshot 이 반영됨
-        //   - 채점 불가능 상태면 normalizedScore 는 그대로 null → 후속 applyBaseline 에서 계산 가능
-        applySectionScoring(response);
-        return mapResponseWithNames(response);
-    }
-
-    /**
-     * [L-1 / Phase D] response.group.design.sections + answersJson + goalSnapshotJson +
-     * (옵션) 동료 응답 집계로 섹션 타입별 채점을 수행하고 normalizedScore 를 갱신한다.
-     * design 이 없거나 채점 가능한 섹션이 없으면 조용히 스킵.
-     */
-    private void applySectionScoring(EvaluationResponse response) {
-        ScoreBreakdown breakdown = computeBreakdownForResponse(response);
-        if (breakdown != null && breakdown.getTotalScore() != null) {
-            response.updateNormalizedScore(breakdown.getTotalScore());
-            applyAbsoluteOriginalGrade(response);
-        }
-    }
-
-    @Transactional
-    public ResponseResDto reopenResponse(UUID responseId, UUID companyId) {
-        EvaluationResponse response = responseRepository.findById(responseId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
-        if (!response.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다.");
-        }
-        // 결과가 공개된 뒤에는 재개방 불가
-        EvaluationSeason season = response.getGroup().getSeason();
-        if (season.isResultsPublished()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "결과 공개 이후에는 응답을 재개방할 수 없습니다.");
-        }
-        response.reopen();
-        String seasonName = season.getName() != null ? season.getName() : "평가";
-        notificationService.publishSystem(
-                response.getEvaluatorId(),
-                NotificationType.EVALUATION_REOPENED,
-                "\"" + seasonName + "\" 평가 응답이 재작성 가능한 상태로 변경되었습니다.",
-                responseId,
-                "EVALUATION_RESPONSE");
-        return mapResponseWithNames(response);
-    }
-
-    // 리마인드
-    @Transactional
-    public void sendReminder(UUID seasonId, UUID memberId, UUID companyId) {
-        List<EvaluationResponse> pending = responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getEvaluatorId().equals(memberId))
-                .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
-                .collect(Collectors.toList());
-        if (pending.isEmpty()) {
-            return;
-        }
-        for (EvaluationResponse r : pending) {
-            r.updateRemindedAt();
-        }
-        String seasonName = seasonRepository.findById(seasonId)
-                .map(EvaluationSeason::getName)
-                .orElse("평가");
-        publishEvaluationReminder(memberId, seasonId, seasonName, pending.size());
-    }
-
-    @Transactional
-    public void sendBulkReminder(UUID seasonId, UUID companyId) {
-        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
-                .collect(Collectors.toList());
-        if (responses.isEmpty()) {
-            return;
-        }
-        String seasonName = seasonRepository.findById(seasonId)
-                .map(EvaluationSeason::getName)
-                .orElse("평가");
-        Map<UUID, List<EvaluationResponse>> byEvaluator = responses.stream()
-                .collect(Collectors.groupingBy(EvaluationResponse::getEvaluatorId));
-        for (List<EvaluationResponse> list : byEvaluator.values()) {
-            for (EvaluationResponse r : list) {
-                r.updateRemindedAt();
-            }
-        }
-        for (Map.Entry<UUID, List<EvaluationResponse>> e : byEvaluator.entrySet()) {
-            publishEvaluationReminder(e.getKey(), seasonId, seasonName, e.getValue().size());
-        }
-    }
-
-    private void publishEvaluationReminder(UUID receiverId, UUID seasonId, String seasonName, int pendingCount) {
-        notificationService.publishSystem(
-                receiverId,
-                NotificationType.EVALUATION_REMINDER,
-                "\"" + seasonName + "\" 미제출 평가가 " + pendingCount + "건 있습니다.",
-                seasonId,
-                "EVALUATION_SEASON");
-    }
-
-    /**
-     * 기준점(baseline) 기반 정규화 점수 재계산.
-     * answersJson 에서 항목별 점수를 합산한 뒤, baselineValue 를 기준으로 0~100 스케일로 정규화합니다.
-     * range = "team" 이면 시즌 전체 평균을 기준으로, "individual" 이면 baselineValue 를 직접 기준으로 사용합니다.
-     */
-    @Transactional
-    public void applyBaseline(UUID seasonId, UUID companyId, String range, Double baselineValue) {
-        EvaluationSeason season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
-        if (!season.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
-        }
-        if (!season.canCalibrate()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "진행 중이면서 결과 미공개 상태에서만 기준점을 적용할 수 있습니다.");
-        }
-
-        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
-                .collect(Collectors.toList());
-
-        if (responses.isEmpty()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "제출된 응답이 없어 기준점을 적용할 수 없습니다.");
-        }
-
-        // 각 응답의 원시 점수 추출 (answersJson 에서 "totalScore" 필드)
-        List<BigDecimal> rawScores = responses.stream()
-                .map(this::extractRawScore)
-                .collect(Collectors.toList());
-
-        // 기준점 결정
-        BigDecimal baseline;
-        if ("team".equalsIgnoreCase(range)) {
-            // 팀 전체 평균을 기준으로 사용
-            BigDecimal sum = rawScores.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-            baseline = sum.divide(BigDecimal.valueOf(rawScores.size()), 4, RoundingMode.HALF_UP);
         } else {
-            // individual: 직접 지정한 baselineValue 사용
-            baseline = baselineValue != null ? BigDecimal.valueOf(baselineValue) : BigDecimal.ZERO;
-        }
-
-        if (baseline.compareTo(BigDecimal.ZERO) == 0) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "기준점이 0이면 정규화할 수 없습니다.");
-        }
-
-        // 정규화 점수 계산: (rawScore / baseline) * 50 → 기준점 = 50점
-        for (int i = 0; i < responses.size(); i++) {
-            EvaluationResponse response = responses.get(i);
-            BigDecimal rawScore = rawScores.get(i);
-            BigDecimal normalized = rawScore
-                    .divide(baseline, 4, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(50))
-                    .min(BigDecimal.valueOf(100))
-                    .max(BigDecimal.ZERO)
-                    .setScale(2, RoundingMode.HALF_UP);
-            response.updateNormalizedScore(normalized);
-            applyAbsoluteOriginalGrade(response);
-        }
-    }
-
-    private BigDecimal extractRawScore(EvaluationResponse response) {
-        if (response.getAnswersJson() == null) return BigDecimal.ZERO;
-        try {
-            var node = objectMapper.readTree(response.getAnswersJson());
-            if (node.has("totalScore")) {
-                return BigDecimal.valueOf(node.get("totalScore").asDouble());
-            }
-            // totalScore 필드가 없으면 items 배열의 score 합산 시도
-            if (node.has("items") && node.get("items").isArray()) {
-                BigDecimal sum = BigDecimal.ZERO;
-                for (var item : node.get("items")) {
-                    if (item.has("score")) {
-                        sum = sum.add(BigDecimal.valueOf(item.get("score").asDouble()));
-                    }
-                }
-                return sum;
-            }
-        } catch (Exception ignore) {
-        }
-        return BigDecimal.ZERO;
-    }
-
-    // 캘리브레이션
-    @Transactional
-    public void adjustCalibrations(UUID seasonId, UUID companyId, UUID actorMemberId, CalibrationAdjustReqDto dto) {
-        EvaluationSeason season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
-        if (!season.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
-        }
-        // 결과 공개 이전 ACTIVE 시즌에서만 조정 가능
-        if (!season.canCalibrate()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "진행 중이면서 결과 미공개 상태에서만 등급 조율이 가능합니다.");
-        }
-        for (CalibrationAdjustReqDto.Adjustment adj : dto.getAdjustments()) {
-            EvaluationResponse response = responseRepository.findById(adj.getResponseId())
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
-            if (!response.getCompanyId().equals(companyId)) {
-                throw new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다.");
-            }
-            if (response.getStatus() != EvaluationStatus.SUBMITTED) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST,
-                        "제출되지 않은 응답은 캘리브레이션할 수 없습니다. responseId=" + response.getResponseId());
-            }
-            String previousGrade = extractAdjustedGrade(response.getCalibrationJson());
-            try {
-                ObjectNode calibration = objectMapper.createObjectNode();
-                if (response.getCalibrationJson() != null) {
-                    calibration = (ObjectNode) objectMapper.readTree(response.getCalibrationJson());
-                }
-                calibration.put("adjustedGrade", adj.getAdjustedGrade());
-                calibration.put("adjustmentReason", adj.getAdjustmentReason());
-                calibration.put("adjustedAt", LocalDateTime.now().toString());
-                calibration.put("adjustedBy", actorMemberId != null ? actorMemberId.toString() : "unknown");
-                response.updateCalibration(objectMapper.writeValueAsString(calibration));
-            } catch (Exception e) {
-                throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "캘리브레이션 데이터 처리 실패");
-            }
-            // 감사 이력 저장 — 매 조정마다 append
-            calibrationHistoryRepository.save(CalibrationHistory.builder()
-                    .companyId(companyId)
-                    .seasonId(seasonId)
-                    .responseId(response.getResponseId())
-                    .adjustedGrade(adj.getAdjustedGrade())
-                    .adjustmentReason(adj.getAdjustmentReason())
-                    .previousGrade(previousGrade)
-                    .adjustedBy(actorMemberId != null ? actorMemberId : companyId)
+            // LEAD entry 가 없는 비정상 케이스 — 신규 생성
+            calibrationRepository.save(EvaluationCalibration.builder()
+                    .responseId(responseId)
+                    .evaluatorId(newLeadId)
+                    .role(CalibrationRole.LEAD)
                     .build());
         }
-    }
 
-    @Transactional
-    public void confirmCalibration(UUID seasonId, UUID companyId) {
-        EvaluationSeason season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
-        if (!season.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
-        }
-        // 결과 공개 이전 ACTIVE 시즌에서만 확정 가능
-        if (!season.canCalibrate()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "진행 중이면서 결과 미공개 상태에서만 등급 조율을 확정할 수 있습니다.");
-        }
-        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .collect(Collectors.toList());
-        // 모든 응답이 제출(SUBMITTED)되어야 캘리브레이션 확정 가능
-        long notSubmitted = responses.stream()
-                .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
-                .count();
-        if (notSubmitted > 0) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "제출되지 않은 평가 응답이 " + notSubmitted + "건 있어 캘리브레이션을 확정할 수 없습니다.");
-        }
-        for (EvaluationResponse r : responses) {
-            if (r.getStatus() == EvaluationStatus.SUBMITTED) {
-                applyAbsoluteOriginalGrade(r);
-            }
-        }
-        enforceRelativeDistributionIfConfigured(responses);
-        stampCalibrationConfirmedAt(responses, "ADMIN_CONFIRM_CALIBRATION", false);
-        // phase 전이는 더 이상 존재하지 않음. 각 응답의 calibrationJson.confirmedAt 이
-        // "이 응답은 확정되었다" 표시자 역할을 계속 수행한다.
+        return EvaluationResponseResDto.from(r);
     }
 
     /**
-     * 설계상 등급 확정 시점:
-     * <ul>
-     *   <li><b>기본</b>: 결과 공개({@link #publishResults}) 시 제출된 응답 전체에 대해
-     *       ABSOLUTE 는 {@link #applyAbsoluteOriginalGrade}, RELATIVE 는 목표 분포
-     *       {@link #enforceRelativeDistributionIfConfigured} 를 한 번 적용해 최종 등급을 채운 뒤,
-     *       {@code confirmedVia=RESULT_PUBLISH} 로 확정 스탬프를 남긴다 (이미 스탬프가 있으면 생략).</li>
-     *   <li><b>선행 확정</b>: 공개 전 관리자가 {@link #confirmCalibration}을 호출하면 동일 로직으로
-     *       등급을 만들고 {@code confirmedVia=ADMIN_CONFIRM_CALIBRATION} 으로 스탬프한다.
-     *       이후 공개 시에는 등급 산식을 다시 덮어쓰지 않는다.</li>
-     *   <li><b>캘리브레이션 UI</b>: 분포 미리보기·수동 조정은 공개 전 조율용이며,
-     *       공개 시 자동 확정과 충돌하지 않도록 사전 확정된 시즌은 공개 경로에서 재산출하지 않는다.</li>
-     * </ul>
-     */
-    private boolean responseHasCalibrationConfirmedAt(EvaluationResponse r) {
-        if (r == null || r.getCalibrationJson() == null || r.getCalibrationJson().isBlank()) {
-            return false;
-        }
-        try {
-            var node = objectMapper.readTree(r.getCalibrationJson());
-            return node.has("confirmedAt") && !node.get("confirmedAt").asText().isBlank();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private boolean anySubmittedResponseHasCalibrationConfirmed(List<EvaluationResponse> responses) {
-        return responses.stream()
-                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
-                .anyMatch(this::responseHasCalibrationConfirmedAt);
-    }
-
-    /**
-     * 공개 직전 기본 등급 산출 — 사전 확정({@code confirmedAt} 존재)이 없을 때만 호출.
-     */
-    private void finalizeDefaultGradesForPublish(List<EvaluationResponse> responses) {
-        for (EvaluationResponse r : responses) {
-            if (r.getStatus() == EvaluationStatus.SUBMITTED) {
-                applyAbsoluteOriginalGrade(r);
-            }
-        }
-        enforceRelativeDistributionIfConfigured(responses);
-    }
-
-    /**
-     * @param onlyIfMissing true 이면 이미 {@code confirmedAt} 이 있으면 해당 응답은 건너뜀 (공개 시 멱등).
-     */
-    private void stampCalibrationConfirmedAt(List<EvaluationResponse> responses, String confirmedVia,
-                                            boolean onlyIfMissing) {
-        LocalDateTime now = LocalDateTime.now();
-        for (EvaluationResponse r : responses) {
-            if (r.getStatus() != EvaluationStatus.SUBMITTED) {
-                continue;
-            }
-            try {
-                ObjectNode calibration;
-                if (r.getCalibrationJson() != null && !r.getCalibrationJson().isBlank()) {
-                    calibration = (ObjectNode) objectMapper.readTree(r.getCalibrationJson());
-                } else {
-                    calibration = objectMapper.createObjectNode();
-                }
-                boolean has = calibration.has("confirmedAt") && !calibration.get("confirmedAt").asText().isBlank();
-                if (onlyIfMissing && has) {
-                    continue;
-                }
-                calibration.put("confirmedAt", now.toString());
-                if (confirmedVia != null && !confirmedVia.isBlank()) {
-                    calibration.put("confirmedVia", confirmedVia);
-                }
-                r.updateCalibration(objectMapper.writeValueAsString(calibration));
-            } catch (Exception e) {
-                throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "캘리브레이션 확정 스탬프 처리 실패");
-            }
-        }
-    }
-
-    /**
-     * RELATIVE 등급 설정이 있는 설계에 대해 목표 분포를 강제 적용한다.
-     * 분포 적용 단위는 "같은 시즌 + 같은 설계" 버킷이며, 점수 내림차순으로 컷오프한다.
-     */
-    private void enforceRelativeDistributionIfConfigured(List<EvaluationResponse> responses) {
-        Map<UUID, List<EvaluationResponse>> byDesign = responses.stream()
-                .filter(r -> r.getGroup() != null && r.getGroup().getDesign() != null)
-                .collect(Collectors.groupingBy(r -> r.getGroup().getDesign().getDesignId()));
-
-        for (List<EvaluationResponse> bucket : byDesign.values()) {
-            if (bucket.isEmpty()) continue;
-            GradeConfig cfg = bucket.get(0).getGroup().getDesign().getGradeConfig();
-            if (cfg == null || !"RELATIVE".equalsIgnoreCase(cfg.getType())) continue;
-            if (cfg.getTargetDistribution() == null || cfg.getTargetDistribution().isEmpty()) continue;
-
-            LinkedHashMap<String, BigDecimal> distribution = normalizeDistribution(cfg);
-            if (distribution.isEmpty()) continue;
-
-            List<EvaluationResponse> ranked = new ArrayList<>(bucket);
-            ranked.sort(Comparator
-                    .comparing((EvaluationResponse r) ->
-                            r.getNormalizedScore() != null ? r.getNormalizedScore() : BigDecimal.valueOf(-1))
-                    .reversed()
-                    .thenComparing(r -> r.getResponseId().toString()));
-
-            Map<String, Integer> quotas = allocateRelativeQuotas(distribution, ranked.size());
-            applyRelativeGrades(ranked, quotas);
-        }
-    }
-
-    private LinkedHashMap<String, BigDecimal> normalizeDistribution(GradeConfig cfg) {
-        LinkedHashMap<String, BigDecimal> ordered = new LinkedHashMap<>();
-
-        if (cfg.getGrades() != null) {
-            for (GradeConfig.GradeBand band : cfg.getGrades()) {
-                if (band == null || band.getLabel() == null || band.getLabel().isBlank()) continue;
-                BigDecimal raw = cfg.getTargetDistribution().get(band.getLabel());
-                if (raw == null) continue;
-                ordered.put(band.getLabel(), normalizeRatio(raw));
-            }
-        }
-        // grades 목록에 없는 분포 키도 보전
-        for (Map.Entry<String, BigDecimal> e : cfg.getTargetDistribution().entrySet()) {
-            if (e.getKey() == null || e.getKey().isBlank()) continue;
-            ordered.putIfAbsent(e.getKey(), normalizeRatio(e.getValue()));
-        }
-        ordered.entrySet().removeIf(e -> e.getValue().compareTo(BigDecimal.ZERO) <= 0);
-        return ordered;
-    }
-
-    private BigDecimal normalizeRatio(BigDecimal v) {
-        if (v == null) return BigDecimal.ZERO;
-        if (v.compareTo(BigDecimal.ONE) > 0) {
-            return v.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
-        }
-        return v.max(BigDecimal.ZERO);
-    }
-
-    private Map<String, Integer> allocateRelativeQuotas(LinkedHashMap<String, BigDecimal> distribution, int total) {
-        Map<String, Integer> quotas = new LinkedHashMap<>();
-        if (total <= 0 || distribution.isEmpty()) return quotas;
-
-        List<Map.Entry<String, BigDecimal>> labels = new ArrayList<>(distribution.entrySet());
-        Map<String, BigDecimal> fractional = new LinkedHashMap<>();
-        int assigned = 0;
-        for (Map.Entry<String, BigDecimal> e : labels) {
-            BigDecimal rawCount = e.getValue().multiply(BigDecimal.valueOf(total));
-            int floor = rawCount.setScale(0, RoundingMode.DOWN).intValue();
-            quotas.put(e.getKey(), floor);
-            fractional.put(e.getKey(), rawCount.subtract(BigDecimal.valueOf(floor)));
-            assigned += floor;
-        }
-        int remain = total - assigned;
-        if (remain > 0) {
-            List<String> byFraction = fractional.entrySet().stream()
-                    .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
-                    .map(Map.Entry::getKey)
-                    .toList();
-            int idx = 0;
-            while (remain > 0 && !byFraction.isEmpty()) {
-                String key = byFraction.get(idx % byFraction.size());
-                quotas.put(key, quotas.getOrDefault(key, 0) + 1);
-                remain--;
-                idx++;
-            }
-        } else if (remain < 0) {
-            int overflow = -remain;
-            List<String> byFractionAsc = fractional.entrySet().stream()
-                    .sorted(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .toList();
-            int idx = 0;
-            while (overflow > 0 && !byFractionAsc.isEmpty()) {
-                String key = byFractionAsc.get(idx % byFractionAsc.size());
-                int cur = quotas.getOrDefault(key, 0);
-                if (cur > 0) {
-                    quotas.put(key, cur - 1);
-                    overflow--;
-                }
-                idx++;
-            }
-        }
-        return quotas;
-    }
-
-    private void applyRelativeGrades(List<EvaluationResponse> ranked, Map<String, Integer> quotas) {
-        List<String> labels = quotas.entrySet().stream()
-                .filter(e -> e.getValue() != null && e.getValue() > 0)
-                .map(Map.Entry::getKey)
-                .toList();
-        if (labels.isEmpty()) return;
-
-        int cursor = 0;
-        for (String label : labels) {
-            int count = quotas.getOrDefault(label, 0);
-            for (int i = 0; i < count && cursor < ranked.size(); i++, cursor++) {
-                upsertAdjustedGrade(ranked.get(cursor), label, "RELATIVE_DISTRIBUTION_ENFORCED");
-            }
-        }
-        // 분포 반올림으로 잔여가 생긴 경우 마지막 등급으로 채운다.
-        String lastLabel = labels.get(labels.size() - 1);
-        while (cursor < ranked.size()) {
-            upsertAdjustedGrade(ranked.get(cursor), lastLabel, "RELATIVE_DISTRIBUTION_ENFORCED");
-            cursor++;
-        }
-    }
-
-    private record RelativePreviewResult(List<RelativeDistributionPreviewResDto.PreviewAdjustment> adjustments) {}
-
-    private RelativePreviewResult buildRelativePreview(List<EvaluationResponse> responses) {
-        Map<UUID, List<EvaluationResponse>> byDesign = responses.stream()
-                .filter(r -> r.getGroup() != null && r.getGroup().getDesign() != null)
-                .collect(Collectors.groupingBy(r -> r.getGroup().getDesign().getDesignId()));
-
-        List<RelativeDistributionPreviewResDto.PreviewAdjustment> out = new ArrayList<>();
-        for (List<EvaluationResponse> bucket : byDesign.values()) {
-            if (bucket.isEmpty()) continue;
-            GradeConfig cfg = bucket.get(0).getGroup().getDesign().getGradeConfig();
-            if (cfg == null || !"RELATIVE".equalsIgnoreCase(cfg.getType())) continue;
-            if (cfg.getTargetDistribution() == null || cfg.getTargetDistribution().isEmpty()) continue;
-
-            LinkedHashMap<String, BigDecimal> distribution = normalizeDistribution(cfg);
-            if (distribution.isEmpty()) continue;
-
-            List<EvaluationResponse> ranked = new ArrayList<>(bucket);
-            ranked.sort(Comparator
-                    .comparing((EvaluationResponse r) ->
-                            r.getNormalizedScore() != null ? r.getNormalizedScore() : BigDecimal.valueOf(-1))
-                    .reversed()
-                    .thenComparing(r -> r.getResponseId().toString()));
-
-            Map<String, Integer> quotas = allocateRelativeQuotas(distribution, ranked.size());
-            List<String> labels = quotas.entrySet().stream()
-                    .filter(e -> e.getValue() != null && e.getValue() > 0)
-                    .map(Map.Entry::getKey)
-                    .toList();
-            if (labels.isEmpty()) continue;
-
-            int cursor = 0;
-            for (String label : labels) {
-                int count = quotas.getOrDefault(label, 0);
-                for (int i = 0; i < count && cursor < ranked.size(); i++, cursor++) {
-                    EvaluationResponse r = ranked.get(cursor);
-                    out.add(RelativeDistributionPreviewResDto.PreviewAdjustment.builder()
-                            .responseId(r.getResponseId())
-                            .normalizedScore(r.getNormalizedScore())
-                            .currentGrade(resolveCurrentGrade(r))
-                            .predictedGrade(label)
-                            .build());
-                }
-            }
-            String lastLabel = labels.get(labels.size() - 1);
-            while (cursor < ranked.size()) {
-                EvaluationResponse r = ranked.get(cursor);
-                out.add(RelativeDistributionPreviewResDto.PreviewAdjustment.builder()
-                        .responseId(r.getResponseId())
-                        .normalizedScore(r.getNormalizedScore())
-                        .currentGrade(resolveCurrentGrade(r))
-                        .predictedGrade(lastLabel)
-                        .build());
-                cursor++;
-            }
-        }
-        return new RelativePreviewResult(out);
-    }
-
-    private void upsertAdjustedGrade(EvaluationResponse response, String grade, String reason) {
-        try {
-            ObjectNode calibration = objectMapper.createObjectNode();
-            if (response.getCalibrationJson() != null && !response.getCalibrationJson().isBlank()) {
-                calibration = (ObjectNode) objectMapper.readTree(response.getCalibrationJson());
-            }
-            calibration.put("adjustedGrade", grade);
-            calibration.put("adjustmentReason", reason);
-            calibration.put("adjustedAt", LocalDateTime.now().toString());
-            response.updateCalibration(objectMapper.writeValueAsString(calibration));
-        } catch (Exception e) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "상대 등급 분포 적용 실패");
-        }
-    }
-
-    /**
-     * 결과 공개 — 관리자가 호출하거나 스케줄러가 자동 호출.
-     * resultsPublishedAt 을 now() 로 세팅하고 피드백 면담을 자동 생성합니다.
-     *
-     * 선행 조건:
-     *  - status = ACTIVE 또는 CLOSED
-     *  - 이미 공개된 상태가 아님 (resultsPublishedAt == null)
-     *  - 모든 응답이 SUBMITTED
-     *
-     * 등급: {@link #anySubmittedResponseHasCalibrationConfirmed} 가 false 이면
-     * {@link #finalizeDefaultGradesForPublish} 로 RELATIVE 분포·ABSOLUTE 구간 등급을 채웁니다.
-     * 제출 응답에 {@code confirmedAt} 이 없으면 {@code confirmedVia=RESULT_PUBLISH} 스탬프를 남깁니다.
-     * 공개 전 {@link #confirmCalibration}으로 이미 확정된 경우 등급 산식은 다시 적용하지 않습니다.
+     * 시즌 중 퇴사 처리 — HR 운영. SKIPPED_LEAVER 전이.
+     * 결과 공개 검증/면담 자동 생성에서 자연스럽게 제외됨.
      */
     @Transactional
-    public void publishResults(UUID seasonId, UUID companyId) {
-        EvaluationSeason season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."));
-        if (!season.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다.");
+    public EvaluationResponseResDto skipLeaver(UUID responseId, String reason) {
+        EvaluationResponse r = mustGet(responseId);
+        r.skipForLeaver();
+        if (reason != null && !reason.isBlank()) {
+            calibrationRepository.findByResponseIdAndRole(responseId, CalibrationRole.LEAD).ifPresent(lead -> {
+                String prefixed = "[skip-leaver reason] " + reason
+                        + (lead.getComment() != null ? "\n--\n" + lead.getComment() : "");
+                lead.saveFinal(lead.getFinalGradeJson(), prefixed);
+            });
         }
-        if (season.getStatus() != SeasonStatus.ACTIVE && season.getStatus() != SeasonStatus.CLOSED) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "DRAFT 상태에서는 결과를 공개할 수 없습니다. 먼저 시즌을 시작하세요.");
-        }
-        if (season.isResultsPublished()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "이미 결과가 공개된 시즌입니다.");
-        }
-        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .collect(Collectors.toList());
-        long notSubmitted = responses.stream()
-                .filter(r -> r.getStatus() != EvaluationStatus.SUBMITTED)
-                .count();
-        if (notSubmitted > 0) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "제출되지 않은 평가 응답이 " + notSubmitted + "건 있어 결과를 공개할 수 없습니다.");
-        }
-        if (!anySubmittedResponseHasCalibrationConfirmed(responses)) {
-            finalizeDefaultGradesForPublish(responses);
-        }
-        stampCalibrationConfirmedAt(responses, "RESULT_PUBLISH", true);
-        season.markResultsPublished();
-        // 피드백 면담 자동 생성 (같은 트랜잭션에서 수행)
-        meetingRecordService.createFeedbackMeetingsForSeason(seasonId, companyId);
-    }
-
-    private String extractAdjustedGrade(String calibrationJson) {
-        if (calibrationJson == null) return null;
-        try {
-            var node = objectMapper.readTree(calibrationJson);
-            if (node.has("adjustedGrade")) {
-                return node.get("adjustedGrade").asText();
-            }
-        } catch (Exception ignore) {
-        }
-        return null;
-    }
-
-    private String extractOriginalGrade(String calibrationJson) {
-        if (calibrationJson == null) return null;
-        try {
-            var node = objectMapper.readTree(calibrationJson);
-            if (node.has("originalGrade")) {
-                return node.get("originalGrade").asText();
-            }
-        } catch (Exception ignore) {
-        }
-        return null;
-    }
-
-    private String resolveCurrentGrade(EvaluationResponse r) {
-        if (r == null) return null;
-        String adjusted = extractAdjustedGrade(r.getCalibrationJson());
-        if (adjusted != null && !adjusted.isBlank()) return adjusted;
-        return extractOriginalGrade(r.getCalibrationJson());
-    }
-
-    private Map<String, Double> extractTargetDistribution(List<EvaluationResponse> responses) {
-        for (EvaluationResponse r : responses) {
-            if (r.getGroup() == null || r.getGroup().getDesign() == null) continue;
-            GradeConfig cfg = r.getGroup().getDesign().getGradeConfig();
-            if (cfg == null || cfg.getTargetDistribution() == null || cfg.getTargetDistribution().isEmpty()) continue;
-            Map<String, Double> out = new LinkedHashMap<>();
-            for (Map.Entry<String, BigDecimal> e : cfg.getTargetDistribution().entrySet()) {
-                if (e.getKey() == null || e.getKey().isBlank()) continue;
-                out.put(e.getKey(), normalizeRatio(e.getValue()).doubleValue());
-            }
-            return out;
-        }
-        return Map.of();
-    }
-
-    private Map<String, Double> toDistributionMap(List<String> grades) {
-        if (grades == null || grades.isEmpty()) return Map.of();
-        Map<String, Long> counts = grades.stream()
-                .collect(Collectors.groupingBy(g -> g, LinkedHashMap::new, Collectors.counting()));
-        int total = grades.size();
-        Map<String, Double> out = new LinkedHashMap<>();
-        for (Map.Entry<String, Long> e : counts.entrySet()) {
-            out.put(e.getKey(), BigDecimal.valueOf(e.getValue())
-                    .divide(BigDecimal.valueOf(total), 6, RoundingMode.HALF_UP)
-                    .doubleValue());
-        }
-        return out;
+        return EvaluationResponseResDto.from(r);
     }
 
     /**
-     * ABSOLUTE 등급표가 설계에 존재하면 normalizedScore 를 기반으로 originalGrade 를 자동 반영한다.
-     * RELATIVE 는 캘리브레이션 조정(분포 고려)이 필요하므로 자동 반영하지 않는다.
+     * 공개 후 정정 — HR 운영. CONFIRMED → CALIBRATION_OPEN.
+     * 기존 EvaluationResponse.unconfirm() 도메인 메서드 호출.
+     * Lead 가 finalGradeJson 수정 후 재confirm 하면 aggregate 자동 갱신.
      */
-    private void applyAbsoluteOriginalGrade(EvaluationResponse response) {
-        if (response == null || response.getNormalizedScore() == null) return;
-        EvaluationGroup group = response.getGroup();
-        if (group == null || group.getDesign() == null || group.getDesign().getGradeConfig() == null) return;
-
-        GradeConfig cfg = group.getDesign().getGradeConfig();
-        if (!"ABSOLUTE".equalsIgnoreCase(cfg.getType())) return;
-        if (cfg.getGrades() == null || cfg.getGrades().isEmpty()) return;
-
-        String mapped = mapAbsoluteGrade(response.getNormalizedScore(), cfg);
-        if (mapped == null || mapped.isBlank()) return;
-
-        try {
-            ObjectNode calibration = objectMapper.createObjectNode();
-            if (response.getCalibrationJson() != null && !response.getCalibrationJson().isBlank()) {
-                calibration = (ObjectNode) objectMapper.readTree(response.getCalibrationJson());
-            }
-            calibration.put("originalGrade", mapped);
-            response.updateCalibration(objectMapper.writeValueAsString(calibration));
-        } catch (Exception e) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "등급 자동 반영 처리 실패");
+    @Transactional
+    public EvaluationResponseResDto reopenForCorrection(UUID responseId, String reason) {
+        EvaluationResponse r = mustGet(responseId);
+        r.unconfirm();
+        // 사유 기록 — calibration 의 LEAD comment 에 prefix 형태로 보존
+        if (reason != null && !reason.isBlank()) {
+            calibrationRepository.findByResponseIdAndRole(responseId, CalibrationRole.LEAD).ifPresent(lead -> {
+                String prefixed = "[reopen 사유] " + reason
+                        + (lead.getComment() != null ? "\n--\n" + lead.getComment() : "");
+                lead.saveFinal(lead.getFinalGradeJson(), prefixed);
+            });
         }
-    }
-
-    private String mapAbsoluteGrade(BigDecimal score, GradeConfig cfg) {
-        for (GradeConfig.GradeBand band : cfg.getGrades()) {
-            if (band == null || band.getLabel() == null) continue;
-            BigDecimal min = band.getMinScore() != null ? band.getMinScore() : BigDecimal.ZERO;
-            BigDecimal max = band.getMaxScore() != null ? band.getMaxScore() : BigDecimal.valueOf(100);
-            if (score.compareTo(min) >= 0 && score.compareTo(max) <= 0) {
-                return band.getLabel();
-            }
-        }
-        return null;
-    }
-
-    // 진행도
-    @Transactional(readOnly = true)
-    public List<ResponseResDto> listBySeasonForProgress(UUID seasonId, UUID companyId) {
-        return listBySeasonForProgress(seasonId, companyId, null);
+        return EvaluationResponseResDto.from(r);
     }
 
     /**
-     * 진행도 조회 + 대상자 이름 contains 필터.
-     * q 가 null/빈값이면 전체 반환. q 는 DTO 매핑 이후 targetMemberName 에 대해 case-insensitive contains 매칭한다.
+     * 이의제기 — 본인 요청.
      */
-    public List<ResponseResDto> listBySeasonForProgress(UUID seasonId, UUID companyId, String q) {
-        List<EvaluationResponse> list = responseRepository.findByGroup_Season_SeasonId(seasonId)
-                .stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .collect(Collectors.toList());
-        List<ResponseResDto> dtos = mapResponsesWithNames(list);
-        if (q == null || q.isBlank()) return dtos;
-        String needle = q.trim().toLowerCase();
-        return dtos.stream()
-                .filter(d -> {
-                    String name = d.getTargetMemberName();
-                    String dept = d.getTargetMemberDepartment();
-                    return (name != null && name.toLowerCase().contains(needle))
-                            || (dept != null && dept.toLowerCase().contains(needle));
-                })
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public CalibrationOverviewResDto getCalibrationOverview(UUID seasonId, UUID companyId) {
-        List<EvaluationResponse> submitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
-                .collect(Collectors.toList());
-
-        Map<String, Double> current = toDistributionMap(submitted.stream()
-                .map(this::resolveCurrentGrade)
-                .filter(Objects::nonNull)
-                .toList());
-        Map<String, Double> target = extractTargetDistribution(submitted);
-        return CalibrationOverviewResDto.builder()
-                .targetDistribution(target)
-                .currentDistribution(current)
-                .members(List.of())
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public RelativeDistributionPreviewResDto previewRelativeDistribution(UUID seasonId, UUID companyId) {
-        List<EvaluationResponse> submitted = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getStatus() == EvaluationStatus.SUBMITTED)
-                .collect(Collectors.toList());
-
-        Map<String, Double> current = toDistributionMap(submitted.stream()
-                .map(this::resolveCurrentGrade)
-                .filter(Objects::nonNull)
-                .toList());
-        Map<String, Double> target = extractTargetDistribution(submitted);
-
-        RelativePreviewResult predicted = buildRelativePreview(submitted);
-        Map<String, Double> predictedDist = toDistributionMap(predicted.adjustments().stream()
-                .map(RelativeDistributionPreviewResDto.PreviewAdjustment::getPredictedGrade)
-                .filter(Objects::nonNull)
-                .toList());
-
-        return RelativeDistributionPreviewResDto.builder()
-                .targetDistribution(target)
-                .currentDistribution(current)
-                .predictedDistribution(predictedDist)
-                .adjustments(predicted.adjustments())
-                .build();
-    }
-
-    // ── 목표 요약 카드 ──
-
-    /**
-     * 평가 응답에 캡처된 목표 스냅샷과 현재 DB 상의 목표 최신 값을 비교하여
-     * 요약 카드 목록을 반환한다.
-     *
-     * 요청자(requesterId)가 해당 응답의 evaluator 가 아니면 접근 차단한다.
-     */
-    @Transactional(readOnly = true)
-    public List<GoalSummaryCardResDto> listGoalSummaries(UUID responseId, UUID requesterId) {
-        EvaluationResponse response = responseRepository.findById(responseId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
-        if (!response.getEvaluatorId().equals(requesterId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "자신의 평가만 조회할 수 있습니다.");
+    @Transactional
+    public EvaluationResponseResDto requestObjection(UUID responseId, UUID memberId, String message) {
+        EvaluationResponse r = mustGet(responseId);
+        if (!r.getTargetMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인 응답에 대해서만 이의제기 가능합니다.");
         }
-
-        List<GoalSnapshotDto> snapshots = parseSnapshots(response.getGoalSnapshotJson());
-        if (snapshots.isEmpty()) {
-            return List.of();
+        // 결과 공개 후에만 가능
+        if (r.getGroup() == null || r.getGroup().getSeason() == null
+                || r.getGroup().getSeason().getResultsPublishedAt() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "결과 공개 후에만 이의제기 가능합니다.");
         }
-        return buildGoalSummaryCardsFromSnapshots(snapshots);
+        r.requestObjection(message);
+        return EvaluationResponseResDto.from(r);
     }
 
     /**
-     * 본인이 피평가자인 자기평가(SELF) 응답의 목표 스냅샷을 기준으로 요약 카드를 만든다.
-     * 자기평가 응답이 없거나 스냅샷이 비어 있으면, 시즌 기간과 겹치는 본인 목표를 현재값만으로 반환한다(폴백).
-     *
-     * @param completedOnly true 이면 현재 DB 기준 완료(COMPLETED) 목표만 남긴다.
+     * 이의제기 검토 시작 — HR.
      */
-    @Transactional(readOnly = true)
-    public List<GoalSummaryCardResDto> listMyGoalSummariesForSeason(
-            UUID seasonId, UUID requesterMemberId, UUID companyId, boolean completedOnly) {
-        EvaluationSeason season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다."));
-        if (!season.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다.");
-        }
-
-        Optional<EvaluationResponse> selfEval = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
-                .filter(r -> r.getCompanyId().equals(companyId))
-                .filter(r -> r.getEvaluatorId().equals(requesterMemberId))
-                .filter(r -> r.getTargetMemberId().equals(requesterMemberId))
-                .filter(r -> r.getEvaluationType() == EvalType.SELF)
-                .findFirst();
-
-        if (selfEval.isPresent()) {
-            List<GoalSnapshotDto> snapshots = parseSnapshots(selfEval.get().getGoalSnapshotJson());
-            if (!snapshots.isEmpty()) {
-                List<GoalSummaryCardResDto> cards = buildGoalSummaryCardsFromSnapshots(snapshots);
-                if (completedOnly) {
-                    return cards.stream()
-                            .filter(this::goalCardRepresentsCompleted)
-                            .collect(Collectors.toList());
-                }
-                return cards;
-            }
-        }
-
-        return buildFallbackGoalCardsForSeason(companyId, requesterMemberId, season, completedOnly);
+    @Transactional
+    public EvaluationResponseResDto reviewObjection(UUID responseId) {
+        EvaluationResponse r = mustGet(responseId);
+        r.reviewObjection();
+        return EvaluationResponseResDto.from(r);
     }
 
-    private List<GoalSummaryCardResDto> buildGoalSummaryCardsFromSnapshots(List<GoalSnapshotDto> snapshots) {
-        List<UUID> goalIds = snapshots.stream().map(GoalSnapshotDto::getGoalId).toList();
-        Map<UUID, Goal> currentGoals = goalRepository.findAllById(goalIds).stream()
-                .collect(Collectors.toMap(Goal::getGoalId, Function.identity()));
-
-        List<GoalSummaryCardResDto> cards = new ArrayList<>();
-        for (GoalSnapshotDto snap : snapshots) {
-            Goal current = currentGoals.get(snap.getGoalId());
-            GoalSummaryCardResDto.CurrentGoalView currentView = null;
-            boolean changed = false;
-            List<String> changeSummary = new ArrayList<>();
-
-            if (current != null) {
-                currentView = toCurrentGoalView(current);
-
-                if (!Objects.equals(snap.getTitle(), current.getTitle())) {
-                    changeSummary.add("TITLE");
-                }
-                if (snap.getTargetValue() != null && current.getTargetValue() != null
-                        && snap.getTargetValue().compareTo(current.getTargetValue()) != 0) {
-                    changeSummary.add("TARGET_VALUE");
-                }
-                if (!Objects.equals(snap.getStatusAtSnapshot(), current.getStatus())) {
-                    changeSummary.add("STATUS");
-                }
-                if (!Objects.equals(snap.getEndDate(), current.getEndDate())) {
-                    changeSummary.add("PERIOD");
-                }
-                if (snap.getActualValueAtSnapshot() != null && current.getActualValue() != null
-                        && snap.getActualValueAtSnapshot().compareTo(current.getActualValue()) != 0) {
-                    changeSummary.add("PROGRESS");
-                }
-                changed = !changeSummary.isEmpty();
-            } else {
-                changeSummary.add("DELETED_OR_HIDDEN");
-                changed = true;
-            }
-
-            cards.add(GoalSummaryCardResDto.builder()
-                    .goalId(snap.getGoalId())
-                    .snapshot(snap)
-                    .current(currentView)
-                    .changedSinceSnapshot(changed)
-                    .changeSummary(changeSummary)
-                    .build());
-        }
-        return cards;
+    /**
+     * 이의제기 종결 — HR. resolution 메시지 기록.
+     */
+    @Transactional
+    public EvaluationResponseResDto resolveObjection(UUID responseId, UUID resolverId, String resolution) {
+        EvaluationResponse r = mustGet(responseId);
+        r.resolveObjection(resolverId, resolution);
+        return EvaluationResponseResDto.from(r);
     }
-
-    private static GoalSummaryCardResDto.CurrentGoalView toCurrentGoalView(Goal current) {
-        return GoalSummaryCardResDto.CurrentGoalView.builder()
-                .title(current.getTitle())
-                .status(current.getStatus().name())
-                .targetValue(current.getTargetValue())
-                .actualValue(current.getActualValue())
-                .achievementPct(current.getAchievementPct())
-                .rolledAchievementPct(current.getRolledAchievementPct())
-                .weightPct(current.getWeightPct())
-                .unitLabel(current.getUnitLabel())
-                .build();
-    }
-
-    private boolean goalCardRepresentsCompleted(GoalSummaryCardResDto card) {
-        if (card.getCurrent() != null && card.getCurrent().getStatus() != null) {
-            return GoalStatus.COMPLETED.name().equals(card.getCurrent().getStatus());
-        }
-        if (card.getSnapshot() != null && card.getSnapshot().getStatusAtSnapshot() != null) {
-            return card.getSnapshot().getStatusAtSnapshot() == GoalStatus.COMPLETED;
-        }
-        return false;
-    }
-
-    private static boolean goalPeriodOverlapsSeason(Goal goal, EvaluationSeason season) {
-        LocalDate sStart = season.getStartDate();
-        LocalDate sEnd = season.getEndDate();
-        return !goal.getEndDate().isBefore(sStart) && !goal.getStartDate().isAfter(sEnd);
-    }
-
-    private List<GoalSummaryCardResDto> buildFallbackGoalCardsForSeason(
-            UUID companyId, UUID memberId, EvaluationSeason season, boolean completedOnly) {
-        List<Goal> goals = goalRepository.findByCompanyIdAndOwnerId(companyId, memberId).stream()
-                .filter(g -> goalPeriodOverlapsSeason(g, season))
-                .filter(g -> !completedOnly || g.getStatus() == GoalStatus.COMPLETED)
-                .collect(Collectors.toList());
-        List<GoalSummaryCardResDto> cards = new ArrayList<>();
-        for (Goal g : goals) {
-            cards.add(GoalSummaryCardResDto.builder()
-                    .goalId(g.getGoalId())
-                    .snapshot(null)
-                    .current(toCurrentGoalView(g))
-                    .changedSinceSnapshot(false)
-                    .changeSummary(List.of())
-                    .build());
-        }
-        return cards;
-    }
-
-    private List<GoalSnapshotDto> parseSnapshots(String goalSnapshotJson) {
-        if (goalSnapshotJson == null || goalSnapshotJson.isBlank()) {
-            return List.of();
-        }
-        try {
-            return objectMapper.readValue(goalSnapshotJson, new TypeReference<List<GoalSnapshotDto>>() {});
-        } catch (Exception e) {
-            return List.of();
-        }
-    }
-
 }

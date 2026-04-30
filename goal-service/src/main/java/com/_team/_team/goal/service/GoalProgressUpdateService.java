@@ -56,7 +56,7 @@ public class GoalProgressUpdateService {
         if (!goal.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 목표입니다.");
         }
-        if (!goalService.canMemberPostManualProgress(goal, memberId) && !hasGoalUpdatePermission) {
+        if (!goalService.canPostManualProgress(goal, memberId) && !hasGoalUpdatePermission) {
             throw new BusinessException(HttpStatus.FORBIDDEN,
                     "담당자·참여 멤버이거나 목표 수정(GOAL:UPDATE) 권한이 있어야 진행률을 업데이트할 수 있습니다.");
         }
@@ -112,7 +112,7 @@ public class GoalProgressUpdateService {
 
     @Transactional(readOnly = true)
     public List<GoalProgressUpdateResDto> list(UUID goalId, UUID requesterId, UUID companyId) {
-        goalService.requireReadableGoal(goalId, requesterId, companyId);
+        goalService.requireReadable(goalId, requesterId, companyId);
         return goalActivityRepository.findByGoal_GoalIdAndTypeOrderByCreatedAtDesc(goalId, GoalActivityType.PROGRESS_UPDATED).stream()
                 .map(this::toProgressUpdateRes)
                 .toList();
