@@ -50,7 +50,7 @@ public class GoalActivityService {
 
     @Transactional(readOnly = true)
     public List<GoalActivityResDto> list(UUID goalId, UUID requesterId, UUID companyId) {
-        goalService.requireReadableGoal(goalId, requesterId, companyId);
+        goalService.requireReadable(goalId, requesterId, companyId);
         return goalActivityRepository.findByGoal_GoalIdOrderByCreatedAtDesc(goalId)
                 .stream()
                 .map(GoalActivityResDto::from)
@@ -59,7 +59,7 @@ public class GoalActivityService {
 
     @Transactional(readOnly = true)
     public Page<GoalActivityResDto> listPage(UUID goalId, UUID requesterId, UUID companyId, int page, int size) {
-        goalService.requireReadableGoal(goalId, requesterId, companyId);
+        goalService.requireReadable(goalId, requesterId, companyId);
         return goalActivityRepository
                 .findByGoal_GoalIdOrderByCreatedAtDesc(goalId, PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size))))
                 .map(GoalActivityResDto::from);

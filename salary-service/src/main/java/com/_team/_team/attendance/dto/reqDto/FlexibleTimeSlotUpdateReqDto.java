@@ -26,6 +26,7 @@ public class FlexibleTimeSlotUpdateReqDto {
     @Positive
     private Integer workMinutes;
 
-    @PositiveOrZero
-    private Integer breakMinutes;
+    /** 슬롯 점심 시작/종료 시각 - null 이면 미변경  */
+    private LocalTime breakStart;
+    private LocalTime breakEnd;
 }

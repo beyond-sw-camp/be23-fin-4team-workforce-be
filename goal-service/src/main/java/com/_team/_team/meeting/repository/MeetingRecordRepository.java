@@ -20,4 +20,7 @@ public interface MeetingRecordRepository extends JpaRepository<MeetingRecord, UU
 
     /** 특정 시즌에 대해 이미 생성된 피드백 면담이 있는지 확인 (중복 생성 방지) */
     boolean existsByRelatedSeasonIdAndCompanyId(UUID relatedSeasonId, UUID companyId);
+
+    /** 시즌별 면담 목록 — 운영자 대시보드 / 멱등 재생성 */
+    List<MeetingRecord> findByRelatedSeasonIdAndCompanyId(UUID relatedSeasonId, UUID companyId);
 }

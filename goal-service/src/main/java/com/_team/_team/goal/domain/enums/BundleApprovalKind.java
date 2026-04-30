@@ -6,8 +6,7 @@ package com._team._team.goal.domain.enums;
  * - ACTIVATION : DRAFT 상태의 목표를 ACTIVE 로 활성화하기 위한 승인
  * - COMPLETION : ACTIVE 상태의 목표를 COMPLETED 로 종료하기 위한 승인
  *
- * {@link GoalApprovalBundle} 에 부착되며, KpiTemplate 의 {@link GoalApprovalPolicy} 와 조합되어
- * 어떤 단계에서 어떤 승인 절차가 필요한지를 결정한다.
+ * {@link GoalApprovalBundle} 에 부착되며 어떤 단계에서 승인 절차가 필요한지를 결정한다.
  */
 public enum BundleApprovalKind {
     ACTIVATION,

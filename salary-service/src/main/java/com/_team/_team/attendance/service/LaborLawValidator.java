@@ -6,7 +6,6 @@ import com._team._team.attendance.domain.enums.AttendanceStatus;
 import com._team._team.attendance.domain.enums.ViolationType;
 import com._team._team.attendance.dto.resDto.WorkTimeSummaryResDto;
 import com._team._team.attendance.dto.vo.LaborLawViolation;
-import com._team._team.attendance.dto.vo.ResolvedSchedule;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
 import com._team._team.attendance.repository.OvertimePolicyRepository;
 import com._team._team.attendance.repository.OvertimeRequestRepository;
@@ -131,40 +130,6 @@ public class LaborLawValidator {
         }
 
         return violations;
-    }
-
-    /**
-     * 법정 휴게시간 미달 검증
-     * 실제 근무시간이 4h/8h 를 넘었는데 휴게시간이 부족하면 위반
-     */
-    public Optional<LaborLawViolation> validateDailyBreak(DailyAttendance daily,
-                                                          ResolvedSchedule schedule) {
-        if (daily.getWorkedMinutes() == null) {
-            return Optional.empty();
-        }
-
-        int worked = daily.getWorkedMinutes();
-        int breakMin = schedule.breakMinutes();
-
-        int required;
-        if (worked >= EIGHT_HOURS) {
-            required = MIN_BREAK_OVER_EIGHT;
-        } else if (worked >= FOUR_HOURS) {
-            required = MIN_BREAK_OVER_FOUR;
-        } else {
-            // 4시간 미만 근무는 휴게 의무 없음
-            return Optional.empty();
-        }
-
-        if (breakMin < required) {
-            return Optional.of(new LaborLawViolation(
-                    ViolationType.BREAK_TIME_INSUFFICIENT,
-                    String.format("법정 휴게시간 부족 (현재 %d분 / 필요 %d분)", breakMin, required),
-                    breakMin,
-                    required
-            ));
-        }
-        return Optional.empty();
     }
 
     /**

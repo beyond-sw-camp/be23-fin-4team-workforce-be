@@ -9,8 +9,6 @@ import com._team._team.attendance.repository.FlexibleTimeSlotRepository;
 import com._team._team.attendance.repository.MemberScheduleSelectionRepository;
 import com._team._team.dto.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,6 +83,8 @@ public class MemberScheduleSelectionService {
                 .companyId(companyId)
                 .targetYearMonth(reqDto.getTargetYearMonth())
                 .slotId(reqDto.getSlotId())
+                .breakStart(reqDto.getBreakStart())
+                .breakEnd(reqDto.getBreakEnd())
                 .approvalStatus(ScheduleApprovalStatus.PENDING)
                 .requestReason(reqDto.getRequestReason())
                 .requestedBy(memberId)
@@ -115,7 +115,7 @@ public class MemberScheduleSelectionService {
         MemberScheduleSelection selection = memberScheduleSelectionRepository
                 .findById(selectionId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "슬롯 선택을 찾을 수 없습니다."));
+                        HttpStatus.NOT_FOUND, "스케줄 선택을 찾을 수 없습니다."));
 
         selection.linkApprovalRequest(approvalRequestId);
         selection.approve(approverId, decidedAt);
@@ -123,7 +123,6 @@ public class MemberScheduleSelectionService {
 
     /**
      * 결재 반려·취소 반영
-     * approval-service 의 REJECT 와 CANCEL 모두 이 메서드로 매핑
      */
     public void applyRejection(UUID selectionId,
                                UUID approvalRequestId,
@@ -133,7 +132,7 @@ public class MemberScheduleSelectionService {
         MemberScheduleSelection selection = memberScheduleSelectionRepository
                 .findById(selectionId)
                 .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "스케줄 슬롯 선택을 찾을 수 없습니다."));
+                        HttpStatus.NOT_FOUND, "스케줄 선택을 찾을 수 없습니다."));
 
         selection.linkApprovalRequest(approvalRequestId);
         selection.reject(approverId, decidedAt, note);

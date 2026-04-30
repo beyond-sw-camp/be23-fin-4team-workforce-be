@@ -3,312 +3,230 @@ package com._team._team.goal.controller;
 import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
-import com._team._team.goal.permission.PositionPermissionReader;
 import com._team._team.dto.ApiResponse;
-import com._team._team.goal.domain.enums.GoalHealthStatus;
+import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.domain.enums.KpiCycle;
-import com._team._team.goal.dto.reqdto.*;
-import com._team._team.goal.dto.resdto.GoalCommentResDto;
-import com._team._team.goal.dto.resdto.GoalProgressUpdateResDto;
-import com._team._team.goal.dto.resdto.GoalResDto;
-import com._team._team.goal.service.GoalCommentService;
-import com._team._team.goal.service.GoalCompletionFileService;
-import com._team._team.goal.service.GoalProgressUpdateService;
+import com._team._team.goal.dto.reqdto.GoalCreateReqDto;
+import com._team._team.goal.dto.reqdto.GoalUpdateReqDto;
+import com._team._team.goal.dto.resdto.GoalAggregateResDto;
+import com._team._team.goal.dto.resdto.GoalKrResDto;
+import com._team._team.goal.dto.resdto.GoalObjectiveResDto;
+import com._team._team.goal.dto.resdto.GoalViewResDto;
+import com._team._team.goal.permission.PositionPermissionReader;
 import com._team._team.goal.service.GoalService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
-// 목표 조회/수정
 @RestController
 @RequestMapping("/goal")
 public class GoalController {
 
-    final GoalService goalService;
-    final GoalProgressUpdateService goalProgressUpdateService;
-    final GoalCommentService goalCommentService;
-    final GoalCompletionFileService goalCompletionFileService;
-    final PositionPermissionReader positionPermissionReader;
+    private final GoalService goalService;
+    private final PositionPermissionReader positionPermissionReader;
 
-    @Autowired
-    public GoalController(
-            GoalService goalService,
-            GoalProgressUpdateService goalProgressUpdateService,
-            GoalCommentService goalCommentService,
-            GoalCompletionFileService goalCompletionFileService,
-            PositionPermissionReader positionPermissionReader) {
+    public GoalController(GoalService goalService,
+                          PositionPermissionReader positionPermissionReader) {
         this.goalService = goalService;
-        this.goalProgressUpdateService = goalProgressUpdateService;
-        this.goalCommentService = goalCommentService;
-        this.goalCompletionFileService = goalCompletionFileService;
         this.positionPermissionReader = positionPermissionReader;
     }
 
-    // 목표 생성
-    @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
-    @PostMapping
-    public ApiResponse<GoalResDto> createGoal(
+    @GetMapping("/me")
+    public ApiResponse<List<GoalKrResDto>> myGoals(
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestBody @Valid GoalCreateReqDto dto) {
+            @RequestParam(required = false) GoalStatus status) {
         return ApiResponse.success(
-                goalService.createGoal(dto, UUID.fromString(memberId), UUID.fromString(companyId)),
-                "목표가 생성되었습니다.");
+                goalService.listMyGoals(UUID.fromString(memberId), UUID.fromString(companyId), status),
+                "My goals loaded successfully."
+        );
     }
 
-    // 목표 목록 조회 (가시성은 GoalService에서 필터)
-    @GetMapping
-    public ApiResponse<List<GoalResDto>> listGoals(
+    @CheckPermission(resource = Resource.GOAL, action = Action.READ)
+    @GetMapping("/company")
+    public ApiResponse<List<GoalViewResDto>> companyGoals(
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestParam(required = false) UUID parentId,
             @RequestParam(required = false) KpiCycle cycle,
-            @RequestParam(required = false) UUID ownerId,
-            @RequestParam(required = false) GoalHealthStatus status,
-            @RequestParam(required = false) Integer depth) {
+            HttpServletRequest request) {
+        boolean hasEvalRead = positionPermissionReader.hasPermission(request, Resource.EVALUATION, Action.READ);
         return ApiResponse.success(
-                goalService.listGoals(
-                        UUID.fromString(companyId),
+                goalService.listCompanyGoals(
                         UUID.fromString(memberId),
                         UUID.fromString(companyId),
-                        parentId,
                         cycle,
-                        ownerId,
-                        status,
-                        depth),
-                "목표 목록 조회 성공");
+                        hasEvalRead
+                ),
+                "Company goals loaded successfully."
+        );
     }
 
-    // 목표 트리 조회
-    @GetMapping("/tree")
-    public ApiResponse<List<GoalResDto>> treeGoals(
+    @GetMapping("/organization")
+    @CheckPermission(resource = Resource.ORGANIZATION, action = Action.READ)
+    public ApiResponse<List<GoalKrResDto>> orgGoals(
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestParam(required = false, defaultValue = "all") String scope,
-            @RequestParam(required = false) UUID orgId,
-            @RequestParam(required = false) UUID ownerId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodEnd) {
+            @RequestParam UUID orgId) {
         return ApiResponse.success(
-                goalService.treeGoals(
-                        UUID.fromString(companyId),
-                        UUID.fromString(memberId),
-                        UUID.fromString(companyId),
-                        scope,
-                        ownerId != null ? ownerId : orgId,
-                        periodStart,
-                        periodEnd),
-                "목표 트리 조회 성공");
+                goalService.listOrgGoals(UUID.fromString(memberId), orgId, UUID.fromString(companyId)),
+                "Organization member KRs loaded successfully."
+        );
     }
 
-    // 목표 상세 조회
+    @GetMapping("/objectives/me")
+    public ApiResponse<List<GoalObjectiveResDto>> myObjectives(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestParam(required = false) KpiCycle cycle) {
+        return ApiResponse.success(
+                goalService.listMyObjectives(UUID.fromString(memberId), UUID.fromString(companyId), cycle),
+                "Managed organization objectives loaded successfully."
+        );
+    }
+
+    @GetMapping("/objectives/available")
+    public ApiResponse<List<GoalObjectiveResDto>> availableObjectives(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestParam(required = false) KpiCycle cycle) {
+        return ApiResponse.success(
+                goalService.listAvailableObjectives(UUID.fromString(memberId), UUID.fromString(companyId), cycle),
+                "Available objectives loaded successfully."
+        );
+    }
+
+    @GetMapping("/objectives/organization")
+    @CheckPermission(resource = Resource.ORGANIZATION, action = Action.READ)
+    public ApiResponse<List<GoalObjectiveResDto>> organizationObjectives(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestParam UUID orgId,
+            @RequestParam(required = false) KpiCycle cycle) {
+        return ApiResponse.success(
+                goalService.listOrgObjectives(UUID.fromString(memberId), orgId, UUID.fromString(companyId), cycle),
+                "Organization objectives loaded successfully."
+        );
+    }
+
+    @PostMapping
+    public ApiResponse<GoalViewResDto> create(
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestBody @Valid GoalCreateReqDto dto,
+            HttpServletRequest request) {
+        if (dto.getOwnerType() == com._team._team.goal.domain.enums.GoalOwnerType.ORGANIZATION
+                && !positionPermissionReader.canCreateOrganizationScopedGoal(request)) {
+            throw new com._team._team.dto.BusinessException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "You do not have permission to create organization objectives."
+            );
+        }
+        return ApiResponse.success(
+                goalService.create(dto, UUID.fromString(memberId), UUID.fromString(companyId)),
+                "Goal created successfully."
+        );
+    }
+
     @GetMapping("/{goalId}")
-    public ApiResponse<GoalResDto> getGoal(
+    public ApiResponse<GoalViewResDto> get(
             @PathVariable UUID goalId,
             @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            HttpServletRequest request) {
+        boolean hasEvalRead = positionPermissionReader.hasPermission(request, Resource.EVALUATION, Action.READ);
         return ApiResponse.success(
-                goalService.getGoal(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
-                "목표 조회 성공");
+                goalService.get(goalId, UUID.fromString(memberId), UUID.fromString(companyId), hasEvalRead),
+                "Goal loaded successfully."
+        );
     }
 
-    // 목표 수정 (본인 목표 또는 GOAL:UPDATE — 서비스에서 검증)
     @PatchMapping("/{goalId}")
-    public ApiResponse<GoalResDto> updateGoal(
+    public ApiResponse<GoalViewResDto> update(
             @PathVariable UUID goalId,
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid GoalUpdateReqDto dto,
+            HttpServletRequest request) {
+        boolean canManageOrgGoal = positionPermissionReader.canCreateOrganizationScopedGoal(request);
+        return ApiResponse.success(
+                goalService.update(goalId, dto, UUID.fromString(memberId), UUID.fromString(companyId), canManageOrgGoal),
+                "Goal updated successfully."
+        );
+    }
+
+    @GetMapping("/{goalId}/aggregate")
+    public ApiResponse<GoalAggregateResDto> aggregate(
+            @PathVariable UUID goalId,
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             HttpServletRequest request) {
-        boolean hasGoalUpdate = positionPermissionReader.hasPermission(request, Resource.GOAL, Action.UPDATE);
+        boolean hasEvalRead = positionPermissionReader.hasPermission(request, Resource.EVALUATION, Action.READ);
         return ApiResponse.success(
-                goalService.updateGoal(
-                        goalId,
-                        dto,
-                        UUID.fromString(companyId),
-                        UUID.fromString(memberId),
-                        hasGoalUpdate),
-                "목표가 수정되었습니다.");
+                goalService.getAggregate(goalId, UUID.fromString(memberId), UUID.fromString(companyId), hasEvalRead),
+                "Objective aggregate loaded successfully."
+        );
     }
 
-    // 목표 삭제
-    @CheckPermission(resource = Resource.GOAL, action = Action.DELETE)
+    @GetMapping("/{goalId}/children")
+    public ApiResponse<List<GoalKrResDto>> children(
+            @PathVariable UUID goalId,
+            @RequestHeader("X-User-UUID") String memberId,
+            @RequestHeader("X-User-CompanyId") String companyId,
+            HttpServletRequest request) {
+        boolean hasEvalRead = positionPermissionReader.hasPermission(request, Resource.EVALUATION, Action.READ);
+        return ApiResponse.success(
+                goalService.listObjectiveChildren(goalId, UUID.fromString(memberId), UUID.fromString(companyId), hasEvalRead),
+                "Objective child KRs loaded successfully."
+        );
+    }
+
     @DeleteMapping("/{goalId}")
-    public ApiResponse<Void> deleteGoal(
+    public ApiResponse<Void> delete(
             @PathVariable UUID goalId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        goalService.deleteGoal(goalId, UUID.fromString(companyId));
-        return ApiResponse.success(null, "목표가 삭제되었습니다.");
-    }
-
-    // 목표 활성화
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PatchMapping("/{goalId}/activate")
-    public ApiResponse<GoalResDto> activateGoal(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalService.activateGoal(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
-                "목표가 활성화되었습니다.");
-    }
-
-    // 목표 완료
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PatchMapping("/{goalId}/complete")
-    public ApiResponse<GoalResDto> completeGoal(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalService.completeGoal(goalId, UUID.fromString(companyId)),
-                "목표가 완료되었습니다.");
-    }
-
-    // 목표 취소
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PatchMapping("/{goalId}/cancel")
-    public ApiResponse<GoalResDto> cancelGoal(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalService.cancelGoal(goalId, UUID.fromString(companyId)),
-                "목표가 취소되었습니다.");
-    }
-
-    // 목표 롤업 재계산
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PostMapping("/{goalId}/recalculate")
-    public ApiResponse<GoalResDto> recalculate(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalService.recalculate(goalId, UUID.fromString(companyId)),
-                "목표 롤업 재계산 완료");
-    }
-
-    // 진행률 업데이트 등록 (담당·참여 또는 GOAL:UPDATE — 서비스에서 검증)
-    @PostMapping("/{goalId}/updates")
-    public ApiResponse<GoalProgressUpdateResDto> addProgressUpdate(
-            @PathVariable UUID goalId,
-            @RequestBody @Valid GoalProgressUpdateReqDto dto,
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             HttpServletRequest request) {
-        boolean hasGoalUpdate = positionPermissionReader.hasPermission(request, Resource.GOAL, Action.UPDATE);
-        return ApiResponse.success(
-                goalProgressUpdateService.addUpdate(
-                        goalId,
-                        dto,
-                        UUID.fromString(memberId),
-                        UUID.fromString(companyId),
-                        hasGoalUpdate),
-                "진행률이 업데이트되었습니다.");
+        boolean canManageOrgGoal = positionPermissionReader.canCreateOrganizationScopedGoal(request);
+        goalService.delete(goalId, UUID.fromString(memberId), UUID.fromString(companyId), canManageOrgGoal);
+        return ApiResponse.success(null, "Goal deleted successfully.");
     }
 
-    @PostMapping("/{goalId}/completion/submit")
-    public ApiResponse<GoalResDto> submitCompletion(
+    @PostMapping("/{goalId}/cancel")
+    public ApiResponse<GoalViewResDto> cancel(
             @PathVariable UUID goalId,
-            @RequestBody @Valid GoalCompletionSubmitReqDto dto,
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             HttpServletRequest request) {
-        boolean hasGoalUpdate = positionPermissionReader.hasPermission(request, Resource.GOAL, Action.UPDATE);
+        boolean canManageOrgGoal = positionPermissionReader.canCreateOrganizationScopedGoal(request);
         return ApiResponse.success(
-                goalService.submitCompletionForApproval(
-                        goalId,
-                        dto,
-                        UUID.fromString(memberId),
-                        UUID.fromString(companyId),
-                        hasGoalUpdate),
-                "완료 제출이 등록되었습니다.");
+                goalService.cancelMine(goalId, UUID.fromString(memberId), UUID.fromString(companyId), canManageOrgGoal),
+                "Goal cancelled successfully."
+        );
     }
 
-    // 완료 제출 파일 업로드 (인증된 사용자 — 파일 URL은 완료 제출 시에만 연결)
-    @PostMapping("/completion/files")
-    public ApiResponse<List<String>> uploadCompletionFiles(
-            @RequestParam("files") List<MultipartFile> files) {
-        return ApiResponse.success(
-                goalCompletionFileService.upload(files),
-                "완료 제출 파일 업로드 성공");
-    }
-
-    @GetMapping("/{goalId}/updates")
-    public ApiResponse<List<GoalProgressUpdateResDto>> listProgressUpdates(
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
+    @PostMapping("/{goalId}/skip")
+    public ApiResponse<GoalViewResDto> forceSkip(
             @PathVariable UUID goalId,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
         return ApiResponse.success(
-                goalProgressUpdateService.list(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
-                "진행률 이력 조회 성공");
-    }
-
-    // 댓글 등록
-    @CheckPermission(resource = Resource.GOAL, action = Action.CREATE)
-    @PostMapping("/{goalId}/comments")
-    public ApiResponse<GoalCommentResDto> addComment(
-            @PathVariable UUID goalId,
-            @RequestBody @Valid GoalCommentReqDto dto,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalCommentService.create(goalId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
-                "댓글이 등록되었습니다.");
-    }
-
-    // 댓글 목록 조회
-    @GetMapping("/{goalId}/comments")
-    public ApiResponse<List<GoalCommentResDto>> listComments(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalCommentService.list(goalId, UUID.fromString(memberId), UUID.fromString(companyId)),
-                "댓글 목록 조회 성공");
-    }
-
-    // 댓글 수정
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PatchMapping("/{goalId}/comments/{commentId}")
-    public ApiResponse<GoalCommentResDto> updateComment(
-            @PathVariable UUID goalId,
-            @PathVariable UUID commentId,
-            @RequestBody @Valid GoalCommentReqDto dto,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalCommentService.update(goalId, commentId, dto, UUID.fromString(memberId), UUID.fromString(companyId)),
-                "댓글이 수정되었습니다.");
-    }
-
-    // 댓글 삭제
-    @CheckPermission(resource = Resource.GOAL, action = Action.DELETE)
-    @DeleteMapping("/{goalId}/comments/{commentId}")
-    public ApiResponse<Void> deleteComment(
-            @PathVariable UUID goalId,
-            @PathVariable UUID commentId,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        goalCommentService.delete(goalId, commentId, UUID.fromString(memberId), UUID.fromString(companyId));
-        return ApiResponse.success(null, "댓글이 삭제되었습니다.");
-    }
-
-    // 댓글 리액션 토글
-    @CheckPermission(resource = Resource.GOAL, action = Action.UPDATE)
-    @PostMapping("/{goalId}/comments/{commentId}/reactions")
-    public ApiResponse<GoalCommentResDto> toggleReaction(
-            @PathVariable UUID goalId,
-            @PathVariable UUID commentId,
-            @RequestBody @Valid GoalCommentReactionReqDto dto,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        return ApiResponse.success(
-                goalCommentService.toggleReaction(goalId, commentId, dto, UUID.fromString(companyId)),
-                "리액션이 반영되었습니다.");
+                goalService.forceSkipByHr(goalId, reason, UUID.fromString(companyId)),
+                "Goal skipped by HR successfully."
+        );
     }
 }

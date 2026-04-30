@@ -5,7 +5,9 @@ import com._team._team.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.UUID;
 /**
  * 개인별 월 단위 시차출퇴근 스케줄 선택 이력
@@ -54,10 +56,14 @@ public class MemberScheduleSelection extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID slotId;
 
+    /** 직원이 선택한 휴게(점심) 시작 시각 */
+    private LocalTime breakStart;
+
+    /** 직원이 선택한 휴게(점심) 종료 시각 */
+    private LocalTime breakEnd;
+
     /**
      * 결재 상태
-     * PENDING 상태는 실제 근무에 반영되지 않음
-     * APPROVED 또는 AUTO 상태만 Resolver가 조회
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -137,5 +143,16 @@ public class MemberScheduleSelection extends BaseTimeEntity {
             throw new IllegalStateException("PENDING 상태에서만 취소할 수 있습니다.");
         }
         this.approvalStatus = ScheduleApprovalStatus.CANCELLED;
+    }
+
+    /**
+     * 점심 또는 휴게 시간(분) 산정, 둘 중 하나라도 null 이면 0 반환
+     */
+    public int computeBreakMinutes() {
+        if (breakStart == null || breakEnd == null) return 0;
+        Duration d = Duration.between(breakStart, breakEnd);
+        long m = d.toMinutes();
+        if (m < 0) m += 24 * 60;
+        return (int) Math.max(0, m);
     }
 }

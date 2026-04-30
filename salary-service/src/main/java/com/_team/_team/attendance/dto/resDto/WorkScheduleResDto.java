@@ -22,6 +22,11 @@ public class WorkScheduleResDto {
     private LocalTime startTime;
     private LocalTime endTime;
     private Integer workMinutes;
+    /** FIXED 회사 정책 점심 시작 시각, FLEXIBLE 은 null */
+    private LocalTime breakStart;
+    /** FIXED 회사 정책 점심 종료 시각, FLEXIBLE 은 null */
+    private LocalTime breakEnd;
+    /** breakStart/breakEnd 로부터 계산한 점심 분 */
     private Integer breakMinutes;
     private Integer selectionDeadlineDay;
     private LocalDate effectiveFrom;
@@ -37,7 +42,9 @@ public class WorkScheduleResDto {
                 .startTime(workSchedule.getStartTime())
                 .endTime(workSchedule.getEndTime())
                 .workMinutes(workSchedule.getWorkMinutes())
-                .breakMinutes(workSchedule.getBreakMinutes())
+                .breakStart(workSchedule.getBreakStart())
+                .breakEnd(workSchedule.getBreakEnd())
+                .breakMinutes(workSchedule.computeBreakMinutes())
                 .selectionDeadlineDay(workSchedule.getSelectionDeadlineDay())
                 .effectiveFrom(workSchedule.getEffectiveFrom())
                 .effectiveTo(workSchedule.getEffectiveTo())

@@ -2,25 +2,35 @@ package com._team._team.goal.repository;
 
 import com._team._team.goal.domain.GoalApprovalBundle;
 import com._team._team.goal.domain.enums.BundleApprovalStatus;
-import com._team._team.goal.domain.enums.GoalApprovalDecision;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface GoalApprovalBundleRepository extends JpaRepository<GoalApprovalBundle, UUID> {
 
-    List<GoalApprovalBundle> findByCompanyIdAndStatusOrderByRequestedAtDesc(UUID companyId, BundleApprovalStatus status);
+    /** 같은 cycleKey 에 PENDING bundle 이 이미 있는지 — 중복 제출 방지 */
+    Optional<GoalApprovalBundle> findFirstByRequestedByAndCycleKeyAndStatus(
+            UUID requestedBy, String cycleKey, BundleApprovalStatus status);
 
-    List<GoalApprovalBundle> findByCompanyIdAndStatusAndDecisionAndApproverIdOrderByRequestedAtDesc(
-            UUID companyId, BundleApprovalStatus status, GoalApprovalDecision decision, UUID approverId);
+    /** 내가 요청한 bundle 들 (히스토리 포함) */
+    List<GoalApprovalBundle> findByRequestedByAndCompanyIdOrderByRequestedAtDesc(
+            UUID requestedBy, UUID companyId);
 
-    List<GoalApprovalBundle> findByCompanyIdAndStatusAndDecisionAndRequestedByOrderByRequestedAtDesc(
-            UUID companyId, BundleApprovalStatus status, GoalApprovalDecision decision, UUID requestedBy);
+    /** 본인이 요청한 특정 status bundle — SeasonActivation 의 PENDING 잔존 검증 */
+    List<GoalApprovalBundle> findByRequestedByAndCompanyIdAndStatus(
+            UUID requestedBy, UUID companyId, BundleApprovalStatus status);
 
-    List<GoalApprovalBundle> findByCompanyIdAndApproverIdOrderByRequestedAtDesc(UUID companyId, UUID approverId);
+    /** 내가 처리해야 할 bundle (1차 승인자 또는 위임 받은 자) */
+    List<GoalApprovalBundle> findByApproverIdAndCompanyIdAndStatusOrderByRequestedAtDesc(
+            UUID approverId, UUID companyId, BundleApprovalStatus status);
 
-    List<GoalApprovalBundle> findByCompanyIdAndRequestedByOrderByRequestedAtDesc(UUID companyId, UUID requestedBy);
+    List<GoalApprovalBundle> findByDelegateApproverIdAndCompanyIdAndStatusOrderByRequestedAtDesc(
+            UUID delegateApproverId, UUID companyId, BundleApprovalStatus status);
+
+    Optional<GoalApprovalBundle> findFirstByRequestedByAndCycleKeyOrderByRevisionDesc(
+            UUID requestedBy, String cycleKey);
 }

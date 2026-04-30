@@ -17,7 +17,7 @@ public class GoalApprovalBundleDetailResDto {
     /** 번들이 활성화(ACTIVATION) 승인인지 종료(COMPLETION) 승인인지 구분. */
     private BundleApprovalKind approvalKind;
     private String rejectionReason;
-    private List<GoalResDto> goals;
+    private List<GoalKrResDto> goals;
     private UUID approverId;
     private String decision;
     private LocalDateTime decidedAt;

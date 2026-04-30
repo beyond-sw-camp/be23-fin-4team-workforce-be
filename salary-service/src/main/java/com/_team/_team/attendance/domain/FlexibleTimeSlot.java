@@ -67,12 +67,13 @@ public class FlexibleTimeSlot extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer workMinutes;
 
-    /**
-     * 이 스케줄 휴게시간(분)
-     * 스케줄 다르게 설정 (조기 출근은 30분, 표준은 60분 등)
-     */
-    @Column(nullable = false)
-    private Integer breakMinutes;
+    /** 슬롯에 박힌 점심 시작 시각  */
+    @Column
+    private LocalTime breakStart;
+
+    /** 슬롯에 박힌 점심 종료 시각 */
+    @Column
+    private LocalTime breakEnd;
 
     /**
      * 기본 스케줄 여부
@@ -89,12 +90,14 @@ public class FlexibleTimeSlot extends BaseTimeEntity {
 
     // 스케줄 정보 수정
     public void update(String slotLabel, LocalTime startTime, LocalTime endTime,
-                       Integer workMinutes, Integer breakMinutes) {
+                       Integer workMinutes, LocalTime breakStart, LocalTime breakEnd) {
         if (slotLabel != null) this.slotLabel = slotLabel;
         if (startTime != null) this.startTime = startTime;
         if (endTime != null) this.endTime = endTime;
         if (workMinutes != null) this.workMinutes = workMinutes;
-        if (breakMinutes != null) this.breakMinutes = breakMinutes;
+        // break 시간은 null 도 의미 있는 값(미설정) 으로 처리하지 않고, 명시적 변경만 반영하기 위해 null 체크.
+        if (breakStart != null) this.breakStart = breakStart;
+        if (breakEnd != null) this.breakEnd = breakEnd;
     }
 
     // 기본 스케줄 지정
