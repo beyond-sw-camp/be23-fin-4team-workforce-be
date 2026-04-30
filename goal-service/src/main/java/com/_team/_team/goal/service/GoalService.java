@@ -88,6 +88,7 @@ public class GoalService {
                 .gradeCCriteria(dto.getOwnerType() == GoalOwnerType.ORGANIZATION ? dto.getGradeC() : null)
                 .visibleTeamIds(dto.getVisibleTeamIds() != null ? dto.getVisibleTeamIds() : new ArrayList<>())
                 .participantMemberIds(dto.getParticipantMemberIds() != null ? dto.getParticipantMemberIds() : new ArrayList<>())
+                .autoUpdate(dto.getOwnerType() == GoalOwnerType.ORGANIZATION)
                 .build();
 
         if (dto.getOwnerType() == GoalOwnerType.ORGANIZATION) {
