@@ -20,9 +20,6 @@ import java.util.UUID;
 @Getter
 public class MemberScheduleSelectionReqDto {
 
-    @NotNull
-    private UUID memberId;
-
     /** "YYYY-MM" 형식, 예: "2026-05" */
     @NotBlank
     @Pattern(regexp = "^\\d{4}-(0[1-9]|1[0-2])$",
