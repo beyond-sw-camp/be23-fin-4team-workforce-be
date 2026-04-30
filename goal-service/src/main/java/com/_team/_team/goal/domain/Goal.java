@@ -18,7 +18,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -120,19 +119,24 @@ public class Goal extends BaseTimeEntity {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
-    @Transient
+    @Column(name = "actual_value", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal actualValue = BigDecimal.ZERO;
 
-    @Transient
+    @Column(name = "achievement_pct", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal achievementPct = BigDecimal.ZERO;
 
-    @Transient
+    @Column(name = "rolled_achievement_pct", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal rolledAchievementPct = BigDecimal.ZERO;
 
-    @Transient
+    @Enumerated(EnumType.STRING)
+    @Column(name = "health_status", length = 32)
+    @Builder.Default
+    private GoalHealthStatus healthStatus = GoalHealthStatus.NOT_STARTED;
+
+    @Column(name = "auto_update", nullable = false)
     @Builder.Default
     private boolean autoUpdate = true;
 
@@ -217,6 +221,10 @@ public class Goal extends BaseTimeEntity {
         this.description = description;
     }
 
+    public void updateObjectiveOwner(UUID ownerId) {
+        this.ownerId = ownerId;
+    }
+
     public void updateObjectiveGradeCriteria(String gradeS, String gradeA, String gradeB, String gradeC) {
         this.gradeSCriteria = gradeS;
         this.gradeACriteria = gradeA;
@@ -287,6 +295,7 @@ public class Goal extends BaseTimeEntity {
         this.actualValue = value;
         this.achievementPct = value;
         this.rolledAchievementPct = value;
+        this.healthStatus = status == null ? GoalHealthStatus.ON_TRACK : status;
     }
 
     public void updateRollup(BigDecimal rolled, RollupSource source) {

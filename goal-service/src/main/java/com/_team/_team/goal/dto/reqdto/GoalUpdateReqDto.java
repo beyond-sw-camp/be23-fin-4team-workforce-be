@@ -21,6 +21,8 @@ import java.util.UUID;
 @Builder
 public class GoalUpdateReqDto {
 
+    private UUID ownerId;
+
     @Size(max = 300)
     private String title;
 

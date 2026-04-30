@@ -12,6 +12,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -42,6 +43,10 @@ public class GoalObjectiveResDto implements GoalViewResDto {
     private String gradeA;
     private String gradeB;
     private String gradeC;
+    private BigDecimal actualValue;
+    private BigDecimal achievementPct;
+    private BigDecimal rolledAchievementPct;
+    private String healthStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -66,6 +71,10 @@ public class GoalObjectiveResDto implements GoalViewResDto {
                 .gradeA(goal.getGradeACriteria())
                 .gradeB(goal.getGradeBCriteria())
                 .gradeC(goal.getGradeCCriteria())
+                .actualValue(goal.getActualValue())
+                .achievementPct(goal.getAchievementPct())
+                .rolledAchievementPct(goal.getRolledAchievementPct())
+                .healthStatus(goal.getHealthStatus() == null ? null : goal.getHealthStatus().name())
                 .createdAt(goal.getCreatedAt())
                 .updatedAt(goal.getUpdatedAt())
                 .build();
