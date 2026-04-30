@@ -92,4 +92,23 @@ public class CompanyController {
         );
     }
 
+    // 회사 직인 업로드
+    @PatchMapping("/seal")
+    public ResponseEntity<?> updateSeal(
+            @RequestHeader("X-User-Id") UUID memberId,
+            @RequestPart MultipartFile seal) {
+        companyService.updateSeal(memberId, seal);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "직인 업로드 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 회사 직인 조회 (internal - 다른 서비스에서 Feign 호출용)
+    @GetMapping("/internal/{companyId}/seal")
+    public String getSealImageUrl(@PathVariable UUID companyId) {
+        return companyService.getSealImageUrl(companyId);
+    }
+
+
 }
