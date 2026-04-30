@@ -1906,5 +1906,35 @@ public class MemberService {
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         member.completeOnboarding();
     }
+
+    public MemberContractInfoResDto getMemberContractInfo(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "직원을 찾을 수 없습니다."));
+
+        // 현재 포지션에서 부서/직책 가져오기
+        String orgName = null;
+        String jobTitleName = null;
+
+        List<MemberPosition> positions = memberPositionRepository
+                .findActivePositionsByMemberIds(List.of(memberId));
+
+        if (!positions.isEmpty()) {
+            MemberPosition position = positions.get(0);
+            if (position.getOrganization() != null) {
+                orgName = position.getOrganization().getName();
+            }
+            if (position.getJobTitle() != null) {
+                jobTitleName = position.getJobTitle().getName();
+            }
+        }
+
+        return MemberContractInfoResDto.builder()
+                .memberId(member.getMemberId())
+                .name(member.getName())
+                .sabun(member.getSabun())
+                .organizationName(orgName)
+                .jobTitleName(jobTitleName)
+                .build();
+    }
 }
 

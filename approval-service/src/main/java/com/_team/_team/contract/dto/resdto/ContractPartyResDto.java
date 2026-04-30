@@ -23,7 +23,6 @@ public class ContractPartyResDto {
     private SignStatus signStatus;
     private LocalDateTime signedAt;
     private String signatureImageUrl;
-    private String rejectReason;
 
     public static ContractPartyResDto fromEntity(ContractParty entity) {
         return ContractPartyResDto.builder()
@@ -33,7 +32,6 @@ public class ContractPartyResDto {
                 .signStatus(entity.getSignStatus())
                 .signedAt(entity.getSignedAt())
                 .signatureImageUrl(entity.getSignatureImageUrl())
-                .rejectReason(entity.getRejectReason())
                 .build();
     }
 }

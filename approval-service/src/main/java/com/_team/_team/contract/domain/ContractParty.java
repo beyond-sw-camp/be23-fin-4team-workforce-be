@@ -41,17 +41,9 @@ public class ContractParty extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String signatureImageUrl;
 
-    @Column(columnDefinition = "TEXT")
-    private String rejectReason;
-
     public void sign(String signatureImageUrl) {
         this.signStatus = SignStatus.SIGNED;
         this.signedAt = LocalDateTime.now();
         this.signatureImageUrl = signatureImageUrl;
-    }
-
-    public void reject(String reason) {
-        this.signStatus = SignStatus.REJECTED;
-        this.rejectReason = reason;
     }
 }

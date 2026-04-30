@@ -85,10 +85,6 @@ public class Contract extends BaseTimeEntity {
         this.contractStatus = ContractStatus.SIGNED;
     }
 
-    public void reject() {
-        this.contractStatus = ContractStatus.REJECTED;
-    }
-
     public void updateSignedPdfUrl(String pdfUrl) {
         this.signedPdfUrl = pdfUrl;
     }
