@@ -3,6 +3,7 @@ package com._team._team.evaluation.dto.resdto;
 import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.domain.enums.SeasonType;
+import com._team._team.goal.domain.enums.KpiCycle;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -14,6 +15,8 @@ public class SeasonResDto {
     private UUID companyId;
     private String name;
     private SeasonType type;
+    private KpiCycle targetCycle;
+    private LocalDate targetCycleStart;
     private LocalDate startDate;
     private LocalDate endDate;
     private SeasonStatus status;
@@ -28,6 +31,8 @@ public class SeasonResDto {
                 .companyId(e.getCompanyId())
                 .name(e.getName())
                 .type(e.getType())
+                .targetCycle(e.getTargetCycle())
+                .targetCycleStart(e.getTargetCycleStart())
                 .startDate(e.getStartDate())
                 .endDate(e.getEndDate())
                 .status(e.getStatus())

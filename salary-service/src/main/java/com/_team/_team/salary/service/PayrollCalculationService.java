@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 
 /**
  * 급여 자동 계산 서비스
- * 월 장부 MonthlyAttendanceLedger 의 집계값을 읽어 수당, 공제 항목 생성
+ * 월 장부의 집계값을 읽어 수당, 공제 항목 생성
  */
 @Service
 @Transactional
@@ -63,14 +63,22 @@ public class PayrollCalculationService {
                         "월 장부가 없습니다. memberId=" + memberId + " yearMonth=" + yearMonth));
     }
 
+    // 월 소정근로시간 정책에서 가져옴, 없으면 한국 표준 209 사용
+    private int resolveMonthlyHours(SalaryPolicy policy) {
+        if (policy != null && policy.getMonthlyOrdinaryHours() != null
+                && policy.getMonthlyOrdinaryHours() > 0) {
+            return policy.getMonthlyOrdinaryHours();
+        }
+        return 209;
+    }
 
     /** 2. 초과근무 인정 시간 계산 (포괄/비포괄 분기)
-     * 통상시급 = baseSalary / 209 (한국 근로기준법 월 소정근로시간)
+     * 통상시급 = ordinaryWage / monthlyOrdinaryHours (정책 기반)
      * 근로기준법 제56조: 연장근로 통상임금의 50% 이상 가산
      */
     public AutoPayrollItem calculateOvertimePay(
             MonthlyAttendanceLedger ledger,
-            Long baseSalary,
+            Long ordinaryWage,
             SalaryPolicy policy){
 
         // 1) Ledger 의 월 합산 초과근무 (분)
@@ -96,15 +104,15 @@ public class PayrollCalculationService {
             payableOvertimeMinutes = totalApprovedOvertimeMinutes;
         }
 
-        // 3) 포함 범위 내면 추가 지급 없음 → 항목 미생성
+        // 3) 포함 범위 내면 추가 지급 없으면 항목 미생성
         if (payableOvertimeMinutes == 0) {
             return null;
         }
 
         // 4) 통상시급 × 추가지급분 × 1.5배
-        double hourlyRate = baseSalary / 209.0;
+        double hourlyRate = ordinaryWage / (double) resolveMonthlyHours(policy);
 
-        // 초과근무수당 : 초과시간 x 시급 x 1.5 (50% 가산)
+        // 초과근무수당 : 초과시간 x 시급 x 1.5
         double overtimePay = (payableOvertimeMinutes / 60.0) * hourlyRate * 1.5;
 
         return new AutoPayrollItem(
@@ -119,7 +127,8 @@ public class PayrollCalculationService {
     // 5. 공휴일근무수당 계산 (통상시급 × 공휴일 근무시간 × 1.5배)
     public AutoPayrollItem calculateHolidayWorkPay(
             MonthlyAttendanceLedger ledger,
-            Long baseSalary){
+            Long ordinaryWage,
+            SalaryPolicy policy){
 
         int holidayWorkedMinutes = ledger.getHolidayMinutes() == null
                 ? 0 : ledger.getHolidayMinutes();
@@ -130,7 +139,7 @@ public class PayrollCalculationService {
         }
 
         // 통상시급 x 공휴일 근무시간 x 1.5배
-        double hourlyRate = baseSalary / 209.0;
+        double hourlyRate = ordinaryWage / (double) resolveMonthlyHours(policy);
         double holidayPay = (holidayWorkedMinutes / 60.0) * hourlyRate * 1.5;
 
         return new AutoPayrollItem(
@@ -150,7 +159,8 @@ public class PayrollCalculationService {
      */
     public AutoPayrollItem calculateNightWorkPay(
             MonthlyAttendanceLedger ledger,
-            Long baseSalary){
+            Long ordinaryWage,
+            SalaryPolicy policy){
 
         int nightMinutes = ledger.getNightMinutes() == null
                 ? 0 : ledger.getNightMinutes();
@@ -159,8 +169,8 @@ public class PayrollCalculationService {
             return null;
         }
 
-        // 야간 가산수당: 시간 x 시급 x 0.5 (50% 가산분만)
-        double hourlyRate = baseSalary / 209.0;
+        // 야간 가산수당: 시간 x 시급 x 0.5
+        double hourlyRate = ordinaryWage / (double) resolveMonthlyHours(policy);
         double nightPay = (nightMinutes / 60.0) * hourlyRate * 0.5;
 
         return new AutoPayrollItem(
@@ -179,10 +189,45 @@ public class PayrollCalculationService {
      *
      * 통상시급 = baseSalary / 209 (소정근로 176h + 주휴 35h 근사)
      * 결근 1일 = 소정근로 8h + 주휴 자격 상실 8h = 16h
+     *
+     * 지각·조퇴 공제 자동 계산
+     * 시급 × (지각분 + 조퇴분) / 60
+     * 결근공제와 별개로 분 단위 정밀 차감
      */
+    public AutoPayrollItem calculateTardyEarlyLeaveDeduction(
+            MonthlyAttendanceLedger ledger,
+            Long ordinaryWage,
+            SalaryPolicy policy) {
+
+        int lateMinutes = ledger.getLateMinutes() == null ? 0 : ledger.getLateMinutes();
+        int earlyMinutes = ledger.getEarlyLeaveMinutes() == null ? 0 : ledger.getEarlyLeaveMinutes();
+        int totalMinutes = lateMinutes + earlyMinutes;
+
+        if (totalMinutes <= 0) {
+            return null;
+        }
+
+        double hourlyRate = ordinaryWage / (double) resolveMonthlyHours(policy);
+        long deduction = (long) Math.floor(hourlyRate * (totalMinutes / 60.0));
+
+        if (deduction <= 0) {
+            return null;
+        }
+
+        String label = String.format("지각/조퇴 공제 (지각 %d분 + 조퇴 %d분)", lateMinutes, earlyMinutes);
+        return new AutoPayrollItem(
+                label,
+                ItemType.DEDUCTION,
+                deduction,
+                189, // 결근공제(190) 바로 앞
+                "Y"
+        );
+    }
+
     public AutoPayrollItem calculateAbsentDeduction(
             MonthlyAttendanceLedger ledger,
-            Long baseSalary) {
+            Long ordinaryWage,
+            SalaryPolicy policy) {
 
         int absentDays = ledger.getAbsentDays() == null ? 0 : ledger.getAbsentDays();
 
@@ -190,7 +235,7 @@ public class PayrollCalculationService {
             return null;
         }
 
-        double hourlyRate = baseSalary / 209.0;
+        double hourlyRate = ordinaryWage / (double) resolveMonthlyHours(policy);
         long deduction = (long) Math.floor(hourlyRate * 16.0 * absentDays);
 
         if (deduction <= 0) {
@@ -209,11 +254,13 @@ public class PayrollCalculationService {
     // 7. 세율 기반 공제 계산
     /**
      * 4대보험 + 소득세 + 지방소득세 자동 계산
-     * 소득세는 간이세액표 , 부양가족수 기준
+     * 소득세는 간이세액표 (부양가족수) + 자녀세액공제 (8~20세 자녀수) + 감면율 적용
      */
     public List<AutoPayrollItem> calculateDeductions(long totalTaxableEarning,
                                                      LocalDate payrollDate,
-                                                     int dependentCount){
+                                                     int dependentCount,
+                                                     int childUnder20Count,
+                                                     java.math.BigDecimal taxReductionRate){
 
         int year = payrollDate.getYear();
         List<TaxRate> taxRates = taxRateRepository.findByApplyYear(year);
@@ -258,10 +305,19 @@ public class PayrollCalculationService {
             deductions.add(new AutoPayrollItem("고용보험", ItemType.DEDUCTION, employmentInsurance, displayOrder++, "Y"));
         }
 
-        // 소득세 간이세액표 , 한국 원천징수 방식
-        // 부양가족수 + 월 과세소득 기준 국세청 고시 표 사용
-        long incomeTax = simplifiedTaxTableService.findTax(
-                payrollDate.getYear(), totalTaxableEarning, dependentCount);
+        // 소득세 간이세액표 (부양가족수) + 8~20세 자녀세액공제 차감 + 감면율 적용
+        long incomeTaxBeforeReduction = simplifiedTaxTableService.findTaxWithChildDeduction(
+                payrollDate.getYear(), totalTaxableEarning, dependentCount, childUnder20Count);
+        long incomeTax = incomeTaxBeforeReduction;
+        if (taxReductionRate != null && taxReductionRate.signum() > 0 && incomeTaxBeforeReduction > 0) {
+            // incomeTax × (1 - reductionRate) — 청년 SME 90% 감면 등
+            java.math.BigDecimal multiplier = java.math.BigDecimal.ONE.subtract(taxReductionRate);
+            incomeTax = java.math.BigDecimal.valueOf(incomeTaxBeforeReduction)
+                    .multiply(multiplier)
+                    .setScale(0, java.math.RoundingMode.HALF_UP)
+                    .longValue();
+            if (incomeTax < 0) incomeTax = 0;
+        }
         if (incomeTax > 0) {
             deductions.add(new AutoPayrollItem("소득세", ItemType.DEDUCTION, incomeTax, displayOrder++, "Y"));
         }

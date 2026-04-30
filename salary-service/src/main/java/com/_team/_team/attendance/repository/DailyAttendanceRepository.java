@@ -162,4 +162,18 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
 
     Optional<DailyAttendance> findByMemberIdAndAttendanceDate(
             UUID memberId, LocalDate attendanceDate);
+
+    /**
+     * 정정 검토
+     * 관리자 정정 검토 화면에서 사용
+     */
+    @Query("""
+       SELECT d FROM DailyAttendance d
+       WHERE d.companyId = :companyId
+         AND d.closureStatus = :status
+       ORDER BY d.attendanceDate DESC, d.memberId
+       """)
+    List<DailyAttendance> findAllByCompanyIdAndClosureStatusOrderByDateDesc(
+            @Param("companyId") UUID companyId,
+            @Param("status") ClosureStatus status);
 }

@@ -6,6 +6,7 @@ import com._team._team.dto.BusinessException;
 import com._team._team.salary.domain.Payroll;
 import com._team._team.salary.domain.PayrollItem;
 import com._team._team.salary.domain.enums.ItemType;
+import com._team._team.salary.domain.enums.PayrollType;
 import com._team._team.salary.repository.PayrollItemRepository;
 import com._team._team.salary.repository.PayrollRepository;
 import com.lowagie.text.Document;
@@ -27,20 +28,22 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.NumberFormat;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * 급여대장 기반 급여명세서 PDF 생성
- * 한글: classpath fonts/NotoSansKR-Regular.otf 또는 환경변수 SALARY_PAYSLIP_FONT_PATH
- * 다운로드: 본인 급여대장 이거나 급여 조회(SALARY:READ) 권한 또는 시스템 관리자
  */
 @Slf4j
 @Service
@@ -49,6 +52,26 @@ public class PayslipPdfService {
     private static final String FONT_RESOURCE = "/fonts/NotoSansKR-Regular.otf";
     private static final String FONT_ENV = "SALARY_PAYSLIP_FONT_PATH";
     private static final String SALARY_READ = Resource.SALARY.name() + ":" + Action.READ.name();
+
+    /** 세금공제 카테고리로 분류할 항목명 (그 외 공제 = 기타공제) */
+    private static final Set<String> TAX_DEDUCTION_NAMES = Set.of(
+            "소득세", "주민세", "지방소득세"
+    );
+
+    /** 정상근무 시간 - 화면과 동일하게 168H 고정 표기 (월 소정근로시간 기반) */
+    private static final String STANDARD_WORK_HOURS_LABEL = "168H";
+
+    // 색상
+    private static final Color BANNER_BG = new Color(0xEE, 0xF1, 0xFF);   // 라벤더
+    private static final Color BANNER_DOT = new Color(0x59, 0x7E, 0xF7);  // 파란 점
+    private static final Color SECTION_LINE = new Color(0x0F, 0x17, 0x29); // 섹션 하단 진한 라인 (slate-900)
+    private static final Color SOFT_LINE = new Color(0xE2, 0xE8, 0xF0);    // 항목 사이 옅은 라인 (slate-200)
+    private static final Color MUTED_TEXT = new Color(0x64, 0x74, 0x8B);   // slate-500
+    private static final Color BODY_TEXT = new Color(0x33, 0x41, 0x55);    // slate-700
+    private static final Color HEADING_TEXT = new Color(0x0F, 0x17, 0x29); // slate-900
+    private static final Color DEDUCTION_RED = new Color(0xEF, 0x44, 0x44);// red-500
+    private static final Color BADGE_BG = new Color(0xF1, 0xF5, 0xF9);     // slate-100
+    private static final Color BADGE_TEXT = new Color(0x47, 0x55, 0x69);
 
     private final PayrollRepository payrollRepository;
     private final PayrollItemRepository payrollItemRepository;
@@ -83,9 +106,10 @@ public class PayslipPdfService {
 
         try {
             return renderPdf(payroll, items);
-        } catch (DocumentException | IOException e) {
-            log.error("[PayslipPdf] 생성 실패 payrollId={}", payrollId, e);
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "급여명세서 PDF 생성에 실패했습니다.");
+        } catch (Exception e) {
+            log.error("[PayslipPdf] 생성 실패 payrollId={} message={}", payrollId, e.getMessage(), e);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "급여명세서 PDF 생성에 실패했습니다: " + e.getClass().getSimpleName() + " - " + e.getMessage());
         }
     }
 
@@ -104,6 +128,9 @@ public class PayslipPdfService {
         if (payroll.getMemberId().equals(requesterMemberId)) {
             return;
         }
+        if (requesterPositionId == null) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한을 확인할 수 없습니다. 다시 로그인해주세요.");
+        }
 
         String permissionStr = permissionRedisTemplate.opsForValue()
                 .get("PERMISSION:" + requesterPositionId);
@@ -117,89 +144,338 @@ public class PayslipPdfService {
         }
     }
 
+    /** 렌더링 */
     private byte[] renderPdf(Payroll payroll, List<PayrollItem> items) throws DocumentException, IOException {
         FontSet fontSet = resolveFontSet();
         BaseFont baseFont = fontSet.baseFont();
         boolean korean = fontSet.korean();
-        Font titleFont = new Font(baseFont, 16, Font.BOLD);
-        Font bodyFont = new Font(baseFont, 10, Font.NORMAL);
-        Font smallFont = new Font(baseFont, 9, Font.NORMAL);
+
+        Font titleFont   = font(baseFont, 18, Font.BOLD, HEADING_TEXT);
+        Font metaLabel   = font(baseFont, 9,  Font.NORMAL, MUTED_TEXT);
+        Font metaValue   = font(baseFont, 9,  Font.BOLD,   HEADING_TEXT);
+        Font bannerLabel = font(baseFont, 10, Font.NORMAL, BODY_TEXT);
+        Font bannerVal   = font(baseFont, 12, Font.BOLD,   HEADING_TEXT);
+        Font sectionH    = font(baseFont, 12, Font.BOLD,   HEADING_TEXT);
+        Font sectionTotalEarn = font(baseFont, 11, Font.BOLD, HEADING_TEXT);
+        Font sectionTotalDed  = font(baseFont, 11, Font.BOLD, DEDUCTION_RED);
+        Font subGroupH   = font(baseFont, 9,  Font.BOLD,   BODY_TEXT);
+        Font itemName    = font(baseFont, 9,  Font.NORMAL, BODY_TEXT);
+        Font itemAmount  = font(baseFont, 9,  Font.BOLD,   HEADING_TEXT);
+        Font badge       = font(baseFont, 7,  Font.NORMAL, BADGE_TEXT);
+        Font emptyHint   = font(baseFont, 8,  Font.NORMAL, MUTED_TEXT);
 
         NumberFormat nf = NumberFormat.getInstance(Locale.KOREA);
 
-        Document document = new Document(PageSize.A4, 48, 48, 48, 48);
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PdfWriter.getInstance(document, out);
         document.open();
 
-        String title = korean ? "급여명세서" : "PAYSLIP";
-        Paragraph head = new Paragraph(title, titleFont);
-        head.setSpacingAfter(12f);
-        document.add(head);
+        // 1. 타이틀
+        Paragraph title = new Paragraph(korean ? "급여명세서" : "PAYSLIP", titleFont);
+        title.setSpacingAfter(14f);
+        document.add(title);
 
-        document.add(new Paragraph((korean ? "정산일" : "Settlement date") + ": "
-                + payroll.getPayrollYearMonthDay(), bodyFont));
-        document.add(new Paragraph((korean ? "직원 ID" : "Employee ID") + ": "
-                + payroll.getMemberId(), bodyFont));
-        document.add(new Paragraph((korean ? "상태" : "Status") + ": "
-                + payroll.getPayrollStatus().name(), bodyFont));
-        document.add(new Paragraph(" ", smallFont));
+        // 2. 메타 영역 (급여 구분 | 근무기간 | 지급일)
+        document.add(buildMetaTable(payroll, metaLabel, metaValue, korean));
 
-        PdfPTable summary = new PdfPTable(2);
-        summary.setWidthPercentage(55);
-        summary.setHorizontalAlignment(Element.ALIGN_LEFT);
-        addSummaryRow(summary, korean ? "총 지급" : "Gross payment", nf.format(payroll.getTotalPayment()), bodyFont);
-        addSummaryRow(summary, korean ? "총 공제" : "Total deduction", nf.format(payroll.getTotalDeduction()), bodyFont);
-        addSummaryRow(summary, korean ? "실수령액" : "Net pay", nf.format(payroll.getNetPay()), bodyFont);
-        document.add(summary);
-        document.add(new Paragraph(" ", smallFont));
+        // 간격
+        document.add(spacer(8f));
 
-        PdfPTable table = new PdfPTable(3);
-        table.setWidthPercentage(100);
-        table.setWidths(new float[]{4f, 2f, 3f});
-        addHeaderCell(table, korean ? "항목명" : "Item", bodyFont);
-        addHeaderCell(table, korean ? "구분" : "Type", bodyFont);
-        addHeaderCell(table, korean ? "금액" : "Amount", bodyFont);
+        // 3. 라벤더 배너 (정상근무 168H + 실수령액)
+        document.add(buildBanner(payroll, bannerLabel, bannerVal, nf, korean));
 
-        for (PayrollItem it : items) {
-            addBodyCell(table, it.getItemName(), bodyFont, Element.ALIGN_LEFT);
-            String typeLabel = it.getItemType() == ItemType.EARNING
-                    ? (korean ? "지급" : "Earning")
-                    : (korean ? "공제" : "Deduction");
-            addBodyCell(table, typeLabel, bodyFont, Element.ALIGN_CENTER);
-            addBodyCell(table, nf.format(it.getAmount()), bodyFont, Element.ALIGN_RIGHT);
-        }
+        // 간격
+        document.add(spacer(14f));
 
-        document.add(table);
+        // 4. 2단 (지급내역 / 공제내역)
+        List<PayrollItem> earnings = items.stream()
+                .filter(it -> it.getItemType() == ItemType.EARNING)
+                .sorted(Comparator.comparing(it -> nz(it.getDisplayOrder())))
+                .toList();
+        List<PayrollItem> taxDeductions = items.stream()
+                .filter(it -> it.getItemType() == ItemType.DEDUCTION
+                        && TAX_DEDUCTION_NAMES.contains(it.getItemName()))
+                .sorted(Comparator.comparing(it -> nz(it.getDisplayOrder())))
+                .toList();
+        List<PayrollItem> otherDeductions = items.stream()
+                .filter(it -> it.getItemType() == ItemType.DEDUCTION
+                        && !TAX_DEDUCTION_NAMES.contains(it.getItemName()))
+                .sorted(Comparator.comparing(it -> nz(it.getDisplayOrder())))
+                .toList();
+
+        PdfPTable layout = new PdfPTable(2);
+        layout.setWidthPercentage(100);
+        layout.setWidths(new float[]{1f, 1f});
+        layout.getDefaultCell().setBorder(0);
+
+        // 좌측 — 지급내역
+        PdfPCell leftCell = sectionContainer();
+        leftCell.addElement(buildSectionHeader(
+                korean ? "지급내역" : "Earnings",
+                nf.format(nz(payroll.getTotalPayment())),
+                false, sectionH, sectionTotalEarn, korean));
+        leftCell.addElement(buildSubGroup(
+                korean ? "수당" : "Earnings",
+                earnings, korean ? "지급 항목이 없습니다." : "No items.",
+                subGroupH, itemName, itemAmount, badge, emptyHint, nf, korean, true));
+        layout.addCell(leftCell);
+
+        // 우측 — 공제내역
+        PdfPCell rightCell = sectionContainer();
+        rightCell.addElement(buildSectionHeader(
+                korean ? "공제내역" : "Deductions",
+                nf.format(nz(payroll.getTotalDeduction())),
+                true, sectionH, sectionTotalDed, korean));
+        rightCell.addElement(buildSubGroup(
+                korean ? "세금공제" : "Tax",
+                taxDeductions, korean ? "세금공제 항목이 없습니다." : "No tax items.",
+                subGroupH, itemName, itemAmount, badge, emptyHint, nf, korean, false));
+        rightCell.addElement(spacer(6f));
+        rightCell.addElement(buildSubGroup(
+                korean ? "기타공제" : "Other",
+                otherDeductions, korean ? "기타공제 항목이 없습니다." : "No other items.",
+                subGroupH, itemName, itemAmount, badge, emptyHint, nf, korean, false));
+        layout.addCell(rightCell);
+
+        document.add(layout);
+
         document.close();
         return out.toByteArray();
     }
 
-    private void addSummaryRow(PdfPTable table, String label, String value, Font font) {
-        PdfPCell c1 = new PdfPCell(new Phrase(label, font));
-        c1.setBorder(0);
-        c1.setPaddingBottom(4f);
-        table.addCell(c1);
-        PdfPCell c2 = new PdfPCell(new Phrase(value, font));
-        c2.setBorder(0);
-        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        c2.setPaddingBottom(4f);
-        table.addCell(c2);
+    /** 컴포넌트 빌더 */
+
+    /**  좌(급여구분) / 우(근무기간 + 지급일) */
+    private PdfPTable buildMetaTable(Payroll payroll, Font label, Font value, boolean korean) throws DocumentException {
+        PdfPTable t = new PdfPTable(2);
+        t.setWidthPercentage(100);
+        t.setWidths(new float[]{4f, 6f});
+
+        // 좌: 급여 구분
+        PdfPCell left = blankCell();
+        Paragraph p = new Paragraph();
+        p.add(new Phrase((korean ? "급여 구분  " : "Payroll type  "), label));
+        p.add(new Phrase(payrollTypeLabel(payroll.getPayrollType(), korean), value));
+        left.addElement(p);
+        t.addCell(left);
+
+        // 우: 근무기간 + 지급일
+        PdfPCell right = blankCell();
+        right.setHorizontalAlignment(Element.ALIGN_RIGHT);
+
+        Paragraph rp = new Paragraph();
+        rp.setAlignment(Element.ALIGN_RIGHT);
+        rp.add(new Phrase((korean ? "근무기간  " : "Period  "), label));
+        rp.add(new Phrase(periodText(payroll.getPayrollYearMonthDay()) + "    ", value));
+        rp.add(new Phrase((korean ? "지급일  " : "Pay date  "), label));
+        rp.add(new Phrase(formatDateDot(payroll.getPaidAt() != null
+                ? payroll.getPaidAt() : payroll.getPayrollYearMonthDay()), value));
+        right.addElement(rp);
+        t.addCell(right);
+
+        return t;
     }
 
-    private void addHeaderCell(PdfPTable table, String text, Font font) {
-        PdfPCell cell = new PdfPCell(new Phrase(text, font));
-        cell.setBackgroundColor(new java.awt.Color(240, 240, 240));
-        cell.setPadding(6f);
-        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        table.addCell(cell);
+    /** 라벤더 배너 (정상근무 168H + 실수령액) */
+    private PdfPTable buildBanner(Payroll payroll, Font label, Font value, NumberFormat nf, boolean korean) throws DocumentException {
+        PdfPTable t = new PdfPTable(2);
+        t.setWidthPercentage(100);
+        t.setWidths(new float[]{1f, 1f});
+
+        // 좌측: ● 근무시간  정상근무  168H
+        PdfPCell left = bannerCell();
+        Paragraph lp = new Paragraph();
+        lp.add(new Phrase("● ", font(label.getBaseFont(), 10, Font.BOLD, BANNER_DOT)));
+        lp.add(new Phrase((korean ? "근무시간    " : "Hours    "), label));
+        lp.add(new Phrase((korean ? "정상근무  " : "Normal  "),
+                font(label.getBaseFont(), 9, Font.NORMAL, MUTED_TEXT)));
+        lp.add(new Phrase(STANDARD_WORK_HOURS_LABEL, value));
+        left.addElement(lp);
+        t.addCell(left);
+
+        // 우측: ● 실수령액  X원
+        PdfPCell right = bannerCell();
+        right.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        Paragraph rp = new Paragraph();
+        rp.setAlignment(Element.ALIGN_RIGHT);
+        rp.add(new Phrase("● ", font(label.getBaseFont(), 10, Font.BOLD, BANNER_DOT)));
+        rp.add(new Phrase((korean ? "실수령액    " : "Net pay    "), label));
+        rp.add(new Phrase(nf.format(nz(payroll.getNetPay())) + (korean ? "원" : ""),
+                font(value.getBaseFont(), 14, Font.BOLD, HEADING_TEXT)));
+        right.addElement(rp);
+        t.addCell(right);
+
+        return t;
     }
 
-    private void addBodyCell(PdfPTable table, String text, Font font, int align) {
-        PdfPCell cell = new PdfPCell(new Phrase(text == null ? "" : text, font));
-        cell.setPadding(5f);
-        cell.setHorizontalAlignment(align);
-        table.addCell(cell);
+    /** 섹션 헤더 (지급내역 / 공제내역) - 진한 하단 라인 */
+    private PdfPTable buildSectionHeader(
+            String title, String totalText, boolean negative,
+            Font titleFont, Font totalFont, boolean korean) throws DocumentException {
+
+        PdfPTable t = new PdfPTable(2);
+        t.setWidthPercentage(100);
+        t.setWidths(new float[]{1f, 1f});
+        t.setSpacingAfter(2f);
+
+        PdfPCell tc = new PdfPCell(new Phrase(title, titleFont));
+        tc.setBorder(PdfPCell.BOTTOM);
+        tc.setBorderColor(SECTION_LINE);
+        tc.setBorderWidthBottom(1.2f);
+        tc.setPaddingBottom(6f);
+        tc.setPaddingTop(2f);
+        tc.setHorizontalAlignment(Element.ALIGN_LEFT);
+        t.addCell(tc);
+
+        PdfPCell ac = new PdfPCell(new Phrase((negative ? "-" : "") + totalText
+                + (korean ? "원" : ""), totalFont));
+        ac.setBorder(PdfPCell.BOTTOM);
+        ac.setBorderColor(SECTION_LINE);
+        ac.setBorderWidthBottom(1.2f);
+        ac.setPaddingBottom(6f);
+        ac.setPaddingTop(2f);
+        ac.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        t.addCell(ac);
+
+        return t;
+    }
+
+    /** 서브 그룹 (수당 / 세금공제 / 기타공제) */
+    private PdfPTable buildSubGroup(
+            String groupTitle,
+            List<PayrollItem> items,
+            String emptyText,
+            Font groupHFont, Font nameFont, Font amountFont,
+            Font badgeFont, Font emptyFont,
+            NumberFormat nf, boolean korean, boolean showNonTaxableBadge) {
+
+        PdfPTable t = new PdfPTable(1);
+        t.setWidthPercentage(100);
+        t.setSpacingBefore(8f);
+
+        PdfPCell h = new PdfPCell(new Phrase(groupTitle, groupHFont));
+        h.setBorder(0);
+        h.setPaddingBottom(4f);
+        h.setPaddingTop(2f);
+        t.addCell(h);
+
+        if (items.isEmpty()) {
+            PdfPCell empty = new PdfPCell(new Phrase(emptyText, emptyFont));
+            empty.setBorder(0);
+            empty.setPaddingLeft(4f);
+            empty.setPaddingTop(4f);
+            empty.setPaddingBottom(4f);
+            t.addCell(empty);
+            return t;
+        }
+
+        for (PayrollItem it : items) {
+            PdfPCell row = new PdfPCell();
+            row.setBorder(PdfPCell.BOTTOM);
+            row.setBorderColor(SOFT_LINE);
+            row.setBorderWidthBottom(0.5f);
+            row.setPadding(0);
+
+            PdfPTable inner = new PdfPTable(2);
+            inner.setWidthPercentage(100);
+            try {
+                inner.setWidths(new float[]{6f, 4f});
+            } catch (DocumentException ignored) { /* widths is fixed */ }
+
+            // 좌: 항목명 (+ 비과세 뱃지)
+            PdfPCell nameCell = new PdfPCell();
+            nameCell.setBorder(0);
+            nameCell.setPaddingTop(5f);
+            nameCell.setPaddingBottom(5f);
+            nameCell.setPaddingLeft(2f);
+
+            Paragraph np = new Paragraph();
+            np.add(new Phrase(printableText(it.getItemName(), korean), nameFont));
+            if (showNonTaxableBadge && "N".equals(it.getIsTaxableYn())) {
+                np.add(new Phrase("  ", nameFont));
+                Phrase badgePhrase = new Phrase(korean ? " 비과세 " : " Non-tax ", badgeFont);
+                np.add(badgePhrase);
+            }
+            nameCell.addElement(np);
+            inner.addCell(nameCell);
+
+            // 우: 금액
+            PdfPCell amtCell = new PdfPCell(new Phrase(
+                    nf.format(nz(it.getAmount())) + (korean ? "원" : ""), amountFont));
+            amtCell.setBorder(0);
+            amtCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            amtCell.setPaddingTop(5f);
+            amtCell.setPaddingBottom(5f);
+            amtCell.setPaddingRight(2f);
+            inner.addCell(amtCell);
+
+            row.addElement(inner);
+            t.addCell(row);
+        }
+        return t;
+    }
+
+    /** 셀 / 폰트 / 헬퍼 */
+    private PdfPCell sectionContainer() {
+        PdfPCell c = new PdfPCell();
+        c.setBorder(0);
+        c.setPadding(0);
+        c.setPaddingLeft(0f);
+        c.setPaddingRight(12f);
+        return c;
+    }
+
+    private PdfPCell blankCell() {
+        PdfPCell c = new PdfPCell();
+        c.setBorder(0);
+        c.setPadding(0);
+        return c;
+    }
+
+    private PdfPCell bannerCell() {
+        PdfPCell c = new PdfPCell();
+        c.setBorder(0);
+        c.setBackgroundColor(BANNER_BG);
+        c.setPadding(12f);
+        return c;
+    }
+
+    private Paragraph spacer(float height) {
+        Paragraph p = new Paragraph(" ");
+        p.setLeading(height);
+        return p;
+    }
+
+    private Font font(BaseFont base, float size, int style, Color color) {
+        Font f = new Font(base, size, style);
+        f.setColor(color);
+        return f;
+    }
+
+    private String periodText(LocalDate ymd) {
+        if (ymd == null) return "—";
+        LocalDate start = ymd.withDayOfMonth(1);
+        LocalDate end = ymd.withDayOfMonth(ymd.lengthOfMonth());
+        return String.format("%04d.%02d.%02d~%02d.%02d",
+                start.getYear(), start.getMonthValue(), start.getDayOfMonth(),
+                end.getMonthValue(), end.getDayOfMonth());
+    }
+
+    private String formatDateDot(LocalDate d) {
+        if (d == null) return "—";
+        return String.format("%04d.%02d.%02d", d.getYear(), d.getMonthValue(), d.getDayOfMonth());
+    }
+
+    private String payrollTypeLabel(PayrollType type, boolean korean) {
+        if (type == null) return korean ? "—" : "-";
+        if (!korean) return type.name();
+        return switch (type) {
+            case REGULAR_MONTHLY -> "정기급여";
+            case PERFORMANCE_BONUS -> "성과급";
+            case SPECIAL_BONUS -> "특별상여";
+            case RETROACTIVE -> "소급분";
+        };
     }
 
     private FontSet resolveFontSet() throws DocumentException, IOException {
@@ -208,8 +484,9 @@ public class PayslipPdfService {
             Path p = Path.of(envPath);
             if (Files.isReadable(p)) {
                 byte[] bytes = Files.readAllBytes(p);
+                String name = envPath.toLowerCase().endsWith(".ttf") ? "payslip-font.ttf" : "payslip-font.otf";
                 BaseFont bf = BaseFont.createFont(
-                        "PayslipFont", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, bytes, null);
+                        name, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, bytes, null);
                 return new FontSet(bf, true);
             }
             log.warn("[PayslipPdf] SALARY_PAYSLIP_FONT_PATH 가 읽을 수 없습니다: {}", envPath);
@@ -218,13 +495,30 @@ public class PayslipPdfService {
             if (in != null) {
                 byte[] bytes = in.readAllBytes();
                 BaseFont bf = BaseFont.createFont(
-                        "NotoSansKR", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, bytes, null);
+                        "NotoSansKR-Regular.otf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, bytes, null);
                 return new FontSet(bf, true);
             }
         }
         log.warn("[PayslipPdf] 한글 폰트 없음 — resources{} 또는 {} 를 설정하세요.", FONT_RESOURCE, FONT_ENV);
         BaseFont bf = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
         return new FontSet(bf, false);
+    }
+
+    /** 한글 폰트가 없을 때 WinAnsi 글립 밖 문자로 PDF 생성이 실패할 수 있어 동적 텍스트를 ASCII로 축소 */
+    private String printableText(String raw, boolean korean) {
+        if (raw == null || raw.isBlank()) return "";
+        if (korean) return raw;
+        return raw.replaceAll("[^\\x20-\\x7E]", "?");
+    }
+
+    /** null 방지 */
+    private long nz(Long v) {
+        return v == null ? 0L : v;
+    }
+
+    /** null 방지 */
+    private int nz(Integer v) {
+        return v == null ? Integer.MAX_VALUE : v;
     }
 
     private record FontSet(BaseFont baseFont, boolean korean) {}

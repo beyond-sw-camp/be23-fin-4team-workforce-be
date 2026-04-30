@@ -80,8 +80,7 @@ public class CompanyLeaveType extends BaseTimeEntity {
     private String delYn = "N";
 
     /**
-     * 시스템 기본 휴가 수정 (연차/반차 제외)
-     * 연차/반차는 name과 displayOrder만 수정 가능하고,
+     * 시스템 기본 휴가 수정 (연차, 반차는 수정 불가)
      * 나머지 기본 휴가는 일수/유급/증빙도 수정 가능.
      */
     public void update(String name, String isPaidYn, Double maxDaysPerYear,
@@ -100,9 +99,6 @@ public class CompanyLeaveType extends BaseTimeEntity {
                              Double daysPerUse, String isPaidYn,
                              Double maxDaysPerYear, String requireEvidenceYn,
                              Integer displayOrder) {
-        if (Boolean.TRUE.equals(this.isSystemDefault)) {
-            throw new IllegalStateException("시스템 기본 휴가는 이름과 순서만 수정 가능합니다.");
-        }
         this.name = name;
         this.balanceType = balanceType;
         this.daysPerUse = daysPerUse;
@@ -113,10 +109,24 @@ public class CompanyLeaveType extends BaseTimeEntity {
     }
 
     public void softDelete() {
-        if (Boolean.TRUE.equals(this.isSystemDefault)) {
-            throw new IllegalStateException("시스템 기본 휴가는 삭제할 수 없습니다.");
-        }
         this.delYn = "Y";
+    }
+
+    /**
+     * 소프트 삭제된 동일 코드 행을 시스템 기본값으로 되살림
+     */
+    public void restoreSystemDefault(String name, BalanceType balanceType, Double daysPerUse,
+                                     String isPaidYn, Double maxDaysPerYear, String requireEvidenceYn,
+                                     Integer displayOrder) {
+        this.delYn = "N";
+        this.name = name;
+        this.balanceType = balanceType;
+        this.daysPerUse = daysPerUse;
+        this.isSystemDefault = true;
+        this.isPaidYn = isPaidYn;
+        this.maxDaysPerYear = maxDaysPerYear;
+        this.requireEvidenceYn = requireEvidenceYn;
+        this.displayOrder = displayOrder;
     }
 
     /**

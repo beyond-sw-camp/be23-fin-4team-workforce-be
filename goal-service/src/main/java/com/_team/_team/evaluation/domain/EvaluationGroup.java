@@ -44,7 +44,7 @@ public class EvaluationGroup extends BaseTimeEntity {
     private EvaluationDesign design;
 
     /**
-     * 기존 raw String evaluatorMapsJson 을 타입 세이프 Lis<EvaluatorMapping> 으로 대체.
+     * 타입 세이프 List<EvaluatorMapping>.
      * DB 컬럼 이름/타입(JSON) 은 동일하게 유지. 직렬화는 EvaluatorMappingListConverter 가 담당.
      */
     @Convert(converter = EvaluatorMappingListConverter.class)

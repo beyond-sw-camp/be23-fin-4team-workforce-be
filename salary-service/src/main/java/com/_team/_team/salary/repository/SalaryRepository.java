@@ -23,8 +23,6 @@ public interface SalaryRepository extends JpaRepository<Salary, UUID> {
 
     /**
      * 직원의 특정 날짜 기준 적용 중인 급여 조회
-     * - effectiveFrom <= 기준일
-     * - effectiveTo가 null(현재 적용 중)이거나 >= 기준일
      */
     @Query("SELECT s FROM Salary s " +
            "WHERE s.memberId = :memberId " +

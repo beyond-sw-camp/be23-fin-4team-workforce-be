@@ -129,24 +129,24 @@ public class CompanyService {
     // 회사 온보딩
     public void onboarding(CompanyOnboardingReqDto reqDto) {
 
-        // 1. 사업자번호 검증 (국세청 API) - 로컬 테스트용 주석처리
-        // ntsApiService.validate(reqDto.getBusinessNumber());
-
-        // 2. 사업자번호 중복 체크
-        if (companyRepository.existsByBusinessNumber(reqDto.getBusinessNumber())) {
-            throw new BusinessException(
-                    HttpStatus.CONFLICT, "이미 등록된 사업자번호입니다."
-            );
-        }
-
-        // 3. 이메일 인증 여부 확인 - 로컬 테스트용 주석처리
-        // String verified = emailRedisTemplate.opsForValue()
-        //         .get("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
-        // if (!"YES".equals(verified)) {
-        //     throw new BusinessException(
-        //             HttpStatus.BAD_REQUEST, "이메일 인증이 필요합니다."
-        //     );
-        // }
+//        // 1. 사업자번호 검증 (국세청 API) - 로컬 테스트용 주석처리
+//        ntsApiService.validate(reqDto.getBusinessNumber());
+//
+//        // 2. 사업자번호 중복 체크
+//        if (companyRepository.existsByBusinessNumber(reqDto.getBusinessNumber())) {
+//            throw new BusinessException(
+//                    HttpStatus.CONFLICT, "이미 등록된 사업자번호입니다."
+//            );
+//        }
+//
+//        // 3. 이메일 인증 여부 확인 - 로컬 테스트용 주석처리
+//         String verified = emailRedisTemplate.opsForValue()
+//                 .get("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
+//         if (!"YES".equals(verified)) {
+//             throw new BusinessException(
+//                     HttpStatus.BAD_REQUEST, "이메일 인증이 필요합니다."
+//             );
+//         }
 
         // 4. 비밀번호 확인
         if (!reqDto.getAdminPassword().equals(reqDto.getAdminPasswordCheck())) {
@@ -173,7 +173,7 @@ public class CompanyService {
         esgService.createDefaultConfig(company);
 
         // 10. 인증 정보 삭제 - 로컬 테스트용 주석처리
-        // emailRedisTemplate.delete("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
+         emailRedisTemplate.delete("EMAIL_VERIFIED:" + reqDto.getAdminEmail());
 
         // 기본 결재양식 생성 (approval-service 호출)
         try {
@@ -182,6 +182,16 @@ public class CompanyService {
             log.info("기본 결재양식 생성 실패: {}", e.getMessage());
             if (e instanceof FeignException fe) {
                 log.error("응답 body: {}", fe.contentUTF8());  // 서버가 준 실제 에러 JSON
+            }
+        }
+
+        // 기본 계약서 템플릿 생성 (approval-service 호출)
+        try {
+            approvalServiceClient.initDefaultContractTemplates(company.getCompanyId());
+        } catch (Exception e) {
+            log.info("기본 계약서 템플릿 생성 실패: {}", e.getMessage());
+            if (e instanceof FeignException fe) {
+                log.error("응답 body: {}", fe.contentUTF8());
             }
         }
 
@@ -246,5 +256,24 @@ public class CompanyService {
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         return CompanyInfoResDto.fromEntity(member.getCompany());
+    }
+
+    public void updateSeal(UUID memberId, MultipartFile seal) {
+        // memberId로 회사 조회 (기존 updateLogo와 동일한 방식)
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
+
+        Company company = companyRepository.findById(member.getCompanyId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
+
+        // S3 업로드 (기존 로고 업로드와 동일한 방식)
+        String sealUrl = s3Service.upload(seal, "company/" + company.getCompanyId() + "/seal");
+        company.updateSealImageUrl(sealUrl);
+    }
+
+    public String getSealImageUrl(UUID companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
+        return company.getSealImageUrl();
     }
 }

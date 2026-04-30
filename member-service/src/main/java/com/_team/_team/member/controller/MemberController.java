@@ -84,6 +84,23 @@ public class MemberController {
         );
     }
 
+    /**
+     * 본인 권한 목록 조회.
+     * - JWT(AT)에는 권한이 없어 새로고침/AT 연장 후 FE 권한 캐시(Me.permissions) 재수화 용도로 사용.
+     * - {@code @CheckPermission} 미적용 — 인증된 사용자라면 자기 권한은 항상 조회 가능해야 한다
+     *   (예: 팀장은 ROLE:READ 권한이 없어 GET /member/role/{roleId} 가 403 이라 기존 보강이 실패함).
+     */
+    @GetMapping("/me/permissions")
+    public ResponseEntity<?> getMyPermissions(
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId) {
+        return new ResponseEntity<>(
+                ApiResponse.success(
+                        memberService.getMyPermissions(memberPositionId),
+                        "내 권한 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
     // 직원 계정 생성
     @CheckPermission(resource = Resource.MEMBER, action = Action.CREATE)
     @PostMapping("/create")
@@ -466,6 +483,23 @@ public class MemberController {
      *
      * 응답: [memberId, ...]
      */
+    @GetMapping("/internal/{memberId}/org-context")
+    public MemberOrgContextResDto getOrgContextInternal(@PathVariable UUID memberId) {
+        return memberService.findOrgContext(memberId);
+    }
+
+    @GetMapping("/internal/org-contexts")
+    public java.util.Map<java.util.UUID, MemberOrgContextResDto> getOrgContextsInternal(
+            @RequestParam("ids") java.util.List<java.util.UUID> ids) {
+        return memberService.findOrgContextsByMemberIds(ids);
+    }
+
+    @GetMapping("/internal/organizations/{organizationId}/member-ids")
+    public java.util.List<java.util.UUID> getActiveMemberIdsByOrganizationInternal(
+            @PathVariable UUID organizationId) {
+        return memberService.findActiveMemberIdsByOrganization(organizationId);
+    }
+
     @GetMapping("/internal/candidates-for-evaluator")
     public java.util.List<java.util.UUID> getCandidatesForEvaluator(
             @RequestHeader("X-User-CompanyId") String companyId,
@@ -483,5 +517,11 @@ public class MemberController {
                 ApiResponse.success(null, "온보딩 완료"),
                 HttpStatus.OK
         );
+    }
+
+    /** 내부용: 직원 기본정보 조회 (Feign 호출용 - 전자계약 등) */
+    @GetMapping("/internal/{memberId}/info")
+    public MemberContractInfoResDto getMemberInfoInternal(@PathVariable UUID memberId) {
+        return memberService.getMemberContractInfo(memberId);
     }
 }

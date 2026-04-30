@@ -2,6 +2,8 @@ package com._team._team.attendance.dto.resDto;
 
 import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
+import com._team._team.attendance.domain.enums.ClosureStatus;
+import com._team._team.attendance.domain.enums.CorrectionState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,11 +28,14 @@ public class DailyAttendanceResDto {
     private UUID memberId;
     private LocalDate attendanceDate;
     private AttendanceStatus status;
+    private ClosureStatus closureStatus;
     private UUID workScheduleId;
     private LocalDateTime firstClockIn;
     private LocalDateTime lastClockOut;
     private Integer workedMinutes;
     private Integer overtimeMinutes;
+    /** 정정 진행 상태 — 직원 화면 액션 컬럼 분기에 사용 */
+    private CorrectionState correctionState;
 
 
     public static DailyAttendanceResDto fromEntity(DailyAttendance daily) {
@@ -39,11 +44,19 @@ public class DailyAttendanceResDto {
                 .memberId(daily.getMemberId())
                 .attendanceDate(daily.getAttendanceDate())
                 .status(daily.getStatus())
+                .closureStatus(daily.getClosureStatus())
                 .workScheduleId(daily.getWorkScheduleId())
                 .firstClockIn(daily.getFirstClockIn())
                 .lastClockOut(daily.getLastClockOut())
                 .workedMinutes(daily.getWorkedMinutes())
                 .overtimeMinutes(daily.getOvertimeMinutes())
+                .correctionState(CorrectionState.NORMAL)   // 기본값. Service 에서 보정
                 .build();
+    }
+
+    public static DailyAttendanceResDto fromEntity(DailyAttendance daily, CorrectionState state) {
+        DailyAttendanceResDto dto = fromEntity(daily);
+        dto.setCorrectionState(state);
+        return dto;
     }
 }

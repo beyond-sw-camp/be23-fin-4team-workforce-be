@@ -34,7 +34,7 @@ public interface WorkScheduleRepository extends JpaRepository<WorkSchedule, UUID
 
     /**
      * 특정 날짜에 유효한 스케줄 조회
-     * - memberId 매칭 우선, null(회사 기본)은 후순위
+     * - memberId 매칭 우선, null은 (회사 기본)
      */
     @Query("SELECT ws FROM WorkSchedule ws " +
             "WHERE ws.companyId = :companyId " +

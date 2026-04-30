@@ -30,12 +30,21 @@ public enum NotificationType {
     APPROVAL_PROXY_ASSIGNED,  // 결재 위임 지정됨
     APPROVAL_PROXY_ACTED,     // 대결 처리됨 (부재자에게)
 
+    // 전자계약
+    CONTRACT_SENT,           // 계약서 발송됨 (직원에게)
+    CONTRACT_SIGNED,         // 계약서 서명 완료 (인사팀에게)
+
     // 급여
     SALARY_PUBLISHED,        // 급여 명세서 발행 (확정)
     SALARY_PAID,             // 급여 지급 완료 (계좌 입금)
 
     // 목표
-    GOAL_EVALUATED,          // 목표 평가 완료
+    GOAL_EVALUATED,               // 목표 평가 완료
+    GOAL_BUNDLE_REQUESTED,        // 목표 승인 번들 요청
+    GOAL_BUNDLE_APPROVED,         // 목표 승인 번들 승인
+    GOAL_BUNDLE_REJECTED,         // 목표 승인 번들 반려
+    GOAL_BUNDLE_WITHDRAWN,        // 목표 승인 번들 회수
+    GOAL_BUNDLE_DELEGATED,        // 목표 승인 번들 위임
 
     // 평가
     EVALUATION_REMINDER,     // 미제출 평가 리마인드

@@ -33,6 +33,9 @@ public class Company extends BaseTimeEntity {
 
     private String logoUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String sealImageUrl;
+
     @Column(nullable = false)
     private String address;
 
@@ -67,5 +70,9 @@ public class Company extends BaseTimeEntity {
 
     public void delete() {
         this.status = CompanyStatus.DELETED;
+    }
+
+    public void updateSealImageUrl(String sealImageUrl) {
+        this.sealImageUrl = sealImageUrl;
     }
 }

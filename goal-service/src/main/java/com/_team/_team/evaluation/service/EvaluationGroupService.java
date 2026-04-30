@@ -6,6 +6,7 @@ import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.converter.EvaluatorMapping;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
+import com._team._team.evaluation.dto.reqdto.EvaluatorMapUpdateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.EvaluatorMappingResDto;
@@ -32,20 +33,17 @@ public class EvaluationGroupService {
     private final EvaluationSeasonRepository seasonRepository;
     private final EvaluationDesignRepository designRepository;
     private final ObjectMapper objectMapper;
-    private final EvaluationResponseService evaluationResponseService;
     private final com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient;
 
     public EvaluationGroupService(EvaluationGroupRepository groupRepository,
                                    EvaluationSeasonRepository seasonRepository,
                                    EvaluationDesignRepository designRepository,
                                    ObjectMapper objectMapper,
-                                   EvaluationResponseService evaluationResponseService,
                                    com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient) {
         this.groupRepository = groupRepository;
         this.seasonRepository = seasonRepository;
         this.designRepository = designRepository;
         this.objectMapper = objectMapper;
-        this.evaluationResponseService = evaluationResponseService;
         this.memberServiceClient = memberServiceClient;
     }
 
@@ -117,9 +115,6 @@ public class EvaluationGroupService {
         group.updateEvaluatorMaps(newMaps);
         syncGroupScopeFieldsFromMaps(group, newMaps);
         groupRepository.save(group);
-        if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
-            evaluationResponseService.materializeMissingResponsesForGroup(group);
-        }
         return toGroupResDto(group);
     }
 
@@ -209,26 +204,21 @@ public class EvaluationGroupService {
     }
 
     @Transactional
-    public GroupResDto updateEvaluatorMaps(UUID groupId, UUID companyId, String evaluatorMapsJson) {
+    public GroupResDto updateEvaluatorMaps(UUID groupId, UUID companyId, List<EvaluatorMapUpdateReqDto.EvaluatorMapItemReqDto> evaluatorMaps) {
         EvaluationGroup group = findGroupOrThrow(groupId, companyId);
-        // [D-3] 프론트에서 넘어오는 JSON 문자열을 VO 리스트로 파싱 후 엔티티에 주입.
-        // 프론트 호환을 위해 API 시그니처는 유지하되 엔티티 내부는 타입 세이프.
-        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> maps;
-        try {
-            maps = evaluatorMapsJson == null || evaluatorMapsJson.isBlank()
-                    ? new java.util.ArrayList<>()
-                    : objectMapper.readValue(
-                            evaluatorMapsJson,
-                            new com.fasterxml.jackson.core.type.TypeReference<List<com._team._team.evaluation.domain.converter.EvaluatorMapping>>() {});
-        } catch (Exception e) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "평가자 매핑 JSON이 올바르지 않습니다.");
-        }
+        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> maps = evaluatorMaps == null
+                ? new java.util.ArrayList<>()
+                : evaluatorMaps.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(m -> com._team._team.evaluation.domain.converter.EvaluatorMapping.builder()
+                        .targetMemberId(m.getTargetMemberId())
+                        .evaluatorId(m.getEvaluatorId())
+                        .evaluationType(m.getEvaluationType())
+                        .build())
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
         group.updateEvaluatorMaps(maps);
         syncGroupScopeFieldsFromMaps(group, maps);
         groupRepository.save(group);
-        if (group.getSeason().getStatus() == SeasonStatus.ACTIVE) {
-            evaluationResponseService.materializeMissingResponsesForGroup(group);
-        }
         return toGroupResDto(group);
     }
 

@@ -53,6 +53,8 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -338,6 +340,49 @@ public class MemberService {
                 30,
                 TimeUnit.MINUTES
         );
+    }
+
+    /**
+     * 본인 권한 목록 조회.
+     * - 로그인 응답의 {@code permissions} 와 동일한 {@code RESOURCE:ACTION:RANGE} 문자열 리스트.
+     * - JWT(AT)에는 권한이 들어있지 않아, FE 새로고침 / AT 연장 후 권한 재수화 용도로 사용한다.
+     * - {@code @CheckPermission} 을 걸지 않는다 (자기 자신 권한 조회는 인증된 사용자라면 항상 허용).
+     * - Redis 우선, 미스 시 DB 에서 재계산하면서 캐시 재생성.
+     * - 시스템 관리자는 모든 권한 통과 처리되므로 빈 리스트 반환 (FE는 isSystemAdmin 플래그로 따로 분기).
+     */
+    @Transactional(readOnly = true)
+    public List<String> getMyPermissions(UUID memberPositionId) {
+        if (memberPositionId == null) {
+            return Collections.emptyList();
+        }
+
+        String cached = permissoinRedisTemplate.opsForValue().get("PERMISSION:" + memberPositionId);
+        if (cached != null && !cached.isBlank()) {
+            return Arrays.stream(cached.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        }
+
+        MemberPosition memberPosition = memberPositionRepository
+                .findByIdWithRoleAndPermissions(memberPositionId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."));
+
+        // 시스템 관리자는 캐시도 만들지 않고 빈 리스트 반환 (FE는 isSystemAdmin 플래그로 처리)
+        if ("YES".equals(memberPosition.getIsSystemAdminYn())) {
+            return Collections.emptyList();
+        }
+
+        cachePermissions(memberPosition);
+
+        return memberPosition.getRole()
+                .getRolePermissionList()
+                .stream()
+                .map(rp -> rp.getPermission().getResource().name()
+                        + ":" + rp.getPermission().getAction().name()
+                        + ":" + rp.getPermissionRange().name())
+                .collect(Collectors.toList());
     }
 
     // 로그인
@@ -1840,6 +1885,51 @@ public class MemberService {
         return result;
     }
 
+    @Transactional(readOnly = true)
+    public MemberOrgContextResDto findOrgContext(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 직원입니다."));
+        if (member.getDefaultPositionId() == null) {
+            return null;
+        }
+        MemberPosition position = memberPositionRepository.findActiveByIdWithDetails(member.getDefaultPositionId())
+                .orElse(null);
+        if (position == null || position.getOrganization() == null) {
+            return null;
+        }
+        return MemberOrgContextResDto.fromEntity(member, position);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<UUID, MemberOrgContextResDto> findOrgContextsByMemberIds(java.util.Collection<UUID> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        java.util.Map<UUID, MemberOrgContextResDto> result = new java.util.HashMap<>();
+        java.util.List<MemberPosition> positions = memberPositionRepository.findActivePositionsByMemberIds(memberIds);
+        for (MemberPosition position : positions) {
+            if (position.getMember() == null || position.getOrganization() == null) {
+                continue;
+            }
+            result.put(position.getMember().getMemberId(), MemberOrgContextResDto.fromEntity(position.getMember(), position));
+        }
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UUID> findActiveMemberIdsByOrganization(UUID organizationId) {
+        return memberPositionRepository.findByOrganization_OrganizationIdAndDelYn(organizationId, "NO").stream()
+                .filter(position -> "YES".equals(position.getIsActiveYn()))
+                .map(MemberPosition::getMember)
+                .filter(java.util.Objects::nonNull)
+                .filter(member -> member.getMemberStatus() == MemberStatus.ACTIVE)
+                .map(Member::getMemberId)
+                .distinct()
+                .toList();
+    }
+
 
     @Transactional(readOnly = true)
     public DashboardProfileResDto getDashboardProfile(UUID memberId) {
@@ -1905,6 +1995,36 @@ public class MemberService {
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         member.completeOnboarding();
+    }
+
+    public MemberContractInfoResDto getMemberContractInfo(UUID memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "직원을 찾을 수 없습니다."));
+
+        // 현재 포지션에서 부서/직책 가져오기
+        String orgName = null;
+        String jobTitleName = null;
+
+        List<MemberPosition> positions = memberPositionRepository
+                .findActivePositionsByMemberIds(List.of(memberId));
+
+        if (!positions.isEmpty()) {
+            MemberPosition position = positions.get(0);
+            if (position.getOrganization() != null) {
+                orgName = position.getOrganization().getName();
+            }
+            if (position.getJobTitle() != null) {
+                jobTitleName = position.getJobTitle().getName();
+            }
+        }
+
+        return MemberContractInfoResDto.builder()
+                .memberId(member.getMemberId())
+                .name(member.getName())
+                .sabun(member.getSabun())
+                .organizationName(orgName)
+                .jobTitleName(jobTitleName)
+                .build();
     }
 }
 

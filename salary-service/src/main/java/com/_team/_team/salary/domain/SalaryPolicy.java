@@ -2,6 +2,7 @@ package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
+import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.dto.reqdto.SalaryPolicyUpdateReqDto;
 import com._team._team.salary.domain.enums.WageSystemType;
 import jakarta.persistence.*;
@@ -61,6 +62,20 @@ public class SalaryPolicy extends BaseTimeEntity {
     @Builder.Default
     private Integer fixedOvertimeMinutes = 0;
 
+    // 월 소정근로시간 시급 환산 기준
+    // 한국 표준 209h = 주 40h × 4.345주 + 주휴 8h × 4.345주
+    // 회사가 주 35h 면 183h 등 회사별 다를 수 있음
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer monthlyOrdinaryHours = 209;
+
+    // 일할계산 방식 입사 / 퇴사 / 기간변경 월에 적용
+    // DAYS_IN_MONTH 가장 일반적 FIXED_30 통상임금 표준 WORKING_DAYS 시급제
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ProrationMethod prorationMethod = ProrationMethod.DAYS_IN_MONTH;
+
     @Column(nullable = false)
     private LocalDate effectiveFrom;
 
@@ -97,6 +112,12 @@ public class SalaryPolicy extends BaseTimeEntity {
                 : (reqDto.getFixedOvertimeMinutes() == null ? 0 : reqDto.getFixedOvertimeMinutes());
         if (reqDto.getPayDayShiftRule() != null) {
             this.payDayShiftRule = reqDto.getPayDayShiftRule();
+        }
+        if (reqDto.getMonthlyOrdinaryHours() != null && reqDto.getMonthlyOrdinaryHours() > 0) {
+            this.monthlyOrdinaryHours = reqDto.getMonthlyOrdinaryHours();
+        }
+        if (reqDto.getProrationMethod() != null) {
+            this.prorationMethod = reqDto.getProrationMethod();
         }
     }
 

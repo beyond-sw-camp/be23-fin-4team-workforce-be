@@ -1,11 +1,13 @@
 package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.Salary;
+import com._team._team.salary.domain.enums.TaxReductionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -27,6 +29,10 @@ public class SalaryResDto {
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
     private Integer dependentCount;
+    private Integer childUnder20Count;
+    private TaxReductionType taxReductionType;
+    private BigDecimal taxReductionRate;
+    private LocalDate taxReductionEffectiveTo;
 
     // member-service Feign 결합
     private String sabun;
@@ -49,6 +55,10 @@ public class SalaryResDto {
                 .effectiveFrom(salary.getEffectiveFrom())
                 .effectiveTo(salary.getEffectiveTo())
                 .dependentCount(salary.getDependentCount())
+                .childUnder20Count(salary.getChildUnder20Count())
+                .taxReductionType(salary.getTaxReductionType())
+                .taxReductionRate(salary.getTaxReductionRate())
+                .taxReductionEffectiveTo(salary.getTaxReductionEffectiveTo())
                 .createdAt(salary.getCreatedAt())
                 .updatedAt(salary.getUpdatedAt())
                 .build();

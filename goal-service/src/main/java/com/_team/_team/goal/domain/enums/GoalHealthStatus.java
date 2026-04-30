@@ -1,7 +1,7 @@
 package com._team._team.goal.domain.enums;
 
 /**
- * 진행 상태(좋음/보통/어려움 등). 생명주기 {@link GoalStatus} 와 별개로 KPI 헬스를 표현합니다.
+ * 목표 생명주기와 별개로 진행 상태를 표현한다.
  */
 public enum GoalHealthStatus {
     NOT_STARTED,

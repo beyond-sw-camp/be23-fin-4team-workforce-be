@@ -381,7 +381,10 @@ public class ApprovalService {
         publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
         publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId,
                 LeaveOfAbsenceApprovalEvent.Action.REJECT, reqDto.getComment());
-        publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.REJECT);
+
+        // 반려 시 REJECT 이벤트 발행
+        publishLeaveEventIfApplicable(request, actualMemberId,
+                LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
 
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 
@@ -548,14 +551,14 @@ public class ApprovalService {
         }
     }
 
-    // 연차신청서 문서일 때만 leave 이벤트 발행
+    // 휴가신청서 문서일 때만 leave 이벤트 발행
     // 연차=1일씩 누적, 반차=0.5일. BalanceType은 일단 ANNUAL 고정 (CARRYOVER 우선소진은 salary 쪽에서 처리)
     private void publishLeaveEventIfApplicable(ApprovalRequest request,
                                                UUID approverId,
                                                LeaveApprovalEvent.Action action,
                                                String note) {
         String docName = request.getApprovalDocument().getDocumentName();
-        if (!"연차신청서".equals(docName)) return;
+        if (!"휴가신청서".equals(docName)) return;
 
         JsonNode node = readContent(request.getContentJson());
         if (node == null) return;
@@ -635,7 +638,7 @@ public class ApprovalService {
     }
 
     /**
-     * 시차출퇴근 슬롯 선택 문서일 때만 schedule 이벤트 발행
+     * 시차출퇴근 스케줄 선택 문서일 때만 schedule 이벤트 발행
      */
     private void publishScheduleEventIfApplicable(ApprovalRequest request,
                                                   ScheduleApprovalEvent.Action action) {

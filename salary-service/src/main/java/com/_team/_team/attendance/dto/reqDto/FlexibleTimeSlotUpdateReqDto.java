@@ -9,8 +9,8 @@ import java.time.LocalTime;
 
 
 /**
- * 시차출퇴근 슬롯 수정 요청 DTO
- * 관리자가 기존 슬롯의 시간 구성이나 라벨을 바꿀 때 사용
+ * 시차출퇴근 스케줄 수정 요청 DTO
+ * 관리자가 기존 스케줄의 시간 구성이나 라벨을 바꿀 때 사용
  */
 @AllArgsConstructor
 @NoArgsConstructor
@@ -26,6 +26,7 @@ public class FlexibleTimeSlotUpdateReqDto {
     @Positive
     private Integer workMinutes;
 
-    @PositiveOrZero
-    private Integer breakMinutes;
+    /** 슬롯 점심 시작/종료 시각 - null 이면 미변경  */
+    private LocalTime breakStart;
+    private LocalTime breakEnd;
 }
