@@ -13,4 +13,8 @@ public class ChatN8nReqDto {
     private String companyId;
     private String memberPositionId;
     private String accessToken;
+    private String conversationHistory;
+    private String sessionId;
+    private String action;
+
 }

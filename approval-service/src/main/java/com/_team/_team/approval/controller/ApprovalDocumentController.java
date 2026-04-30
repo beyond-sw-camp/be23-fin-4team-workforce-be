@@ -130,4 +130,16 @@ public class ApprovalDocumentController {
                 ApiResponse.success(result, "활성 결재 양식 목록 조회 (내부)"),
                 HttpStatus.OK);
     }
+
+    // 내부 서비스용 결재 양식 단건 조회 (권한 체크 없음)
+    @GetMapping("/internal/{documentId}")
+    public ResponseEntity<?> findByIdInternal(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID documentId) {
+        ApprovalDocumentResDto resDto = approvalDocumentService.findById(companyId, documentId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "결재 양식 조회 성공 (내부)"),
+                HttpStatus.OK
+        );
+    }
 }

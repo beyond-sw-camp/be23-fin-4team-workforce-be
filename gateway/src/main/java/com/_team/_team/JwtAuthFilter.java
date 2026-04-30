@@ -56,7 +56,8 @@ public class JwtAuthFilter implements GlobalFilter {
             "/salary/salary-item-templates/internal",
             "/salary/salary-policies/internal",
             "/salary/pay-grade-table/internal",
-            "/approval/documents/internal"
+            "/approval/documents/internal",
+            "/approval/documents/internal/**"
     );
 
     @Override

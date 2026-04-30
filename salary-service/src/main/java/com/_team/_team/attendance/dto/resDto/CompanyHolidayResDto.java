@@ -18,6 +18,7 @@ public class CompanyHolidayResDto {
     private LocalDate holidayDate;
     private String holidayName;
     private String isPaidYn;
+    private String isLegalYn;
 
     public static CompanyHolidayResDto fromEntity(CompanyHoliday companyHoliday){
         return CompanyHolidayResDto.builder()
@@ -26,6 +27,7 @@ public class CompanyHolidayResDto {
                 .holidayDate(companyHoliday.getHolidayDate())
                 .holidayName(companyHoliday.getHolidayName())
                 .isPaidYn(companyHoliday.getIsPaidYn())
+                .isLegalYn(companyHoliday.getIsLegalYn())
                 .build();
     }
 }

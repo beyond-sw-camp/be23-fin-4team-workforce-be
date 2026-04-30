@@ -108,8 +108,8 @@ def format_leave_type_to_rag(
 {keywords_str}
 
 ■ 관련 메뉴
-관련 메뉴: /ess/attendance/leave-request
-화면명: 휴가 신청"""
+관련 메뉴: /app/approvals?tab=compose&sideNav=request-compose
+화면명: 결재 요청 작성 (휴가 신청은 전자결재 > 결재 생성에서)"""
 
 
 async def sync_leave_documents(
