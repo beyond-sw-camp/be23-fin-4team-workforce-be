@@ -107,6 +107,9 @@ public class GoalService {
 
         if (goal.getOwnerType() == GoalOwnerType.ORGANIZATION) {
             ensureObjectiveOwner(goal, requesterId, companyId, canManageOrgGoal);
+            if (dto.getOwnerId() != null) {
+                goal.updateObjectiveOwner(dto.getOwnerId());
+            }
             if (dto.getTitle() != null || dto.getDescription() != null) {
                 goal.updateObjectiveContent(
                         dto.getTitle() != null ? dto.getTitle() : goal.getTitle(),

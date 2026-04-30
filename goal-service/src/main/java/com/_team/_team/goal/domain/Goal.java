@@ -221,6 +221,10 @@ public class Goal extends BaseTimeEntity {
         this.description = description;
     }
 
+    public void updateObjectiveOwner(UUID ownerId) {
+        this.ownerId = ownerId;
+    }
+
     public void updateObjectiveGradeCriteria(String gradeS, String gradeA, String gradeB, String gradeC) {
         this.gradeSCriteria = gradeS;
         this.gradeACriteria = gradeA;
