@@ -88,6 +88,7 @@ public class GoalService {
                 .gradeCCriteria(dto.getOwnerType() == GoalOwnerType.ORGANIZATION ? dto.getGradeC() : null)
                 .visibleTeamIds(dto.getVisibleTeamIds() != null ? dto.getVisibleTeamIds() : new ArrayList<>())
                 .participantMemberIds(dto.getParticipantMemberIds() != null ? dto.getParticipantMemberIds() : new ArrayList<>())
+                .autoUpdate(dto.getOwnerType() == GoalOwnerType.ORGANIZATION)
                 .build();
 
         if (dto.getOwnerType() == GoalOwnerType.ORGANIZATION) {
@@ -106,6 +107,9 @@ public class GoalService {
 
         if (goal.getOwnerType() == GoalOwnerType.ORGANIZATION) {
             ensureObjectiveOwner(goal, requesterId, companyId, canManageOrgGoal);
+            if (dto.getOwnerId() != null) {
+                goal.updateObjectiveOwner(dto.getOwnerId());
+            }
             if (dto.getTitle() != null || dto.getDescription() != null) {
                 goal.updateObjectiveContent(
                         dto.getTitle() != null ? dto.getTitle() : goal.getTitle(),

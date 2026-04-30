@@ -57,21 +57,28 @@ public class GoalProgressUpdateService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 목표입니다.");
         }
         if (!goalService.canPostManualProgress(goal, memberId) && !hasGoalUpdatePermission) {
-            throw new BusinessException(HttpStatus.FORBIDDEN,
-                    "담당자·참여 멤버이거나 목표 수정(GOAL:UPDATE) 권한이 있어야 진행률을 업데이트할 수 있습니다.");
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN,
+                    "담당자·참여 멤버이거나 목표 수정 권한이 있어야 진행률을 업데이트할 수 있습니다."
+            );
         }
         if (goal.getStatus() != GoalStatus.ACTIVE) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "진행 중인 목표만 업데이트할 수 있습니다.");
         }
         if (goal.isAutoUpdate()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "자동 집계(⚡) 목표는 수동 진행률을 입력할 수 없습니다.");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "자동 집계 목표에는 수동 진행률을 입력할 수 없습니다.");
         }
+
         goal.applyManualProgress(dto.getValue(), dto.getStatus());
         goalRollupService.recalculateFrom(goalId);
-        String summary = String.format("진행률을 업데이트했어요. 수치: %s%%, 상태: %s",
+
+        String summary = String.format(
+                "진행률을 업데이트했습니다. 수치: %s%%, 상태: %s",
                 dto.getValue().stripTrailingZeros().toPlainString(),
-                healthLabelKo(dto.getStatus()));
+                healthLabelKo(dto.getStatus())
+        );
         goalActivityService.append(goalId, GoalActivityType.PROGRESS_UPDATED, memberId, summary, buildProgressMeta(dto));
+
         return GoalProgressUpdateResDto.builder()
                 .updateId(null)
                 .goalId(goalId)
@@ -83,13 +90,21 @@ public class GoalProgressUpdateService {
                 .build();
     }
 
-    private static String healthLabelKo(GoalHealthStatus s) {
-        if (s == null) {
+    @Transactional(readOnly = true)
+    public List<GoalProgressUpdateResDto> list(UUID goalId, UUID requesterId, UUID companyId) {
+        goalService.requireReadable(goalId, requesterId, companyId);
+        return goalActivityRepository.findByGoal_GoalIdAndTypeOrderByCreatedAtDesc(goalId, GoalActivityType.PROGRESS_UPDATED).stream()
+                .map(this::toProgressUpdateRes)
+                .toList();
+    }
+
+    private static String healthLabelKo(GoalHealthStatus status) {
+        if (status == null) {
             return "";
         }
-        return switch (s) {
-            case NOT_STARTED -> "미착수";
-            case ON_TRACK -> "순조로움";
+        return switch (status) {
+            case NOT_STARTED -> "미시작";
+            case ON_TRACK -> "정상";
             case AT_RISK -> "주의";
             case BEHIND -> "지연";
             case COMPLETED -> "완료";
@@ -98,24 +113,16 @@ public class GoalProgressUpdateService {
 
     private String buildProgressMeta(GoalProgressUpdateReqDto dto) {
         try {
-            ObjectNode n = objectMapper.createObjectNode();
-            n.put("progressPct", dto.getValue().stripTrailingZeros().doubleValue());
-            n.put("healthStatus", dto.getStatus().name());
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("progressPct", dto.getValue().stripTrailingZeros().doubleValue());
+            node.put("healthStatus", dto.getStatus().name());
             if (dto.getNote() != null && !dto.getNote().isBlank()) {
-                n.put("note", dto.getNote());
+                node.put("note", dto.getNote());
             }
-            return objectMapper.writeValueAsString(n);
+            return objectMapper.writeValueAsString(node);
         } catch (Exception e) {
             return null;
         }
-    }
-
-    @Transactional(readOnly = true)
-    public List<GoalProgressUpdateResDto> list(UUID goalId, UUID requesterId, UUID companyId) {
-        goalService.requireReadable(goalId, requesterId, companyId);
-        return goalActivityRepository.findByGoal_GoalIdAndTypeOrderByCreatedAtDesc(goalId, GoalActivityType.PROGRESS_UPDATED).stream()
-                .map(this::toProgressUpdateRes)
-                .toList();
     }
 
     private GoalProgressUpdateResDto toProgressUpdateRes(GoalActivity activity) {

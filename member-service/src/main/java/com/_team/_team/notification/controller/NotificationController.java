@@ -3,7 +3,6 @@ package com._team._team.notification.controller;
 import com._team._team.dto.ApiResponse;
 import com._team._team.notification.service.NotificationService;
 import com._team._team.notification.sse.SseEmitterManager;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -49,14 +48,14 @@ public class NotificationController {
         );
     }
 
-    // 안읽은 알림 수 조회
+    // 읽지 않은 알림 수 조회
     @GetMapping("/unread-count")
     public ResponseEntity<?> getUnreadCount(
             @RequestHeader("X-User-UUID") UUID memberId) {
         return new ResponseEntity<>(
                 ApiResponse.success(
                         notificationService.getUnreadCount(memberId),
-                        "안읽은 알림 수 조회 성공"),
+                        "읽지 않은 알림 수 조회 성공"),
                 HttpStatus.OK
         );
     }
@@ -92,6 +91,17 @@ public class NotificationController {
         notificationService.deleteNotification(memberId, notificationId);
         return new ResponseEntity<>(
                 ApiResponse.success(null, "알림 삭제 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 알림 전체 삭제
+    @PatchMapping("/delete-all")
+    public ResponseEntity<?> deleteAllNotification(
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        notificationService.deleteAllNotification(memberId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "알림 전체 삭제 성공"),
                 HttpStatus.OK
         );
     }
