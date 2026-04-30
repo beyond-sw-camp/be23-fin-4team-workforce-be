@@ -30,6 +30,10 @@ public enum NotificationType {
     APPROVAL_PROXY_ASSIGNED,  // 결재 위임 지정됨
     APPROVAL_PROXY_ACTED,     // 대결 처리됨 (부재자에게)
 
+    // 전자계약
+    CONTRACT_SENT,           // 계약서 발송됨 (직원에게)
+    CONTRACT_SIGNED,         // 계약서 서명 완료 (인사팀에게)
+
     // 급여
     SALARY_PUBLISHED,        // 급여 명세서 발행 (확정)
     SALARY_PAID,             // 급여 지급 완료 (계좌 입금)

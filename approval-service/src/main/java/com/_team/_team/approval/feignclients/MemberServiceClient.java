@@ -1,5 +1,6 @@
 package com._team._team.approval.feignclients;
 
+import com._team._team.approval.feignclients.dto.MemberContractInfoResDto;
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
 import com._team._team.approval.feignclients.dto.OrganizationResDto;
 import com._team._team.approval.feignclients.dto.SignatureResDto;
@@ -36,4 +37,10 @@ public interface MemberServiceClient {
 
     @GetMapping("/members/active")
     List<UUID> findActiveMemberIds(@RequestParam("companyId") UUID companyId);
+
+    @GetMapping("/member/internal/{memberId}/info")
+    MemberContractInfoResDto getMemberContractInfo(@PathVariable("memberId") UUID memberId);
+
+    @GetMapping("/company/internal/{companyId}/seal")
+    String getCompanySealImageUrl(@PathVariable("companyId") UUID companyId);
 }
