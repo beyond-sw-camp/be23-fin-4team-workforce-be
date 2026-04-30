@@ -128,7 +128,7 @@ public class ApprovalRequestService {
         // 결재자에 본인 포함 불가
         if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
             boolean selfInApprovers = reqDto.getApprovalLines().stream()
-                    .anyMatch(line -> line.getApproverMemberPositionId().equals(memberPositionId));
+                    .anyMatch(line -> line.getApproverMemberId().equals(memberId));
             if (selfInApprovers) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST,
                         "본인을 결재자로 지정할 수 없습니다.");
@@ -410,7 +410,7 @@ public class ApprovalRequestService {
 
 //    임시저장 수정 (DRAFT 상태인 경우)
     public ApprovalRequestResDto update(UUID companyId, UUID memberId, UUID requestId, ApprovalRequestCreateReqDto reqDto){
-//        결재요청 조회 및 검증
+    //        결재요청 조회 및 검증
         ApprovalRequest request = approvalRequestRepository.findByIdWithDocument(requestId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "결재 요청을 찾을 수 없습니다."));
@@ -440,7 +440,7 @@ public class ApprovalRequestService {
         // 결재자에 본인 포함 불가
         if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
             boolean selfInApprovers = reqDto.getApprovalLines().stream()
-                    .anyMatch(line -> line.getApproverMemberPositionId().equals(memberPositionId));
+                    .anyMatch(line -> line.getApproverMemberId().equals(memberId));
             if (selfInApprovers) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST,
                         "본인을 결재자로 지정할 수 없습니다.");
