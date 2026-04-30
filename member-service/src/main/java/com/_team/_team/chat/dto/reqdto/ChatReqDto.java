@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ChatReqDto {
 
-    @NotBlank(message = "질문은 필수입니다.")
-    private String question;
+    private String question;       // 액션 흐름에서는 비어있을 수 있음
+    private String sessionId;      // 액션 세션 진행 중일 때 클라이언트가 보냄
+    private String action;         // 버튼 클릭 시 (go_to_form, cancel 등)
 }

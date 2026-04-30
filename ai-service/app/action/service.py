@@ -1,10 +1,11 @@
-"""챗봇 액션 메인 로직"""
+"""챗봇 액션 메인 로직 (단순화 버전)
+사용자 슬롯 추출 후 → 결재 작성 화면으로 prefill 데이터 전달
+실제 결재 생성은 사용자가 화면에서 직접 수행
+"""
 import json
 import logging
 import re
 from typing import Optional
-
-from openai import OpenAI
 
 from app.config import settings
 from app.action import approval_client, form_builder, state
@@ -25,7 +26,8 @@ async def handle_action(
         request: ActionRequest,
         company_id: str,
         member_id: str,
-        member_position_id: str) -> ActionResponse:
+        member_position_id: str,
+        authorization: str) -> ActionResponse:
     """챗봇 액션 메인 핸들러"""
     logger.info(f"[action] ========================================")
     logger.info(
@@ -33,16 +35,18 @@ async def handle_action(
         f"session_id={request.session_id}, action={request.action}"
     )
 
-    # 1. 사용자가 버튼 누른 경우 (action 필드)
+    # 1. 사용자가 버튼 누른 경우
     if request.action and request.session_id:
-        return await _handle_user_action(request, company_id, member_id, member_position_id)
+        return await _handle_user_action(
+            request, company_id, member_id, member_position_id
+        )
 
     # 2. 신규 또는 진행 중 세션
     current_state = _load_or_create_state(
         request.session_id, company_id, member_id, member_position_id
     )
 
-    # 3. 양식 매칭 (첫 호출 또는 양식 미매칭 상태)
+    # 3. 양식 매칭 (첫 호출)
     if not current_state.document_id:
         document = await _match_form(request.question, company_id)
         if not document:
@@ -76,7 +80,7 @@ async def handle_action(
         state.save_state(current_state)
         return _ask_response(current_state, missing)
 
-    # 6. 모든 필드 채워짐 → 확인 단계
+    # 6. 모든 슬롯 채워짐 → 확인 단계
     state.save_state(current_state)
     return _confirm_response(current_state)
 
@@ -96,13 +100,20 @@ async def _handle_user_action(
     if not current_state:
         return _error_response("세션이 만료되었습니다. 다시 시작해주세요.", None)
 
-    if request.action == "without_attachment":
-        return await _submit_request(current_state, status="WAIT")
+    # 보안 검증
+    if current_state.member_id != member_id:
+        logger.warning(
+            f"[action] 세션 도용 시도: owner={current_state.member_id}, "
+            f"requester={member_id}"
+        )
+        return _error_response("세션에 접근할 권한이 없습니다.", None)
 
-    elif request.action == "with_attachment":
-        return await _submit_request(current_state, status="DRAFT")
+    action = request.action
 
-    elif request.action == "cancel":
+    if action == "go_to_form":
+        return _redirect_response(current_state)
+
+    if action == "cancel":
         state.clear_state(request.session_id)
         return ActionResponse(
             type="cancelled",
@@ -110,8 +121,7 @@ async def _handle_user_action(
             session_id=request.session_id
         )
 
-    else:
-        return _error_response(f"알 수 없는 액션: {request.action}", request.session_id)
+    return _error_response(f"알 수 없는 액션: {action}", request.session_id)
 
 
 # ============================================
@@ -122,43 +132,38 @@ async def _match_form(question: str, company_id: str) -> Optional[dict]:
     """RAG로 양식 매칭 후 approval-service에서 최신 정보 조회"""
     logger.info(f"[action] 양식 매칭: '{question}'")
 
-    # 1. 임베딩
     query_vector = get_embedding(question)
-
-    # 2. Pinecone 검색 (결재 카테고리, db_sync layer만)
     matches = search_vectors(
         query_vector,
         company_id,
         top_k=3,
         min_score=0.3,
         category="결재",
-        include_platform=False  # 가이드 제외
+        include_platform=False
     )
 
     if not matches:
         logger.warning(f"[action] 양식 매칭 실패")
         return None
 
-    # 3. 가장 점수 높은 매칭의 document_id 추출
     top_match = matches[0]
     metadata = top_match.metadata
-
-    # filename에서 양식 ID 추출 (예: approval_form_{uuid}.auto.txt)
     document_name_field = metadata.get("document_name", "")
-    match = re.search(r"approval_form_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", document_name_field)
+    match = re.search(
+        r"approval_form_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+        document_name_field
+    )
 
     if not match:
         logger.warning(f"[action] 파일명에서 documentId 추출 실패: {document_name_field}")
         return None
 
     document_id = match.group(1)
-
     logger.info(
         f"[action] 매칭됨: {metadata.get('subcategory')} "
         f"(score={top_match.score:.3f}, document_id={document_id})"
     )
 
-    # 4. approval-service에서 최신 양식 정보 조회 (formSchema 최신화)
     document = await approval_client.get_document_by_id(company_id, document_id)
     if not document:
         logger.error(f"[action] 양식 단건 조회 실패: {document_id}")
@@ -178,18 +183,15 @@ async def _extract_slots(
         form_schema: str,
         document_name: str) -> dict:
     """LLM Function Calling으로 사용자 입력에서 슬롯값 추출"""
-
-    # 빈 양식이면 추출 시도 안 함
     document = {"documentName": document_name, "formSchema": form_schema}
     tool = form_builder.build_tool_from_form(document)
     if not tool:
         return {}
 
-
-    # _extract_slots 함수 시작 부분에 추가
     today = date.today()
     tomorrow = today + timedelta(days=1)
     day_after = today + timedelta(days=2)
+
     system_prompt = f"""당신은 HR 결재 양식 작성 어시스턴트입니다.
 
 [현재 날짜 정보]
@@ -218,20 +220,10 @@ async def _extract_slots(
 - 사용일수(usageDays)는 시작일과 종료일이 모두 있으면 자동 계산하세요. (양 끝 포함)
 """
 
-    messages = [
-        {"role": "system", "content": system_prompt}
-    ]
-
+    messages = [{"role": "system", "content": system_prompt}]
     if history:
-        messages.append({
-            "role": "user",
-            "content": f"[이전 대화]\n{history}"
-        })
-
-    messages.append({
-        "role": "user",
-        "content": f"[현재 입력]\n{question}"
-    })
+        messages.append({"role": "user", "content": f"[이전 대화]\n{history}"})
+    messages.append({"role": "user", "content": f"[현재 입력]\n{question}"})
 
     try:
         response = openai_client.chat.completions.create(
@@ -243,108 +235,19 @@ async def _extract_slots(
         )
 
         message = response.choices[0].message
-
-        # 도구 호출이 없으면 빈 dict
         if not message.tool_calls:
             logger.info(f"[action] 추출된 슬롯 없음")
             return {}
 
-        # 첫 번째 tool_call의 arguments 파싱
         tool_call = message.tool_calls[0]
         arguments = json.loads(tool_call.function.arguments)
-
-        # 빈 값/None 제거
-        cleaned = {
-            k: v for k, v in arguments.items()
-            if v is not None and v != ""
-        }
-
+        cleaned = {k: v for k, v in arguments.items() if v is not None and v != ""}
         logger.info(f"[action] 추출된 슬롯: {cleaned}")
         return cleaned
 
     except Exception as e:
         logger.error(f"[action] 슬롯 추출 실패: {e}")
         return {}
-
-
-# ============================================
-# 결재 제출
-# ============================================
-
-async def _submit_request(current_state: ActionState, status: str) -> ActionResponse:
-    """결재 생성 (WAIT 또는 DRAFT)"""
-    logger.info(f"[action] 결재 생성: status={status}, document={current_state.document_name}")
-
-    # 1. 결재선 후보 조회 (WAIT일 때만)
-    approval_lines = []
-    if status == "WAIT":
-        candidates = await approval_client.get_candidates(
-            current_state.company_id,
-            current_state.document_id,
-            current_state.member_position_id
-        )
-
-        approval_lines = _build_approval_lines(candidates)
-
-        if not approval_lines:
-            logger.warning(f"[action] 결재선 후보 없음, DRAFT로 변경")
-            status = "DRAFT"
-
-    # 2. payload 생성
-    payload = {
-        "documentId": current_state.document_id,
-        "contentJson": json.dumps(current_state.slots, ensure_ascii=False),
-        "requestStatus": status,
-        "approvalLines": approval_lines,
-        "viewers": [],
-        "recipients": []
-    }
-
-    # 3. 결재 생성 호출
-    result = await approval_client.create_request(
-        current_state.company_id,
-        current_state.member_id,
-        current_state.member_position_id,
-        payload
-    )
-
-    if not result:
-        return _error_response(
-            "결재 생성에 실패했습니다. 다시 시도해주세요.",
-            current_state.session_id
-        )
-
-    # 4. 상태 정리
-    state.clear_state(current_state.session_id)
-
-    # 5. 응답 분기
-    if status == "WAIT":
-        return _submitted_response(result, approval_lines)
-    else:
-        return _draft_response(result)
-
-
-def _build_approval_lines(candidates: list) -> list:
-    """후보 결재자 목록 → 결재선 자동 구성 (각 stepOrder의 첫 번째 후보)"""
-    approval_lines = []
-
-    for candidate in candidates:
-        step_order = candidate.get("stepOrder")
-        candidate_list = candidate.get("candidates", [])
-
-        if not candidate_list:
-            logger.warning(f"[action] stepOrder={step_order} 후보 없음")
-            continue
-
-        # 첫 번째 후보 자동 선택
-        first = candidate_list[0]
-        approval_lines.append({
-            "approverMemberId": first.get("memberId"),
-            "approverMemberPositionId": first.get("memberPositionId"),
-            "stepOrder": step_order
-        })
-
-    return approval_lines
 
 
 # ============================================
@@ -360,9 +263,21 @@ def _load_or_create_state(
     if session_id:
         existing = state.load_state(session_id)
         if existing:
+            if existing.member_id != member_id:
+                logger.warning(
+                    f"[action] 세션 도용 시도: owner={existing.member_id}, "
+                    f"requester={member_id}"
+                )
+                new_session_id = state.create_session_id()
+                return ActionState(
+                    session_id=new_session_id,
+                    company_id=company_id,
+                    member_id=member_id,
+                    member_position_id=member_position_id,
+                    slots={}
+                )
             return existing
 
-    # 신규 생성
     new_session_id = state.create_session_id()
     return ActionState(
         session_id=new_session_id,
@@ -374,7 +289,7 @@ def _load_or_create_state(
 
 
 # ============================================
-# 응답 빌더들
+# 응답 빌더
 # ============================================
 
 def _ask_response(current_state: ActionState, missing: list) -> ActionResponse:
@@ -382,14 +297,12 @@ def _ask_response(current_state: ActionState, missing: list) -> ActionResponse:
     first_missing = missing[0]
     label = first_missing["label"]
 
-    # 모든 필요 정보를 한 메시지에 안내
     if len(missing) == 1:
         message = f"{label}을(를) 알려주세요."
     else:
         labels = [m["label"] for m in missing]
         message = f"다음 정보를 알려주세요:\n- " + "\n- ".join(labels)
 
-    # select 타입이면 옵션 안내
     if first_missing.get("type") == "select" and first_missing.get("options"):
         options_str = ", ".join(first_missing["options"])
         message += f"\n\n({label} 옵션: {options_str})"
@@ -402,16 +315,16 @@ def _ask_response(current_state: ActionState, missing: list) -> ActionResponse:
 
 
 def _confirm_response(current_state: ActionState) -> ActionResponse:
-    """확인 요청 응답"""
+    """확인 요청 응답 — 결재 화면으로 이동할지"""
     preview_fields = form_builder.render_preview(
         current_state.slots, current_state.form_schema
     )
 
     preview_text = "\n".join([f"- {k}: {v}" for k, v in preview_fields.items()])
     message = (
-        f"다음 내용으로 [{current_state.document_name}]을(를) 작성하시겠습니까?\n\n"
+        f"다음 내용으로 [{current_state.document_name}]을(를) 작성합니다.\n\n"
         f"{preview_text}\n\n"
-        f"증빙 서류를 첨부하시겠습니까?"
+        f"결재 작성 화면에서 결재선·참조자·첨부파일을 마무리한 후 제출해주세요."
     )
 
     return ActionResponse(
@@ -423,54 +336,36 @@ def _confirm_response(current_state: ActionState) -> ActionResponse:
             "fields": preview_fields
         },
         actions=[
-            ActionButton(label="예, 첨부할게요", value="with_attachment"),
-            ActionButton(label="아니요, 바로 제출", value="without_attachment"),
+            ActionButton(label="결재 화면으로 이동", value="go_to_form"),
             ActionButton(label="취소", value="cancel")
         ]
     )
 
 
-def _submitted_response(result: dict, approval_lines: list) -> ActionResponse:
-    """결재 제출(WAIT) 완료 응답"""
-    request_id = result.get("requestId")
-    document_number = result.get("documentNumber", "(미발급)")
+def _redirect_response(current_state: ActionState) -> ActionResponse:
+    """결재 작성 화면 이동 응답 — prefill 데이터 포함"""
+    content_json = json.dumps(current_state.slots, ensure_ascii=False)
+    redirect_url = f"/app/approvals?tab=compose&documentId={current_state.document_id}&prefill=true"
 
-    approver_count = len(approval_lines)
-    message = (
-        f"결재가 제출되었습니다.\n"
-        f"문서번호: {document_number}\n"
-        f"결재자: {approver_count}명"
-    )
+    message = "결재 작성 화면으로 이동합니다."
+
+    # 세션 정리
+    state.clear_state(current_state.session_id)
 
     return ActionResponse(
-        type="submitted",
+        type="redirect_to_form",
         message=message,
-        request_id=request_id
-    )
-
-
-def _draft_response(result: dict) -> ActionResponse:
-    """임시저장(DRAFT) 완료 응답"""
-    request_id = result.get("requestId")
-    redirect_url = f"/app/approvals?tab=compose&requestId={request_id}"
-
-    message = (
-        f"임시저장되었습니다.\n"
-        f"결재 작성 화면에서 첨부파일을 추가한 후 제출해주세요.\n\n"
-        f"관련 메뉴: {redirect_url}\n"
-        f"화면명: 결재 요청 작성"
-    )
-
-    return ActionResponse(
-        type="draft_for_attachment",
-        message=message,
-        request_id=request_id,
+        session_id=None,
+        preview={
+            "documentId": current_state.document_id,
+            "documentName": current_state.document_name,
+            "contentJson": content_json
+        },
         redirect_url=redirect_url
     )
 
 
 def _error_response(message: str, session_id: Optional[str]) -> ActionResponse:
-    """에러 응답"""
     return ActionResponse(
         type="error",
         message=message,
@@ -478,7 +373,7 @@ def _error_response(message: str, session_id: Optional[str]) -> ActionResponse:
         error_code="GENERIC_ERROR"
     )
 
+
 def _get_weekday_korean(target_date: date) -> str:
-    """date 객체 → 한국어 요일"""
     weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
     return weekdays[target_date.weekday()]

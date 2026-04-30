@@ -32,12 +32,13 @@ async def get_document_by_id(company_id: str, document_id: str) -> dict | None:
         return None
 
 
-async def get_candidates(company_id: str, document_id: str, member_position_id: str) -> list[dict]:
+async def get_candidates(company_id: str, document_id: str, member_position_id: str, authorization: str) -> list[dict]:
     """양식별 결재자 후보 조회"""
     url = f"{GATEWAY_URL}/approval/policyLines/{document_id}/candidates"
     headers = {
         "X-User-CompanyId": company_id,
-        "X-User-MemberPositionId": member_position_id
+        "X-User-MemberPositionId": member_position_id,
+        "Authorization": authorization
     }
 
     try:
@@ -61,14 +62,16 @@ async def create_request(
         company_id: str,
         member_id: str,
         member_position_id: str,
-        payload: dict) -> dict | None:
+        payload: dict,
+        authorization: str) -> dict | None:
     """결재 요청 생성"""
     url = f"{GATEWAY_URL}/approval/requests"
     headers = {
         "X-User-CompanyId": company_id,
         "X-User-UUID": member_id,
         "X-User-MemberPositionId": member_position_id,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": authorization
     }
 
     try:
