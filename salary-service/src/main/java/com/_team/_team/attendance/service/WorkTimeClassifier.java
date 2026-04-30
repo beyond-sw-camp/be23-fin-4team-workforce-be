@@ -43,7 +43,8 @@ public class WorkTimeClassifier {
         ).toMinutes();
 
         // 2. 휴게 차감
-        int payable = Math.max(0, stayMinutes - schedule.breakMinutes());
+        int breakMinutes = schedule.breakMinutes() != null ? schedule.breakMinutes() : 0;
+        int payable = Math.max(0, stayMinutes - breakMinutes);
 
         // 3. 야간 교차분 계산 (공휴일 여부 무관)
         int night = calculateNightMinutes(

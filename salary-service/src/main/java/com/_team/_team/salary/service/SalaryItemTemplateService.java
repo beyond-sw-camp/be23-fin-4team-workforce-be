@@ -23,9 +23,6 @@ import java.util.UUID;
 
 /**
  * 급여 항목 템플릿 서비스
- * - 급여 항목 CRUD 비즈니스 로직 처리
- * - 생성자 주입 방식 사용
- * - 읽기 전용 트랜잭션으로 더티체킹 스킵하여 성능 최적화
  */
 @Service
 @Transactional
@@ -110,7 +107,7 @@ public class SalaryItemTemplateService {
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
-    /** 급여 항목 템플릿 삭제 (soft delete, 더티체킹) */
+    /** 급여 항목 템플릿 삭제 */
     public void delete(UUID companyId, UUID salaryItemTemplateId) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
@@ -148,15 +145,18 @@ public class SalaryItemTemplateService {
      * - 식대/자가운전/보육수당/연구활동비 (비과세 각 월 20만원)
      */
     public SeedResult initializeDefaults(UUID companyId) {
+        // applyToAll=Y 인 항목은 회사 공통
+        // 식대/자가운전/보육수당/연구활동비/교통비 = 회사 공통 (정책 일률 지급)
+        // 직책수당/자녀수당 = 개인 차등 (직급, 자녀수에 따라 직원마다 다름)
         List<DefaultSpec> specs = List.of(
-                new DefaultSpec("기본급",         ItemType.EARNING, 10, "Y", TaxCategory.TAXABLE),
-                new DefaultSpec("직책수당",       ItemType.EARNING, 20, "Y", TaxCategory.TAXABLE),
-                new DefaultSpec("식대",           ItemType.EARNING, 30, "N", TaxCategory.MEAL),
-                new DefaultSpec("자가운전보조금", ItemType.EARNING, 40, "N", TaxCategory.VEHICLE_SELF),
-                new DefaultSpec("교통비",         ItemType.EARNING, 41, "Y", TaxCategory.TAXABLE),
-                new DefaultSpec("보육수당",       ItemType.EARNING, 50, "N", TaxCategory.CHILDCARE),
-                new DefaultSpec("자녀수당",       ItemType.EARNING, 51, "Y", TaxCategory.TAXABLE),
-                new DefaultSpec("연구활동비",     ItemType.EARNING, 60, "N", TaxCategory.RESEARCH)
+                new DefaultSpec("기본급",         ItemType.EARNING, 10, "Y", TaxCategory.TAXABLE,       null,    "N"),
+                new DefaultSpec("직책수당",       ItemType.EARNING, 20, "Y", TaxCategory.TAXABLE,       null,    "N"),
+                new DefaultSpec("식대",           ItemType.EARNING, 30, "N", TaxCategory.MEAL,          200000L, "Y"),
+                new DefaultSpec("자가운전보조금", ItemType.EARNING, 40, "N", TaxCategory.VEHICLE_SELF,  200000L, "Y"),
+                new DefaultSpec("교통비",         ItemType.EARNING, 41, "Y", TaxCategory.TAXABLE,       null,    "N"),
+                new DefaultSpec("보육수당",       ItemType.EARNING, 50, "N", TaxCategory.CHILDCARE,     200000L, "Y"),
+                new DefaultSpec("자녀수당",       ItemType.EARNING, 51, "Y", TaxCategory.TAXABLE,       null,    "N"),
+                new DefaultSpec("연구활동비",     ItemType.EARNING, 60, "N", TaxCategory.RESEARCH,      200000L, "Y")
         );
 
         List<SalaryItemTemplate> toSave = new ArrayList<>();
@@ -177,6 +177,8 @@ public class SalaryItemTemplateService {
                     .displayOrder(spec.order())
                     .isTaxableYn(spec.taxable())
                     .taxCategory(spec.category())
+                    .defaultAmount(spec.defaultAmount())
+                    .applyToAllYn(spec.applyToAll())
                     .delYn("N")
                     .build());
         }
@@ -209,7 +211,9 @@ public class SalaryItemTemplateService {
             ItemType type,
             int order,
             String taxable,
-            TaxCategory category
+            TaxCategory category,
+            Long defaultAmount,
+            String applyToAll
     ) {}
 
     public record SeedResult(int created, String message) {}

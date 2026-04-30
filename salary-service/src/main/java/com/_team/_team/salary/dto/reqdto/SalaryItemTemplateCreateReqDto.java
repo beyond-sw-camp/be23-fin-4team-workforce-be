@@ -33,6 +33,12 @@ public class SalaryItemTemplateCreateReqDto {
     // 정기 일률 고정 지급 항목만 Y 변동성 수당 및 비과세 실비 N
     private String isOrdinaryWageYn;
 
+    // 회사 기본 지급 금액
+    private Long defaultAmount;
+
+    // 회사 공통 적용 여부 Y/N
+    private String applyToAllYn;
+
     public SalaryItemTemplate toEntity(UUID companyId) {
         return SalaryItemTemplate.builder()
                 .companyId(companyId)
@@ -41,6 +47,8 @@ public class SalaryItemTemplateCreateReqDto {
                 .displayOrder(displayOrder)
                 .isTaxableYn(isTaxableYn)
                 .isOrdinaryWageYn("Y".equalsIgnoreCase(isOrdinaryWageYn) ? "Y" : "N")
+                .defaultAmount(defaultAmount)
+                .applyToAllYn("Y".equalsIgnoreCase(applyToAllYn) ? "Y" : "N")
                 // 커스텀 등록 시 자동 매핑
                 .taxCategory("Y".equals(isTaxableYn)
                         ? TaxCategory.TAXABLE

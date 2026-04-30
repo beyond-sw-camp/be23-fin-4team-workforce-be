@@ -42,7 +42,7 @@ public class OvertimePolicy extends BaseTimeEntity {
 
     /**
      * 승인 모드
-     * 사용자 결정: HYBRID (사전 + 사후 전자결재)
+     * 사용자 결정: HYBRID (사전 + 사후 전자결재) -> 사용자 결정 없앴음 -> HYBRID로 고정
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

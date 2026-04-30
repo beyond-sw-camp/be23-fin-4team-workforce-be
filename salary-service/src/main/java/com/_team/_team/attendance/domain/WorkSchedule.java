@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
@@ -69,10 +70,17 @@ public class WorkSchedule extends BaseTimeEntity {
     @Column
     private Integer workMinutes;
 
-    /** 휴게시간(분) - 점심 등 근무에서 제외되는 시간 */
-    @Column(nullable = false)
-    @Builder.Default
-    private Integer breakMinutes = 60;
+    /**
+     * 회사가 정한 점심·휴게 시작 시각 (예: 12:00).
+     * - FIXED: 모든 직원에게 일률 적용 (예: 12:00 ~ 13:00)
+     * - FLEXIBLE: 사용 안 함 (직원이 매월 슬롯 선택 시 MemberScheduleSelection 에 본인 점심 시작/종료를 정함)
+     */
+    @Column
+    private LocalTime breakStart;
+
+    /** 회사가 정한 점심·휴게 종료 시각 (예: 13:00) */
+    @Column
+    private LocalTime breakEnd;
 
     /**
      * 슬롯 선택 마감일 (매월 며칠까지 다음 달 슬롯을 선택해야 하는지)
@@ -111,10 +119,30 @@ public class WorkSchedule extends BaseTimeEntity {
             if (dto.getWorkMinutes() != null) this.workMinutes = dto.getWorkMinutes();
         }
 
-        if (dto.getBreakMinutes() != null) this.breakMinutes = dto.getBreakMinutes();
+        // FLEXIBLE 은 점심을 직원이 매월 정하므로 회사 정책 점심 시각은 비움.
+        if (this.workType == WorkType.FLEXIBLE) {
+            this.breakStart = null;
+            this.breakEnd = null;
+        } else {
+            if (dto.getBreakStart() != null) this.breakStart = dto.getBreakStart();
+            if (dto.getBreakEnd() != null) this.breakEnd = dto.getBreakEnd();
+        }
         if (dto.getSelectionDeadlineDay() != null) this.selectionDeadlineDay = dto.getSelectionDeadlineDay();
         if (dto.getEffectiveFrom() != null) this.effectiveFrom = dto.getEffectiveFrom();
         if (dto.getEffectiveTo() != null) this.effectiveTo = dto.getEffectiveTo();
+    }
+
+    /**
+     * breakStart/breakEnd 로부터 점심·휴게 시간(분) 산정.
+     * 시작이 종료보다 늦으면 자정을 넘긴 것으로 보고 +24h 보정.
+     * 둘 중 하나라도 null 이면 0 반환.
+     */
+    public int computeBreakMinutes() {
+        if (breakStart == null || breakEnd == null) return 0;
+        Duration d = Duration.between(breakStart, breakEnd);
+        long m = d.toMinutes();
+        if (m < 0) m += 24 * 60;
+        return (int) Math.max(0, m);
     }
 
     public void delete(){

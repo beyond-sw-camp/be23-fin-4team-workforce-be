@@ -161,17 +161,22 @@ public class PayrollService {
         List<PayrollItem> payrollItems = new ArrayList<>();
 
         for (SalaryItemTemplate template : templates) {
-             // 기본급은 baseSalary, 그 외 지급 항목은 MemberAllowance 금액, 없으면 0원
+             // 모든 EARNING 에 동일한 paidRatio (일할 + 무급휴직) 적용해서 정합성 유지
             long amount = 0L;
             if ("기본급".equals(template.getItemName())) {
-                // 기본급, 일할 + 무급휴직 반영
                 amount = (long) Math.floor(salary.getBaseSalary() * paidRatio);
-            }else if (template.getItemType() == ItemType.EARNING) {
-                // 그 외 EARNING, MemberAllowance 에서 조회 (없으면 0)
+            } else if (template.getItemType() == ItemType.EARNING) {
                 Long allowanceAmount = allowanceByTemplate.get(template.getSalaryItemTemplateId());
+                long base;
                 if (allowanceAmount != null) {
-                    amount = allowanceAmount;
+                    base = allowanceAmount;
+                } else if ("Y".equals(template.getApplyToAllYn())
+                        && template.getDefaultAmount() != null) {
+                    base = template.getDefaultAmount();
+                } else {
+                    base = 0L;
                 }
+                amount = (long) Math.floor(base * paidRatio);
             }
 
             PayrollItem payItem = PayrollItem.fromTemplate(saved, template, amount);
@@ -287,10 +292,17 @@ public class PayrollService {
          * 9. 과세 총지급액 기준 4대보험 + 세금 자동 공제
          * totalTaxableEarning: 비과세 제외 -> 실제 과세 대상 금액
          */
+        // 정산 시점에 감면 기간이 만료됐는지도 함께 판정 - 만료 후엔 감면율 0 으로 적용.
+        java.math.BigDecimal effectiveReductionRate =
+                salary.isTaxReductionApplicableAt(reqDto.getPayrollYearMonthDay())
+                        ? salary.getTaxReductionRate()
+                        : null;
         List<AutoPayrollItem> deductionItems = payrollCalculationService.calculateDeductions(
                 totalTaxableEarning,
                 reqDto.getPayrollYearMonthDay(),
-                salary.getDependentCount() == null ? 1 : salary.getDependentCount());
+                salary.getDependentCount() == null ? 1 : salary.getDependentCount(),
+                salary.getChildUnder20Count() == null ? 0 : salary.getChildUnder20Count(),
+                effectiveReductionRate);
 
         for(AutoPayrollItem deduction : deductionItems){
             PayrollItem payrollItem = buildPayrollItem(saved ,deduction);
@@ -373,7 +385,6 @@ public class PayrollService {
 
     /**
      * 급여 확정 (DRAFT -> CONFIRMED)
-     * DRAFT 상태에서만 확정 가능, 확정 후에는 수정, 삭제 불가
      */
     public PayrollResDto confirmPayroll(UUID companyId, UUID payrollId){
         Payroll payroll = payrollRepository.findByPayrollIdAndCompanyIdAndDelYn(payrollId, companyId, "N")

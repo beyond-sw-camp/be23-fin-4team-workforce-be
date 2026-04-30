@@ -47,7 +47,7 @@ public class MonthlyAttendanceLedger extends BaseTimeEntity {
     @Column(name = "ledger_year_month", nullable = false, length = 7)
     private String ledgerYearMonth;
 
-    /** 총 순 근무 시간(분) 휴게 제외, 휴가 차감 반영 */
+    /** 총 순 근무 시간(분), 휴가 차감 반영 */
     @Column(nullable = false)
     @Builder.Default
     private Integer totalWorkedMinutes = 0;
