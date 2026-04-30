@@ -18,7 +18,6 @@ import java.util.UUID;
 @Builder
 @Data
 public class WorkScheduleCreateReqDto {
-    private static final int DEFAULT_BREAK_MINUTES = 60;
 
     /** 개인 스케줄이면 memberId, 회사 기본이면 null */
     private UUID memberId;
@@ -35,7 +34,11 @@ public class WorkScheduleCreateReqDto {
 
     private Integer workMinutes;
 
-    private Integer breakMinutes;
+    /** 회사 정책 점심·휴게 시작 시각 */
+    private LocalTime breakStart;
+
+    /** 회사 정책 점심·휴게 종료 시각 */
+    private LocalTime breakEnd;
 
     @NotNull(message = "시작일은 필수입니다.")
     private LocalDate effectiveFrom;
@@ -44,6 +47,7 @@ public class WorkScheduleCreateReqDto {
     private LocalDate effectiveTo;
 
     public WorkSchedule toEntity(UUID companyId){
+        boolean isFlexible = this.workType == WorkType.FLEXIBLE;
         return WorkSchedule.builder()
                 .companyId(companyId)
                 .memberId(this.memberId)
@@ -52,7 +56,8 @@ public class WorkScheduleCreateReqDto {
                 .startTime(this.startTime)
                 .endTime(this.endTime)
                 .workMinutes(this.workMinutes)
-                .breakMinutes(this.breakMinutes != null ? this.breakMinutes : DEFAULT_BREAK_MINUTES)
+                .breakStart(isFlexible ? null : (this.breakStart != null ? this.breakStart : LocalTime.of(12, 0)))
+                .breakEnd(isFlexible ? null : (this.breakEnd != null ? this.breakEnd : LocalTime.of(13, 0)))
                 .effectiveFrom(this.effectiveFrom)
                 .effectiveTo(this.effectiveTo)
                 .build();

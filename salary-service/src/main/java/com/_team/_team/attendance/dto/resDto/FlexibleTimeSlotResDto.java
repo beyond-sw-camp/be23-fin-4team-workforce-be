@@ -25,7 +25,10 @@ public class FlexibleTimeSlotResDto {
     private LocalTime startTime;
     private LocalTime endTime;
     private Integer workMinutes;
-    private Integer breakMinutes;
+    /** 슬롯에 박힌 점심·휴게 시작 시각 - 직원이 슬롯을 고르면 자동 적용 */
+    private LocalTime breakStart;
+    /** 슬롯에 박힌 점심·휴게 종료 시각 */
+    private LocalTime breakEnd;
     private Boolean isDefault;
     private String activeYn;
 
@@ -38,7 +41,8 @@ public class FlexibleTimeSlotResDto {
                 .startTime(slot.getStartTime())
                 .endTime(slot.getEndTime())
                 .workMinutes(slot.getWorkMinutes())
-                .breakMinutes(slot.getBreakMinutes())
+                .breakStart(slot.getBreakStart())
+                .breakEnd(slot.getBreakEnd())
                 .isDefault(slot.getIsDefault())
                 .activeYn(slot.getActiveYn())
                 .build();

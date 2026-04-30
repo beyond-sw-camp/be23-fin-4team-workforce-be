@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -80,7 +79,7 @@ public class ScheduleResolver {
                     schedule.getStartTime(),
                     schedule.getEndTime(),
                     schedule.getWorkMinutes(),
-                    schedule.getBreakMinutes()
+                    schedule.computeBreakMinutes()
             );
         }
 
@@ -100,8 +99,10 @@ public class ScheduleResolver {
                 .orElse(null);
 
         UUID slotId;
+        Integer memberSelectedBreak = null;
         if (selection != null) {
             slotId = selection.getSlotId();
+            memberSelectedBreak = selection.computeBreakMinutes(); // 직원이 선택한 점심시간 시작/종료 → 분
         } else {
             // 4. 선택 없으면 기본 슬롯
             FlexibleTimeSlot defaultSlot = flexibleTimeSlotRepository
@@ -119,13 +120,15 @@ public class ScheduleResolver {
                         HttpStatus.NOT_FOUND,
                         "시차출퇴근제 스케줄이 등록되어있지 않습니다."));
 
+        int breakMinutes = memberSelectedBreak != null ? memberSelectedBreak : 0;
+
         return ResolvedSchedule.fromFlexible(
                 schedule.getWorkScheduleId(),
                 slot.getSlotId(),
                 slot.getStartTime(),
                 slot.getEndTime(),
                 slot.getWorkMinutes(),
-                slot.getBreakMinutes()
+                breakMinutes
         );
     }
 }

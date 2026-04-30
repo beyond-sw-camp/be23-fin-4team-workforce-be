@@ -84,6 +84,18 @@ public class AttendanceLogController {
         );
     }
 
+    // 퇴근 취소 — 직원이 잘못 누른 경우 (오늘자, ClosureStatus=OPEN 한정)
+    @DeleteMapping("/clock-out")
+    public ResponseEntity<?> cancelClockOut(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId) {
+        DailyAttendanceResDto resDto = attendanceLogService.cancelClockOut(companyId, memberId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "퇴근이 취소되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
 
     // ==================== 개인 조회 ====================
 

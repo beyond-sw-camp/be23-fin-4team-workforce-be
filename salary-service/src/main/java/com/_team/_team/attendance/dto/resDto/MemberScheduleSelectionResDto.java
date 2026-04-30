@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.UUID;
 
 /**
@@ -24,6 +25,12 @@ public class MemberScheduleSelectionResDto {
     private UUID memberId;
     private String targetYearMonth;
     private UUID slotId;
+    /** FLEXIBLE 직원이 매월 선택한 점심·휴게 시작 시각 */
+    private LocalTime breakStart;
+    /** FLEXIBLE 직원이 매월 선택한 점심·휴게 종료 시각 */
+    private LocalTime breakEnd;
+    /** breakStart/breakEnd 로부터 계산된 점심 분(편의용) */
+    private Integer breakMinutes;
     private ScheduleApprovalStatus approvalStatus;
     private String requestReason;
     private UUID requestedBy;
@@ -39,6 +46,9 @@ public class MemberScheduleSelectionResDto {
                 .memberId(s.getMemberId())
                 .targetYearMonth(s.getTargetYearMonth())
                 .slotId(s.getSlotId())
+                .breakStart(s.getBreakStart())
+                .breakEnd(s.getBreakEnd())
+                .breakMinutes(s.computeBreakMinutes())
                 .approvalStatus(s.getApprovalStatus())
                 .requestReason(s.getRequestReason())
                 .requestedBy(s.getRequestedBy())

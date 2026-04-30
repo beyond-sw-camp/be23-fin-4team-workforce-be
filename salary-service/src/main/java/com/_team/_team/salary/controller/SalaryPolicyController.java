@@ -71,8 +71,9 @@ public class SalaryPolicyController {
     @DeleteMapping("/{salaryPolicyId}")
     public ResponseEntity<?> delete(
             @RequestHeader("X-User-CompanyId") UUID companyId,
-            @PathVariable UUID salaryPolicyId) {
-        salaryService.delete(companyId, salaryPolicyId);
+            @PathVariable UUID salaryPolicyId,
+            @RequestParam(value = "force", required = false, defaultValue = "false") boolean force) {
+        salaryService.delete(companyId, salaryPolicyId, force);
         return new ResponseEntity<>(
                 ApiResponse.success(null, "급여 정책이 삭제되었습니다."),
                 HttpStatus.OK
