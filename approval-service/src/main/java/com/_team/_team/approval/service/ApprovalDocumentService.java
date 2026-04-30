@@ -89,20 +89,6 @@ public class ApprovalDocumentService {
                 {
                   "fields": [
                     { "name": "title", "label": "제목", "type": "text", "required": true },
-                    {
-                      "name": "timing",
-                      "label": "신청 구분",
-                      "type": "select",
-                      "required": true,
-                      "options": ["사전","사후"]
-                    },
-                    {
-                      "name": "workType",
-                      "label": "근무구분",
-                      "type": "select",
-                      "required": true,
-                      "options": ["연장","야간","휴일"]
-                    },
                     { "name": "workDate",      "label": "근무일자",  "type": "date",     "required": true },
                     { "name": "startTime",     "label": "시작시간",  "type": "time",     "required": true },
                     { "name": "endTime",       "label": "종료시간",  "type": "time",     "required": true },
