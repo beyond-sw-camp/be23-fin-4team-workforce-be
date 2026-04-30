@@ -51,6 +51,7 @@ public class ApprovalService {
     private final OfficialRecipientRepository officialRecipientRepository;
     private final MemberServiceClient memberServiceClient;
     private final CalendarApprovalEventPublisher calendarApprovalEventPublisher;
+    private final ResignationApprovalEventPublisher resignationApprovalEventPublisher;
 
     private final ApplicationEventPublisher eventPublisher;
     private final LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher;
@@ -67,7 +68,7 @@ public class ApprovalService {
                            ObjectMapper objectMapper,
                            OfficialRecipientRepository officialRecipientRepository,
                            MemberServiceClient memberServiceClient,
-                           CalendarApprovalEventPublisher calendarApprovalEventPublisher,
+                           CalendarApprovalEventPublisher calendarApprovalEventPublisher, ResignationApprovalEventPublisher resignationApprovalEventPublisher,
                            ApplicationEventPublisher eventPublisher,
                            LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher) {
         this.approvalRepository = approvalRepository;
@@ -82,6 +83,7 @@ public class ApprovalService {
         this.officialRecipientRepository = officialRecipientRepository;
         this.memberServiceClient = memberServiceClient;
         this.calendarApprovalEventPublisher = calendarApprovalEventPublisher;
+        this.resignationApprovalEventPublisher = resignationApprovalEventPublisher;
         this.eventPublisher = eventPublisher;
         this.leaveOfAbsenceApprovalEventPublisher = leaveOfAbsenceApprovalEventPublisher;
     }
@@ -200,6 +202,7 @@ public class ApprovalService {
             publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.APPROVE, reqDto.getComment());
             publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.APPROVE);
             publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId, LeaveOfAbsenceApprovalEvent.Action.APPROVE, null);
+            publishResignationEventIfApplicable(request, actualMemberId, ResignationApprovalEvent.Action.APPROVE, null);
         }
 
         List<Approval> allApprovals =
@@ -381,6 +384,8 @@ public class ApprovalService {
         publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
         publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId,
                 LeaveOfAbsenceApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishResignationEventIfApplicable(request, actualMemberId,
+                ResignationApprovalEvent.Action.REJECT, reqDto.getComment());
 
         // 반려 시 REJECT 이벤트 발행
         publishLeaveEventIfApplicable(request, actualMemberId,
@@ -574,6 +579,37 @@ public class ApprovalService {
                         .requestId(request.getRequestId())
                         .leaveRequestId(leaveRequestId)
                         .leaveDate(startDate)
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .note(note)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // 사직서 문서일 때만 resignation 이벤트 발행
+    private void publishResignationEventIfApplicable(ApprovalRequest request,
+                                                     UUID approverId,
+                                                     ResignationApprovalEvent.Action action,
+                                                     String note) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"사직서".equals(docName)) return;
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) return;
+
+        LocalDate resignDate = dateOrNull(node, "resignDate");
+        String reason = textOrNull(node, "resignReason");
+        String detail = textOrNull(node, "detail");
+
+        resignationApprovalEventPublisher.publish(
+                ResignationApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .resignDate(resignDate)
+                        .resignReason(reason)
+                        .detail(detail)
                         .approverId(approverId)
                         .decidedAt(LocalDateTime.now())
                         .note(note)
