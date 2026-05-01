@@ -45,9 +45,11 @@ public class AttendanceCorrectionApprovalEventConsumer {
                         event.getRequestedClockIn(),
                         event.getRequestedClockOut(),
                         event.getReason());
-                case REJECT, CANCEL -> log.info(
-                        "[AttendanceCorrection] {} 처리 - 일일근태 변경 없음, requestId={}",
-                        event.getAction(), event.getRequestId());
+                // 반려/취소 - submit 시점에 격리한 일일근태를 OPEN 으로 복구 + 정정 로그 삭제 + 원본 시각 복구
+                case REJECT, CANCEL -> attendanceCorrectionService.cancelSubmittedCorrection(
+                        event.getCompanyId(),
+                        event.getMemberId(),
+                        event.getAttendanceDate());
             }
         } catch (Exception e) {
             log.error("[AttendanceCorrection] consume failed. requestId={}", event.getRequestId(), e);

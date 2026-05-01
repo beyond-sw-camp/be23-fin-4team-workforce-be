@@ -25,6 +25,10 @@ import com._team._team.approval.repository.ApprovalSearchOutboxRepository;
 import com._team._team.event.ApprovalChangedEvent;
 import com._team._team.event.ApprovalDeletedEvent;
 import com._team._team.event.ApprovalSavedEvent;
+import com._team._team.event.AttendanceCorrectionSubmittedEvent;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -54,10 +58,11 @@ public class ApprovalRequestService {
     private final ApplicationEventPublisher eventPublisher;
     private final ApprovalSearchOutboxRepository approvalSearchOutboxRepository;
     private final ObjectMapper objectMapper;
+    private final AttendanceCorrectionSubmittedEventPublisher attendanceCorrectionSubmittedEventPublisher;
 
 
     @Autowired
-    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService, OfficialRecipientRepository officialRecipientRepository, OfficialNumberService officialNumberService, ApplicationEventPublisher eventPublisher, ApprovalSearchOutboxRepository approvalSearchOutboxRepository, ObjectMapper objectMapper) {
+    public ApprovalRequestService(ApprovalRequestRepository approvalRequestRepository, ApprovalDocumentRepository approvalDocumentRepository, ApprovalRepository approvalRepository, ApprovalViewerRepository approvalViewerRepository, AttachmentService attachmentService, MemberServiceClient memberServiceClient, ApprovalNotificationService approvalNotificationService, OfficialRecipientRepository officialRecipientRepository, OfficialNumberService officialNumberService, ApplicationEventPublisher eventPublisher, ApprovalSearchOutboxRepository approvalSearchOutboxRepository, ObjectMapper objectMapper, AttendanceCorrectionSubmittedEventPublisher attendanceCorrectionSubmittedEventPublisher) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalDocumentRepository = approvalDocumentRepository;
         this.approvalRepository = approvalRepository;
@@ -70,6 +75,7 @@ public class ApprovalRequestService {
         this.eventPublisher = eventPublisher;
         this.approvalSearchOutboxRepository = approvalSearchOutboxRepository;
         this.objectMapper = objectMapper;
+        this.attendanceCorrectionSubmittedEventPublisher = attendanceCorrectionSubmittedEventPublisher;
     }
 
 //    결재요청 생성(결재라인 + 참조/공람자 포함)
@@ -248,6 +254,9 @@ public class ApprovalRequestService {
                     .orElseThrow(() -> new BusinessException(
                             HttpStatus.INTERNAL_SERVER_ERROR, "첫 결재자를 찾을 수 없습니다."));
             approvalNotificationService.notifyApprovalRequested(savedRequest, firstApproval, savedViewers);
+
+            // 근태정정신청 양식이면 일일근태 격리(UNDER_REVIEW)용 이벤트 발행
+            publishAttendanceCorrectionSubmittedIfApplicable(document, savedRequest, memberId);
         }
 
         // === [수정] fromEntity 호출 — recipients 인자 추가 ===
@@ -808,6 +817,74 @@ public ApprovalRequestResDto sendOfficial(UUID companyId, UUID memberId, UUID me
 
     return ApprovalRequestResDto.fromEntity(request, approvals, viewers, recipientDtos);
 }
+
+    // 근태정정신청 양식 결재 상신 시 일일근태 격리(UNDER_REVIEW) 이벤트 발행
+    // 출/퇴근시각은 LocalDateTime 생성
+    private void publishAttendanceCorrectionSubmittedIfApplicable(ApprovalDocument document,
+                                                                  ApprovalRequest request,
+                                                                  UUID memberId) {
+        if (!"근태정정신청".equals(document.getDocumentName())) return;
+
+        JsonNode node = readContentSafely(request.getContentJson());
+        if (node == null) return;
+
+        LocalDate date = parseDateOrNull(node, "attendanceDate");
+        if (date == null) {
+            log.warn("[AttendanceCorrectionSubmit] 정정 일자 누락, requestId={}", request.getRequestId());
+            return;
+        }
+
+        try {
+            attendanceCorrectionSubmittedEventPublisher.publish(
+                    AttendanceCorrectionSubmittedEvent.builder()
+                            .companyId(document.getCompanyId())
+                            .memberId(memberId)
+                            .requestId(request.getRequestId())
+                            .attendanceDate(date)
+                            .requestedClockIn(combineLocalDateTime(date, parseTextOrNull(node, "requestedClockIn")))
+                            .requestedClockOut(combineLocalDateTime(date, parseTextOrNull(node, "requestedClockOut")))
+                            .reason(parseTextOrNull(node, "reason"))
+                            .submittedBy(memberId)
+                            .submittedAt(LocalDateTime.now())
+                            .build());
+        } catch (Exception e) {
+            log.error("[AttendanceCorrectionSubmit] publish 실패 - 결재 상신은 진행, requestId={}",
+                    request.getRequestId(), e);
+        }
+    }
+
+    private JsonNode readContentSafely(String json) {
+        if (json == null) return null;
+        try {
+            return objectMapper.readTree(json);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String parseTextOrNull(JsonNode node, String field) {
+        JsonNode n = node.get(field);
+        return (n != null && !n.isNull()) ? n.asText() : null;
+    }
+
+    private LocalDate parseDateOrNull(JsonNode node, String field) {
+        String text = parseTextOrNull(node, field);
+        if (text == null || text.isBlank()) return null;
+        try {
+            return LocalDate.parse(text);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private LocalDateTime combineLocalDateTime(LocalDate date, String time) {
+        if (date == null || time == null || time.isBlank()) return null;
+        try {
+            return LocalDateTime.of(date, LocalTime.parse(time));
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     // ======== 검색 인덱싱 이벤트 처리 (Outbox 패턴) ========
 
