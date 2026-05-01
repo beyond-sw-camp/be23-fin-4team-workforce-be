@@ -99,6 +99,25 @@ public class ApprovalDocumentService {
             """)
                 .build());
 
+        // 근태 정정 신청
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("근태정정신청")
+                .requestType(RequestType.ATTENDANCE)
+                .isCalendarVisibleYn("N")
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",             "label": "제목",         "type": "text",           "required": true },
+                    { "name": "attendanceDate",    "label": "정정 일자",    "type": "date",           "required": true },
+                    { "name": "requestedClockIn",  "label": "정정 출근시각","type": "datetime-local"                   },
+                    { "name": "requestedClockOut", "label": "정정 퇴근시각","type": "datetime-local"                   },
+                    { "name": "reason",            "label": "정정 사유",    "type": "textarea",       "required": true }
+                  ]
+                }
+            """)
+                .build());
+
         // ========== HR ==========
 
         approvalDocumentRepository.save(ApprovalDocument.builder()
