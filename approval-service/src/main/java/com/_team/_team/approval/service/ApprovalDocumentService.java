@@ -118,6 +118,24 @@ public class ApprovalDocumentService {
             """)
                 .build());
 
+        // 조퇴계 - 7일 이내 일자, 조퇴 시각, 사유. 승인 시 정규 8h 유지
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("조퇴계")
+                .requestType(RequestType.ATTENDANCE)
+                .isCalendarVisibleYn("N")
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",          "label": "제목",         "type": "text",     "required": true },
+                    { "name": "attendanceDate", "label": "조퇴 일자",    "type": "date",     "required": true },
+                    { "name": "earlyLeaveTime", "label": "조퇴 시각",    "type": "time",     "required": true },
+                    { "name": "reason",         "label": "조퇴 사유",    "type": "textarea", "required": true }
+                  ]
+                }
+            """)
+                .build());
+
         // ========== HR ==========
 
         approvalDocumentRepository.save(ApprovalDocument.builder()

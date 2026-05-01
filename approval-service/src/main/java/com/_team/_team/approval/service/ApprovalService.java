@@ -53,6 +53,7 @@ public class ApprovalService {
     private final CalendarApprovalEventPublisher calendarApprovalEventPublisher;
     private final ResignationApprovalEventPublisher resignationApprovalEventPublisher;
     private final AttendanceCorrectionApprovalEventPublisher attendanceCorrectionApprovalEventPublisher;
+    private final EarlyLeaveApprovalEventPublisher earlyLeaveApprovalEventPublisher;
 
     private final ApplicationEventPublisher eventPublisher;
     private final LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher;
@@ -71,6 +72,7 @@ public class ApprovalService {
                            MemberServiceClient memberServiceClient,
                            CalendarApprovalEventPublisher calendarApprovalEventPublisher, ResignationApprovalEventPublisher resignationApprovalEventPublisher,
                            AttendanceCorrectionApprovalEventPublisher attendanceCorrectionApprovalEventPublisher,
+                           EarlyLeaveApprovalEventPublisher earlyLeaveApprovalEventPublisher,
                            ApplicationEventPublisher eventPublisher,
                            LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher) {
         this.approvalRepository = approvalRepository;
@@ -87,6 +89,7 @@ public class ApprovalService {
         this.calendarApprovalEventPublisher = calendarApprovalEventPublisher;
         this.resignationApprovalEventPublisher = resignationApprovalEventPublisher;
         this.attendanceCorrectionApprovalEventPublisher = attendanceCorrectionApprovalEventPublisher;
+        this.earlyLeaveApprovalEventPublisher = earlyLeaveApprovalEventPublisher;
         this.eventPublisher = eventPublisher;
         this.leaveOfAbsenceApprovalEventPublisher = leaveOfAbsenceApprovalEventPublisher;
     }
@@ -207,6 +210,7 @@ public class ApprovalService {
             publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId, LeaveOfAbsenceApprovalEvent.Action.APPROVE, null);
             publishResignationEventIfApplicable(request, actualMemberId, ResignationApprovalEvent.Action.APPROVE, null);
             publishAttendanceCorrectionEventIfApplicable(request, actualMemberId, AttendanceCorrectionApprovalEvent.Action.APPROVE, null);
+            publishEarlyLeaveEventIfApplicable(request, actualMemberId, EarlyLeaveApprovalEvent.Action.APPROVE, null);
         }
 
         List<Approval> allApprovals =
@@ -392,6 +396,8 @@ public class ApprovalService {
                 ResignationApprovalEvent.Action.REJECT, reqDto.getComment());
         publishAttendanceCorrectionEventIfApplicable(request, actualMemberId,
                 AttendanceCorrectionApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishEarlyLeaveEventIfApplicable(request, actualMemberId,
+                EarlyLeaveApprovalEvent.Action.REJECT, reqDto.getComment());
 
         // 반려 시 REJECT 이벤트 발행
         publishLeaveEventIfApplicable(request, actualMemberId,
@@ -616,6 +622,39 @@ public class ApprovalService {
                         .resignDate(resignDate)
                         .resignReason(reason)
                         .detail(detail)
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .note(note)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // 조퇴계 - 승인 시 퇴근시간 정정 + 정규 8h 보정
+    private void publishEarlyLeaveEventIfApplicable(ApprovalRequest request,
+                                                     UUID approverId,
+                                                     EarlyLeaveApprovalEvent.Action action,
+                                                     String note) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"조퇴계".equals(docName)) return;
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) return;
+
+        LocalDate date = dateOrNull(node, "attendanceDate");
+        if (date == null) {
+            log.warn("[EarlyLeave] 조퇴 일자 누락, requestId={}", request.getRequestId());
+            return;
+        }
+
+        earlyLeaveApprovalEventPublisher.publish(
+                EarlyLeaveApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .attendanceDate(date)
+                        .earlyLeaveAt(combineDateTime(date, textOrNull(node, "earlyLeaveTime")))
+                        .reason(textOrNull(node, "reason"))
                         .approverId(approverId)
                         .decidedAt(LocalDateTime.now())
                         .note(note)
