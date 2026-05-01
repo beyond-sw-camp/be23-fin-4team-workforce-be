@@ -108,11 +108,11 @@ public class ApprovalDocumentService {
                 .formSchema("""
                 {
                   "fields": [
-                    { "name": "title",             "label": "제목",         "type": "text",           "required": true },
-                    { "name": "attendanceDate",    "label": "정정 일자",    "type": "date",           "required": true },
-                    { "name": "requestedClockIn",  "label": "정정 출근시각","type": "datetime-local"                   },
-                    { "name": "requestedClockOut", "label": "정정 퇴근시각","type": "datetime-local"                   },
-                    { "name": "reason",            "label": "정정 사유",    "type": "textarea",       "required": true }
+                    { "name": "title",             "label": "제목",         "type": "text",     "required": true },
+                    { "name": "attendanceDate",    "label": "정정 일자",    "type": "date",     "required": true },
+                    { "name": "requestedClockIn",  "label": "정정 출근시각","type": "time"                       },
+                    { "name": "requestedClockOut", "label": "정정 퇴근시각","type": "time"                       },
+                    { "name": "reason",            "label": "정정 사유",    "type": "textarea", "required": true }
                   ]
                 }
             """)

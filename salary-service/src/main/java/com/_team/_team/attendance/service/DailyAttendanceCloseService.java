@@ -279,6 +279,43 @@ public class DailyAttendanceCloseService {
     }
 
     /**
+     * 결재 통합 정정 승인 시 재계산 + FINALIZED 직행
+     * - LOCKED 만 스킵 (월마감 후)
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recalculateAndFinalizeForCorrection(UUID dailyAttendanceId) {
+        DailyAttendance da = dailyAttendanceRepository.findById(dailyAttendanceId)
+                .orElse(null);
+        if (da == null) return;
+
+        if (da.getClosureStatus() == ClosureStatus.LOCKED) {
+            log.warn("[AttendanceCorrection] LOCKED 상태라 정정 적용 불가 dailyId={}", dailyAttendanceId);
+            return;
+        }
+
+        ResolvedSchedule schedule = scheduleResolver.resolve(
+                da.getMemberId(), da.getCompanyId(), da.getAttendanceDate());
+
+        boolean isHoliday = companyHolidayRepository.existsByCompanyIdAndHolidayDate(
+                da.getCompanyId(), da.getAttendanceDate());
+
+        Integer approvedOt = overtimeRequestRepository.sumApprovedMinutes(
+                da.getMemberId(), da.getAttendanceDate());
+        int approvedMinutes = approvedOt == null ? 0 : approvedOt;
+
+        OvertimePolicy otPolicy = overtimePolicyRepository
+                .findEffective(da.getCompanyId(), da.getAttendanceDate())
+                .orElseThrow(() -> new IllegalStateException(
+                        "OvertimePolicy not found. companyId=" + da.getCompanyId()));
+
+        WorkTimeBreakdown breakdown = workTimeClassifier.classify(
+                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeFloorMinutes());
+
+        da.applyWorkResult(breakdown.totalPayableMinutes(), breakdown.overtimeMinutes());
+        da.transitionClosure(ClosureStatus.FINALIZED);
+    }
+
+    /**
      * 정정 신청 승인 시 재계산 + FINALIZED 직행
      * - UNDER_REVIEW 상태 DA 만 처리
      * - draftOne / finalizeOne 과 동일한 분류 로직을 거쳐 workedMinutes / overtimeMinutes 갱신
