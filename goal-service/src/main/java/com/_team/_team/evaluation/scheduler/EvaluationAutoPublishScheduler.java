@@ -56,7 +56,7 @@ public class EvaluationAutoPublishScheduler {
     public void autoPublishDueSeasons() {
         LocalDate today = LocalDate.now();
         List<EvaluationSeason> candidates = seasonRepository.findAll().stream()
-                .filter(s -> s.getStatus() == SeasonStatus.ACTIVE)
+                .filter(s -> s.getStatus() == SeasonStatus.GRADE_CONFIRM)
                 .filter(s -> s.getResultsPublishedAt() == null)
                 .filter(s -> s.getResultPublishDate() != null)
                 .filter(s -> !s.getResultPublishDate().isAfter(today))
