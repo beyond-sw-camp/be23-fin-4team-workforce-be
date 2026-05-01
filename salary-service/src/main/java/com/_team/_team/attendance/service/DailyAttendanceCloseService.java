@@ -78,7 +78,7 @@ public class DailyAttendanceCloseService {
         int leaveReflected = leaveAttendanceReflector.reflectForDate(targetDate);
         log.info("[DRAFT] 휴가 반영 count={}", leaveReflected);
 
-        // 1단계: ACTIVE 휴직 -> 해당일 DailyAttendance LEAVE (endExpired 전에 수행 -> 마지막 휴직일 targetDate 반영 가능)
+        // 1단계: 휴직 -> 일일근태에 LEAVE
         int loaReflected = leaveOfAbsenceAttendanceReflector.reflectForDate(targetDate);
         log.info("[DRAFT] 휴직 근태 반영 count={}", loaReflected);
 
@@ -243,6 +243,42 @@ public class DailyAttendanceCloseService {
     }
 
     /**
+     * 사후 휴가 승인 반영 후 재계산
+     * - LOCKED이면 스킵, LEAVE 면 무효 처리
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recalculateAfterLeaveApproval(UUID dailyAttendanceId) {
+        DailyAttendance da = dailyAttendanceRepository.findById(dailyAttendanceId)
+                .orElse(null);
+        if (da == null) return;
+
+        if (da.getClosureStatus() == ClosureStatus.LOCKED) {
+            log.warn("[Leave] LOCKED 상태라 사후 휴가 재계산 스킵 dailyId={}", dailyAttendanceId);
+            return;
+        }
+        // 스케줄 조회
+        ResolvedSchedule schedule = scheduleResolver.resolve(
+                da.getMemberId(), da.getCompanyId(), da.getAttendanceDate());
+        // 휴일인지 확인
+        boolean isHoliday = companyHolidayRepository.existsByCompanyIdAndHolidayDate(
+                da.getCompanyId(), da.getAttendanceDate());
+        // 초과근무 확인
+        Integer approvedOt = overtimeRequestRepository.sumApprovedMinutes(
+                da.getMemberId(), da.getAttendanceDate());
+        int approvedMinutes = approvedOt == null ? 0 : approvedOt;
+        // 초과 근무 정책 확인
+        OvertimePolicy otPolicy = overtimePolicyRepository
+                .findEffective(da.getCompanyId(), da.getAttendanceDate())
+                .orElseThrow(() -> new IllegalStateException(
+                        "OvertimePolicy not found. companyId=" + da.getCompanyId()));
+
+        WorkTimeBreakdown breakdown = workTimeClassifier.classify(
+                da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeFloorMinutes());
+
+        da.applyWorkResult(breakdown.totalPayableMinutes(), breakdown.overtimeMinutes());
+    }
+
+    /**
      * 정정 신청 승인 시 재계산 + FINALIZED 직행
      * - UNDER_REVIEW 상태 DA 만 처리
      * - draftOne / finalizeOne 과 동일한 분류 로직을 거쳐 workedMinutes / overtimeMinutes 갱신
@@ -258,25 +294,25 @@ public class DailyAttendanceCloseService {
             throw new IllegalStateException(
                     "검토 대기(UNDER_REVIEW) 상태가 아닙니다. status=" + da.getClosureStatus());
         }
-
+        // 스케줄 확인
         ResolvedSchedule schedule = scheduleResolver.resolve(
                 da.getMemberId(), da.getCompanyId(), da.getAttendanceDate());
-
+        // 휴일 확인
         boolean isHoliday = companyHolidayRepository.existsByCompanyIdAndHolidayDate(
                 da.getCompanyId(), da.getAttendanceDate());
-
+        // 초과 근무 확인
         Integer approvedOt = overtimeRequestRepository.sumApprovedMinutes(
                 da.getMemberId(), da.getAttendanceDate());
         int approvedMinutes = approvedOt == null ? 0 : approvedOt;
-
+        // 초과근무 정책 확인
         OvertimePolicy otPolicy = overtimePolicyRepository
                 .findEffective(da.getCompanyId(), da.getAttendanceDate())
                 .orElseThrow(() -> new IllegalStateException(
                         "OvertimePolicy not found. companyId=" + da.getCompanyId()));
-
+        // 일 근태 종합 정리
         WorkTimeBreakdown breakdown = workTimeClassifier.classify(
                 da, schedule, isHoliday, approvedMinutes, otPolicy.getOvertimeFloorMinutes());
-
+        // 근태 반영
         da.applyWorkResult(breakdown.totalPayableMinutes(), breakdown.overtimeMinutes());
         da.transitionClosure(ClosureStatus.FINALIZED);
     }

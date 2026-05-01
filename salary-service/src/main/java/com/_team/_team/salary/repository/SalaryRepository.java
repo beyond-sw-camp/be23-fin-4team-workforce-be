@@ -34,6 +34,24 @@ public interface SalaryRepository extends JpaRepository<Salary, UUID> {
                                       @Param("companyId") UUID companyId,
                                       @Param("date") LocalDate date);
 
+    /**
+     * 정산기간과 겹치는 Salary 조회
+     * 월 중간 퇴사여도 그 달 정산기간에 일부 active 였던 Salary 를 찾아 일할 계산에 사용
+     */
+    @Query("""
+        SELECT s FROM Salary s
+        WHERE s.memberId = :memberId
+          AND s.companyId = :companyId
+          AND s.effectiveFrom <= :periodEnd
+          AND (s.effectiveTo IS NULL OR s.effectiveTo >= :periodStart)
+        ORDER BY s.effectiveFrom DESC
+        """)
+    List<Salary> findSalariesOverlappingPeriod(
+            @Param("memberId") UUID memberId,
+            @Param("companyId") UUID companyId,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("periodEnd") LocalDate periodEnd);
+
     // 급여 계산 배치시 회사 ID 조회
     @Query("SELECT DISTINCT s.companyId FROM Salary s")
     List<UUID> findDistinctCompanyIds();

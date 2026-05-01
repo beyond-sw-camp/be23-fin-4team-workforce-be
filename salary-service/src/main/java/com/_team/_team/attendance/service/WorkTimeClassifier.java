@@ -36,6 +36,14 @@ public class WorkTimeClassifier {
             return handleNoClockInOut(daily, schedule);
         }
 
+        // 전일 휴가(LEAVE) 확정일 출근은 무효 처리, 휴가 차감만 적용
+        // 반차(HALF)는 일부 출근이 정상 케이스이므로 아래 평일 분류로 진행
+        if (daily.getStatus() == AttendanceStatus.LEAVE) {
+            return new WorkTimeBreakdown(
+                    0, 0, 0, 0, 0, schedule.workMinutes(), 0, 0
+            );
+        }
+
         // 1. 체류 시간 계산
         int stayMinutes = (int) Duration.between(
                 daily.getFirstClockIn(),
@@ -58,7 +66,7 @@ public class WorkTimeClassifier {
             );
         }
 
-        // 5. 평일 근무 분류
+        // 5. 평일 근무 분류 (반차여도 8시간 초과분만 overtime)
         int regular = Math.min(payable, schedule.workMinutes());
         int actualOt = Math.max(0, payable - schedule.workMinutes());
         int overtime = Math.min(actualOt, approvedOvertimeMinutes);

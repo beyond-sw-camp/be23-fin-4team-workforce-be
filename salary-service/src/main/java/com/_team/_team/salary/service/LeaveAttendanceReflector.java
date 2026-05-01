@@ -12,8 +12,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * 승인된 휴가신청을 일일근태에 반영
@@ -57,16 +59,39 @@ public class LeaveAttendanceReflector {
     }
 
     /**
-     * 한 건의 LeaveRequest 를 DailyAttendance 에 반영
-     * [로직]
+     * 사후 휴가 승인 시 호출, 휴가 기간 내 모든 날짜의 일일근태에 반영
+     * 마감 후 케이스 재계산용
+     */
+    @Transactional
+    public List<UUID> reflectForLeaveRequest(LeaveRequest leave) {
+        List<UUID> affected = new ArrayList<>();
+        LocalDate cur = leave.getStartDate();
+        LocalDate end = leave.getEndDate();
+        while (!cur.isAfter(end)) {
+            try {
+                UUID daId = applyLeaveToAttendance(leave, cur);
+                if (daId != null) affected.add(daId);
+            } catch (Exception e) {
+                log.error("[LeaveReflect] 사후반영 실패 leaveRequestId={}, date={}",
+                        leave.getLeaveRequestId(), cur, e);
+            }
+            cur = cur.plusDays(1);
+        }
+        log.info("[LeaveReflect] 사후반영 완료 leaveRequestId={}, affected={}",
+                leave.getLeaveRequestId(), affected.size());
+        return affected;
+    }
+
+    /**
+     * 한 건의 휴가승인요청 일일근태에 반영
      * 1. usageDays 로 status 결정 (1.0 미만이면 HALF, 이상이면 LEAVE)
-     * 2. DailyAttendance(memberId, targetDate) 기존 레코드 조회
-     * 3-A. 있으면: 기존 출근 기록 보존, status 만 변경
-     *              예, 오전 반차 후 14시 출근 -> status=HALF, workedMinutes=240 유지
-     * 3-B. 없으면: LEAVE 상태로 새로 생성 (workedMinutes=0)
+     * 2. 일일 근태 조회
+     * 있으면: 기존 출근 기록 보존, status 만 변경
+     *  예, 오전 반차 후 14시 출근 -> status=HALF, workedMinutes=240 유지
+     * 없으면: LEAVE 상태로 새로 생성 (workedMinutes=0)
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private void applyLeaveToAttendance(LeaveRequest leave, LocalDate targetDate) {
+    private UUID applyLeaveToAttendance(LeaveRequest leave, LocalDate targetDate) {
 
         // 1. usageDays 기준 status 결정
         // 반차-> 1.0 미만 = HALF, 전일 휴가 = LEAVE
@@ -80,24 +105,26 @@ public class LeaveAttendanceReflector {
 
 
         if (existing.isPresent()) {
-            // 3-A. 이미 출근 기록 있음, status 만 업데이트
+            // 이미 출근 기록 있음, status 만 업데이트
             // 반차 + 오후 출근 케이스, 무단 출근 후 사후 휴가 처리 케이스 등 대응
-            existing.get().updateStatus(newStatus);
-        } else {
-            // 3-B. 출근 기록 없음, LEAVE/HALF 로 신규 생성
-            DailyAttendance newAttendance = DailyAttendance.builder()
-                    .memberId(leave.getMemberId())
-                    .companyId(leave.getCompanyId())
-                    .attendanceDate(targetDate)
-                    .status(newStatus)
-                    .workedMinutes(0)
-                    .overtimeMinutes(0)
-                    .build();
-            dailyAttendanceRepository.save(newAttendance);
-
-            log.debug("[LeaveReflect] 신규 휴가 근태 생성, " +
-                            "memberId={}, date={}, status={}",
-                    leave.getMemberId(), targetDate, newStatus);
+            DailyAttendance da = existing.get();
+            da.updateStatus(newStatus);
+            return da.getDailyAttendanceId();
         }
+        // 출근 기록 없음, LEAVE/HALF 로 신규 생성
+        DailyAttendance newAttendance = DailyAttendance.builder()
+                .memberId(leave.getMemberId())
+                .companyId(leave.getCompanyId())
+                .attendanceDate(targetDate)
+                .status(newStatus)
+                .workedMinutes(0)
+                .overtimeMinutes(0)
+                .build();
+        DailyAttendance saved = dailyAttendanceRepository.save(newAttendance);
+
+        log.debug("[LeaveReflect] 신규 휴가 근태 생성, " +
+                        "memberId={}, date={}, status={}",
+                leave.getMemberId(), targetDate, newStatus);
+        return saved.getDailyAttendanceId();
     }
 }
