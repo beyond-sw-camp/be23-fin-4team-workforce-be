@@ -45,6 +45,7 @@ public class BatchJobConfig {
     private final MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker;
     private final LeavePromotionWorker leavePromotionWorker;
     private final UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker;
+    private final com._team._team.batch.bonus.worker.RegularBonusPaymentWorker regularBonusPaymentWorker;
 
     @Autowired
     public BatchJobConfig(
@@ -59,7 +60,7 @@ public class BatchJobConfig {
             CarryoverLeaveWorker carryoverLeaveWorker,
             WeeklyLimitCheckWorker weeklyLimitCheckWorker
             , OvertimeExpirationWorker overtimeExpirationWorker
-            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker, LeavePromotionWorker leavePromotionWorker, UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker) {
+            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker, LeavePromotionWorker leavePromotionWorker, UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker, com._team._team.batch.bonus.worker.RegularBonusPaymentWorker regularBonusPaymentWorker) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.leaveGrantWorker = leaveGrantWorker;
@@ -75,6 +76,7 @@ public class BatchJobConfig {
         this.monthlyAttendanceCloseWorker = monthlyAttendanceCloseWorker;
         this.leavePromotionWorker = leavePromotionWorker;
         this.unusedLeaveAutoPayoutWorker = unusedLeaveAutoPayoutWorker;
+        this.regularBonusPaymentWorker = regularBonusPaymentWorker;
     }
 
     /** 휴가 부여 Job */
@@ -318,6 +320,24 @@ public class BatchJobConfig {
         return new StepBuilder("leavePromotionStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
                     leavePromotionWorker.run(java.time.LocalDate.now());
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
+    /** 정기 상여 지급일 알림 Job - 매일 실행, 회사별 지급 월/일 검증 후 자격 통과 직원에게 알림 */
+    @Bean
+    public Job regularBonusPaymentJob() {
+        return new JobBuilder("regularBonusPaymentJob", jobRepository)
+                .start(regularBonusPaymentStep())
+                .build();
+    }
+
+    @Bean
+    public Step regularBonusPaymentStep() {
+        return new StepBuilder("regularBonusPaymentStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    regularBonusPaymentWorker.run(java.time.LocalDate.now());
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();

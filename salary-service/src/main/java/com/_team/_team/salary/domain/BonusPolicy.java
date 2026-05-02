@@ -90,6 +90,20 @@ public class BonusPolicy extends BaseTimeEntity {
     @Builder.Default
     private BonusEligibilityScope eligibilityScope = BonusEligibilityScope.ALL;
 
+    /**
+     * 최소 근속 월수 - 입사 후 N개월 미만 직원은 상여 대상에서 제외
+     */
+    @Column
+    @Builder.Default
+    private Integer minTenureMonths = 0;
+
+    /**
+     * 휴직자 제외 여부 - 'Y' 면 휴직 중인 직원은 상여 지급에서 제외
+     */
+    @Column(nullable = false, length = 1)
+    @Builder.Default
+    private String excludeOnLeaveYn = "Y";
+
     @Column(nullable = false)
     private LocalDate effectiveFrom;
 
@@ -119,6 +133,8 @@ public class BonusPolicy extends BaseTimeEntity {
                        HolidayBonusType holidayBonusType,
                        BigDecimal holidayBonusValue,
                        BonusEligibilityScope eligibilityScope,
+                       Integer minTenureMonths,
+                       String excludeOnLeaveYn,
                        LocalDate effectiveTo,
                        String memo) {
         this.useRegularBonusYn = useRegularBonusYn;
@@ -131,6 +147,8 @@ public class BonusPolicy extends BaseTimeEntity {
         this.holidayBonusType = holidayBonusType;
         this.holidayBonusValue = holidayBonusValue;
         this.eligibilityScope = eligibilityScope;
+        this.minTenureMonths = minTenureMonths != null ? minTenureMonths : 0;
+        this.excludeOnLeaveYn = excludeOnLeaveYn != null ? excludeOnLeaveYn : "Y";
         this.effectiveTo = effectiveTo;
         this.memo = memo;
     }
