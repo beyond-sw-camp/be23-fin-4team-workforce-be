@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -27,6 +28,9 @@ public class MemberBalanceResDto {
     private LocalDate expirationDate;
     private String isUsableYn;
     private String isExpireYn;
+    // 이월 동의 여부 / 회신 시각 - FE 가 동의 상태 표시에 사용
+    private String carryoverConsentYn;
+    private LocalDateTime carryoverConsentAt;
 
     public static MemberBalanceResDto fromEntity(MemberBalance mb) {
         return MemberBalanceResDto.builder()
@@ -39,6 +43,8 @@ public class MemberBalanceResDto {
                 .expirationDate(mb.getExpirationDate())
                 .isUsableYn(mb.getIsUsableYn())
                 .isExpireYn(mb.getIsExpireYn())
+                .carryoverConsentYn(mb.getCarryoverConsentYn())
+                .carryoverConsentAt(mb.getCarryoverConsentAt())
                 .build();
     }
 }

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.4team'
-version = '1.0.18'
+version = '1.0.25'
 
 java {
     toolchain {

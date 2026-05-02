@@ -89,25 +89,48 @@ public class ApprovalDocumentService {
                 {
                   "fields": [
                     { "name": "title", "label": "제목", "type": "text", "required": true },
-                    {
-                      "name": "timing",
-                      "label": "신청 구분",
-                      "type": "select",
-                      "required": true,
-                      "options": ["사전","사후"]
-                    },
-                    {
-                      "name": "workType",
-                      "label": "근무구분",
-                      "type": "select",
-                      "required": true,
-                      "options": ["연장","야간","휴일"]
-                    },
                     { "name": "workDate",      "label": "근무일자",  "type": "date",     "required": true },
                     { "name": "startTime",     "label": "시작시간",  "type": "time",     "required": true },
                     { "name": "endTime",       "label": "종료시간",  "type": "time",     "required": true },
                     { "name": "requestReason", "label": "신청 사유", "type": "textarea"                  },
                     { "name": "overtimeRequestId", "label": "salary 연결 ID", "type": "hidden"          }
+                  ]
+                }
+            """)
+                .build());
+
+        // 근태 정정 신청
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("근태정정신청")
+                .requestType(RequestType.ATTENDANCE)
+                .isCalendarVisibleYn("N")
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",             "label": "제목",         "type": "text",     "required": true },
+                    { "name": "attendanceDate",    "label": "정정 일자",    "type": "date",     "required": true },
+                    { "name": "requestedClockIn",  "label": "정정 출근시각","type": "time"                       },
+                    { "name": "requestedClockOut", "label": "정정 퇴근시각","type": "time"                       },
+                    { "name": "reason",            "label": "정정 사유",    "type": "textarea", "required": true }
+                  ]
+                }
+            """)
+                .build());
+
+        // 조퇴계 - 7일 이내 일자, 조퇴 시각, 사유. 승인 시 정규 8h 유지
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("조퇴계")
+                .requestType(RequestType.ATTENDANCE)
+                .isCalendarVisibleYn("N")
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",          "label": "제목",         "type": "text",     "required": true },
+                    { "name": "attendanceDate", "label": "조퇴 일자",    "type": "date",     "required": true },
+                    { "name": "earlyLeaveTime", "label": "조퇴 시각",    "type": "time",     "required": true },
+                    { "name": "reason",         "label": "조퇴 사유",    "type": "textarea", "required": true }
                   ]
                 }
             """)

@@ -8,13 +8,13 @@ import com._team._team.attendance.domain.enums.PromotionStage;
 import com._team._team.attendance.repository.LeavePolicyRepository;
 import com._team._team.attendance.repository.LeavePromotionLogRepository;
 import com._team._team.attendance.repository.MemberBalanceRepository;
+import com._team._team.attendance.service.LeavePromotionResponseService;
 import com._team._team.dto.NotificationMessage;
 import com._team._team.notification.NotificationType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 
 import java.time.LocalDate;
@@ -33,19 +33,21 @@ public class LeavePromotionWorker {
     private final MemberBalanceRepository memberBalanceRepository;
     private final LeavePromotionLogRepository promotionLogRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final LeavePromotionResponseService leavePromotionResponseService;
 
     @Autowired
     public LeavePromotionWorker(LeavePolicyRepository leavePolicyRepository,
                                 MemberBalanceRepository memberBalanceRepository,
                                 LeavePromotionLogRepository promotionLogRepository,
-                                ApplicationEventPublisher eventPublisher) {
+                                ApplicationEventPublisher eventPublisher,
+                                LeavePromotionResponseService leavePromotionResponseService) {
         this.leavePolicyRepository = leavePolicyRepository;
         this.memberBalanceRepository = memberBalanceRepository;
         this.promotionLogRepository = promotionLogRepository;
         this.eventPublisher = eventPublisher;
+        this.leavePromotionResponseService = leavePromotionResponseService;
     }
 
-    @Transactional
     public Result run(LocalDate today) {
         Result result = new Result();
 
@@ -65,6 +67,8 @@ public class LeavePromotionWorker {
     }
 
     // 단계별 촉진 대상 조회 후 알림 + 로그 저장
+    // 외부 @Transactional 없으므로 각 saveLog 는 JpaRepository 기본 트랜잭션으로 즉시 commit, (포폴에 쓸 수도..)
+    // 그 후 autoDesignateOnSecondNotice(REQUIRES_NEW)가 commit 된 row 를 정상 조회
     private void processStage(LeavePolicy policy, LocalDate today,
                               PromotionStage stage, Integer beforeDays, Result result) {
         if (beforeDays == null || beforeDays <= 0) return;
@@ -90,7 +94,7 @@ public class LeavePromotionWorker {
             }
 
             publishPromotion(b, stage);
-            promotionLogRepository.save(LeavePromotionLog.builder()
+            LeavePromotionLog savedLog = promotionLogRepository.save(LeavePromotionLog.builder()
                     .memberBalanceId(b.getMemberBalanceId())
                     .memberId(b.getMemberId())
                     .companyId(b.getCompanyId())
@@ -98,8 +102,20 @@ public class LeavePromotionWorker {
                     .sentOn(today)
                     .status(PromotionLogStatus.SENT)
                     .build());
-            if (stage == PromotionStage.FIRST) result.firstSent++;
-            else result.secondSent++;
+            if (stage == PromotionStage.FIRST) {
+                result.firstSent++;
+            } else {
+                result.secondSent++;
+                // 근로기준법 61조 - 2차 통보 시점 자동 강제 지정
+                // 1차 회신 없이 2차 도달한 경우 회사가 만료일 직전 평일 N일을 자동 지정
+                try {
+                    leavePromotionResponseService.autoDesignateOnSecondNotice(
+                            savedLog.getPromotionLogId(), null);
+                } catch (Exception e) {
+                    log.error("[LeavePromotion] 2차 자동 지정 실패 logId={}",
+                            savedLog.getPromotionLogId(), e);
+                }
+            }
         }
     }
 
@@ -114,9 +130,12 @@ public class LeavePromotionWorker {
         NotificationType type = stage == PromotionStage.FIRST
                 ? NotificationType.LEAVE_PROMOTION_FIRST
                 : NotificationType.LEAVE_PROMOTION_SECOND;
-        String content = (stage == PromotionStage.FIRST ? "[연차 촉진 1차] " : "[연차 촉진 2차] ")
-                + "남은 연차 " + b.getRemaining() + "일, 만료일 "
-                + b.getExpirationDate() + ". 사용 계획을 확인해주세요.";
+        // 1차: 사용 계획 회신 요청 / 2차: 회사 자동 지정 통보 안내
+        String content = stage == PromotionStage.FIRST
+                ? "[연차 촉진 1차] 남은 연차 " + b.getRemaining() + "일, 만료일 "
+                    + b.getExpirationDate() + ". 사용 계획을 회신해주세요."
+                : "[연차 촉진 2차] 1차 통보 미회신으로 회사가 사용일을 자동 지정 통보합니다 (근로기준법 61조). 만료일 "
+                    + b.getExpirationDate();
         eventPublisher.publishEvent(NotificationMessage.builder()
                 .receiverId(b.getMemberId())
                 .senderId(null)

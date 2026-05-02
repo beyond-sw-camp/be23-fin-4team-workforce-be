@@ -22,6 +22,8 @@ public class ApprovalSearchResDto {
     private String requestStatus;
     private String requestType;
     private LocalDateTime createdAt;
+    /** 프론트에서 핵심 날짜(휴가일, 연장일 등) 추출용 */
+    private String contentJson;
 
     public static ApprovalSearchResDto fromDocument(ApprovalDocument doc) {
         return ApprovalSearchResDto.builder()
@@ -33,6 +35,7 @@ public class ApprovalSearchResDto {
                 .requestStatus(doc.getRequestStatus())
                 .requestType(doc.getRequestType())
                 .createdAt(doc.getCreatedAt())
+                .contentJson(doc.getContentJson())
                 .build();
     }
 }

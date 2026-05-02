@@ -4,6 +4,7 @@ import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.MonthlyAttendanceLedger;
 import com._team._team.attendance.domain.OvertimePolicy;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
+import com._team._team.attendance.domain.enums.ClosureStatus;
 import com._team._team.attendance.dto.vo.MonthlyWorkBreakdown;
 import com._team._team.attendance.dto.vo.ResolvedSchedule;
 import com._team._team.attendance.dto.vo.WorkTimeBreakdown;
@@ -165,8 +166,10 @@ public class MonthlyAttendanceCloseService {
         MonthlyWorkBreakdown totals = aggregateMemberMonth(memberId, companyId, dailyList);
 
         // 신규 생성 또는 기존 갱신
+        boolean created;
+        MonthlyAttendanceLedger ledger;
         if (existing == null) {
-            MonthlyAttendanceLedger ledger = MonthlyAttendanceLedger.builder()
+            ledger = MonthlyAttendanceLedger.builder()
                     .memberId(memberId)
                     .companyId(companyId)
                     .ledgerYearMonth(ledgerYearMonth)
@@ -185,23 +188,36 @@ public class MonthlyAttendanceCloseService {
                     .isLocked(false)
                     .build();
             ledgerRepository.save(ledger);
-            return true;
+            created = true;
+        } else {
+            // 기존 장부 재마감 (LOCKED 아닐 때만)
+            existing.updateAggregates(
+                    totals.totalWorkedMinutes(),
+                    totals.regularMinutes(),
+                    totals.overtimeMinutes(),
+                    totals.nightMinutes(),
+                    totals.holidayMinutes(),
+                    totals.leaveMinutes(),
+                    totals.lateMinutes(),
+                    totals.earlyLeaveMinutes(),
+                    totals.absentDays(),
+                    totals.leaveBreakdownJson()
+            );
+            ledger = existing;
+            created = false;
         }
 
-        // 기존 장부 재마감 (LOCKED 아닐 때만)
-        existing.updateAggregates(
-                totals.totalWorkedMinutes(),
-                totals.regularMinutes(),
-                totals.overtimeMinutes(),
-                totals.nightMinutes(),
-                totals.holidayMinutes(),
-                totals.leaveMinutes(),
-                totals.lateMinutes(),
-                totals.earlyLeaveMinutes(),
-                totals.absentDays(),
-                totals.leaveBreakdownJson()
-        );
-        return false;
+        // 월마감 확정, 일일근태 LOCKED 전이 + 월 장부 lock
+        for (DailyAttendance daily : dailyList) {
+            if (daily.getClosureStatus() != ClosureStatus.LOCKED) {
+                daily.transitionClosure(ClosureStatus.LOCKED);
+            }
+        }
+        ledger.lock();
+        log.info("[MonthlyClose] 월 장부 LOCK 완료 memberId={} yearMonth={} dailyCount={}",
+                memberId, ledgerYearMonth, dailyList.size());
+
+        return created;
     }
 
     // 일별 WorkTimeBreakdown 누적해서 월 집계 완성

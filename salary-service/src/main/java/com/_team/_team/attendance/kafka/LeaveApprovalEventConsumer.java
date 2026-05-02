@@ -8,9 +8,11 @@ import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.attendance.repository.LeaveRequestRepository;
 import com._team._team.attendance.repository.MemberBalanceRepository;
 import com._team._team.attendance.service.BalancePriorityResolver;
+import com._team._team.attendance.service.DailyAttendanceCloseService;
 import com._team._team.attendance.service.LeaveApprovalService;
 import com._team._team.attendance.service.LeaveRequestService;
 import com._team._team.event.LeaveApprovalEvent;
+import com._team._team.salary.service.LeaveAttendanceReflector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,7 @@ import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.stereotype.Component;
 
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,18 +41,24 @@ public class LeaveApprovalEventConsumer {
     private final ObjectMapper objectMapper;
     private final LeaveRequestRepository leaveRequestRepository;
     private final CompanyLeaveTypeRepository companyLeaveTypeRepository;
+    private final LeaveAttendanceReflector leaveAttendanceReflector;
+    private final DailyAttendanceCloseService dailyAttendanceCloseService;
 
     @Autowired
     public LeaveApprovalEventConsumer(LeaveApprovalService leaveApprovalService,
                                       LeaveRequestService leaveRequestService,
                                       BalancePriorityResolver balancePriorityResolver,
-                                      ObjectMapper objectMapper, LeaveRequestRepository leaveRequestRepository, CompanyLeaveTypeRepository companyLeaveTypeRepository) {
+                                      ObjectMapper objectMapper, LeaveRequestRepository leaveRequestRepository, CompanyLeaveTypeRepository companyLeaveTypeRepository,
+                                      LeaveAttendanceReflector leaveAttendanceReflector,
+                                      DailyAttendanceCloseService dailyAttendanceCloseService) {
         this.leaveApprovalService = leaveApprovalService;
         this.leaveRequestService = leaveRequestService;
         this.balancePriorityResolver = balancePriorityResolver;
         this.objectMapper = objectMapper;
         this.leaveRequestRepository = leaveRequestRepository;
         this.companyLeaveTypeRepository = companyLeaveTypeRepository;
+        this.leaveAttendanceReflector = leaveAttendanceReflector;
+        this.dailyAttendanceCloseService = dailyAttendanceCloseService;
     }
 
     // 이벤트 수신 후 action에 따라 USE(차감) / RESTORE(복구) 분기
@@ -122,6 +131,20 @@ public class LeaveApprovalEventConsumer {
         // 2. MemberBalance 차감
         if (deductions != null && !deductions.isEmpty()) {
             leaveApprovalService.applyUse(event, deductions);
+        }
+
+        // 3. 사후 휴가 반영, 휴가 기간 일일 근태 상태 변경 + 마감 후라면 재계산
+        try {
+            List<UUID> affected = leaveAttendanceReflector.reflectForLeaveRequest(leaveRequest);
+            for (UUID daId : affected) {
+                try {
+                    dailyAttendanceCloseService.recalculateAfterLeaveApproval(daId);
+                } catch (Exception e) {
+                    log.error("[Leave] 사후 재계산 실패 dailyId={}", daId, e);
+                }
+            }
+        } catch (Exception e) {
+            log.error("[Leave] 사후 반영 실패 leaveRequestId={}", leaveRequest.getLeaveRequestId(), e);
         }
     }
 

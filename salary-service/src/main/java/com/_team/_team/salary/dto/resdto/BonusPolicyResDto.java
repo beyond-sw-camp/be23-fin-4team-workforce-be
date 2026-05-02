@@ -35,6 +35,8 @@ public class BonusPolicyResDto {
     private BigDecimal holidayBonusValue;
 
     private BonusEligibilityScope eligibilityScope;
+    private Integer minTenureMonths;
+    private String excludeOnLeaveYn;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
     private String memo;
@@ -59,6 +61,8 @@ public class BonusPolicyResDto {
                 .holidayBonusType(p.getHolidayBonusType())
                 .holidayBonusValue(p.getHolidayBonusValue())
                 .eligibilityScope(p.getEligibilityScope())
+                .minTenureMonths(p.getMinTenureMonths())
+                .excludeOnLeaveYn(p.getExcludeOnLeaveYn())
                 .effectiveFrom(p.getEffectiveFrom())
                 .effectiveTo(p.getEffectiveTo())
                 .memo(p.getMemo())
