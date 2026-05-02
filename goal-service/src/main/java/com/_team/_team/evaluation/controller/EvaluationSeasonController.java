@@ -9,11 +9,15 @@ import com._team._team.evaluation.dto.reqdto.SeasonCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.SeasonOperationalAlertsResDto;
 import com._team._team.evaluation.dto.resdto.PublishBlockersResDto;
+import com._team._team.evaluation.dto.resdto.EvaluationResponseResDto;
 import com._team._team.evaluation.service.EvaluationGroupTranslator;
+import com._team._team.evaluation.service.EvaluationResponseService;
 import com._team._team.evaluation.service.EvaluationSeasonService;
 import com._team._team.evaluation.service.SeasonActivationService;
+import com._team._team.meeting.dto.resdto.MeetingRecordResDto;
 import com._team._team.meeting.service.MeetingRecordService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,13 +37,16 @@ public class EvaluationSeasonController {
     private final EvaluationSeasonService seasonService;
     private final EvaluationGroupTranslator groupTranslator;
     private final MeetingRecordService meetingRecordService;
+    private final EvaluationResponseService responseService;
 
     public EvaluationSeasonController(EvaluationSeasonService seasonService,
                                       EvaluationGroupTranslator groupTranslator,
-                                      MeetingRecordService meetingRecordService) {
+                                      MeetingRecordService meetingRecordService,
+                                      EvaluationResponseService responseService) {
         this.seasonService = seasonService;
         this.groupTranslator = groupTranslator;
         this.meetingRecordService = meetingRecordService;
+        this.responseService = responseService;
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.CREATE)
@@ -86,14 +93,59 @@ public class EvaluationSeasonController {
         );
     }
 
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.DELETE)
+    @DeleteMapping("/{seasonId}")
+    public ApiResponse<Void> delete(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        seasonService.delete(seasonId, UUID.fromString(companyId));
+        return ApiResponse.success(null, "Evaluation season deleted successfully.");
+    }
+
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
-    @PostMapping("/{seasonId}/activate")
-    public ApiResponse<Void> activate(
+    @PostMapping("/{seasonId}/open-self-eval")
+    public ApiResponse<Void> openSelfEval(
             @PathVariable UUID seasonId,
             @RequestHeader("X-User-CompanyId") String companyId) {
         List<SeasonActivationService.TargetSpec> targetSpecs = groupTranslator.translate(seasonId);
-        seasonService.activate(seasonId, UUID.fromString(companyId), targetSpecs);
-        return ApiResponse.success(null, "Evaluation season activated successfully.");
+        seasonService.openSelfEval(seasonId, UUID.fromString(companyId), targetSpecs);
+        return ApiResponse.success(null, "Self evaluation opened successfully.");
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
+    @PostMapping("/{seasonId}/open-manager-eval")
+    public ApiResponse<Void> openManagerEval(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        seasonService.advanceToManagerEval(seasonId, UUID.fromString(companyId));
+        return ApiResponse.success(null, "Manager evaluation opened successfully.");
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
+    @PostMapping("/{seasonId}/open-grade-confirm")
+    public ApiResponse<Void> openGradeConfirm(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        seasonService.advanceToGradeConfirm(seasonId, UUID.fromString(companyId));
+        return ApiResponse.success(null, "Grade confirmation opened successfully.");
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
+    @PostMapping("/{seasonId}/publish-results")
+    public ApiResponse<Void> publish(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        seasonService.publishResults(seasonId, UUID.fromString(companyId));
+        return ApiResponse.success(null, "Evaluation results published successfully.");
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
+    @PostMapping("/{seasonId}/open-interview")
+    public ApiResponse<Void> openInterview(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        seasonService.openInterview(seasonId, UUID.fromString(companyId));
+        return ApiResponse.success(null, "Interview stage opened successfully.");
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
@@ -103,15 +155,6 @@ public class EvaluationSeasonController {
             @RequestHeader("X-User-CompanyId") String companyId) {
         seasonService.close(seasonId, UUID.fromString(companyId));
         return ApiResponse.success(null, "Evaluation season closed successfully.");
-    }
-
-    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
-    @PostMapping("/{seasonId}/publish")
-    public ApiResponse<Void> publish(
-            @PathVariable UUID seasonId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
-        seasonService.publishResults(seasonId, UUID.fromString(companyId));
-        return ApiResponse.success(null, "Evaluation results published successfully.");
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
@@ -153,6 +196,28 @@ public class EvaluationSeasonController {
         return ApiResponse.success(
                 meetingRecordService.getSeasonStatus(seasonId, UUID.fromString(companyId)),
                 "Meeting status loaded successfully."
+        );
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/{seasonId}/responses")
+    public ApiResponse<List<EvaluationResponseResDto>> responses(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                responseService.listSeasonResponses(seasonId, UUID.fromString(companyId)),
+                "Season evaluation responses loaded successfully."
+        );
+    }
+
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/{seasonId}/meetings")
+    public ApiResponse<List<MeetingRecordResDto>> meetings(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                meetingRecordService.listBySeason(seasonId, UUID.fromString(companyId)),
+                "Season meetings loaded successfully."
         );
     }
 }
