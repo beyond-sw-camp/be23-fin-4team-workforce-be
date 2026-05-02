@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -71,6 +72,22 @@ public class OvertimeRequestService {
             throw new BusinessException(
                     HttpStatus.BAD_REQUEST,
                     String.format("신청 시간은 %d분 단위여야 합니다.", unit));
+        }
+
+        // 사후 신청 마감 시한 검증
+        // 근무 종료 시점으로부터 정책 deadline 시간 이내에만 가능
+        if (reqDto.getRequestType() == OvertimeRequestType.POST) {
+            Integer deadlineHours = otPolicy.getPostApprovalDeadlineHours();
+            if (deadlineHours != null && deadlineHours > 0
+                    && reqDto.getActualEndTime() != null) {
+                LocalDateTime workEnd = LocalDateTime.of(reqDto.getTargetDate(), reqDto.getActualEndTime());
+                long hoursElapsed = ChronoUnit.HOURS.between(workEnd, LocalDateTime.now());
+                if (hoursElapsed > deadlineHours) {
+                    throw new BusinessException(
+                            HttpStatus.BAD_REQUEST,
+                            String.format("연장 근무 신청은 근무 종료 후 %d시간 이내에만 가능합니다.", deadlineHours));
+                }
+            }
         }
 
         // 법정 한도 사전 검증
@@ -161,19 +178,30 @@ public class OvertimeRequestService {
     }
 
     /**
-     * 72시간 경과 사후 신청 자동 만료 (배치에서 호출)
+     * 사후 신청 자동 만료 (배치에서 호출)
+     * 정책 미설정 시 기본 72 시간
      */
     public int expirePostOvertimeRequests(LocalDateTime now) {
-        LocalDateTime cutoff = now.minusHours(72);
-
-        List<OvertimeRequest> expired = overtimeRequestRepository
+        List<OvertimeRequest> pending = overtimeRequestRepository
                 .findAllByRequestTypeAndApprovalStatusAndSubmittedAtBefore(
                         OvertimeRequestType.POST,
                         OvertimeApprovalStatus.PENDING,
-                        cutoff);
+                        now);
 
-        expired.forEach(r -> r.expire(now));
-        return expired.size();
+        int expiredCount = 0;
+        for (OvertimeRequest r : pending) {
+            int deadlineHours = overtimePolicyRepository
+                    .findEffective(r.getCompanyId(), r.getTargetDate())
+                    .map(OvertimePolicy::getPostApprovalDeadlineHours)
+                    .filter(h -> h != null && h > 0)
+                    .orElse(72);
+            LocalDateTime cutoff = now.minusHours(deadlineHours);
+            if (r.getSubmittedAt() != null && r.getSubmittedAt().isBefore(cutoff)) {
+                r.expire(now);
+                expiredCount++;
+            }
+        }
+        return expiredCount;
     }
 
     /**
