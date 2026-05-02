@@ -14,6 +14,7 @@ import java.util.UUID;
 public interface GoalActivityRepository extends JpaRepository<GoalActivity, UUID> {
     List<GoalActivity> findByGoal_GoalIdOrderByCreatedAtDesc(UUID goalId);
     List<GoalActivity> findByGoal_GoalIdAndTypeOrderByCreatedAtDesc(UUID goalId, GoalActivityType type);
+    boolean existsByGoal_GoalIdAndType(UUID goalId, GoalActivityType type);
 
     Page<GoalActivity> findByGoal_GoalIdOrderByCreatedAtDesc(UUID goalId, Pageable pageable);
 }

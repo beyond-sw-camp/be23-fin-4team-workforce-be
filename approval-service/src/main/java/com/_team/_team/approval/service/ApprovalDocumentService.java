@@ -48,7 +48,7 @@ public class ApprovalDocumentService {
         // ========== VACATION ==========
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)
-                .documentName("휴가 신청서")
+                .documentName("휴가신청서")
                 .requestType(RequestType.VACATION)
                 .isCalendarVisibleYn("Y")
                 .calendarDisplayName("휴가")

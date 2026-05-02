@@ -15,6 +15,7 @@ public class CompanyInfoResDto {
     private String companyName;
     private String companyDomain;
     private String logoUrl;
+    private String sealImageUrl;
 
     public static CompanyInfoResDto fromEntity(Company company) {
         return CompanyInfoResDto.builder()
@@ -22,6 +23,7 @@ public class CompanyInfoResDto {
                 .companyName(company.getCompanyName())
                 .companyDomain(company.getCompanyDomain())
                 .logoUrl(company.getLogoUrl())
+                .sealImageUrl(company.getSealImageUrl())
                 .build();
     }
 }

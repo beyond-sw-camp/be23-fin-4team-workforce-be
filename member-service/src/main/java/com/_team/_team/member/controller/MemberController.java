@@ -518,4 +518,10 @@ public class MemberController {
                 HttpStatus.OK
         );
     }
+
+    /** 내부용: 직원 기본정보 조회 (Feign 호출용 - 전자계약 등) */
+    @GetMapping("/internal/{memberId}/info")
+    public MemberContractInfoResDto getMemberInfoInternal(@PathVariable UUID memberId) {
+        return memberService.getMemberContractInfo(memberId);
+    }
 }

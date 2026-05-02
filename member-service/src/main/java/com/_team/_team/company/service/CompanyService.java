@@ -184,6 +184,16 @@ public class CompanyService {
             }
         }
 
+        // 기본 계약서 템플릿 생성 (approval-service 호출)
+        try {
+            approvalServiceClient.initDefaultContractTemplates(company.getCompanyId());
+        } catch (Exception e) {
+            log.info("기본 계약서 템플릿 생성 실패: {}", e.getMessage());
+            if (e instanceof FeignException fe) {
+                log.error("응답 body: {}", fe.contentUTF8());
+            }
+        }
+
         // 기본 휴가 종류 생성 (salary-service 호출)
         try {
             salaryServiceClient.initDefaultLeaveTypes(company.getCompanyId());
@@ -245,5 +255,24 @@ public class CompanyService {
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         return CompanyInfoResDto.fromEntity(member.getCompany());
+    }
+
+    public void updateSeal(UUID memberId, MultipartFile seal) {
+        // memberId로 회사 조회 (기존 updateLogo와 동일한 방식)
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
+
+        Company company = companyRepository.findById(member.getCompanyId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
+
+        // S3 업로드 (기존 로고 업로드와 동일한 방식)
+        String sealUrl = s3Service.upload(seal, "company/" + company.getCompanyId() + "/seal");
+        company.updateSealImageUrl(sealUrl);
+    }
+
+    public String getSealImageUrl(UUID companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
+        return company.getSealImageUrl();
     }
 }

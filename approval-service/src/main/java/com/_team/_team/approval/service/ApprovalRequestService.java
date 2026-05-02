@@ -140,6 +140,16 @@ public class ApprovalRequestService {
             }
         }
 
+        // 결재자에 본인 포함 불가
+        if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
+            boolean selfInApprovers = reqDto.getApprovalLines().stream()
+                    .anyMatch(line -> line.getApproverMemberPositionId().equals(memberPositionId));
+            if (selfInApprovers) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "본인을 결재자로 지정할 수 없습니다.");
+            }
+        }
+
         // 참조/공람자 중복 검증
         if (reqDto.getViewers() != null && !reqDto.getViewers().isEmpty()) {
             long distinctCount = reqDto.getViewers().stream()
@@ -150,6 +160,16 @@ public class ApprovalRequestService {
             if (distinctCount != reqDto.getViewers().size()) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST,
                         "동일한 참조/공람자를 중복 지정할 수 없습니다.");
+            }
+        }
+
+        // 참조/공람자에 본인 포함 불가
+        if (reqDto.getViewers() != null && !reqDto.getViewers().isEmpty()) {
+            boolean selfInViewers = reqDto.getViewers().stream()
+                    .anyMatch(v -> v.getViewerMemberId().equals(memberId));
+            if (selfInViewers) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "본인을 참조/공람자로 지정할 수 없습니다.");
             }
         }
 
@@ -435,6 +455,26 @@ public class ApprovalRequestService {
                 && reqDto.getRequestStatus() != RequestStatus.WAIT) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "요청 상태는 DRAFT 또는 WAIT만 가능합니다.");
+        }
+
+        // 결재자에 본인 포함 불가
+        if (reqDto.getApprovalLines() != null && !reqDto.getApprovalLines().isEmpty()) {
+            boolean selfInApprovers = reqDto.getApprovalLines().stream()
+                    .anyMatch(line -> line.getApproverMemberPositionId().equals(memberPositionId));
+            if (selfInApprovers) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "본인을 결재자로 지정할 수 없습니다.");
+            }
+        }
+
+        // 참조/공람자에 본인 포함 불가
+        if (reqDto.getViewers() != null && !reqDto.getViewers().isEmpty()) {
+            boolean selfInViewers = reqDto.getViewers().stream()
+                    .anyMatch(v -> v.getViewerMemberId().equals(memberId));
+            if (selfInViewers) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "본인을 참조/공람자로 지정할 수 없습니다.");
+            }
         }
 
         // WAIT(제출)일 때 결재자 최소 1명 검증

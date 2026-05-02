@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str
 
+    gateway_url: str = "http://localhost:8080"
+
     eureka_server_url: str
 
     class Config:

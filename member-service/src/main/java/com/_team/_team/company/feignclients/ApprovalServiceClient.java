@@ -11,4 +11,7 @@ public interface ApprovalServiceClient {
 
     @PostMapping("/approval/documents/init")
     void initDefaultDocuments(@RequestParam("companyId") UUID companyId);
+
+    @PostMapping("/contract/templates/init")
+    void initDefaultContractTemplates(@RequestParam("companyId") UUID companyId);
 }
