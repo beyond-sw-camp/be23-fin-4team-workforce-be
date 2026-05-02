@@ -4,6 +4,7 @@ import com._team._team.batch.attendance.worker.MonthlyAttendanceCloseWorker;
 import com._team._team.batch.attendance.worker.OvertimeExpirationWorker;
 import com._team._team.batch.attendance.worker.SlotDeadlineAutoAssignWorker;
 import com._team._team.batch.attendance.worker.WeeklyLimitCheckWorker;
+import com._team._team.batch.bonus.worker.RegularBonusPaymentWorker;
 import com._team._team.batch.leave.worker.*;
 import com._team._team.batch.payroll.worker.PayrollCalculateWorker;
 import com._team._team.batch.payroll.worker.PayslipSendWorker;
@@ -45,7 +46,7 @@ public class BatchJobConfig {
     private final MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker;
     private final LeavePromotionWorker leavePromotionWorker;
     private final UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker;
-    private final com._team._team.batch.bonus.worker.RegularBonusPaymentWorker regularBonusPaymentWorker;
+    private final RegularBonusPaymentWorker regularBonusPaymentWorker;
 
     @Autowired
     public BatchJobConfig(
@@ -60,7 +61,7 @@ public class BatchJobConfig {
             CarryoverLeaveWorker carryoverLeaveWorker,
             WeeklyLimitCheckWorker weeklyLimitCheckWorker
             , OvertimeExpirationWorker overtimeExpirationWorker
-            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker, LeavePromotionWorker leavePromotionWorker, UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker, com._team._team.batch.bonus.worker.RegularBonusPaymentWorker regularBonusPaymentWorker) {
+            , SlotDeadlineAutoAssignWorker slotDeadlineAutoAssignWorker, MonthlyAttendanceCloseWorker monthlyAttendanceCloseWorker, LeavePromotionWorker leavePromotionWorker, UnusedLeaveAutoPayoutWorker unusedLeaveAutoPayoutWorker, RegularBonusPaymentWorker regularBonusPaymentWorker) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.leaveGrantWorker = leaveGrantWorker;
@@ -319,7 +320,7 @@ public class BatchJobConfig {
     public Step leavePromotionStep() {
         return new StepBuilder("leavePromotionStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    leavePromotionWorker.run(java.time.LocalDate.now());
+                    leavePromotionWorker.run(LocalDate.now());
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
@@ -337,7 +338,7 @@ public class BatchJobConfig {
     public Step regularBonusPaymentStep() {
         return new StepBuilder("regularBonusPaymentStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    regularBonusPaymentWorker.run(java.time.LocalDate.now());
+                    regularBonusPaymentWorker.run(LocalDate.now());
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
