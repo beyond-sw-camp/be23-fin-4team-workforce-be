@@ -50,6 +50,13 @@ public class LeavePromotionLog extends BaseTimeEntity {
     @Column
     private LocalDateTime acknowledgedAt;
 
+    /**
+     * 직원이 알림을 가장 최근에 열람한 시각 (Read Receipt). 회신(acknowledge)보다 약한 단계.
+     * 매 열람 시 최신 시각으로 갱신. 노동부 감사 시 "직원이 통보를 인지했다"는 증거로 활용. null 이면 미열람.
+     */
+    @Column
+    private LocalDateTime viewedAt;
+
     /** 직원이 입력한 사용 계획 날짜 — 참고용. JSON 배열 ["2027-05-12","2027-05-13"] */
     @Column(columnDefinition = "TEXT")
     private String plannedDates;
@@ -66,6 +73,13 @@ public class LeavePromotionLog extends BaseTimeEntity {
     /** 강제 지정 시 사유 */
     @Column(length = 500)
     private String designationReason;
+
+    /**
+     * 알림 열람 처리, 매 열람 시 최신 시각으로 갱신
+     */
+    public void markViewed() {
+        this.viewedAt = LocalDateTime.now();
+    }
 
     /**
      * 직원 회신 처리.

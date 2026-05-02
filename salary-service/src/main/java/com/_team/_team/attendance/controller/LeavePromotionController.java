@@ -51,6 +51,16 @@ public class LeavePromotionController {
                 HttpStatus.OK);
     }
 
+    // 직원 알림 열람 시 viewedAt 기록
+    @PostMapping("/{promotionLogId}/view")
+    public ResponseEntity<?> markViewed(@RequestHeader("X-User-Id") UUID memberId,
+                                        @PathVariable UUID promotionLogId) {
+        service.markViewed(memberId, promotionLogId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "통보 열람 기록 완료"),
+                HttpStatus.OK);
+    }
+
     // 관리자 무응답자 리스트
     @GetMapping("/admin/no-response")
     public ResponseEntity<?> findNoResponse(@RequestHeader("X-User-CompanyId") UUID companyId) {

@@ -93,6 +93,21 @@ public class LeavePromotionResponseService {
         return result;
     }
 
+    /**
+     * 직원이 알림을 처음 열람했을 때 viewedAt 기록
+     * 회신(acknowledge)보다 약한 단계 - 통보를 인지했다는 추가 증거로 활용
+     */
+    public void markViewed(UUID memberId, UUID promotionLogId) {
+        LeavePromotionLog log = promotionLogRepository.findById(promotionLogId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "촉진 통보를 찾을 수 없습니다"));
+        if (!log.getMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN,
+                    "본인의 통보만 열람 처리 가능합니다");
+        }
+        log.markViewed();
+    }
+
     // 직원 회신 처리
     // 핵심 LeaveRequest 자동 생성 안 함 잔여 차감 없음 회사 면책 기록만
     public void respondAsMember(UUID memberId, UUID promotionLogId,

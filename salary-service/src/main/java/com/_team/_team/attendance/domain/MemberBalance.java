@@ -68,6 +68,18 @@ public class MemberBalance extends BaseTimeEntity {
     @Builder.Default
     private String isExpireYn = "N";
 
+    /**
+     * 이월 동의 여부
+     * 직원이 회계연도 종료 직전 "이월 동의" 회신 시 'Y'
+     * CarryoverLeaveWorker 가 'Y' 인 잔고만 이월 처리
+     */
+    @Column(length = 1, nullable = false)
+    @Builder.Default
+    private String carryoverConsentYn = "N";
+
+    /** 이월 동의 회신 시각 - null 이면 미회신 */
+    private java.time.LocalDateTime carryoverConsentAt;
+
     @Column(length = 1, nullable = false)
     @Builder.Default
     private String delYn = "N";
@@ -101,5 +113,21 @@ public class MemberBalance extends BaseTimeEntity {
     public void markExpired() {
         this.isExpireYn = "Y";
         this.isUsableYn = "N";
+    }
+
+    /** 직원 이월 동의 회신 - 'Y' + 회신 시각 기록 */
+    public void agreeCarryover() {
+        this.carryoverConsentYn = "Y";
+        this.carryoverConsentAt = java.time.LocalDateTime.now();
+    }
+
+    /** 이월 동의 철회 - 'N' 으로 복귀 + 시각 초기화 */
+    public void revokeCarryoverConsent() {
+        this.carryoverConsentYn = "N";
+        this.carryoverConsentAt = null;
+    }
+
+    public boolean isCarryoverConsented() {
+        return "Y".equals(this.carryoverConsentYn);
     }
 }
