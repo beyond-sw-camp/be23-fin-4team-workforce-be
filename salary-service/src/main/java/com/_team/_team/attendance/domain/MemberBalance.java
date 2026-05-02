@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -78,7 +79,7 @@ public class MemberBalance extends BaseTimeEntity {
     private String carryoverConsentYn = "N";
 
     /** 이월 동의 회신 시각 - null 이면 미회신 */
-    private java.time.LocalDateTime carryoverConsentAt;
+    private LocalDateTime carryoverConsentAt;
 
     @Column(length = 1, nullable = false)
     @Builder.Default
@@ -118,7 +119,7 @@ public class MemberBalance extends BaseTimeEntity {
     /** 직원 이월 동의 회신 - 'Y' + 회신 시각 기록 */
     public void agreeCarryover() {
         this.carryoverConsentYn = "Y";
-        this.carryoverConsentAt = java.time.LocalDateTime.now();
+        this.carryoverConsentAt = LocalDateTime.now();
     }
 
     /** 이월 동의 철회 - 'N' 으로 복귀 + 시각 초기화 */

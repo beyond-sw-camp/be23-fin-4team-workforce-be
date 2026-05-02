@@ -13,6 +13,7 @@ import com._team._team.attendance.dto.reqDto.MemberBalanceUseReqDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionHistoryResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionMyResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionNoResponseResDto;
+import com._team._team.attendance.repository.CompanyHolidayRepository;
 import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.attendance.repository.LeavePromotionLogRepository;
 import com._team._team.attendance.repository.LeaveRequestRepository;
@@ -31,12 +32,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 // 연차 사용 촉진제 회신 처리 서비스, 직원 회신은 계획 기록만 잔여 차감 없음
 @Slf4j
@@ -53,6 +58,7 @@ public class LeavePromotionResponseService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final MemberBalanceRepository memberBalanceRepository;
     private final CompanyLeaveTypeRepository companyLeaveTypeRepository;
+    private final CompanyHolidayRepository companyHolidayRepository;
     private final MemberBalanceService memberBalanceService;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
@@ -62,12 +68,14 @@ public class LeavePromotionResponseService {
                                          LeaveRequestRepository leaveRequestRepository,
                                          MemberBalanceRepository memberBalanceRepository,
                                          CompanyLeaveTypeRepository companyLeaveTypeRepository,
+                                         CompanyHolidayRepository companyHolidayRepository,
                                          MemberBalanceService memberBalanceService,
                                          ApplicationEventPublisher eventPublisher) {
         this.promotionLogRepository = promotionLogRepository;
         this.leaveRequestRepository = leaveRequestRepository;
         this.memberBalanceRepository = memberBalanceRepository;
         this.companyLeaveTypeRepository = companyLeaveTypeRepository;
+        this.companyHolidayRepository = companyHolidayRepository;
         this.memberBalanceService = memberBalanceService;
         this.eventPublisher = eventPublisher;
         this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule())
@@ -212,6 +220,100 @@ public class LeavePromotionResponseService {
 
         // 직원 알림 발송
         publishDesignationNotice(log.getMemberId(), reqDto.getDates(), log.getMemberBalanceId());
+    }
+
+    /**
+     * 2차 통보 시점 자동 강제 지정 (근로기준법 61조 정합)
+     * 1차 통보 회신 없이 D-60 도달 -> 회사가 만료일 직전 평일 N일을 자동 지정
+     */
+    public void autoDesignateOnSecondNotice(UUID promotionLogId, UUID systemActorId) {
+        LeavePromotionLog log = promotionLogRepository.findById(promotionLogId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "촉진 통보를 찾을 수 없습니다"));
+        if (log.getStage() != PromotionStage.SECOND) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "2차 통보 건만 자동 지정 가능합니다");
+        }
+        if (log.getStatus() != PromotionLogStatus.SENT) {
+            // 이미 회신/지정된 건은 스킵 (멱등성)
+            return;
+        }
+
+        UUID companyId = log.getCompanyId();
+        MemberBalance balance = memberBalanceRepository.findById(log.getMemberBalanceId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "잔고를 찾을 수 없습니다"));
+
+        int remainingDays = (int) Math.floor(balance.getRemaining() != null ? balance.getRemaining() : 0.0);
+        if (remainingDays <= 0) return;
+
+        LocalDate expiration = balance.getExpirationDate();
+        if (expiration == null) return;
+
+        // 만료일부터 역순으로 평일 + 공휴일 아닌 날짜 N개 산출 (오늘 이후만)
+        Set<LocalDate> holidays = companyHolidayRepository
+                .findAllInRange(companyId, LocalDate.now(), expiration)
+                .stream()
+                .map(h -> h.getHolidayDate())
+                .collect(Collectors.toSet());
+
+        List<LocalDate> picked = pickDesignatedDates(expiration, remainingDays, holidays);
+        if (picked.isEmpty()) {
+            log.info("[AutoDesignate] 지정 가능 날짜 없음 - 스킵 memberId={} expiration={}",
+                    log.getMemberId(), expiration);
+            return;
+        }
+
+        UUID companyLeaveTypeId = companyLeaveTypeRepository
+                .findByCompanyIdAndCodeAndDelYn(companyId, DEFAULT_LEAVE_TYPE_CODE, "N")
+                .map(CompanyLeaveType::getCompanyLeaveTypeId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "기본 연차 종류를 찾을 수 없습니다"));
+
+        String reason = "근로기준법 61조에 따른 회사 자동 지정 (1차 통보 후 미회신)";
+
+        for (LocalDate date : picked) {
+            LeaveRequest req = LeaveRequest.createDesignated(
+                    log.getMemberId(),
+                    companyId,
+                    companyLeaveTypeId,
+                    date, date,
+                    1.0,
+                    reason,
+                    systemActorId);
+            leaveRequestRepository.save(req);
+        }
+
+        for (LocalDate date : picked) {
+            MemberBalanceUseReqDto useReq = MemberBalanceUseReqDto.builder()
+                    .balanceType(BalanceType.ANNUAL)
+                    .days(1.0)
+                    .leaveDate(date)
+                    .build();
+            memberBalanceService.useBalance(companyId, log.getMemberId(), useReq);
+        }
+
+        log.designate(serializeDates(picked), reason);
+        publishDesignationNotice(log.getMemberId(), picked, log.getMemberBalanceId());
+    }
+
+    /** 만료일부터 역순으로 평일 + 공휴일 아닌 날짜 needed 개 추출 (오늘 이후만) */
+    private List<LocalDate> pickDesignatedDates(LocalDate expiration, int needed,
+                                                 Set<LocalDate> holidays) {
+        List<LocalDate> result = new ArrayList<>();
+        LocalDate cursor = expiration;
+        LocalDate today = LocalDate.now();
+        int safetyLimit = 365; // 무한루프 방지
+        while (result.size() < needed && cursor.isAfter(today) && safetyLimit-- > 0) {
+            DayOfWeek dow = cursor.getDayOfWeek();
+            boolean isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
+            if (!isWeekend && !holidays.contains(cursor)) {
+                result.add(cursor);
+            }
+            cursor = cursor.minusDays(1);
+        }
+        Collections.sort(result); // 오름차순 정렬
+        return result;
     }
 
     private void publishDesignationNotice(UUID memberId, List<LocalDate> dates,
