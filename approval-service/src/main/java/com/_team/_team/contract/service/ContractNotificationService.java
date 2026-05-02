@@ -58,4 +58,20 @@ public class ContractNotificationService {
                 .build());
     }
 
+    public void notifyContractRejected(UUID senderMemberId, UUID employeeMemberId,
+                                       UUID contractId, String employeeName, String reason) {
+        publish(senderMemberId, employeeMemberId,
+                NotificationType.CONTRACT_REJECTED,
+                employeeName + "님이 전자계약서를 거절했습니다. 사유: " + reason,
+                contractId);
+    }
+
+//    public void notifyContractCanceled(UUID employeeMemberId, UUID senderMemberId,
+//                                       UUID contractId, String templateName) {
+//        publish(employeeMemberId, senderMemberId,
+//                NotificationType.CONTRACT_CANCELED,
+//                "[" + templateName + "] 전자계약서가 회수되었습니다.",
+//                contractId);
+//    }
+
 }

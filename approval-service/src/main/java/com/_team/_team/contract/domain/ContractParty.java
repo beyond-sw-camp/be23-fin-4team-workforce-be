@@ -46,4 +46,12 @@ public class ContractParty extends BaseTimeEntity {
         this.signedAt = LocalDateTime.now();
         this.signatureImageUrl = signatureImageUrl;
     }
+
+    public void reject(String reason) {
+        this.signStatus = SignStatus.REJECTED;
+    }
+
+    public void cancel() {
+        this.signStatus = SignStatus.CANCELED;
+    }
 }

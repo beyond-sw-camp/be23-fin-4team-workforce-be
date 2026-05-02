@@ -9,9 +9,7 @@ import com._team._team.contract.domain.ContractTemplate;
 import com._team._team.contract.domain.enums.ContractStatus;
 import com._team._team.contract.domain.enums.PartyRole;
 import com._team._team.contract.domain.enums.SignStatus;
-import com._team._team.contract.dto.reqdto.ContractBatchSendReqDto;
-import com._team._team.contract.dto.reqdto.ContractSendReqDto;
-import com._team._team.contract.dto.reqdto.ContractSignReqDto;
+import com._team._team.contract.dto.reqdto.*;
 import com._team._team.contract.dto.resdto.ContractBatchResDto;
 import com._team._team.contract.dto.resdto.ContractResDto;
 import com._team._team.contract.feignclients.SalaryServiceClient;
@@ -68,9 +66,13 @@ public class ContractService {
 
         // salary/member 데이터로 AUTO 필드 채우기
         SalaryInfoResDto salaryInfo = getCurrentSalary(companyId, reqDto.getEmployeeMemberId());
+        log.info("salaryInfo: baseSalary={}", salaryInfo.getBaseSalary());
 
         // member 데이터 (인사 정보)
         MemberContractInfoResDto memberInfo = memberServiceClient.getMemberContractInfo(reqDto.getEmployeeMemberId());
+        log.info("memberInfo: name={}, sabun={}, org={}, jobTitle={}",
+                memberInfo.getName(), memberInfo.getSabun(),
+                memberInfo.getOrganizationName(), memberInfo.getJobTitleName());
 
         // contentJson 생성 (AUTO + ADMIN_INPUT 합치기)
         String contentJson = buildContentJson(template.getFormSchema(), salaryInfo, memberInfo, reqDto.getAdminInputJson());
@@ -239,12 +241,66 @@ public class ContractService {
         return ContractResDto.fromEntity(contract, parties);
     }
 
+    // 직원 거절
+    public ContractResDto reject(UUID companyId, UUID memberId, UUID contractId, ContractRejectReqDto reqDto) {
+        Contract contract = findContractWithPermission(companyId, contractId);
+
+        if (contract.getContractStatus() != ContractStatus.SENT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "거절할 수 있는 상태가 아닙니다.");
+        }
+
+        // 본인 파티 찾기
+        ContractParty party = partyRepository.findByContractContractIdAndMemberId(contractId, memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.FORBIDDEN, "거절 권한이 없습니다."));
+
+        if (party.getPartyRole() == PartyRole.COMPANY) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "회사측은 거절할 수 없습니다.");
+        }
+
+        if (party.getSignStatus() != SignStatus.PENDING) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "이미 처리된 계약입니다.");
+        }
+
+        // 거절 처리
+        party.reject(reqDto.getRejectReason());
+        contract.reject(reqDto.getRejectReason());
+
+        if (contract.getContractBatch() != null) {
+            contract.getContractBatch().incrementRejectedCount();
+        }
+
+        // 발송자(인사팀)에게 거절 알림
+        List<ContractParty> parties = partyRepository.findByContractContractId(contractId);
+
+        ContractParty companyPartyEntity = parties.stream()
+                .filter(p -> p.getPartyRole() == PartyRole.COMPANY)
+                .findFirst()
+                .orElse(null);
+
+        if (companyPartyEntity != null) {
+            contractNotificationService.notifyContractRejected(
+                    companyPartyEntity.getMemberId(),
+                    memberId,
+                    contractId,
+                    contract.getEmployeeName(),
+                    reqDto.getRejectReason());
+        }
+
+        return ContractResDto.fromEntity(contract, parties);
+    }
+
     // ===================== 조회 =====================
 
     // 직원 본인 계약 목록
     @Transactional(readOnly = true)
-    public List<ContractResDto> findMyContracts(UUID memberId) {
-        List<Contract> contracts = contractRepository.findByEmployeeMemberIdAndDelYnOrderByCreatedAtDesc(memberId, "N");
+    public List<ContractResDto> findMyContracts(UUID memberId, ContractStatus status) {
+        List<Contract> contracts;
+        if (status != null) {
+            contracts = contractRepository.findByEmployeeMemberIdAndContractStatusAndDelYnOrderByCreatedAtDesc(
+                    memberId, status, "N");
+        } else {
+            contracts = contractRepository.findByEmployeeMemberIdAndDelYnOrderByCreatedAtDesc(memberId, "N");
+        }
         return contracts.stream()
                 .map(c -> {
                     List<ContractParty> parties = partyRepository.findByContractContractId(c.getContractId());
@@ -371,4 +427,243 @@ public class ContractService {
         }
     }
 
+    // 계약 회수 (인사팀)
+    public ContractResDto cancel(UUID companyId, UUID memberId, UUID contractId, String cancelReason) {
+        Contract contract = findContractWithPermission(companyId, contractId);
+
+        if (contract.getContractStatus() != ContractStatus.SENT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "회수할 수 있는 상태가 아닙니다.");
+        }
+
+        // 직원이 이미 서명했는지 확인
+        ContractParty employeeParty = partyRepository.findByContractContractId(contractId).stream()
+                .filter(p -> p.getPartyRole() == PartyRole.EMPLOYEE)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "직원 파티를 찾을 수 없습니다."));
+
+        if (employeeParty.getSignStatus() == SignStatus.SIGNED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "직원이 이미 서명한 계약은 회수할 수 없습니다.");
+        }
+
+        // 회수 처리
+        contract.cancel(cancelReason);
+        employeeParty.cancel();
+
+        // 직원에게 회수 알림
+//        contractNotificationService.notifyContractCanceled(
+//                contract.getEmployeeMemberId(),
+//                memberId,
+//                contractId,
+//                contract.getContractTemplate().getTemplateName());
+
+        List<ContractParty> parties = partyRepository.findByContractContractId(contractId);
+        return ContractResDto.fromEntity(contract, parties);
+    }
+
+    // 개별 재발송
+    public ContractResDto resend(UUID companyId, UUID senderMemberId, UUID contractId, String adminInputJson) {
+        Contract original = findContractWithPermission(companyId, contractId);
+
+        // 상태 검증: REJECTED 또는 CANCELED만 재발송 가능
+        if (original.getContractStatus() != ContractStatus.REJECTED
+                && original.getContractStatus() != ContractStatus.CANCELED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "거절 또는 회수된 계약만 재발송할 수 있습니다.");
+        }
+
+        // 재발송 횟수 제한 (최대 5회)
+        if (original.getRevision() >= 5) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "최대 재발송 횟수(5회)를 초과했습니다.");
+        }
+
+        // 동일 직원 + 동일 템플릿으로 SENT 상태인 계약 중복 차단
+        boolean hasSent = contractRepository.existsByEmployeeMemberIdAndContractTemplateTemplateIdAndContractStatusAndDelYn(
+                original.getEmployeeMemberId(),
+                original.getContractTemplate().getTemplateId(),
+                ContractStatus.SENT,
+                "N");
+        if (hasSent) {
+            throw new BusinessException(HttpStatus.CONFLICT, "해당 직원에게 이미 발송 중인 동일 계약서가 있습니다.");
+        }
+
+        ContractTemplate template = original.getContractTemplate();
+
+        // 최신 데이터로 AUTO 필드 갱신
+        SalaryInfoResDto salaryInfo = getCurrentSalary(companyId, original.getEmployeeMemberId());
+        MemberContractInfoResDto memberInfo = memberServiceClient.getMemberContractInfo(original.getEmployeeMemberId());
+        String contentJson = buildContentJson(template.getFormSchema(), salaryInfo, memberInfo, adminInputJson);
+
+        // 새 Contract 생성 (이력 연결)
+        Contract contract = Contract.builder()
+                .companyId(companyId)
+                .contractTemplate(template)
+                .employeeMemberId(original.getEmployeeMemberId())
+                .contractType(template.getContractType())
+                .contentJson(contentJson)
+                .formSchemaSnapshot(template.getFormSchema())
+                .contractStatus(ContractStatus.SENT)
+                .employeeName(memberInfo.getName())
+                .employeeSabun(memberInfo.getSabun())
+                .organizationName(memberInfo.getOrganizationName())
+                .jobTitleName(memberInfo.getJobTitleName())
+                .previousContractId(original.getContractId())
+                .revision(original.getRevision() + 1)
+                .build();
+
+        Contract saved = contractRepository.save(contract);
+
+        // ContractParty 생성
+        ContractParty companyParty = ContractParty.builder()
+                .contract(saved)
+                .memberId(senderMemberId)
+                .partyRole(PartyRole.COMPANY)
+                .signStatus(SignStatus.SIGNED)
+                .build();
+        companyParty.sign(null);
+
+        ContractParty employeeParty = ContractParty.builder()
+                .contract(saved)
+                .memberId(original.getEmployeeMemberId())
+                .partyRole(PartyRole.EMPLOYEE)
+                .build();
+
+        List<ContractParty> savedParties = partyRepository.saveAll(List.of(companyParty, employeeParty));
+
+        // 직원에게 재발송 알림
+        contractNotificationService.notifyContractSent(
+                original.getEmployeeMemberId(),
+                senderMemberId,
+                saved.getContractId(),
+                template.getTemplateName());
+
+        return ContractResDto.fromEntity(saved, savedParties);
+    }
+
+    // 배치 재발송
+    public ContractBatchResDto resendBatch(UUID companyId, UUID senderMemberId,
+                                           UUID batchId, ContractBatchResendReqDto reqDto) {
+        ContractBatch originalBatch = batchRepository.findById(batchId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "배치를 찾을 수 없습니다."));
+
+        if (!originalBatch.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
+
+        ContractTemplate template = originalBatch.getContractTemplate();
+
+        // 새 배치 생성 (이력 연결)
+        ContractBatch newBatch = ContractBatch.builder()
+                .companyId(companyId)
+                .contractTemplate(template)
+                .batchName(reqDto.getBatchName())
+                .totalCount(reqDto.getItems().size())
+                .createdBy(senderMemberId)
+                .previousBatchId(originalBatch.getBatchId())
+                .build();
+
+        ContractBatch savedBatch = batchRepository.save(newBatch);
+
+        for (ContractBatchResendReqDto.BatchResendItem item : reqDto.getItems()) {
+            Contract original = contractRepository.findByIdWithTemplate(item.getContractId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                            "계약을 찾을 수 없습니다: " + item.getContractId()));
+
+            // 상태 검증
+            if (original.getContractStatus() != ContractStatus.REJECTED
+                    && original.getContractStatus() != ContractStatus.CANCELED) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "거절 또는 회수된 계약만 재발송할 수 있습니다: " + original.getEmployeeName());
+            }
+
+            // 재발송 횟수 제한
+            if (original.getRevision() >= 5) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST,
+                        "최대 재발송 횟수(5회)를 초과했습니다: " + original.getEmployeeName());
+            }
+
+            // 중복 SENT 차단
+            boolean hasSent = contractRepository.existsByEmployeeMemberIdAndContractTemplateTemplateIdAndContractStatusAndDelYn(
+                    original.getEmployeeMemberId(),
+                    template.getTemplateId(),
+                    ContractStatus.SENT,
+                    "N");
+            if (hasSent) {
+                throw new BusinessException(HttpStatus.CONFLICT,
+                        "이미 발송 중인 동일 계약서가 있습니다: " + original.getEmployeeName());
+            }
+
+            // 최신 데이터로 갱신
+            SalaryInfoResDto salaryInfo = getCurrentSalary(companyId, original.getEmployeeMemberId());
+            MemberContractInfoResDto memberInfo = memberServiceClient.getMemberContractInfo(original.getEmployeeMemberId());
+            String contentJson = buildContentJson(template.getFormSchema(), salaryInfo, memberInfo, item.getAdminInputJson());
+
+            Contract contract = Contract.builder()
+                    .companyId(companyId)
+                    .contractTemplate(template)
+                    .contractBatch(savedBatch)
+                    .employeeMemberId(original.getEmployeeMemberId())
+                    .contractType(template.getContractType())
+                    .contentJson(contentJson)
+                    .formSchemaSnapshot(template.getFormSchema())
+                    .contractStatus(ContractStatus.SENT)
+                    .employeeName(memberInfo.getName())
+                    .employeeSabun(memberInfo.getSabun())
+                    .organizationName(memberInfo.getOrganizationName())
+                    .jobTitleName(memberInfo.getJobTitleName())
+                    .previousContractId(original.getContractId())
+                    .revision(original.getRevision() + 1)
+                    .build();
+
+            Contract savedContract = contractRepository.save(contract);
+
+            ContractParty companyParty = ContractParty.builder()
+                    .contract(savedContract)
+                    .memberId(senderMemberId)
+                    .partyRole(PartyRole.COMPANY)
+                    .signStatus(SignStatus.SIGNED)
+                    .build();
+            companyParty.sign(null);
+
+            ContractParty employeeParty = ContractParty.builder()
+                    .contract(savedContract)
+                    .memberId(original.getEmployeeMemberId())
+                    .partyRole(PartyRole.EMPLOYEE)
+                    .build();
+
+            partyRepository.saveAll(List.of(companyParty, employeeParty));
+
+            contractNotificationService.notifyContractSent(
+                    original.getEmployeeMemberId(),
+                    senderMemberId,
+                    savedContract.getContractId(),
+                    template.getTemplateName());
+        }
+
+        return ContractBatchResDto.fromEntity(savedBatch);
+    }
+
+    // 계약 이력 조회
+    @Transactional(readOnly = true)
+    public List<ContractResDto> findHistory(UUID companyId, UUID contractId) {
+        Contract current = findContractWithPermission(companyId, contractId);
+
+        List<ContractResDto> history = new java.util.ArrayList<>();
+
+        Contract c = current;
+        int maxDepth = 10;
+        int depth = 0;
+        while (c != null && depth < maxDepth) {
+            List<ContractParty> parties = partyRepository.findByContractContractId(c.getContractId());
+            history.add(ContractResDto.fromEntity(c, parties));
+
+            if (c.getPreviousContractId() != null) {
+                c = contractRepository.findByIdWithTemplate(c.getPreviousContractId()).orElse(null);
+            } else {
+                c = null;
+            }
+            depth++;
+        }
+
+        history.sort(java.util.Comparator.comparingInt(ContractResDto::getRevision));
+        return history;
+    }
 }

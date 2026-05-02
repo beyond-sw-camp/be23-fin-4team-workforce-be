@@ -262,11 +262,9 @@ public class CompanyService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
-        Company company = companyRepository.findById(member.getCompanyId())
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
+        Company company = member.getCompany();
 
-        // S3 업로드 (기존 로고 업로드와 동일한 방식)
-        String sealUrl = s3Service.upload(seal, "company/" + company.getCompanyId() + "/seal");
+        String sealUrl = s3Uploader.upload(seal, "company/" + company.getCompanyId() + "/seal");
         company.updateSealImageUrl(sealUrl);
     }
 

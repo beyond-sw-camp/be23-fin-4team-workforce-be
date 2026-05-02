@@ -3,9 +3,8 @@ package com._team._team.contract.controller;
 import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
-import com._team._team.contract.dto.reqdto.ContractBatchSendReqDto;
-import com._team._team.contract.dto.reqdto.ContractSendReqDto;
-import com._team._team.contract.dto.reqdto.ContractSignReqDto;
+import com._team._team.contract.domain.enums.ContractStatus;
+import com._team._team.contract.dto.reqdto.*;
 import com._team._team.contract.dto.resdto.ContractBatchResDto;
 import com._team._team.contract.dto.resdto.ContractResDto;
 import com._team._team.contract.service.ContractService;
@@ -76,8 +75,9 @@ public class ContractController {
     // 내 계약 목록 (직원용)
     @GetMapping("/my")
     public ResponseEntity<?> findMyContracts(
-            @RequestHeader("X-User-UUID") UUID memberId) {
-        List<ContractResDto> result = contractService.findMyContracts(memberId);
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestParam(required = false) ContractStatus status) {
+        List<ContractResDto> result = contractService.findMyContracts(memberId, status);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "내 계약 목록 조회 성공"),
                 HttpStatus.OK);
@@ -125,6 +125,72 @@ public class ContractController {
         List<ContractResDto> result = contractService.findByBatchId(companyId, batchId);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "배치별 계약 목록 조회 성공"),
+                HttpStatus.OK);
+    }
+
+    // 직원 계약 거절
+    @PostMapping("/{contractId}/reject")
+    public ResponseEntity<?> reject(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID contractId,
+            @RequestBody ContractRejectReqDto reqDto) {
+        return new ResponseEntity<>(
+                ApiResponse.success(contractService.reject(companyId, memberId, contractId, reqDto), "계약 거절 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 계약 회수 (인사팀)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.CREATE)
+    @PostMapping("/{contractId}/cancel")
+    public ResponseEntity<?> cancel(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID contractId,
+            @RequestBody ContractCancelReqDto reqDto) {
+        ContractResDto resDto = contractService.cancel(companyId, memberId, contractId, reqDto.getCancelReason());
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "계약이 회수되었습니다."),
+                HttpStatus.OK);
+    }
+
+    // 개별 재발송
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.CREATE)
+    @PostMapping("/{contractId}/resend")
+    public ResponseEntity<?> resend(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID contractId,
+            @RequestBody ContractResendReqDto reqDto) {
+        ContractResDto resDto = contractService.resend(companyId, memberId, contractId, reqDto.getAdminInputJson());
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "계약서가 재발송되었습니다."),
+                HttpStatus.CREATED);
+    }
+
+    // 배치 재발송
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.CREATE)
+    @PostMapping("/batches/{batchId}/resend")
+    public ResponseEntity<?> resendBatch(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID batchId,
+            @Valid @RequestBody ContractBatchResendReqDto reqDto) {
+        ContractBatchResDto resDto = contractService.resendBatch(companyId, memberId, batchId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "계약서가 일괄 재발송되었습니다."),
+                HttpStatus.CREATED);
+    }
+
+    // 이력 조회
+    @GetMapping("/{contractId}/history")
+    public ResponseEntity<?> findHistory(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID contractId) {
+        List<ContractResDto> result = contractService.findHistory(companyId, contractId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "계약 이력 조회 성공"),
                 HttpStatus.OK);
     }
 }
