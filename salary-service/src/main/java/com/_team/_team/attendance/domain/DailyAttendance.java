@@ -19,7 +19,7 @@ import java.util.UUID;
 /**
  * 일별 근태 집계
  * - attendance_log의 부모 테이블 (1:N)
- * - 월간 근태 조회 시 이 테이블만 조회 (성능 최적화)
+ * - 월간 근태 조회 시 이 테이블만 조회
  */
 @AllArgsConstructor
 @NoArgsConstructor
@@ -68,6 +68,14 @@ public class DailyAttendance extends BaseTimeEntity {
 
     /** 초과 근무 시간(분) - workMinutes가 스케줄 workMinutes 초과 시 */
     private Integer overtimeMinutes;
+
+    /**
+     * 조퇴계 결재 승인 플래그 - 'Y' 면 실제 퇴근 시각이 정규 종료 시각보다 일러도
+     * 정규 근무 시간을 schedule.workMinutes 그대로 인정
+     */
+    @Column(length = 1)
+    @Builder.Default
+    private String earlyLeaveExcusedYn = "N";
 
     /** 출퇴근 이벤트 로그 (상세 조회 시에만 LAZY 로딩) */
     @OneToMany(mappedBy = "dailyAttendance", fetch = FetchType.LAZY)
@@ -134,5 +142,19 @@ public class DailyAttendance extends BaseTimeEntity {
     public void applyWorkResult(int workedMinutes, int overtimeMinutes) {
         this.workedMinutes = workedMinutes;
         this.overtimeMinutes = overtimeMinutes;
+    }
+
+    /** 조퇴계 결재 승인 플래그 ON - 정규 근무 시간 면제용 */
+    public void markEarlyLeaveExcused() {
+        this.earlyLeaveExcusedYn = "Y";
+    }
+
+    /** 조퇴계 반려/취소 시 플래그 OFF */
+    public void clearEarlyLeaveExcused() {
+        this.earlyLeaveExcusedYn = "N";
+    }
+
+    public boolean isEarlyLeaveExcused() {
+        return "Y".equals(this.earlyLeaveExcusedYn);
     }
 }

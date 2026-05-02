@@ -6,7 +6,6 @@ import com._team._team.attendance.domain.enums.AttendanceStatus;
 import com._team._team.attendance.domain.enums.ClosureStatus;
 import com._team._team.attendance.domain.enums.EventType;
 import com._team._team.attendance.domain.enums.SourceType;
-import com._team._team.attendance.dto.vo.ResolvedSchedule;
 import com._team._team.attendance.repository.AttendanceLogRepository;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
 import com._team._team.attendance.repository.LeaveRequestRepository;
@@ -36,19 +35,16 @@ public class EarlyLeaveService {
     private final DailyAttendanceRepository dailyAttendanceRepository;
     private final AttendanceLogRepository attendanceLogRepository;
     private final LeaveRequestRepository leaveRequestRepository;
-    private final ScheduleResolver scheduleResolver;
     private final DailyAttendanceCloseService dailyAttendanceCloseService;
 
     @Autowired
     public EarlyLeaveService(DailyAttendanceRepository dailyAttendanceRepository,
                              AttendanceLogRepository attendanceLogRepository,
                              LeaveRequestRepository leaveRequestRepository,
-                             ScheduleResolver scheduleResolver,
                              DailyAttendanceCloseService dailyAttendanceCloseService) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.attendanceLogRepository = attendanceLogRepository;
         this.leaveRequestRepository = leaveRequestRepository;
-        this.scheduleResolver = scheduleResolver;
         this.dailyAttendanceCloseService = dailyAttendanceCloseService;
     }
 
@@ -112,8 +108,9 @@ public class EarlyLeaveService {
     }
 
     /**
-     * 결재 승인 적용 - lastClockOut 을 schedule.endTime 으로 가상 세팅(정규 8h 유지) + 정정 로그 마킹
-     * 휴가 차감 X, 정규근무 줄이지 X
+     * 결재 승인 적용 - 출/퇴근 시각은 실제 조퇴 시각 그대로 보존(이력/사용자 가시성 유지),
+     * 조퇴했으면 WorkTimeClassifier 가 정규 근무 시간을 스케줄시간대로 근무시간을 만듬
+     * 정책: 휴가 차감 X, 정규근무 줄이지 X (급여 정산만 정규 8h 유지)
      */
     @Transactional
     public void applyApprovedEarlyLeave(UUID companyId, UUID memberId, UUID approverId,
@@ -135,30 +132,20 @@ public class EarlyLeaveService {
             return;
         }
 
-        // schedule.endTime 으로 lastClockOut 가상 보정 -> 정규 8h 유지
-        ResolvedSchedule schedule = scheduleResolver.resolve(memberId, companyId, attendanceDate);
-        if (schedule != null && schedule.endTime() != null) {
-            LocalDateTime virtualClockOut = LocalDateTime.of(attendanceDate, schedule.endTime());
-            // 정정 로그(ADMIN_MANUAL)를 schedule.endTime 으로 갱신해서 향후 조회 시 일관성 유지
-            upsertCorrectionLog(da, EventType.CLOCK_OUT, virtualClockOut, reason);
-            da.updateClockOut(virtualClockOut);
-            log.info("[EarlyLeave] schedule.endTime 보정 적용 memberId={} date={} endTime={}",
-                    memberId, attendanceDate, schedule.endTime());
-        } else {
-            // 스케줄 못 찾으면 earlyLeaveAt 그대로 (이 경우 정규근무 줄어들 수 있음)
-            log.warn("[EarlyLeave] schedule 없음 - 보정 스킵 memberId={} date={}", memberId, attendanceDate);
-        }
+        // 조퇴 체크 - 출퇴근 시각은 실제 그대로, 정규 근무는 WorkTimeClassifier 가 스케줄 정규 근무 시간으로 만듬
+        da.markEarlyLeaveExcused();
 
-        // 정정 로그 markCorrected
+        // 정정 로그 markCorrected (사유 보존, 출퇴근 시각 변경 없음)
         attendanceLogRepository
                 .findTop1ByDailyAttendanceAndEventTypeAndSourceTypeOrderByEventTimeDesc(
                         da, EventType.CLOCK_OUT, SourceType.ADMIN_MANUAL)
                 .ifPresent(l -> l.markCorrected(approverId, l.getCorrectionReason()));
 
-        // 재계산 + FINALIZED
+        // 재계산 + FINALIZED (조회했으면 반영해서 정규근무 시간 8h 처리)
         dailyAttendanceCloseService.recalculateAndFinalize(da.getDailyAttendanceId());
 
-        log.info("[EarlyLeave] 결재 승인 적용 완료 memberId={} date={}", memberId, attendanceDate);
+        log.info("[EarlyLeave] 결재 승인 적용 완료 memberId={} date={} earlyLeaveAt={}",
+                memberId, attendanceDate, earlyLeaveAt);
     }
 
     /**
@@ -192,6 +179,9 @@ public class EarlyLeaveService {
                         da, EventType.CLOCK_OUT, SourceType.ADMIN_MANUAL)
                 .map(AttendanceLog::getEventTime).orElse(null);
         da.updateClockOut(origOut);
+
+        // 조퇴 반려/취소 체크
+        da.clearEarlyLeaveExcused();
 
         da.transitionClosure(ClosureStatus.OPEN);
 
