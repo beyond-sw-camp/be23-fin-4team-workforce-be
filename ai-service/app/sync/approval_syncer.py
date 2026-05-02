@@ -95,8 +95,8 @@ def format_approval_document_to_rag(document: dict) -> str:
 {keywords_str}
 
 ■ 관련 메뉴
-관련 메뉴: /ess/approval/request
-화면명: 결재 신청"""
+관련 메뉴: /app/salary/pay-grade-table
+화면명: 결재 요청 작성"""
 
 
 def _parse_form_fields(form_schema_str: str) -> list:

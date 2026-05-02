@@ -3,6 +3,7 @@ from typing import List
 
 class RagSearchRequest(BaseModel):
     question: str
+    conversation_history: str = ""
 
 class RagSearchResponse(BaseModel):
     context: str
