@@ -15,9 +15,7 @@ import java.util.UUID;
 public interface ContractRepository extends JpaRepository<Contract, UUID> {
     // 직원 본인 계약 목록
     List<Contract> findByEmployeeMemberIdAndDelYnOrderByCreatedAtDesc(UUID memberId, String delYn);
-
-    // 직원 본인 계약 목록 (상태 필터)
-    List<Contract> findByEmployeeMemberIdAndContractStatusAndDelYn(UUID memberId, ContractStatus status, String delYn);
+    
 
     // 배치별 계약 목록
     List<Contract> findByContractBatchBatchIdAndDelYn(UUID batchId, String delYn);
@@ -41,4 +39,12 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
             "AND c.contractStatus = :status " +
             "AND c.delYn = 'N'")
     long countByBatchIdAndStatus(@Param("batchId") UUID batchId, @Param("status") ContractStatus status);
+
+    // 중복 SENT 차단용
+    boolean existsByEmployeeMemberIdAndContractTemplateTemplateIdAndContractStatusAndDelYn(
+            UUID employeeMemberId, UUID templateId, ContractStatus contractStatus, String delYn);
+
+    // 상태 필터링 조회
+    List<Contract> findByEmployeeMemberIdAndContractStatusAndDelYnOrderByCreatedAtDesc(
+            UUID employeeMemberId, ContractStatus contractStatus, String delYn);
 }
