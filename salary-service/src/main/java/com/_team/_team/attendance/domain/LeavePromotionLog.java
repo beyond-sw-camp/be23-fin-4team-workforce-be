@@ -74,12 +74,10 @@ public class LeavePromotionLog extends BaseTimeEntity {
     private String designationReason;
 
     /**
-     * 알림 열람 처리, 1회 기록 후 변경하지 않음
+     * 알림 열람 처리, 호출 시마다 최신 열람 시각으로 갱신
      */
     public void markViewed() {
-        if (this.viewedAt == null) {
-            this.viewedAt = LocalDateTime.now();
-        }
+        this.viewedAt = LocalDateTime.now();
     }
 
     /**
