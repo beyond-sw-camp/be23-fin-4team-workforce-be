@@ -33,6 +33,8 @@ public enum NotificationType {
     // 전자계약
     CONTRACT_SENT,           // 계약서 발송됨 (직원에게)
     CONTRACT_SIGNED,         // 계약서 서명 완료 (인사팀에게)
+    CONTRACT_REJECTED,       // 계약서 거절됨 (인사팀에게)
+    CONTRACT_CANCELED,       // 계약서 회수됨 (직원에게)
 
     // 급여
     SALARY_PUBLISHED,        // 급여 명세서 발행 (확정)
