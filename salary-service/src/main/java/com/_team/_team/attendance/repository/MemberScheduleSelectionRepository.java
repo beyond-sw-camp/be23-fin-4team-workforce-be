@@ -13,14 +13,19 @@ import java.util.UUID;
 public interface MemberScheduleSelectionRepository  extends JpaRepository<MemberScheduleSelection, UUID> {
 
     // 최신 APPROVED 또는 AUTO 1건을 현재 유효 선택으로 사용
+    // 같은 월에 재신청으로 여러 건 승인된 경우 최신 1건 사용
     @Query("SELECT s FROM MemberScheduleSelection s " +
             "WHERE s.memberId = :memberId " +
             "  AND s.targetYearMonth = :yearMonth " +
             "  AND s.approvalStatus IN ('APPROVED', 'AUTO') " +
             "ORDER BY s.requestedAt DESC")
-    Optional<MemberScheduleSelection> findCurrentActive(
+    List<MemberScheduleSelection> findCurrentActiveList(
             @Param("memberId") UUID memberId,
             @Param("yearMonth") String yearMonth);
+
+    default Optional<MemberScheduleSelection> findCurrentActive(UUID memberId, String yearMonth) {
+        return findCurrentActiveList(memberId, yearMonth).stream().findFirst();
+    }
 
     // 중복 제출 방지 (PENDING 건이 이미 있는지 확인)
     boolean existsByMemberIdAndTargetYearMonthAndApprovalStatus(

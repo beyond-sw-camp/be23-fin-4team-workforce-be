@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * 소급분 자동 재계산 컨트롤러
- *  preview 차액 미리보기 (DB 변경 없음)
+ *  preview 차액 미리보기
  *  apply 새 RETROACTIVE 타입 Payroll 발행 DRAFT 상태로 생성
  */
 @RestController
