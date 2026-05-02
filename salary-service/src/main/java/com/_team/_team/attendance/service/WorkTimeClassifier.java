@@ -78,6 +78,15 @@ public class WorkTimeClassifier {
         int early = calculateEarlyLeaveMinutes(daily, schedule);
         int leave = calculateLeaveMinutes(daily, schedule);
 
+        // 조퇴계 결재 승인된 날
+        // (휴가 차감 X, 정규 8h 유지) 조퇴 분(early) 도 무효 처리하고 payable 에도 정규시간 반영
+        if (daily.isEarlyLeaveExcused()) {
+            regular = schedule.workMinutes();
+            early = 0;
+            // payable 표시는 실제 체류시간 기준 유지
+            payable = Math.max(payable, schedule.workMinutes());
+        }
+
         return new WorkTimeBreakdown(
                 payable, regular, overtime, night, 0, leave, late, early
         );
