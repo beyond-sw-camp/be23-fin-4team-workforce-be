@@ -227,20 +227,21 @@ public class LeavePromotionResponseService {
      * 1차 통보 회신 없이 D-60 도달 -> 회사가 만료일 직전 평일 N일을 자동 지정
      */
     public void autoDesignateOnSecondNotice(UUID promotionLogId, UUID systemActorId) {
-        LeavePromotionLog log = promotionLogRepository.findById(promotionLogId)
+
+        LeavePromotionLog promotionLog = promotionLogRepository.findById(promotionLogId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "촉진 통보를 찾을 수 없습니다"));
-        if (log.getStage() != PromotionStage.SECOND) {
+        if (promotionLog.getStage() != PromotionStage.SECOND) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "2차 통보 건만 자동 지정 가능합니다");
         }
-        if (log.getStatus() != PromotionLogStatus.SENT) {
+        if (promotionLog.getStatus() != PromotionLogStatus.SENT) {
             // 이미 회신/지정된 건은 스킵 (멱등성)
             return;
         }
 
-        UUID companyId = log.getCompanyId();
-        MemberBalance balance = memberBalanceRepository.findById(log.getMemberBalanceId())
+        UUID companyId = promotionLog.getCompanyId();
+        MemberBalance balance = memberBalanceRepository.findById(promotionLog.getMemberBalanceId())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "잔고를 찾을 수 없습니다"));
 
@@ -260,7 +261,7 @@ public class LeavePromotionResponseService {
         List<LocalDate> picked = pickDesignatedDates(expiration, remainingDays, holidays);
         if (picked.isEmpty()) {
             log.info("[AutoDesignate] 지정 가능 날짜 없음 - 스킵 memberId={} expiration={}",
-                    log.getMemberId(), expiration);
+                    promotionLog.getMemberId(), expiration);
             return;
         }
 
@@ -274,7 +275,7 @@ public class LeavePromotionResponseService {
 
         for (LocalDate date : picked) {
             LeaveRequest req = LeaveRequest.createDesignated(
-                    log.getMemberId(),
+                    promotionLog.getMemberId(),
                     companyId,
                     companyLeaveTypeId,
                     date, date,
@@ -290,11 +291,11 @@ public class LeavePromotionResponseService {
                     .days(1.0)
                     .leaveDate(date)
                     .build();
-            memberBalanceService.useBalance(companyId, log.getMemberId(), useReq);
+            memberBalanceService.useBalance(companyId, promotionLog.getMemberId(), useReq);
         }
 
-        log.designate(serializeDates(picked), reason);
-        publishDesignationNotice(log.getMemberId(), picked, log.getMemberBalanceId());
+        promotionLog.designate(serializeDates(picked), reason);
+        publishDesignationNotice(promotionLog.getMemberId(), picked, promotionLog.getMemberBalanceId());
     }
 
     /** 만료일부터 역순으로 평일 + 공휴일 아닌 날짜 needed 개 추출 (오늘 이후만) */
