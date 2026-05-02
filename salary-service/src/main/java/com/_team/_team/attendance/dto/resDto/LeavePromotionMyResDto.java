@@ -24,6 +24,8 @@ public class LeavePromotionMyResDto {
     private PromotionLogStatus status;
     private LocalDate sentOn;
     private LocalDateTime acknowledgedAt;
+    // 직원이 처음 통보를 열람한 시각
+    private LocalDateTime viewedAt;
     private LocalDate balanceExpirationDate;
     private Double remainingDays;
 
@@ -47,6 +49,7 @@ public class LeavePromotionMyResDto {
                 .status(log.getStatus())
                 .sentOn(log.getSentOn())
                 .acknowledgedAt(log.getAcknowledgedAt())
+                .viewedAt(log.getViewedAt())
                 .balanceExpirationDate(balanceExpirationDate)
                 .remainingDays(remainingDays)
                 .plannedDates(parseDates(log.getPlannedDates()))

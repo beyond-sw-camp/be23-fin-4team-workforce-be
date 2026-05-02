@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 
 import java.time.LocalDate;
@@ -49,7 +48,6 @@ public class LeavePromotionWorker {
         this.leavePromotionResponseService = leavePromotionResponseService;
     }
 
-    @Transactional
     public Result run(LocalDate today) {
         Result result = new Result();
 
@@ -69,6 +67,8 @@ public class LeavePromotionWorker {
     }
 
     // 단계별 촉진 대상 조회 후 알림 + 로그 저장
+    // 외부 @Transactional 없으므로 각 saveLog 는 JpaRepository 기본 트랜잭션으로 즉시 commit, (포폴에 쓸 수도..)
+    // 그 후 autoDesignateOnSecondNotice(REQUIRES_NEW)가 commit 된 row 를 정상 조회
     private void processStage(LeavePolicy policy, LocalDate today,
                               PromotionStage stage, Integer beforeDays, Result result) {
         if (beforeDays == null || beforeDays <= 0) return;
