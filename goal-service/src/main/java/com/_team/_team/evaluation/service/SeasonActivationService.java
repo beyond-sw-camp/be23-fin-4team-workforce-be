@@ -161,7 +161,7 @@ public class SeasonActivationService {
             }
         }
 
-        season.activate();
+        season.openSelfEval();
     }
 
     private boolean isEvaluableActiveMember(EvaluationSeason season, UUID memberId) {
@@ -219,13 +219,13 @@ public class SeasonActivationService {
                         "Each KR must have a valid aligned objective. goalId=" + goal.getGoalId()
                 );
             }
-            if (isBlank(objective.getGradeSCriteria())
-                    || isBlank(objective.getGradeACriteria())
-                    || isBlank(objective.getGradeBCriteria())
-                    || isBlank(objective.getGradeCCriteria())) {
+            if (isBlank(goal.getGradeSCriteria())
+                    || isBlank(goal.getGradeACriteria())
+                    || isBlank(goal.getGradeBCriteria())
+                    || isBlank(goal.getGradeCCriteria())) {
                 throw new BusinessException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
-                        "Aligned objective rubric is incomplete. goalId=" + goal.getGoalId()
+                        "Personal goal grade criteria are incomplete. goalId=" + goal.getGoalId()
                 );
             }
         }

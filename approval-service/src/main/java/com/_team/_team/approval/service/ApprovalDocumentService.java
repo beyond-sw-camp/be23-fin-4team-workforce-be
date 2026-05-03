@@ -89,25 +89,48 @@ public class ApprovalDocumentService {
                 {
                   "fields": [
                     { "name": "title", "label": "제목", "type": "text", "required": true },
-                    {
-                      "name": "timing",
-                      "label": "신청 구분",
-                      "type": "select",
-                      "required": true,
-                      "options": ["사전","사후"]
-                    },
-                    {
-                      "name": "workType",
-                      "label": "근무구분",
-                      "type": "select",
-                      "required": true,
-                      "options": ["연장","야간","휴일"]
-                    },
                     { "name": "workDate",      "label": "근무일자",  "type": "date",     "required": true },
                     { "name": "startTime",     "label": "시작시간",  "type": "time",     "required": true },
                     { "name": "endTime",       "label": "종료시간",  "type": "time",     "required": true },
                     { "name": "requestReason", "label": "신청 사유", "type": "textarea"                  },
                     { "name": "overtimeRequestId", "label": "salary 연결 ID", "type": "hidden"          }
+                  ]
+                }
+            """)
+                .build());
+
+        // 근태 정정 신청
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("근태정정신청")
+                .requestType(RequestType.ATTENDANCE)
+                .isCalendarVisibleYn("N")
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",             "label": "제목",         "type": "text",     "required": true },
+                    { "name": "attendanceDate",    "label": "정정 일자",    "type": "date",     "required": true },
+                    { "name": "requestedClockIn",  "label": "정정 출근시각","type": "time"                       },
+                    { "name": "requestedClockOut", "label": "정정 퇴근시각","type": "time"                       },
+                    { "name": "reason",            "label": "정정 사유",    "type": "textarea", "required": true }
+                  ]
+                }
+            """)
+                .build());
+
+        // 조퇴계 - 7일 이내 일자, 조퇴 시각, 사유. 승인 시 정규 8h 유지
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("조퇴계")
+                .requestType(RequestType.ATTENDANCE)
+                .isCalendarVisibleYn("N")
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "title",          "label": "제목",         "type": "text",     "required": true },
+                    { "name": "attendanceDate", "label": "조퇴 일자",    "type": "date",     "required": true },
+                    { "name": "earlyLeaveTime", "label": "조퇴 시각",    "type": "time",     "required": true },
+                    { "name": "reason",         "label": "조퇴 사유",    "type": "textarea", "required": true }
                   ]
                 }
             """)
@@ -123,9 +146,9 @@ public class ApprovalDocumentService {
                 {
                   "fields": [
                     { "name": "title", "label": "제목", "type": "text", "required": true },
-                    { "name": "type", "label": "휴직 종류", "type": "select", "options": ["출산휴가", "육아휴직", "장기병가", "무급휴직", "학업휴직", "군복무"] },
-                    { "name": "startDate", "label": "시작일", "type": "date" },
-                    { "name": "endDate", "label": "종료일", "type": "date" },
+                    { "name": "type", "label": "휴직 종류", "type": "select", "required": true, "options": ["출산휴가", "육아휴직", "장기병가", "무급휴직", "학업휴직", "군복무"] },
+                    { "name": "startDate", "label": "시작일", "type": "date", "required": true },
+                    { "name": "endDate", "label": "종료일", "type": "date", "required": true },
                     { "name": "reason", "label": "휴직 사유", "type": "textarea" },
                     { "name": "evidenceFileUrl", "label": "증빙 서류", "type": "file" },
                     { "name": "leaveOfAbsenceId", "label": "salary 연결 ID", "type": "hidden" }
@@ -152,34 +175,6 @@ public class ApprovalDocumentService {
                     },
                     { "name": "detail", "label": "상세 사유", "type": "textarea" },
                     { "name": "note",   "label": "비고",      "type": "textarea" }
-                  ]
-                }
-            """)
-                .build());
-
-        approvalDocumentRepository.save(ApprovalDocument.builder()
-                .companyId(companyId)
-                .documentName("근로계약서")
-                .requestType(RequestType.HR)
-                .formSchema("""
-                {
-                  "fields": [
-                    { "name": "title",         "label": "제목",       "type": "text",   "required": true },
-                    { "name": "contractStart", "label": "계약 시작일","type": "date",   "required": true },
-                    { "name": "contractEnd",   "label": "계약 종료일","type": "date"                    },
-                    {
-                      "name": "contractType",
-                      "label": "계약 유형",
-                      "type": "select",
-                      "required": true,
-                      "options": ["정규직","계약직","파트타임","인턴"]
-                    },
-                    { "name": "department",   "label": "소속 부서",  "type": "text",   "required": true },
-                    { "name": "position",     "label": "직급/직책",  "type": "text",   "required": true },
-                    { "name": "workLocation", "label": "근무지",     "type": "text",   "required": true },
-                    { "name": "workHours",    "label": "근무시간",   "type": "text",   "required": true },
-                    { "name": "salary",       "label": "급여",       "type": "number", "required": true },
-                    { "name": "note",         "label": "비고",       "type": "textarea"                }
                   ]
                 }
             """)
@@ -319,37 +314,6 @@ public class ApprovalDocumentService {
                     { "name": "title",      "label": "제목",      "type": "text",     "required": true },
                     { "name": "reportDate", "label": "보고일",    "type": "date",     "required": true },
                     { "name": "content",    "label": "보고 내용", "type": "textarea", "required": true }
-                  ]
-                }
-            """)
-                .build());
-
-        approvalDocumentRepository.save(ApprovalDocument.builder()
-                .companyId(companyId)
-                .documentName("회의록")
-                .requestType(RequestType.GENERAL)
-                .formSchema("""
-                {
-                  "fields": [
-                    { "name": "title",       "label": "제목",         "type": "text",     "required": true },
-                    { "name": "meetingDate", "label": "회의일자",     "type": "date",     "required": true },
-                    { "name": "meetingTime", "label": "회의시각",     "type": "time"                       },
-                    { "name": "location",    "label": "장소",         "type": "text"                       },
-                    { "name": "attendees",   "label": "참석자",       "type": "textarea", "required": true },
-                    {
-                      "name": "audio",
-                      "label": "녹음 받아쓰기",
-                      "type": "ai_transcribe",
-                      "config": {
-                        "fillTranscript": "transcript",
-                        "fillSummary": "summary",
-                        "attachAudio": true,
-                        "language": "ko"
-                      }
-                    },
-                    { "name": "transcript",  "label": "원본 받아쓰기","type": "textarea"                   },
-                    { "name": "summary",     "label": "AI 회의록",    "type": "textarea", "required": true },
-                    { "name": "note",        "label": "비고",         "type": "textarea"                   }
                   ]
                 }
             """)

@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -208,4 +209,40 @@ public interface MemberBalanceRepository extends JpaRepository<MemberBalance, UU
      AND b.delYn = 'N'
    """)
     List<MemberBalance> findExpiringAnnualWithRemaining(@Param("today") LocalDate today);
+
+    /**
+     * 퇴직 cascade - 직원의 모든 활성 잔액을 사용 불가(isUsableYn='N') 처리
+     * remaining 값은 보존 (미사용 연차 수당 환산 시 참조)
+     */
+    @Modifying
+    @Query("""
+       UPDATE MemberBalance b
+          SET b.isUsableYn = 'N'
+        WHERE b.memberId = :memberId
+          AND b.companyId = :companyId
+          AND b.isUsableYn = 'Y'
+          AND b.delYn = 'N'
+       """)
+    int markAllUnusableByMember(
+            @Param("memberId") UUID memberId,
+            @Param("companyId") UUID companyId);
+
+    /**
+     * 퇴직 시점의 직원별 활성 ANNUAL 잔액 합 (미사용 연차 수당 정산용 정보)
+     * 비활성화 처리 전에 호출하여 로그/리포트에 잔여 일수 기록
+     */
+    @Query("""
+       SELECT COALESCE(SUM(b.remaining), 0)
+         FROM MemberBalance b
+        WHERE b.memberId = :memberId
+          AND b.companyId = :companyId
+          AND b.balanceType = :type
+          AND b.isUsableYn = 'Y'
+          AND b.isExpireYn = 'N'
+          AND b.delYn = 'N'
+       """)
+    Double sumRemainingByMemberAndType(
+            @Param("memberId") UUID memberId,
+            @Param("companyId") UUID companyId,
+            @Param("type") BalanceType type);
 }

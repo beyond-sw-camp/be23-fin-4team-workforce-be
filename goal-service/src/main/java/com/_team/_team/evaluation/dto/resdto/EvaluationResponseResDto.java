@@ -37,6 +37,11 @@ public class EvaluationResponseResDto {
     private BigDecimal finalScoreSnapshot;
     private UUID confirmedBy;
     private LocalDateTime confirmedAt;
+    private String objectionStatus;
+    private String objectionMessage;
+    private String objectionResolution;
+    private LocalDateTime objectionRequestedAt;
+    private LocalDateTime objectionResolvedAt;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -68,6 +73,11 @@ public class EvaluationResponseResDto {
                 .finalScoreSnapshot(r.getFinalScoreSnapshot())
                 .confirmedBy(r.getConfirmedBy())
                 .confirmedAt(r.getConfirmedAt())
+                .objectionStatus(r.getObjectionStatus())
+                .objectionMessage(r.getObjectionMessage())
+                .objectionResolution(r.getObjectionResolution())
+                .objectionRequestedAt(r.getObjectionRequestedAt())
+                .objectionResolvedAt(r.getObjectionResolvedAt())
                 .createdAt(r.getCreatedAt())
                 .updatedAt(r.getUpdatedAt())
                 .build();

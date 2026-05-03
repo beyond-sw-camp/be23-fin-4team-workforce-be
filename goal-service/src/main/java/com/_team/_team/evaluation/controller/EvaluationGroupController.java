@@ -9,7 +9,9 @@ import com._team._team.evaluation.dto.reqdto.EvaluatorMapUpdateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.GroupResDto;
+import com._team._team.evaluation.service.EvaluationAccessScopeService;
 import com._team._team.evaluation.service.EvaluationGroupService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,17 +24,27 @@ import java.util.UUID;
 public class EvaluationGroupController {
 
     private final EvaluationGroupService groupService;
+    private final EvaluationAccessScopeService accessScopeService;
 
-    public EvaluationGroupController(EvaluationGroupService groupService) {
+    public EvaluationGroupController(EvaluationGroupService groupService,
+                                     EvaluationAccessScopeService accessScopeService) {
         this.groupService = groupService;
+        this.accessScopeService = accessScopeService;
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
     @GetMapping
     public ResponseEntity<ApiResponse<List<GroupResDto>>> listGroups(
             @RequestHeader("X-User-CompanyId") String companyId,
-            @PathVariable UUID seasonId) {
-        List<GroupResDto> result = groupService.listGroups(seasonId, UUID.fromString(companyId));
+            @RequestHeader("X-User-UUID") String requesterId,
+            @PathVariable UUID seasonId,
+            HttpServletRequest request) {
+        EvaluationAccessScopeService.AccessScope scope = accessScopeService.resolveOperationReadScope(
+                request,
+                UUID.fromString(companyId),
+                UUID.fromString(requesterId)
+        );
+        List<GroupResDto> result = groupService.listGroups(seasonId, UUID.fromString(companyId), scope);
         return ResponseEntity.ok(ApiResponse.success(result, "평가 그룹 목록 조회 성공"));
     }
 

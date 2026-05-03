@@ -3,12 +3,9 @@ package com._team._team.goal.domain;
 import com._team._team.domain.BaseTimeEntity;
 import com._team._team.goal.domain.converter.UuidListConverter;
 import com._team._team.goal.domain.enums.GoalApprovalStatus;
-import com._team._team.goal.domain.enums.GoalHealthStatus;
 import com._team._team.goal.domain.enums.GoalOwnerType;
 import com._team._team.goal.domain.enums.GoalStatus;
-import com._team._team.goal.domain.enums.GoalVisibility;
 import com._team._team.goal.domain.enums.KpiCycle;
-import com._team._team.goal.domain.enums.RollupSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -24,7 +21,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -73,10 +69,6 @@ public class Goal extends BaseTimeEntity {
     @Column(name = "cycle_end_date", nullable = false)
     private LocalDate cycleEndDate;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "visibility", nullable = false, length = 32)
-    private GoalVisibility visibility;
-
     @Column(name = "weight_pct", nullable = false)
     @Builder.Default
     private int weightPct = 0;
@@ -118,27 +110,6 @@ public class Goal extends BaseTimeEntity {
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
-
-    @Column(name = "actual_value", precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal actualValue = BigDecimal.ZERO;
-
-    @Column(name = "achievement_pct", precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal achievementPct = BigDecimal.ZERO;
-
-    @Column(name = "rolled_achievement_pct", precision = 10, scale = 2)
-    @Builder.Default
-    private BigDecimal rolledAchievementPct = BigDecimal.ZERO;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "health_status", length = 32)
-    @Builder.Default
-    private GoalHealthStatus healthStatus = GoalHealthStatus.NOT_STARTED;
-
-    @Column(name = "auto_update", nullable = false)
-    @Builder.Default
-    private boolean autoUpdate = true;
 
     public void markPending() {
         if (this.status != GoalStatus.DRAFT) {
@@ -193,19 +164,12 @@ public class Goal extends BaseTimeEntity {
 
     public void cancel() {
         if (this.status == GoalStatus.COMPLETED) {
-            throw new IllegalStateException("Completed goals cannot be cancelled. Use HR skip instead.");
+            throw new IllegalStateException("Completed goals cannot be cancelled.");
         }
         if (this.status == GoalStatus.CANCELLED || this.status == GoalStatus.SKIPPED) {
             return;
         }
         this.status = GoalStatus.CANCELLED;
-    }
-
-    public void forceSkipByHr(String reason) {
-        if (this.status == GoalStatus.SKIPPED) {
-            return;
-        }
-        this.status = GoalStatus.SKIPPED;
     }
 
     public void updateContent(String title, String description) {
@@ -225,13 +189,6 @@ public class Goal extends BaseTimeEntity {
         this.ownerId = ownerId;
     }
 
-    public void updateObjectiveGradeCriteria(String gradeS, String gradeA, String gradeB, String gradeC) {
-        this.gradeSCriteria = gradeS;
-        this.gradeACriteria = gradeA;
-        this.gradeBCriteria = gradeB;
-        this.gradeCCriteria = gradeC;
-    }
-
     public void updateWeight(int weightPct) {
         if (this.status != GoalStatus.DRAFT) {
             throw new IllegalStateException("Only draft goals can change weight.");
@@ -243,7 +200,7 @@ public class Goal extends BaseTimeEntity {
     }
 
     public void updateGradeCriteria(String gradeS, String gradeA, String gradeB, String gradeC) {
-        if (this.status != GoalStatus.DRAFT) {
+        if (this.status != GoalStatus.DRAFT || isCriteriaLocked()) {
             throw new IllegalStateException("Only draft goals can change grade criteria.");
         }
         this.gradeSCriteria = gradeS;
@@ -257,23 +214,6 @@ public class Goal extends BaseTimeEntity {
             throw new IllegalStateException("Only draft goals can change alignment.");
         }
         this.alignedOrgGoalId = alignedOrgGoalId;
-    }
-
-    public void updateVisibility(GoalVisibility visibility, List<UUID> visibleTeamIds) {
-        if (this.status != GoalStatus.DRAFT) {
-            throw new IllegalStateException("Only draft goals can change visibility.");
-        }
-        this.visibility = visibility;
-        if (visibleTeamIds != null) {
-            this.visibleTeamIds = new ArrayList<>(visibleTeamIds);
-        }
-    }
-
-    public void updateObjectiveVisibility(GoalVisibility visibility, List<UUID> visibleTeamIds) {
-        this.visibility = visibility;
-        this.visibleTeamIds = visibleTeamIds == null
-                ? new ArrayList<>()
-                : new ArrayList<>(visibleTeamIds);
     }
 
     public void updateParticipants(List<UUID> participantMemberIds) {
@@ -291,14 +231,23 @@ public class Goal extends BaseTimeEntity {
                 : new ArrayList<>(participantMemberIds);
     }
 
-    public void applyManualProgress(BigDecimal value, GoalHealthStatus status) {
-        this.actualValue = value;
-        this.achievementPct = value;
-        this.rolledAchievementPct = value;
-        this.healthStatus = status == null ? GoalHealthStatus.ON_TRACK : status;
+    public boolean hasGradeCriteria() {
+        return this.gradeSCriteria != null && !this.gradeSCriteria.trim().isEmpty();
     }
 
-    public void updateRollup(BigDecimal rolled, RollupSource source) {
-        this.rolledAchievementPct = rolled;
+    public void inheritCriteriaFrom(Goal orgGoal) {
+        if (orgGoal == null) {
+            throw new IllegalArgumentException("orgGoal is required.");
+        }
+        this.gradeSCriteria = orgGoal.gradeSCriteria;
+        this.gradeACriteria = orgGoal.gradeACriteria;
+        this.gradeBCriteria = orgGoal.gradeBCriteria;
+        this.gradeCCriteria = orgGoal.gradeCCriteria;
+    }
+
+    public boolean isCriteriaLocked() {
+        return this.goalApprovalStatus == GoalApprovalStatus.APPROVED
+                || this.status == GoalStatus.ACTIVE
+                || this.status == GoalStatus.COMPLETED;
     }
 }

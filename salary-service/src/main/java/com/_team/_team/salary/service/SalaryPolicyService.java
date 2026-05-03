@@ -2,7 +2,7 @@ package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.event.RagSyncSalaryEvent;
-import com._team._team.salary.kafka.RagSyncSalaryEventPublisher;
+import com._team._team.salary.publisher.RagSyncSalaryEventPublisher;
 import com._team._team.salary.repository.SalaryPolicyRepository;
 import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.dto.reqdto.SalaryPolicyCreateReqDto;

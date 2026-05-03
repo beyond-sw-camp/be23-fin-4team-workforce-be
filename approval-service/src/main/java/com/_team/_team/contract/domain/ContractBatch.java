@@ -35,10 +35,21 @@ public class ContractBatch extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer signedCount = 0;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer rejectedCount = 0;
+
     @Column(nullable = false)
     private UUID createdBy;
 
+    @Column
+    private UUID previousBatchId;
+
     public void incrementSignedCount() {
         this.signedCount++;
+    }
+
+    public void incrementRejectedCount() {
+        this.rejectedCount++;
     }
 }

@@ -38,6 +38,10 @@ public class ContractResDto {
     private List<ContractPartyResDto> parties;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String rejectReason;
+    private UUID previousContractId;
+    private Integer revision;
+    private String cancelReason;
 
     public static ContractResDto fromEntity(Contract entity, List<ContractParty> parties) {
         return ContractResDto.builder()
@@ -61,6 +65,10 @@ public class ContractResDto {
                         .toList())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .rejectReason(entity.getRejectReason())
+                .previousContractId(entity.getPreviousContractId())
+                .revision(entity.getRevision())
+                .cancelReason(entity.getCancelReason())
                 .build();
     }
 

@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 /**
- * 시차출퇴근 슬롯 선택 서비스
+ * 시차출퇴근 스케줄 선택 서비스
  */
 @Service
 @Transactional
@@ -173,8 +173,7 @@ public class MemberScheduleSelectionService {
         return memberScheduleSelectionRepository
                 .findCurrentActive(memberId, targetYearMonth)
                 .map(MemberScheduleSelectionResDto::fromEntity)
-                .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "유효한 스케줄 슬롯이 없습니다."));
+                .orElse(null);
     }
 
 

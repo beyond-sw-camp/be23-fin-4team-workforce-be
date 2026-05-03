@@ -11,6 +11,7 @@ import com._team._team.evaluation.dto.resdto.SeasonOperationalAlertsResDto;
 import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.PublishBlockersResDto;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
+import com._team._team.evaluation.repository.EvaluationGroupRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
 import com._team._team.evaluation.util.SeasonTargetCycleRules;
 import com._team._team.goal.domain.enums.KpiCycle;
@@ -32,17 +33,20 @@ public class EvaluationSeasonService {
 
     private final EvaluationSeasonRepository seasonRepository;
     private final EvaluationResponseRepository responseRepository;
+    private final EvaluationGroupRepository groupRepository;
     private final SeasonActivationService activationService;
     private final MeetingRecordService meetingRecordService;
     private final MemberServiceClient memberServiceClient;
 
     public EvaluationSeasonService(EvaluationSeasonRepository seasonRepository,
                                    EvaluationResponseRepository responseRepository,
+                                   EvaluationGroupRepository groupRepository,
                                    SeasonActivationService activationService,
                                    MeetingRecordService meetingRecordService,
                                    MemberServiceClient memberServiceClient) {
         this.seasonRepository = seasonRepository;
         this.responseRepository = responseRepository;
+        this.groupRepository = groupRepository;
         this.activationService = activationService;
         this.meetingRecordService = meetingRecordService;
         this.memberServiceClient = memberServiceClient;
@@ -104,25 +108,41 @@ public class EvaluationSeasonService {
     }
 
     @Transactional
-    public void activate(UUID seasonId, UUID companyId, List<SeasonActivationService.TargetSpec> targetSpecs) {
+    public void delete(UUID seasonId, UUID companyId) {
+        EvaluationSeason season = mustGet(seasonId, companyId);
+        if (season.getStatus() != SeasonStatus.DRAFT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Only draft seasons can be deleted.");
+        }
+        if (!responseRepository.findByGroup_Season_SeasonId(seasonId).isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Evaluation responses already exist for this season.");
+        }
+        groupRepository.deleteAll(groupRepository.findBySeason_SeasonId(seasonId));
+        seasonRepository.delete(season);
+    }
+
+    @Transactional
+    public void openSelfEval(UUID seasonId, UUID companyId, List<SeasonActivationService.TargetSpec> targetSpecs) {
         EvaluationSeason season = mustGet(seasonId, companyId);
         activationService.activate(season, targetSpecs);
     }
 
     @Transactional
-    public void close(UUID seasonId, UUID companyId) {
+    public void advanceToManagerEval(UUID seasonId, UUID companyId) {
         EvaluationSeason season = mustGet(seasonId, companyId);
-        if (season.getStatus() != SeasonStatus.ACTIVE) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Only active seasons can be closed.");
-        }
-        season.close();
+        season.openManagerEval();
+    }
+
+    @Transactional
+    public void advanceToGradeConfirm(UUID seasonId, UUID companyId) {
+        EvaluationSeason season = mustGet(seasonId, companyId);
+        season.openGradeConfirm();
     }
 
     @Transactional
     public void publishResults(UUID seasonId, UUID companyId) {
         EvaluationSeason season = mustGet(seasonId, companyId);
-        if (season.getStatus() != SeasonStatus.ACTIVE && season.getStatus() != SeasonStatus.CLOSED) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Only active or closed seasons can be published.");
+        if (season.isResultsPublished()) {
+            return;
         }
 
         List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
@@ -140,8 +160,20 @@ public class EvaluationSeasonService {
             );
         }
 
-        season.markResultsPublished();
+        season.publishResults();
         meetingRecordService.createFeedbackMeetingsForSeason(seasonId, companyId);
+    }
+
+    @Transactional
+    public void openInterview(UUID seasonId, UUID companyId) {
+        EvaluationSeason season = mustGet(seasonId, companyId);
+        season.openInterview();
+    }
+
+    @Transactional
+    public void close(UUID seasonId, UUID companyId) {
+        EvaluationSeason season = mustGet(seasonId, companyId);
+        season.close();
     }
 
     @Transactional(readOnly = true)
@@ -162,6 +194,26 @@ public class EvaluationSeasonService {
                 .filter(r -> companyId.equals(r.getCompanyId()))
                 .toList();
 
+        return buildPublishBlockers(seasonId, responses);
+    }
+
+    @Transactional(readOnly = true)
+    public PublishBlockersResDto getPublishBlockers(
+            UUID seasonId,
+            UUID companyId,
+            EvaluationAccessScopeService.AccessScope scope
+    ) {
+        mustGet(seasonId, companyId);
+
+        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> companyId.equals(r.getCompanyId()))
+                .filter(r -> canSeeInOperation(r, scope))
+                .toList();
+
+        return buildPublishBlockers(seasonId, responses);
+    }
+
+    private PublishBlockersResDto buildPublishBlockers(UUID seasonId, List<EvaluationResponse> responses) {
         Map<String, Integer> byStage = new LinkedHashMap<>();
         for (EvaluationStage stage : EvaluationStage.values()) {
             byStage.put(stage.name(), 0);
@@ -202,11 +254,46 @@ public class EvaluationSeasonService {
                 .flatMap(response -> buildOperationalAlerts(response).stream())
                 .toList();
 
+        return buildOperationalAlertsResponse(seasonId, alerts);
+    }
+
+    @Transactional(readOnly = true)
+    public SeasonOperationalAlertsResDto getOperationalAlerts(
+            UUID seasonId,
+            UUID companyId,
+            EvaluationAccessScopeService.AccessScope scope
+    ) {
+        mustGet(seasonId, companyId);
+
+        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> companyId.equals(r.getCompanyId()))
+                .filter(r -> canSeeInOperation(r, scope))
+                .toList();
+
+        List<SeasonOperationalAlertsResDto.AlertItem> alerts = responses.stream()
+                .flatMap(response -> buildOperationalAlerts(response).stream())
+                .toList();
+
+        return buildOperationalAlertsResponse(seasonId, alerts);
+    }
+
+    private SeasonOperationalAlertsResDto buildOperationalAlertsResponse(
+            UUID seasonId,
+            List<SeasonOperationalAlertsResDto.AlertItem> alerts
+    ) {
         return SeasonOperationalAlertsResDto.builder()
                 .seasonId(seasonId)
                 .totalAlerts(alerts.size())
                 .alerts(alerts)
                 .build();
+    }
+
+    private boolean canSeeInOperation(EvaluationResponse response, EvaluationAccessScopeService.AccessScope scope) {
+        if (scope == null || scope.companyWide()) {
+            return true;
+        }
+        return scope.canSeeTarget(response.getTargetMemberId())
+                || scope.isRequester(response.getEvaluatorId());
     }
 
     private List<SeasonOperationalAlertsResDto.AlertItem> buildOperationalAlerts(EvaluationResponse response) {

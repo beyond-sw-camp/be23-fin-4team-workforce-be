@@ -11,7 +11,6 @@ import com._team._team.approval.feignclients.MemberServiceClient;
 import com._team._team.approval.feignclients.dto.SignatureResDto;
 import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.approval.repository.ApprovalRepository;
-import com._team._team.approval.repository.ApprovalRequestRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
 import com._team._team.approval.repository.OfficialRecipientRepository;
 import com._team._team.dto.BusinessException;
@@ -23,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com._team._team.event.ApprovalChangedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +51,9 @@ public class ApprovalService {
     private final OfficialRecipientRepository officialRecipientRepository;
     private final MemberServiceClient memberServiceClient;
     private final CalendarApprovalEventPublisher calendarApprovalEventPublisher;
+    private final ResignationApprovalEventPublisher resignationApprovalEventPublisher;
+    private final AttendanceCorrectionApprovalEventPublisher attendanceCorrectionApprovalEventPublisher;
+    private final EarlyLeaveApprovalEventPublisher earlyLeaveApprovalEventPublisher;
 
     private final ApplicationEventPublisher eventPublisher;
     private final LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher;
@@ -67,7 +70,9 @@ public class ApprovalService {
                            ObjectMapper objectMapper,
                            OfficialRecipientRepository officialRecipientRepository,
                            MemberServiceClient memberServiceClient,
-                           CalendarApprovalEventPublisher calendarApprovalEventPublisher,
+                           CalendarApprovalEventPublisher calendarApprovalEventPublisher, ResignationApprovalEventPublisher resignationApprovalEventPublisher,
+                           AttendanceCorrectionApprovalEventPublisher attendanceCorrectionApprovalEventPublisher,
+                           EarlyLeaveApprovalEventPublisher earlyLeaveApprovalEventPublisher,
                            ApplicationEventPublisher eventPublisher,
                            LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher) {
         this.approvalRepository = approvalRepository;
@@ -82,6 +87,9 @@ public class ApprovalService {
         this.officialRecipientRepository = officialRecipientRepository;
         this.memberServiceClient = memberServiceClient;
         this.calendarApprovalEventPublisher = calendarApprovalEventPublisher;
+        this.resignationApprovalEventPublisher = resignationApprovalEventPublisher;
+        this.attendanceCorrectionApprovalEventPublisher = attendanceCorrectionApprovalEventPublisher;
+        this.earlyLeaveApprovalEventPublisher = earlyLeaveApprovalEventPublisher;
         this.eventPublisher = eventPublisher;
         this.leaveOfAbsenceApprovalEventPublisher = leaveOfAbsenceApprovalEventPublisher;
     }
@@ -200,6 +208,9 @@ public class ApprovalService {
             publishAllowanceEventIfApplicable(request, actualMemberId, AllowanceApprovalEvent.Action.APPROVE, reqDto.getComment());
             publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.APPROVE);
             publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId, LeaveOfAbsenceApprovalEvent.Action.APPROVE, null);
+            publishResignationEventIfApplicable(request, actualMemberId, ResignationApprovalEvent.Action.APPROVE, null);
+            publishAttendanceCorrectionEventIfApplicable(request, actualMemberId, AttendanceCorrectionApprovalEvent.Action.APPROVE, null);
+            publishEarlyLeaveEventIfApplicable(request, actualMemberId, EarlyLeaveApprovalEvent.Action.APPROVE, null);
         }
 
         List<Approval> allApprovals =
@@ -381,6 +392,12 @@ public class ApprovalService {
         publishLeaveEventIfApplicable(request, actualMemberId, LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
         publishLeaveOfAbsenceEventIfApplicable(request, actualMemberId,
                 LeaveOfAbsenceApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishResignationEventIfApplicable(request, actualMemberId,
+                ResignationApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishAttendanceCorrectionEventIfApplicable(request, actualMemberId,
+                AttendanceCorrectionApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishEarlyLeaveEventIfApplicable(request, actualMemberId,
+                EarlyLeaveApprovalEvent.Action.REJECT, reqDto.getComment());
 
         // 반려 시 REJECT 이벤트 발행
         publishLeaveEventIfApplicable(request, actualMemberId,
@@ -582,6 +599,114 @@ public class ApprovalService {
         );
     }
 
+    // 사직서 문서일 때만 resignation 이벤트 발행
+    private void publishResignationEventIfApplicable(ApprovalRequest request,
+                                                     UUID approverId,
+                                                     ResignationApprovalEvent.Action action,
+                                                     String note) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"사직서".equals(docName)) return;
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) return;
+
+        LocalDate resignDate = dateOrNull(node, "resignDate");
+        String reason = textOrNull(node, "resignReason");
+        String detail = textOrNull(node, "detail");
+
+        resignationApprovalEventPublisher.publish(
+                ResignationApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .resignDate(resignDate)
+                        .resignReason(reason)
+                        .detail(detail)
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .note(note)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // 조퇴계 - 승인 시 퇴근시간 정정 + 정규 8h 보정
+    private void publishEarlyLeaveEventIfApplicable(ApprovalRequest request,
+                                                     UUID approverId,
+                                                     EarlyLeaveApprovalEvent.Action action,
+                                                     String note) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"조퇴계".equals(docName)) return;
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) return;
+
+        LocalDate date = dateOrNull(node, "attendanceDate");
+        if (date == null) {
+            log.warn("[EarlyLeave] 조퇴 일자 누락, requestId={}", request.getRequestId());
+            return;
+        }
+
+        earlyLeaveApprovalEventPublisher.publish(
+                EarlyLeaveApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .attendanceDate(date)
+                        .earlyLeaveAt(combineDateTime(date, textOrNull(node, "earlyLeaveTime")))
+                        .reason(textOrNull(node, "reason"))
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .note(note)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // 근태정정신청 - 출/퇴근시각은 HH:mm 시간만 받아 attendanceDate 와 결합
+    private void publishAttendanceCorrectionEventIfApplicable(ApprovalRequest request,
+                                                              UUID approverId,
+                                                              AttendanceCorrectionApprovalEvent.Action action,
+                                                              String note) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        if (!"근태정정신청".equals(docName)) return;
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) return;
+
+        LocalDate date = dateOrNull(node, "attendanceDate");
+        if (date == null) {
+            log.warn("[AttendanceCorrection] 정정 일자 누락, requestId={}", request.getRequestId());
+            return;
+        }
+
+        attendanceCorrectionApprovalEventPublisher.publish(
+                AttendanceCorrectionApprovalEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .memberId(request.getMemberId())
+                        .requestId(request.getRequestId())
+                        .attendanceDate(date)
+                        .requestedClockIn(combineDateTime(date, textOrNull(node, "requestedClockIn")))
+                        .requestedClockOut(combineDateTime(date, textOrNull(node, "requestedClockOut")))
+                        .reason(textOrNull(node, "reason"))
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .note(note)
+                        .action(action)
+                        .build()
+        );
+    }
+
+    // HH:mm 또는 HH:mm:ss 시간 문자열을 attendanceDate 와 결합해 LocalDateTime 생성, 빈 값/포맷 이상이면 null
+    private LocalDateTime combineDateTime(LocalDate date, String time) {
+        if (date == null || time == null || time.isBlank()) return null;
+        try {
+            return LocalDateTime.of(date, LocalTime.parse(time));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /**
      * 연차/반차 류인지 판단, 잔고 차감 필요 여부
      */
@@ -632,6 +757,17 @@ public class ApprovalService {
         if (text == null || text.isBlank()) return null;
         try {
             return LocalDate.parse(text);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // yyyy-MM-dd'T'HH:mm 문자열을 LocalDateTime으로 파싱
+    private LocalDateTime dateTimeOrNull(JsonNode node, String field) {
+        String text = textOrNull(node, field);
+        if (text == null || text.isBlank()) return null;
+        try {
+            return LocalDateTime.parse(text);
         } catch (Exception e) {
             return null;
         }

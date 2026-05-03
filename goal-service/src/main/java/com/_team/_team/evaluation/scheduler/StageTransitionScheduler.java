@@ -57,7 +57,8 @@ public class StageTransitionScheduler {
     public void runDaily() {
         LocalDate today = LocalDate.now();
         List<EvaluationSeason> active = seasonRepository.findAll().stream()
-                .filter(s -> s.getStatus() == SeasonStatus.ACTIVE)
+                .filter(s -> s.getStatus() == SeasonStatus.SELF_EVAL
+                        || s.getStatus() == SeasonStatus.MANAGER_EVAL)
                 .toList();
 
         for (EvaluationSeason s : active) {

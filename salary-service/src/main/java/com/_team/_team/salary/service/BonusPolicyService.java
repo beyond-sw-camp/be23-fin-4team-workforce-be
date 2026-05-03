@@ -74,6 +74,8 @@ public class BonusPolicyService {
                 .holidayBonusType(reqDto.getHolidayBonusType())
                 .holidayBonusValue(reqDto.getHolidayBonusValue())
                 .eligibilityScope(reqDto.getEligibilityScope())
+                .minTenureMonths(reqDto.getMinTenureMonths() != null ? reqDto.getMinTenureMonths() : 0)
+                .excludeOnLeaveYn(normalizeYn(reqDto.getExcludeOnLeaveYn() != null ? reqDto.getExcludeOnLeaveYn() : "Y"))
                 .effectiveFrom(reqDto.getEffectiveFrom())
                 .effectiveTo(reqDto.getEffectiveTo())
                 .memo(reqDto.getMemo())
@@ -104,6 +106,8 @@ public class BonusPolicyService {
                 reqDto.getHolidayBonusType(),
                 reqDto.getHolidayBonusValue(),
                 reqDto.getEligibilityScope(),
+                reqDto.getMinTenureMonths(),
+                normalizeYn(reqDto.getExcludeOnLeaveYn() != null ? reqDto.getExcludeOnLeaveYn() : "Y"),
                 reqDto.getEffectiveTo(),
                 reqDto.getMemo()
         );

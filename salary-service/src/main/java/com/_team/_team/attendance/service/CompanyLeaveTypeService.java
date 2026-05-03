@@ -4,7 +4,7 @@ import com._team._team.attendance.domain.CompanyLeaveType;
 import com._team._team.attendance.domain.enums.BalanceType;
 import com._team._team.attendance.dto.reqDto.CompanyLeaveTypeCreateReqDto;
 import com._team._team.attendance.dto.reqDto.CompanyLeaveTypeUpdateReqDto;
-import com._team._team.attendance.kafka.RagSyncLeaveEventPublisher;
+import com._team._team.attendance.publisher.RagSyncLeaveEventPublisher;
 import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.event.RagSyncLeaveEvent;

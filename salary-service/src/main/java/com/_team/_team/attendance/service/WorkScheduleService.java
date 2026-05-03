@@ -1,6 +1,6 @@
 package com._team._team.attendance.service;
 
-import com._team._team.attendance.kafka.RagSyncAttendanceEventPublisher;
+import com._team._team.attendance.publisher.RagSyncAttendanceEventPublisher;
 import com._team._team.attendance.domain.enums.WorkType;
 import com._team._team.attendance.repository.WorkScheduleRepository;
 import com._team._team.attendance.domain.WorkSchedule;

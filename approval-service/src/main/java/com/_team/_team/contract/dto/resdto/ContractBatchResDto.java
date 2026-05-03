@@ -25,6 +25,8 @@ public class ContractBatchResDto {
     private Integer signedCount;
     private UUID createdBy;
     private LocalDateTime createdAt;
+    private UUID previousBatchId;
+    private Integer rejectedCount;
 
     public static ContractBatchResDto fromEntity(ContractBatch entity) {
         return ContractBatchResDto.builder()
@@ -38,6 +40,8 @@ public class ContractBatchResDto {
                 .signedCount(entity.getSignedCount())
                 .createdBy(entity.getCreatedBy())
                 .createdAt(entity.getCreatedAt())
+                .previousBatchId(entity.getPreviousBatchId())
+                .rejectedCount(entity.getRejectedCount())
                 .build();
     }
 }

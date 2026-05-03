@@ -14,7 +14,6 @@ import com._team._team.member.service.MemberService;
 import com._team._team.organization.service.OrganizationService;
 import com._team._team.s3.S3Uploader;
 import feign.FeignException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -179,9 +178,9 @@ public class CompanyService {
         try {
             approvalServiceClient.initDefaultDocuments(company.getCompanyId());
         } catch (Exception e) {
-            log.info("기본 결재양식 생성 실패: {}", e.getMessage());
+            log.error("기본 결재양식 생성 실패 companyId={}", company.getCompanyId(), e);
             if (e instanceof FeignException fe) {
-                log.error("응답 body: {}", fe.contentUTF8());  // 서버가 준 실제 에러 JSON
+                log.error("응답 body: {}", fe.contentUTF8());
             }
         }
 
@@ -199,7 +198,7 @@ public class CompanyService {
         try {
             salaryServiceClient.initDefaultLeaveTypes(company.getCompanyId());
         } catch (Exception e) {
-            log.info("기본 휴가 생성 실패: {}", e.getMessage());
+            log.error("기본 휴가 생성 실패 companyId={}", company.getCompanyId(), e);
         }
 
         // 법정 공휴일 복사 (salary-service <- member-service Feign 내부 호출)
@@ -256,5 +255,22 @@ public class CompanyService {
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."));
         return CompanyInfoResDto.fromEntity(member.getCompany());
+    }
+
+    public void updateSeal(UUID memberId, MultipartFile seal) {
+        // memberId로 회사 조회 (기존 updateLogo와 동일한 방식)
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
+
+        Company company = member.getCompany();
+
+        String sealUrl = s3Uploader.upload(seal, "company/" + company.getCompanyId() + "/seal");
+        company.updateSealImageUrl(sealUrl);
+    }
+
+    public String getSealImageUrl(UUID companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
+        return company.getSealImageUrl();
     }
 }

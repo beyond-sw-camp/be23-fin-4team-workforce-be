@@ -63,6 +63,14 @@ public class PayrollCalculationService {
                         "월 장부가 없습니다. memberId=" + memberId + " yearMonth=" + yearMonth));
     }
 
+    /** 월 장부  조회
+     *  퇴직자, 신규 입사자처럼 그 월에 출퇴근 기록이 없는 직원의 정산을 허용하기 위함 */
+    public Optional<MonthlyAttendanceLedger> findLedgerOptional(
+            UUID memberId, YearMonth yearMonth) {
+        return monthlyAttendanceLedgerRepository
+                .findByMemberIdAndLedgerYearMonth(memberId, yearMonth.toString());
+    }
+
     // 월 소정근로시간 정책에서 가져옴, 없으면 한국 표준 209 사용
     private int resolveMonthlyHours(SalaryPolicy policy) {
         if (policy != null && policy.getMonthlyOrdinaryHours() != null

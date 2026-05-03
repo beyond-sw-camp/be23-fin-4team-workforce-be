@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
@@ -79,7 +80,9 @@ public class ScheduleResolver {
                     schedule.getStartTime(),
                     schedule.getEndTime(),
                     schedule.getWorkMinutes(),
-                    schedule.computeBreakMinutes()
+                    schedule.computeBreakMinutes(),
+                    schedule.getBreakStart(),
+                    schedule.getBreakEnd()
             );
         }
 
@@ -122,13 +125,23 @@ public class ScheduleResolver {
 
         int breakMinutes = memberSelectedBreak != null ? memberSelectedBreak : 0;
 
+        // 휴게 시각 - 직원 선택이 있으면 그것 사용, 없으면 슬롯 기본값
+        LocalTime breakStart = selection != null && selection.getBreakStart() != null
+                ? selection.getBreakStart()
+                : slot.getBreakStart();
+        LocalTime breakEnd = selection != null && selection.getBreakEnd() != null
+                ? selection.getBreakEnd()
+                : slot.getBreakEnd();
+
         return ResolvedSchedule.fromFlexible(
                 schedule.getWorkScheduleId(),
                 slot.getSlotId(),
                 slot.getStartTime(),
                 slot.getEndTime(),
                 slot.getWorkMinutes(),
-                breakMinutes
+                breakMinutes,
+                breakStart,
+                breakEnd
         );
     }
 }

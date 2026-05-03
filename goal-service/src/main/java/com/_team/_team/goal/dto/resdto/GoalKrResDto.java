@@ -4,7 +4,6 @@ import com._team._team.goal.domain.Goal;
 import com._team._team.goal.domain.enums.GoalApprovalStatus;
 import com._team._team.goal.domain.enums.GoalOwnerType;
 import com._team._team.goal.domain.enums.GoalStatus;
-import com._team._team.goal.domain.enums.GoalVisibility;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.util.CycleKeyResolver;
 import lombok.AllArgsConstructor;
@@ -12,7 +11,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -35,7 +33,6 @@ public class GoalKrResDto implements GoalViewResDto {
     private LocalDate cycleStartDate;
     private LocalDate cycleEndDate;
     private String cycleKey;
-    private GoalVisibility visibility;
     private int weightPct;
     private GoalStatus status;
     private GoalApprovalStatus goalApprovalStatus;
@@ -44,14 +41,10 @@ public class GoalKrResDto implements GoalViewResDto {
     private List<UUID> visibleTeamIds;
     private List<UUID> participantMemberIds;
     private String objectiveTitle;
-    private String objectiveGradeS;
-    private String objectiveGradeA;
-    private String objectiveGradeB;
-    private String objectiveGradeC;
-    private BigDecimal actualValue;
-    private BigDecimal achievementPct;
-    private BigDecimal rolledAchievementPct;
-    private String healthStatus;
+    private String gradeS;
+    private String gradeA;
+    private String gradeB;
+    private String gradeC;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -68,7 +61,6 @@ public class GoalKrResDto implements GoalViewResDto {
                 .cycleStartDate(goal.getCycleStartDate())
                 .cycleEndDate(goal.getCycleEndDate())
                 .cycleKey(CycleKeyResolver.resolve(goal.getCycle(), goal.getCycleStartDate()))
-                .visibility(goal.getVisibility())
                 .weightPct(goal.getWeightPct())
                 .status(goal.getStatus())
                 .goalApprovalStatus(goal.getGoalApprovalStatus())
@@ -76,10 +68,10 @@ public class GoalKrResDto implements GoalViewResDto {
                 .approvedAt(goal.getApprovedAt())
                 .visibleTeamIds(goal.getVisibleTeamIds() != null ? goal.getVisibleTeamIds() : Collections.emptyList())
                 .participantMemberIds(goal.getParticipantMemberIds() != null ? goal.getParticipantMemberIds() : Collections.emptyList())
-                .actualValue(goal.getActualValue())
-                .achievementPct(goal.getAchievementPct())
-                .rolledAchievementPct(goal.getRolledAchievementPct())
-                .healthStatus(goal.getHealthStatus() == null ? null : goal.getHealthStatus().name())
+                .gradeS(goal.getGradeSCriteria())
+                .gradeA(goal.getGradeACriteria())
+                .gradeB(goal.getGradeBCriteria())
+                .gradeC(goal.getGradeCCriteria())
                 .createdAt(goal.getCreatedAt())
                 .updatedAt(goal.getUpdatedAt())
                 .build();
@@ -89,10 +81,6 @@ public class GoalKrResDto implements GoalViewResDto {
         GoalKrResDto dto = from(goal);
         if (objective != null) {
             dto.objectiveTitle = objective.getTitle();
-            dto.objectiveGradeS = objective.getGradeSCriteria();
-            dto.objectiveGradeA = objective.getGradeACriteria();
-            dto.objectiveGradeB = objective.getGradeBCriteria();
-            dto.objectiveGradeC = objective.getGradeCCriteria();
         }
         return dto;
     }

@@ -88,4 +88,30 @@ public class MemberBalanceController {
                 HttpStatus.OK
         );
     }
+
+    // 이월 동의 회신 (사원용) - 회사 정책 isCarryoverConsentYn='Y' 인 회사에서 본인 잔고에 대해 호출
+    @PostMapping("/{memberBalanceId}/carryover-consent")
+    public ResponseEntity<?> agreeCarryover(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID memberBalanceId) {
+        MemberBalanceResDto resDto = memberBalanceService.agreeCarryover(companyId, memberId, memberBalanceId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "이월 동의가 접수되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    // 이월 동의 철회 (사원용)
+    @DeleteMapping("/{memberBalanceId}/carryover-consent")
+    public ResponseEntity<?> revokeCarryoverConsent(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID memberBalanceId) {
+        MemberBalanceResDto resDto = memberBalanceService.revokeCarryoverConsent(companyId, memberId, memberBalanceId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "이월 동의가 철회되었습니다."),
+                HttpStatus.OK
+        );
+    }
 }

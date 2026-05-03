@@ -1,11 +1,7 @@
 package com._team._team.goal.dto.reqdto;
 
-import com._team._team.goal.domain.enums.GoalKind;
 import com._team._team.goal.domain.enums.GoalOwnerType;
-import com._team._team.goal.domain.enums.GoalVisibility;
 import com._team._team.goal.domain.enums.KpiCycle;
-import com._team._team.goal.domain.enums.MeasureType;
-import com._team._team.goal.domain.enums.UnitType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -16,7 +12,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,20 +47,10 @@ public class GoalCreateReqDto {
     @NotNull
     private LocalDate cycleEndDate;
 
-    @NotNull
-    private GoalVisibility visibility;
-
     @Min(0)
     @Max(100)
     private int weightPct;
 
-    private MeasureType measureType;
-    private UnitType unitType;
-    private String unitLabel;
-    private BigDecimal baseline;
-    private BigDecimal targetValue;
-    private Integer capPct;
-    private GoalKind goalKind;
     private Boolean requireApproval;
     private Boolean activateImmediately;
 

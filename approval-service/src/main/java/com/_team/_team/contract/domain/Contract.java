@@ -77,6 +77,19 @@ public class Contract extends BaseTimeEntity {
     @Column
     private String jobTitleName;
 
+    private String rejectReason;
+
+    // 재발송 이력 관련
+    @Column
+    private UUID previousContractId;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer revision = 1;
+
+    @Column
+    private String cancelReason;
+
     public void send() {
         this.contractStatus = ContractStatus.SENT;
     }
@@ -91,5 +104,15 @@ public class Contract extends BaseTimeEntity {
 
     public void delete() {
         this.delYn = "Y";
+    }
+
+    public void reject(String reason) {
+        this.contractStatus = ContractStatus.REJECTED;
+        this.rejectReason = reason;
+    }
+
+    public void cancel(String cancelReason) {
+        this.contractStatus = ContractStatus.CANCELED;
+        this.cancelReason = cancelReason;
     }
 }
