@@ -77,10 +77,6 @@ public class GoalApprovalBundle extends BaseTimeEntity {
     @Column(name = "approver_id", nullable = false)
     private UUID approverId;
 
-    /** 1차 승인자 부재 시 위임 받은 ID */
-    @Column(name = "delegate_approver_id")
-    private UUID delegateApproverId;
-
     @Column(name = "decided_at")
     private LocalDateTime decidedAt;
 
@@ -142,13 +138,4 @@ public class GoalApprovalBundle extends BaseTimeEntity {
         this.decidedAt = LocalDateTime.now();
     }
 
-    public void delegateTo(UUID delegateApproverId) {
-        if (this.status != BundleApprovalStatus.PENDING) {
-            throw new IllegalStateException("PENDING 상태에서만 위임 가능: " + this.status);
-        }
-        if (delegateApproverId == null) {
-            throw new IllegalArgumentException("delegateApproverId 는 필수입니다.");
-        }
-        this.delegateApproverId = delegateApproverId;
-    }
 }

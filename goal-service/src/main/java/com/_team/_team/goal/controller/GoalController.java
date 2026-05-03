@@ -8,7 +8,7 @@ import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.dto.reqdto.GoalCreateReqDto;
 import com._team._team.goal.dto.reqdto.GoalUpdateReqDto;
-import com._team._team.goal.dto.resdto.GoalAggregateResDto;
+import com._team._team.goal.dto.resdto.GoalCycleResDto;
 import com._team._team.goal.dto.resdto.GoalKrResDto;
 import com._team._team.goal.dto.resdto.GoalObjectiveResDto;
 import com._team._team.goal.dto.resdto.GoalViewResDto;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -74,12 +74,23 @@ public class GoalController {
         );
     }
 
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/organization-cycles")
+    public ApiResponse<List<GoalCycleResDto>> organizationGoalCycles(
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                goalService.listOrganizationGoalCycles(UUID.fromString(companyId)),
+                "Organization goal cycles loaded successfully."
+        );
+    }
+
     @GetMapping("/organization")
-    @CheckPermission(resource = Resource.ORGANIZATION, action = Action.READ)
     public ApiResponse<List<GoalKrResDto>> orgGoals(
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestParam UUID orgId) {
+            @RequestParam UUID orgId,
+            HttpServletRequest request) {
+        ensureCanReadOrganizationGoalScope(request);
         return ApiResponse.success(
                 goalService.listOrgGoals(UUID.fromString(memberId), orgId, UUID.fromString(companyId)),
                 "Organization member KRs loaded successfully."
@@ -97,24 +108,14 @@ public class GoalController {
         );
     }
 
-    @GetMapping("/objectives/available")
-    public ApiResponse<List<GoalObjectiveResDto>> availableObjectives(
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestParam(required = false) KpiCycle cycle) {
-        return ApiResponse.success(
-                goalService.listAvailableObjectives(UUID.fromString(memberId), UUID.fromString(companyId), cycle),
-                "Available objectives loaded successfully."
-        );
-    }
-
     @GetMapping("/objectives/organization")
-    @CheckPermission(resource = Resource.ORGANIZATION, action = Action.READ)
     public ApiResponse<List<GoalObjectiveResDto>> organizationObjectives(
             @RequestHeader("X-User-UUID") String memberId,
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestParam UUID orgId,
-            @RequestParam(required = false) KpiCycle cycle) {
+            @RequestParam(required = false) KpiCycle cycle,
+            HttpServletRequest request) {
+        ensureCanReadOrganizationGoalScope(request);
         return ApiResponse.success(
                 goalService.listOrgObjectives(UUID.fromString(memberId), orgId, UUID.fromString(companyId), cycle),
                 "Organization objectives loaded successfully."
@@ -167,32 +168,6 @@ public class GoalController {
         );
     }
 
-    @GetMapping("/{goalId}/aggregate")
-    public ApiResponse<GoalAggregateResDto> aggregate(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId,
-            HttpServletRequest request) {
-        boolean hasEvalRead = positionPermissionReader.hasPermission(request, Resource.EVALUATION, Action.READ);
-        return ApiResponse.success(
-                goalService.getAggregate(goalId, UUID.fromString(memberId), UUID.fromString(companyId), hasEvalRead),
-                "Objective aggregate loaded successfully."
-        );
-    }
-
-    @GetMapping("/{goalId}/children")
-    public ApiResponse<List<GoalKrResDto>> children(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-UUID") String memberId,
-            @RequestHeader("X-User-CompanyId") String companyId,
-            HttpServletRequest request) {
-        boolean hasEvalRead = positionPermissionReader.hasPermission(request, Resource.EVALUATION, Action.READ);
-        return ApiResponse.success(
-                goalService.listObjectiveChildren(goalId, UUID.fromString(memberId), UUID.fromString(companyId), hasEvalRead),
-                "Objective child KRs loaded successfully."
-        );
-    }
-
     @DeleteMapping("/{goalId}")
     public ApiResponse<Void> delete(
             @PathVariable UUID goalId,
@@ -217,16 +192,25 @@ public class GoalController {
         );
     }
 
-    @CheckPermission(resource = Resource.EVALUATION, action = Action.UPDATE)
-    @PostMapping("/{goalId}/skip")
-    public ApiResponse<GoalViewResDto> forceSkip(
-            @PathVariable UUID goalId,
-            @RequestHeader("X-User-CompanyId") String companyId,
-            @RequestBody(required = false) Map<String, String> body) {
-        String reason = body != null ? body.get("reason") : null;
-        return ApiResponse.success(
-                goalService.forceSkipByHr(goalId, reason, UUID.fromString(companyId)),
-                "Goal skipped by HR successfully."
+    private void ensureCanReadOrganizationGoalScope(HttpServletRequest request) {
+        boolean canRead = positionPermissionReader.hasPermissionInAnyRange(
+                request,
+                Resource.GOAL,
+                Action.READ,
+                Set.of("TEAM", "COMPANY")
         );
+        boolean canManage = positionPermissionReader.hasPermissionInAnyRange(
+                request,
+                Resource.GOAL,
+                Action.UPDATE,
+                Set.of("TEAM", "COMPANY")
+        );
+        if (!canRead && !canManage) {
+            throw new com._team._team.dto.BusinessException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "You do not have permission to read organization goals."
+            );
+        }
     }
+
 }

@@ -98,7 +98,7 @@ public class MeetingRecordService {
                     .memberId(memberId)
                     .managerId(managerId)
                     .repeatCycle(RepeatCycle.ONE_TIME)
-                    .scheduledAt(LocalDateTime.now().plusDays(3))
+                    .scheduledAt(defaultFeedbackMeetingTime())
                     .agenda("평가 결과 피드백 면담 — 시즌: " + seasonId)
                     .relatedEvaluationResponseId(response.getResponseId())
                     .relatedSeasonId(seasonId)
@@ -108,11 +108,12 @@ public class MeetingRecordService {
             String snap = response.getGoalSnapshotJson();
             if (snap != null && !snap.isBlank()) {
                 try {
-                    com.fasterxml.jackson.databind.JsonNode arr =
+                    com.fasterxml.jackson.databind.JsonNode root =
                             new com.fasterxml.jackson.databind.ObjectMapper().readTree(snap);
-                    if (arr.isArray() && arr.size() > 0) {
+                    com.fasterxml.jackson.databind.JsonNode goalsNode = root.isArray() ? root : root.get("goals");
+                    if (goalsNode != null && goalsNode.isArray() && goalsNode.size() > 0) {
                         List<String> ids = new java.util.ArrayList<>();
-                        for (com.fasterxml.jackson.databind.JsonNode n : arr) {
+                        for (com.fasterxml.jackson.databind.JsonNode n : goalsNode) {
                             com.fasterxml.jackson.databind.JsonNode idNode = n.get("goalId");
                             if (idNode != null && !idNode.isNull()) ids.add(idNode.asText());
                         }
@@ -158,6 +159,14 @@ public class MeetingRecordService {
         return status;
     }
 
+    @Transactional(readOnly = true)
+    public List<MeetingRecordResDto> listBySeason(UUID seasonId, UUID companyId) {
+        return meetingRecordRepository.findByRelatedSeasonIdAndCompanyId(seasonId, companyId)
+                .stream()
+                .map(MeetingRecordResDto::from)
+                .collect(Collectors.toList());
+    }
+
     /**
      * 응답의 LEAD 평가자 결정.
      *  1) EvaluationCalibration where role=LEAD → evaluatorId
@@ -179,6 +188,9 @@ public class MeetingRecordService {
         if (dto.getMemberId() != null && dto.getMemberId().equals(dto.getManagerId())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST,
                     "본인 자신을 매니저로 둔 1:1 미팅은 생성할 수 없습니다.");
+        }
+        if (dto.getScheduledAt() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "면담 예정 일시는 필수입니다.");
         }
         MeetingRecord parentRecord = null;
         if (dto.getParentRecordId() != null) {
@@ -205,6 +217,11 @@ public class MeetingRecordService {
 
         MeetingRecord saved = meetingRecordRepository.save(meetingRecord);
         return MeetingRecordResDto.from(saved);
+    }
+
+    private LocalDateTime defaultFeedbackMeetingTime() {
+        LocalDateTime base = LocalDateTime.now().plusDays(3);
+        return base.withHour(10).withMinute(0).withSecond(0).withNano(0);
     }
 
     /**
