@@ -9,7 +9,6 @@ import com._team._team.dto.NotificationMessage;
 import com._team._team.event.MemberChangedEvent;
 import com._team._team.event.MemberDeletedEvent;
 import com._team._team.event.MemberSavedEvent;
-import com._team._team.member.event.MemberHiredInternalEvent;
 import com._team._team.member.domain.enums.MemberStatus;
 import com._team._team.member.dto.resdto.MemberResDto;
 import com._team._team.event.OrganizationSavedEvent;
@@ -660,17 +659,6 @@ public class MemberService {
 
         // 14. 아웃박스 저장
         eventPublisher.publishEvent(new MemberChangedEvent(savedMember.getMemberId()));
-
-        // 15. 신규 입사 이벤트 발행 → salary-service에서 Salary 자동 생성
-        eventPublisher.publishEvent(new MemberHiredInternalEvent(
-                savedMember.getMemberId(),
-                company.getCompanyId(),
-                jobGrade.getJobGradeId(),
-                jobGrade.getName(),
-                jobTitle.getName(),
-                reqDto.getJoinDate()
-//                reqDto.getBaseSalary()
-        ));
     }
 
     // 직원 목록 조회
