@@ -475,6 +475,7 @@ public class PayslipPdfService {
             case PERFORMANCE_BONUS -> "성과급";
             case SPECIAL_BONUS -> "특별상여";
             case RETROACTIVE -> "소급분";
+            case RETIREMENT_SETTLEMENT -> "퇴직정산";
         };
     }
 

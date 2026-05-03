@@ -13,10 +13,12 @@ import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.domain.enums.ItemType;
 import com._team._team.salary.domain.enums.PayrollType;
 import com._team._team.salary.domain.enums.RetirementType;
+import com._team._team.salary.domain.vo.AutoPayrollItem;
 import com._team._team.salary.dto.reqdto.RetirementSimReqDto;
 import com._team._team.salary.dto.resdto.RetirementSimResDto;
 import com._team._team.salary.feignClients.MemberFeignClient;
 import com._team._team.salary.feignClients.dto.MemberResDto;
+import com._team._team.salary.repository.MemberAllowanceRepository;
 import com._team._team.salary.repository.PayrollRepository;
 import com._team._team.salary.repository.RetirementPolicyRepository;
 import com._team._team.salary.repository.SalaryItemTemplateRepository;
@@ -30,23 +32,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * 퇴직금 시뮬레이션 회사 정책 LEGAL DB DC 분기
- *  LEGAL DB 평균임금 일액 × 30 × 근속일수 365
- *  DC 평균월급 × 근속연수 매월 1 12 누적 근사
+ *  법정 퇴직금 DB == 평균임금 일액 × 30 × 근속일수 365
+ *  DC == 평균월급 × 근속연수 매월 1 12 누적 근사
  *
  * 평균임금 정확 산정 (근로기준법 제2조 1항 6호 + 시행령 제2조)
- *  base 직전 3개월 정기급여 임금총액 / 3개월 calendar 일수
+ *  기본급 직전 3개월 정기급여 임금총액 / 3개월 calendar 일수
  *  + 직전 12개월 상여금 합계 × 3/12 환산
  *  + 직전 12개월 연차수당 합계 × 3/12 환산
- *  → 일평균 = (base + 환산) / 3개월일수
- *  → 통상시급 일액 = ordinaryWage × 8 / monthlyOrdinaryHours
- *  → 적용 평균임금 = max(일평균, 통상시급일액) 시행령 제2조
+ *  -> 일평균 = (base + 환산) / 3개월일수
+ *  -> 통상시급 일액 = ordinaryWage × 8 / monthlyOrdinaryHours
+ *  -> 적용 평균임금 = max(일평균, 통상시급일액) 시행령 제2조
  */
 @Slf4j
 @Service
@@ -57,25 +58,31 @@ public class RetirementSimulationService {
     private final SalaryRepository salaryRepository;
     private final SalaryPolicyRepository salaryPolicyRepository;
     private final SalaryItemTemplateRepository salaryItemTemplateRepository;
+    private final MemberAllowanceRepository memberAllowanceRepository;
     private final PayrollRepository payrollRepository;
     private final MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository;
     private final MemberFeignClient memberFeignClient;
+    private final PayrollCalculationService payrollCalculationService;
 
     @Autowired
     public RetirementSimulationService(RetirementPolicyRepository retirementPolicyRepository,
                                        SalaryRepository salaryRepository,
                                        SalaryPolicyRepository salaryPolicyRepository,
                                        SalaryItemTemplateRepository salaryItemTemplateRepository,
+                                       MemberAllowanceRepository memberAllowanceRepository,
                                        PayrollRepository payrollRepository,
                                        MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository,
-                                       MemberFeignClient memberFeignClient) {
+                                       MemberFeignClient memberFeignClient,
+                                       PayrollCalculationService payrollCalculationService) {
         this.retirementPolicyRepository = retirementPolicyRepository;
         this.salaryRepository = salaryRepository;
         this.salaryPolicyRepository = salaryPolicyRepository;
         this.salaryItemTemplateRepository = salaryItemTemplateRepository;
+        this.memberAllowanceRepository = memberAllowanceRepository;
         this.payrollRepository = payrollRepository;
         this.memberLeaveOfAbsenceRepository = memberLeaveOfAbsenceRepository;
         this.memberFeignClient = memberFeignClient;
+        this.payrollCalculationService = payrollCalculationService;
     }
 
     public RetirementSimResDto simulateForMember(UUID companyId, UUID memberId, RetirementSimReqDto req) {
@@ -148,6 +155,199 @@ public class RetirementSimulationService {
                 .eligible(eligible)
                 .disclaimer(disclaimer(type))
                 .build();
+    }
+
+    /**
+     * 사직 결재 승인 cascade 시 자동 호출 - 퇴직정산 Payroll 생성
+     * - 항목 구성:
+     *   1. 퇴직월 일할 급여 (해당월 REGULAR_MONTHLY 미생성 시 baseMonthly × 근무일/월일수)
+     *   2. 퇴직금 (LEGAL/DB/DC simulate 결과)
+     *   3. 미사용 연차 수당 (잠금 직전 잔여 연차일수 × 통상시급 일액) - unusedLeaveDays > 0 일 때만
+     */
+    @Transactional
+    public Payroll createRetirementSettlementPayroll(UUID companyId,
+                                                      UUID memberId,
+                                                      LocalDate resignDate,
+                                                      Double unusedLeaveDays) {
+        // 중복 방지 - 이미 같은 날 RETIREMENT_SETTLEMENT 있으면 그대로 반환
+        Payroll existing = payrollRepository
+                .findByCompanyIdAndMemberIdAndPayrollYearMonthDay(
+                        companyId, memberId, resignDate)
+                .filter(p -> "N".equals(p.getDelYn()))
+                .filter(p -> p.getPayrollType() == PayrollType.RETIREMENT_SETTLEMENT)
+                .orElse(null);
+        if (existing != null) {
+            log.info("[RETIREMENT-SETTLEMENT] 이미 생성됨 skip memberId={} resignDate={}",
+                    memberId, resignDate);
+            return existing;
+        }
+
+        // 시뮬레이션 호출
+        RetirementSimReqDto req = new RetirementSimReqDto();
+        req.setResignDate(resignDate);
+        RetirementSimResDto sim = simulateForMember(companyId, memberId, req);
+
+        long retirementAmount = sim.getEstimatedAmount();
+
+        // 미사용 연차 수당 = 통상시급 일액 × 잔여 연차일수
+        long unusedLeaveAmount = 0L;
+        long unusedLeaveDaysLong = 0L;
+        if (unusedLeaveDays != null && unusedLeaveDays > 0 && sim.getOrdinaryDailyWage() > 0) {
+            unusedLeaveDaysLong = Math.round(unusedLeaveDays);
+            unusedLeaveAmount = sim.getOrdinaryDailyWage() * unusedLeaveDaysLong;
+        }
+
+        // 퇴직월 일할 급여 - 해당월에 REGULAR_MONTHLY Payroll 이 없으면 일할로 가산
+        // 일할 = baseMonthly × 퇴직일까지 근무일수 / 해당월 일수
+        long proratedSalary = 0L;
+        int proratedDaysWorked = 0;
+        int proratedDaysInMonth = 0;
+        long baseMonthlyForProrate = sim.getAvgMonthlyWage();
+        LocalDate monthStart = resignDate.withDayOfMonth(1);
+        LocalDate monthEnd = resignDate.withDayOfMonth(resignDate.lengthOfMonth());
+        boolean hasRegularThisMonth = payrollRepository
+                .findInYearByMemberFetchItems(companyId, memberId, monthStart, monthEnd)
+                .stream()
+                .anyMatch(p -> p.getPayrollType() == null
+                        || p.getPayrollType() == PayrollType.REGULAR_MONTHLY);
+        if (!hasRegularThisMonth && baseMonthlyForProrate > 0) {
+            proratedDaysWorked = resignDate.getDayOfMonth();
+            proratedDaysInMonth = resignDate.lengthOfMonth();
+            proratedSalary = baseMonthlyForProrate * proratedDaysWorked / proratedDaysInMonth;
+        }
+
+        long totalPayment = retirementAmount + unusedLeaveAmount + proratedSalary;
+
+        // 활성 Salary 조회 - effectiveTo 가 resignDate 또는 그 이후
+        Salary salary = salaryRepository
+                .findActiveSalary(memberId, companyId, resignDate)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND,
+                        "퇴직정산 대상 직원의 활성 급여를 찾을 수 없습니다. memberId=" + memberId));
+
+        // 1) 퇴직금 분리과세 - 퇴직소득세/지방소득세 자체 계산
+        long days = ChronoUnit.DAYS.between(sim.getJoinDate(), resignDate);
+        RetirementIncomeTaxCalculator.Result retiTax =
+                RetirementIncomeTaxCalculator.calculate(retirementAmount, days);
+
+        // 2) 일반 근로소득 (미사용연차 + 일할 급여) - 4대보험 + 소득세 + 지방세 일괄 계산
+        long ordinaryTaxableEarning = unusedLeaveAmount + proratedSalary;
+        int dependents = salary.getDependentCount() != null ? salary.getDependentCount() : 1;
+        int childUnder20 = salary.getChildUnder20Count() != null ? salary.getChildUnder20Count() : 0;
+        List<AutoPayrollItem> ordinaryDeductions = ordinaryTaxableEarning > 0
+                ? payrollCalculationService.calculateDeductions(
+                        ordinaryTaxableEarning, resignDate,
+                        dependents, childUnder20, salary.getTaxReductionRate())
+                : List.of();
+
+        long ordinaryDeductionSum = ordinaryDeductions.stream()
+                .mapToLong(AutoPayrollItem::amount).sum();
+        long totalDeduction = retiTax.incomeTax() + retiTax.localTax() + ordinaryDeductionSum;
+        long netPay = totalPayment - totalDeduction;
+
+        Payroll payroll = Payroll.builder()
+                .companyId(companyId)
+                .memberId(memberId)
+                .salaryId(salary.getSalaryId())
+                .payrollYearMonthDay(resignDate)
+                .totalPayment(totalPayment)
+                .totalDeduction(totalDeduction)
+                .netPay(netPay)
+                .payrollType(PayrollType.RETIREMENT_SETTLEMENT)
+                .build();
+        Payroll saved = payrollRepository.save(payroll);
+
+        int order = 1;
+
+        // 퇴직월 일할 급여 - 일반 과세
+        if (proratedSalary > 0) {
+            PayrollItem proratedItem = PayrollItem.builder()
+                    .payroll(saved)
+                    .itemName(String.format("퇴직월 일할 급여 (%d/%d일)",
+                            proratedDaysWorked, proratedDaysInMonth))
+                    .itemType(ItemType.EARNING)
+                    .amount(proratedSalary)
+                    .displayOrder(order++)
+                    .isTaxableYn("Y")
+                    .build();
+            saved.getPayrollItemList().add(proratedItem);
+        }
+
+        // 퇴직금 항목 - 분리과세이므로 일반 소득세 비과세
+        PayrollItem retirementItem = PayrollItem.builder()
+                .payroll(saved)
+                .itemName("퇴직금")
+                .itemType(ItemType.EARNING)
+                .amount(retirementAmount)
+                .displayOrder(order++)
+                .isTaxableYn("N")
+                .build();
+        saved.getPayrollItemList().add(retirementItem);
+
+        // 미사용 연차 수당 항목 - 잔여일수 > 0 일 때만 추가
+        // 일반 소득세 과세 대상 (퇴직금과 별도)
+        if (unusedLeaveAmount > 0) {
+            PayrollItem leavePayoutItem = PayrollItem.builder()
+                    .payroll(saved)
+                    .itemName(String.format("미사용 연차 수당 (%d일)", unusedLeaveDaysLong))
+                    .itemType(ItemType.EARNING)
+                    .amount(unusedLeaveAmount)
+                    .displayOrder(order++)
+                    .isTaxableYn("Y")
+                    .build();
+            saved.getPayrollItemList().add(leavePayoutItem);
+        }
+
+        // 공제 항목 표시 순서는 200번대 (일반 급여 관행과 일치)
+        int deductionOrder = 200;
+
+        // 일반 근로소득 공제 (4대보험 + 소득세 + 지방소득세)
+        for (AutoPayrollItem auto : ordinaryDeductions) {
+            PayrollItem item = PayrollItem.builder()
+                    .payroll(saved)
+                    .itemName(auto.itemName())
+                    .itemType(auto.itemType())
+                    .amount(auto.amount())
+                    .displayOrder(auto.displayOrder() > 0 ? auto.displayOrder() : deductionOrder++)
+                    .isTaxableYn(auto.isTaxableYn())
+                    .build();
+            saved.getPayrollItemList().add(item);
+        }
+
+        // 퇴직소득세 (분리과세) - 퇴직금만 대상
+        if (retiTax.incomeTax() > 0) {
+            PayrollItem retiTaxItem = PayrollItem.builder()
+                    .payroll(saved)
+                    .itemName("퇴직소득세")
+                    .itemType(ItemType.DEDUCTION)
+                    .amount(retiTax.incomeTax())
+                    .displayOrder(290)
+                    .isTaxableYn("Y")
+                    .build();
+            saved.getPayrollItemList().add(retiTaxItem);
+        }
+
+        // 퇴직 지방소득세 - 퇴직소득세의 10%
+        if (retiTax.localTax() > 0) {
+            PayrollItem retiLocalTaxItem = PayrollItem.builder()
+                    .payroll(saved)
+                    .itemName("퇴직 지방소득세")
+                    .itemType(ItemType.DEDUCTION)
+                    .amount(retiTax.localTax())
+                    .displayOrder(291)
+                    .isTaxableYn("Y")
+                    .build();
+            saved.getPayrollItemList().add(retiLocalTaxItem);
+        }
+
+        log.info("[RETIREMENT-SETTLEMENT] 생성 memberId={} resignDate={} type={} prorated={}/{} retirement={} unusedLeave={}일/{} retiTax={}/{} ordinaryDed={} netPay={} eligible={}",
+                memberId, resignDate, sim.getRetirementType(),
+                proratedSalary, proratedDaysInMonth > 0
+                        ? (proratedDaysWorked + "/" + proratedDaysInMonth) : "skip",
+                retirementAmount, unusedLeaveDaysLong, unusedLeaveAmount,
+                retiTax.incomeTax(), retiTax.localTax(),
+                ordinaryDeductionSum, netPay, sim.isEligible());
+        return saved;
     }
 
     /**
@@ -263,8 +463,8 @@ public class RetirementSimulationService {
                 && activeSalaryPolicy.getMonthlyOrdinaryHours() > 0
                 ? activeSalaryPolicy.getMonthlyOrdinaryHours() : 209;
 
-        // 통상임금 추정 baseSalary + 통상임금 플래그 Y 항목들 평균 (간이)
-        long ordinaryWage = estimateOrdinaryWage(companyId, memberId, baseMonthly);
+        // 통상임금 산정 baseSalary + 직원별 활성 MemberAllowance 중 통상임금 플래그 Y 항목 합산
+        long ordinaryWage = estimateOrdinaryWage(companyId, memberId, baseMonthly, resignDate);
         aw.ordinaryDailyWage = monthlyHours > 0
                 ? (ordinaryWage * 8) / monthlyHours
                 : 0;
@@ -282,27 +482,32 @@ public class RetirementSimulationService {
     }
 
     /**
-     * 통상임금 추정 baseSalary + 통상임금 플래그 Y 항목 합 (정기급여 1회분 기준)
-     * 직원 활성 Allowance 까진 보지 않고 회사 표준 템플릿 정기수당으로 근사
+     * 통상임금 산정
+     *  - baseSalary + 직원별 활성 MemberAllowance 중 통상임금 플래그 Y 인 항목들의 실제 금액 합
+     *  - SalaryItemTemplate 의 isOrdinaryWageYn='Y' 인 templateId 만 통상임금 대상
+     *  - resignDate 시점에 active 인 (effectiveFrom <= resignDate <= effectiveTo) 수당만 집계
      */
-    private long estimateOrdinaryWage(UUID companyId, UUID memberId, long baseMonthly) {
-        // 회사 표준 템플릿 중 통상임금 플래그 Y 인 EARNING 만
-        List<SalaryItemTemplate> templates = salaryItemTemplateRepository
-                .findByCompanyIdAndDelYn(companyId, "N");
-        // baseSalary 그 자체가 가장 큰 비중이므로 템플릿은 추가 표시용 (보강 방향)
-        // 실 데이터 부재 시 baseMonthly 만 사용
-        // 정확한 값은 직원별 MemberAllowance 까지 봐야 하지만 시뮬은 근사로 충분
-        long ordinaryAddition = 0L;
-        Map<String, Boolean> seen = new HashMap<>();
-        for (SalaryItemTemplate t : templates) {
-            if (t.getItemType() != ItemType.EARNING) continue;
-            if (!"Y".equals(t.getIsOrdinaryWageYn())) continue;
-            if ("기본급".equals(t.getItemName())) continue;
-            if (seen.put(t.getItemName(), true) != null) continue;
-            // 템플릿만 보고 금액은 알 수 없으므로 baseMonthly 의 5% 를 항목당 가산 (간이 추정)
-            // 정확한 값은 평균임금 base 임금에 이미 반영됨 — 통상임금은 비교용일 뿐
-            ordinaryAddition += baseMonthly / 20; // 5%
+    private long estimateOrdinaryWage(UUID companyId, UUID memberId, long baseMonthly, LocalDate resignDate) {
+        // 회사 통상임금 대상 templateId 셋
+        Set<UUID> ordinaryTemplateIds = salaryItemTemplateRepository
+                .findByCompanyIdAndDelYn(companyId, "N").stream()
+                .filter(t -> t.getItemType() == ItemType.EARNING)
+                .filter(t -> "Y".equals(t.getIsOrdinaryWageYn()))
+                .map(SalaryItemTemplate::getSalaryItemTemplateId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        if (ordinaryTemplateIds.isEmpty()) {
+            return baseMonthly;
         }
+
+        // 직원의 활성 수당 중 통상임금 대상 항목만 합
+        long ordinaryAddition = memberAllowanceRepository
+                .findActiveByMemberAndDate(memberId, companyId, resignDate).stream()
+                .filter(a -> a.getSalaryItemTemplateId() != null
+                        && ordinaryTemplateIds.contains(a.getSalaryItemTemplateId()))
+                .mapToLong(a -> a.getAmount() == null ? 0L : a.getAmount())
+                .sum();
+
         return baseMonthly + ordinaryAddition;
     }
 

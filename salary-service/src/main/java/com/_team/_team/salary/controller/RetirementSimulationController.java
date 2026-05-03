@@ -36,4 +36,16 @@ public class RetirementSimulationController {
                 ApiResponse.success(data, "퇴직금 시뮬레이션 성공"),
                 HttpStatus.OK);
     }
+
+    // 관리자 - 특정 직원 퇴직금 시뮬 (퇴직 정산 화면에서 상세 보기용)
+    @PostMapping("/simulate/admin/{memberId}")
+    public ResponseEntity<?> simulateForMemberByAdmin(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID memberId,
+            @Valid @RequestBody RetirementSimReqDto reqDto) {
+        RetirementSimResDto data = retirementSimulationService.simulateForMember(companyId, memberId, reqDto);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "퇴직금 시뮬레이션 성공"),
+                HttpStatus.OK);
+    }
 }
