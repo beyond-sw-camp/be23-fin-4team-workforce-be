@@ -4,9 +4,11 @@ import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
+import com._team._team.evaluation.service.EvaluationAccessScopeService;
 import com._team._team.meeting.dto.reqdto.*;
 import com._team._team.meeting.dto.resdto.MeetingRecordResDto;
 import com._team._team.meeting.service.MeetingRecordService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -20,10 +22,13 @@ import java.util.UUID;
 public class MeetingRecordController {
 
     final MeetingRecordService meetingRecordService;
+    final EvaluationAccessScopeService accessScopeService;
 
     @Autowired
-    public MeetingRecordController(MeetingRecordService meetingRecordService) {
+    public MeetingRecordController(MeetingRecordService meetingRecordService,
+                                   EvaluationAccessScopeService accessScopeService) {
         this.meetingRecordService = meetingRecordService;
+        this.accessScopeService = accessScopeService;
     }
 
     // 면담 기록 생성
@@ -149,9 +154,16 @@ public class MeetingRecordController {
     @GetMapping("/seasons/{seasonId}/status")
     public ApiResponse<java.util.Map<String, Integer>> seasonStatus(
             @PathVariable UUID seasonId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-UUID") String requesterId,
+            HttpServletRequest request) {
+        EvaluationAccessScopeService.AccessScope scope = accessScopeService.resolveOperationReadScope(
+                request,
+                UUID.fromString(companyId),
+                UUID.fromString(requesterId)
+        );
         return ApiResponse.success(
-                meetingRecordService.getSeasonStatus(seasonId, UUID.fromString(companyId)),
+                meetingRecordService.getSeasonStatus(seasonId, UUID.fromString(companyId), scope),
                 "시즌 면담 현황 조회 성공"
         );
     }

@@ -10,12 +10,14 @@ import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.SeasonOperationalAlertsResDto;
 import com._team._team.evaluation.dto.resdto.PublishBlockersResDto;
 import com._team._team.evaluation.dto.resdto.EvaluationResponseResDto;
+import com._team._team.evaluation.service.EvaluationAccessScopeService;
 import com._team._team.evaluation.service.EvaluationGroupTranslator;
 import com._team._team.evaluation.service.EvaluationResponseService;
 import com._team._team.evaluation.service.EvaluationSeasonService;
 import com._team._team.evaluation.service.SeasonActivationService;
 import com._team._team.meeting.dto.resdto.MeetingRecordResDto;
 import com._team._team.meeting.service.MeetingRecordService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -38,15 +40,18 @@ public class EvaluationSeasonController {
     private final EvaluationGroupTranslator groupTranslator;
     private final MeetingRecordService meetingRecordService;
     private final EvaluationResponseService responseService;
+    private final EvaluationAccessScopeService accessScopeService;
 
     public EvaluationSeasonController(EvaluationSeasonService seasonService,
                                       EvaluationGroupTranslator groupTranslator,
                                       MeetingRecordService meetingRecordService,
-                                      EvaluationResponseService responseService) {
+                                      EvaluationResponseService responseService,
+                                      EvaluationAccessScopeService accessScopeService) {
         this.seasonService = seasonService;
         this.groupTranslator = groupTranslator;
         this.meetingRecordService = meetingRecordService;
         this.responseService = responseService;
+        this.accessScopeService = accessScopeService;
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.CREATE)
@@ -161,9 +166,16 @@ public class EvaluationSeasonController {
     @GetMapping("/{seasonId}/publish-blockers")
     public ApiResponse<PublishBlockersResDto> publishBlockers(
             @PathVariable UUID seasonId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-UUID") String requesterId,
+            HttpServletRequest request) {
+        EvaluationAccessScopeService.AccessScope scope = accessScopeService.resolveOperationReadScope(
+                request,
+                UUID.fromString(companyId),
+                UUID.fromString(requesterId)
+        );
         return ApiResponse.success(
-                seasonService.getPublishBlockers(seasonId, UUID.fromString(companyId)),
+                seasonService.getPublishBlockers(seasonId, UUID.fromString(companyId), scope),
                 "Publish blockers loaded successfully."
         );
     }
@@ -172,9 +184,16 @@ public class EvaluationSeasonController {
     @GetMapping("/{seasonId}/operational-alerts")
     public ApiResponse<SeasonOperationalAlertsResDto> operationalAlerts(
             @PathVariable UUID seasonId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-UUID") String requesterId,
+            HttpServletRequest request) {
+        EvaluationAccessScopeService.AccessScope scope = accessScopeService.resolveOperationReadScope(
+                request,
+                UUID.fromString(companyId),
+                UUID.fromString(requesterId)
+        );
         return ApiResponse.success(
-                seasonService.getOperationalAlerts(seasonId, UUID.fromString(companyId)),
+                seasonService.getOperationalAlerts(seasonId, UUID.fromString(companyId), scope),
                 "Operational alerts loaded successfully."
         );
     }
@@ -192,9 +211,16 @@ public class EvaluationSeasonController {
     @GetMapping("/{seasonId}/meetings/status")
     public ApiResponse<Map<String, Integer>> meetingStatus(
             @PathVariable UUID seasonId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-UUID") String requesterId,
+            HttpServletRequest request) {
+        EvaluationAccessScopeService.AccessScope scope = accessScopeService.resolveOperationReadScope(
+                request,
+                UUID.fromString(companyId),
+                UUID.fromString(requesterId)
+        );
         return ApiResponse.success(
-                meetingRecordService.getSeasonStatus(seasonId, UUID.fromString(companyId)),
+                meetingRecordService.getSeasonStatus(seasonId, UUID.fromString(companyId), scope),
                 "Meeting status loaded successfully."
         );
     }
@@ -203,9 +229,16 @@ public class EvaluationSeasonController {
     @GetMapping("/{seasonId}/responses")
     public ApiResponse<List<EvaluationResponseResDto>> responses(
             @PathVariable UUID seasonId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-UUID") String requesterId,
+            HttpServletRequest request) {
+        EvaluationAccessScopeService.AccessScope scope = accessScopeService.resolveOperationReadScope(
+                request,
+                UUID.fromString(companyId),
+                UUID.fromString(requesterId)
+        );
         return ApiResponse.success(
-                responseService.listSeasonResponses(seasonId, UUID.fromString(companyId)),
+                responseService.listSeasonResponses(seasonId, UUID.fromString(companyId), scope),
                 "Season evaluation responses loaded successfully."
         );
     }
@@ -214,9 +247,16 @@ public class EvaluationSeasonController {
     @GetMapping("/{seasonId}/meetings")
     public ApiResponse<List<MeetingRecordResDto>> meetings(
             @PathVariable UUID seasonId,
-            @RequestHeader("X-User-CompanyId") String companyId) {
+            @RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-UUID") String requesterId,
+            HttpServletRequest request) {
+        EvaluationAccessScopeService.AccessScope scope = accessScopeService.resolveOperationReadScope(
+                request,
+                UUID.fromString(companyId),
+                UUID.fromString(requesterId)
+        );
         return ApiResponse.success(
-                meetingRecordService.listBySeason(seasonId, UUID.fromString(companyId)),
+                meetingRecordService.listBySeason(seasonId, UUID.fromString(companyId), scope),
                 "Season meetings loaded successfully."
         );
     }

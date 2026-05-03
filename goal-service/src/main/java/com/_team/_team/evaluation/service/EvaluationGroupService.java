@@ -147,6 +147,18 @@ public class EvaluationGroupService {
     }
 
     @Transactional
+    public List<GroupResDto> listGroups(UUID seasonId, UUID companyId, EvaluationAccessScopeService.AccessScope scope) {
+        List<GroupResDto> groups = listGroups(seasonId, companyId);
+        if (scope == null || scope.companyWide()) {
+            return groups;
+        }
+        return groups.stream()
+                .map(group -> filterGroupForScope(group, scope))
+                .filter(group -> hasVisibleTargets(group) || hasVisibleMappings(group))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
     public GroupResDto createGroup(UUID seasonId, UUID companyId, GroupCreateReqDto dto) {
         throw new BusinessException(HttpStatus.BAD_REQUEST,
                 "평가 대상자는 목표 기간의 승인 완료 개인 목표 기준으로 자동 생성됩니다. 수동 그룹 생성은 지원하지 않습니다.");
@@ -364,6 +376,64 @@ public class EvaluationGroupService {
                 .collect(Collectors.toList());
 
         return GroupResDto.from(group, resMaps);
+    }
+
+    private GroupResDto filterGroupForScope(GroupResDto group, EvaluationAccessScopeService.AccessScope scope) {
+        List<EvaluatorMappingResDto> visibleMaps = group.getEvaluatorMaps() == null
+                ? List.of()
+                : group.getEvaluatorMaps().stream()
+                .filter(map -> scope.canSeeTarget(map.getTargetMemberId()) || scope.isRequester(map.getEvaluatorId()))
+                .collect(Collectors.toList());
+
+        Set<UUID> visibleTargets = new LinkedHashSet<>();
+        List<UUID> originalTargets = readTargetMemberIds(group.getTargetMemberIdsJson());
+        originalTargets.stream()
+                .filter(scope::canSeeTarget)
+                .forEach(visibleTargets::add);
+        visibleMaps.stream()
+                .map(EvaluatorMappingResDto::getTargetMemberId)
+                .filter(java.util.Objects::nonNull)
+                .forEach(visibleTargets::add);
+
+        String targetMemberIdsJson;
+        try {
+            targetMemberIdsJson = objectMapper.writeValueAsString(visibleTargets);
+        } catch (Exception e) {
+            targetMemberIdsJson = "[]";
+        }
+
+        return GroupResDto.builder()
+                .groupId(group.getGroupId())
+                .companyId(group.getCompanyId())
+                .seasonId(group.getSeasonId())
+                .name(group.getName())
+                .evaluationTypesJson(group.getEvaluationTypesJson())
+                .targetMemberIdsJson(targetMemberIdsJson)
+                .designId(group.getDesignId())
+                .evaluatorMaps(visibleMaps)
+                .build();
+    }
+
+    private boolean hasVisibleTargets(GroupResDto group) {
+        return !readTargetMemberIds(group.getTargetMemberIdsJson()).isEmpty();
+    }
+
+    private boolean hasVisibleMappings(GroupResDto group) {
+        return group.getEvaluatorMaps() != null && !group.getEvaluatorMaps().isEmpty();
+    }
+
+    private List<UUID> readTargetMemberIds(String targetMemberIdsJson) {
+        if (targetMemberIdsJson == null || targetMemberIdsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(
+                    targetMemberIdsJson,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<UUID>>() {}
+            );
+        } catch (Exception ignored) {
+            return List.of();
+        }
     }
 
     /**

@@ -7,6 +7,7 @@ import com._team._team.evaluation.domain.enums.CalibrationRole;
 import com._team._team.evaluation.domain.enums.EvaluationStage;
 import com._team._team.evaluation.repository.EvaluationCalibrationRepository;
 import com._team._team.evaluation.repository.EvaluationResponseRepository;
+import com._team._team.evaluation.service.EvaluationAccessScopeService;
 import com._team._team.meeting.domain.MeetingRecord;
 import com._team._team.meeting.domain.enums.RepeatCycle;
 import com._team._team.meeting.dto.reqdto.MeetingRecordCompleteReqDto;
@@ -148,6 +149,24 @@ public class MeetingRecordService {
     public java.util.Map<String, Integer> getSeasonStatus(UUID seasonId, UUID companyId) {
         List<MeetingRecord> meetings = meetingRecordRepository
                 .findByRelatedSeasonIdAndCompanyId(seasonId, companyId);
+        return buildStatus(meetings);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Integer> getSeasonStatus(
+            UUID seasonId,
+            UUID companyId,
+            EvaluationAccessScopeService.AccessScope scope
+    ) {
+        List<MeetingRecord> meetings = meetingRecordRepository
+                .findByRelatedSeasonIdAndCompanyId(seasonId, companyId)
+                .stream()
+                .filter(meeting -> canSeeInOperation(meeting, scope))
+                .toList();
+        return buildStatus(meetings);
+    }
+
+    private java.util.Map<String, Integer> buildStatus(List<MeetingRecord> meetings) {
         int created = meetings.size();
         int completed = (int) meetings.stream().filter(m -> m.getCompletedAt() != null).count();
         int unscheduled = (int) meetings.stream().filter(m -> m.getScheduledAt() == null).count();
@@ -165,6 +184,27 @@ public class MeetingRecordService {
                 .stream()
                 .map(MeetingRecordResDto::from)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MeetingRecordResDto> listBySeason(
+            UUID seasonId,
+            UUID companyId,
+            EvaluationAccessScopeService.AccessScope scope
+    ) {
+        return meetingRecordRepository.findByRelatedSeasonIdAndCompanyId(seasonId, companyId)
+                .stream()
+                .filter(meeting -> canSeeInOperation(meeting, scope))
+                .map(MeetingRecordResDto::from)
+                .collect(Collectors.toList());
+    }
+
+    private boolean canSeeInOperation(MeetingRecord meeting, EvaluationAccessScopeService.AccessScope scope) {
+        if (scope == null || scope.companyWide()) {
+            return true;
+        }
+        return scope.canSeeTarget(meeting.getMemberId())
+                || scope.isRequester(meeting.getManagerId());
     }
 
     /**

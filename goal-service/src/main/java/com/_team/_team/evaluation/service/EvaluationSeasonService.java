@@ -194,6 +194,26 @@ public class EvaluationSeasonService {
                 .filter(r -> companyId.equals(r.getCompanyId()))
                 .toList();
 
+        return buildPublishBlockers(seasonId, responses);
+    }
+
+    @Transactional(readOnly = true)
+    public PublishBlockersResDto getPublishBlockers(
+            UUID seasonId,
+            UUID companyId,
+            EvaluationAccessScopeService.AccessScope scope
+    ) {
+        mustGet(seasonId, companyId);
+
+        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> companyId.equals(r.getCompanyId()))
+                .filter(r -> canSeeInOperation(r, scope))
+                .toList();
+
+        return buildPublishBlockers(seasonId, responses);
+    }
+
+    private PublishBlockersResDto buildPublishBlockers(UUID seasonId, List<EvaluationResponse> responses) {
         Map<String, Integer> byStage = new LinkedHashMap<>();
         for (EvaluationStage stage : EvaluationStage.values()) {
             byStage.put(stage.name(), 0);
@@ -234,11 +254,46 @@ public class EvaluationSeasonService {
                 .flatMap(response -> buildOperationalAlerts(response).stream())
                 .toList();
 
+        return buildOperationalAlertsResponse(seasonId, alerts);
+    }
+
+    @Transactional(readOnly = true)
+    public SeasonOperationalAlertsResDto getOperationalAlerts(
+            UUID seasonId,
+            UUID companyId,
+            EvaluationAccessScopeService.AccessScope scope
+    ) {
+        mustGet(seasonId, companyId);
+
+        List<EvaluationResponse> responses = responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> companyId.equals(r.getCompanyId()))
+                .filter(r -> canSeeInOperation(r, scope))
+                .toList();
+
+        List<SeasonOperationalAlertsResDto.AlertItem> alerts = responses.stream()
+                .flatMap(response -> buildOperationalAlerts(response).stream())
+                .toList();
+
+        return buildOperationalAlertsResponse(seasonId, alerts);
+    }
+
+    private SeasonOperationalAlertsResDto buildOperationalAlertsResponse(
+            UUID seasonId,
+            List<SeasonOperationalAlertsResDto.AlertItem> alerts
+    ) {
         return SeasonOperationalAlertsResDto.builder()
                 .seasonId(seasonId)
                 .totalAlerts(alerts.size())
                 .alerts(alerts)
                 .build();
+    }
+
+    private boolean canSeeInOperation(EvaluationResponse response, EvaluationAccessScopeService.AccessScope scope) {
+        if (scope == null || scope.companyWide()) {
+            return true;
+        }
+        return scope.canSeeTarget(response.getTargetMemberId())
+                || scope.isRequester(response.getEvaluatorId());
     }
 
     private List<SeasonOperationalAlertsResDto.AlertItem> buildOperationalAlerts(EvaluationResponse response) {
