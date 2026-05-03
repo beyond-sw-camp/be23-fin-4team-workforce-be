@@ -90,6 +90,12 @@ public class Contract extends BaseTimeEntity {
     @Column
     private String cancelReason;
 
+    @Column(columnDefinition = "TEXT")
+    private String sealImageUrl;
+
+    @Column(length = 30, unique = true)
+    private String contractNumber;  // 계약 문서번호 (예: 근로-2026-0001)
+
     public void send() {
         this.contractStatus = ContractStatus.SENT;
     }
