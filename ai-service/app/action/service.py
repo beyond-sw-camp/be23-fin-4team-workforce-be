@@ -35,6 +35,17 @@ async def handle_action(
         f"session_id={request.session_id}, action={request.action}"
     )
 
+    # 0. 액션 진행 중 사용자가 텍스트로 취소 의도 입력
+    if request.session_id and request.question and not request.action:
+        if _is_cancel_intent(request.question):
+            logger.info(f"[action] 취소 키워드 감지로 세션 종료")
+            state.clear_state(request.session_id)
+            return ActionResponse(
+                type="cancelled",
+                message="결재 작성을 취소했습니다. 새로운 질문을 입력해주세요.",
+                session_id=None
+            )
+
     # 1. 사용자가 버튼 누른 경우
     if request.action and request.session_id:
         return await _handle_user_action(
@@ -205,8 +216,18 @@ async def _extract_slots(
 [이미 입력된 정보]
 {json.dumps(existing_slots, ensure_ascii=False) if existing_slots else "(없음)"}
 
-[규칙]
-- 사용자 입력에서 양식의 필드값을 추출하세요.
+[절대 규칙 - 가장 중요]
+- 사용자 입력에 **명시적으로 언급되지 않은 정보는 절대 추출하지 마세요.**
+- 추측, 추론, 기본값 사용 모두 금지입니다.
+- select 필드의 옵션이 사용자 입력에 없으면 그 필드는 비워두세요. "기타" 같은 기본값 사용 금지.
+- 사용자가 날짜를 명시하지 않았으면 시작일/종료일을 임의로 정하지 마세요.
+- 사용자가 사유를 명시하지 않았으면 reason/사유 필드를 임의로 채우지 마세요.
+
+[허용된 자동 생성]
+- title 필드: 양식 내용을 바탕으로 자연스러운 제목 자동 생성 가능
+- usageDays 필드: 시작일과 종료일이 모두 있을 때 영업일 기준 자동 계산
+
+[일반 규칙]
 - 추출 가능한 정보가 없으면 함수를 호출하지 마세요.
 - 날짜는 반드시 위의 [현재 날짜 정보]를 기준으로 YYYY-MM-DD로 변환하세요.
   - "오늘" → {today.isoformat()}
@@ -214,10 +235,21 @@ async def _extract_slots(
   - "모레" → {day_after.isoformat()}
   - "다음주 월요일", "이번주 금요일" 등도 [현재 날짜 정보] 기준으로 계산
 - 시간은 HH:mm 형식으로 변환하세요.
-- 사용자가 명시하지 않은 정보는 추출하지 마세요. (추측 금지)
-- title 필드는 양식 내용에 어울리는 자연스러운 제목을 자동 생성해도 됩니다.
 - 이미 입력된 정보는 유지하고, 새 정보만 추출하세요.
-- 사용일수(usageDays)는 시작일과 종료일이 모두 있으면 자동 계산하세요. (양 끝 포함)
+
+[빈 입력 처리]
+사용자가 단순히 "사직서 작성해줘", "연차 신청해줘"처럼 양식만 요청한 경우:
+- title 외의 모든 필드는 비워두세요.
+- 함수를 호출하지 않거나, title 하나만 추출하세요.
+
+[잘못된 추출 예시 - 절대 하지 말 것]
+입력: "사직서 작성해줘"
+잘못된 추출: {{ "title": "사직서", "resignDate": "2026-05-02", "resignReason": "기타" }}
+올바른 추출: {{ "title": "사직서" }} 또는 함수 호출 안 함
+
+입력: "연차 신청"
+잘못된 추출: {{ "startDate": "2026-05-01", "endDate": "2026-05-01", "vacationType": "연차" }}
+올바른 추출: {{ "title": "연차 신청서" }} 또는 함수 호출 안 함
 """
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -307,6 +339,8 @@ def _ask_response(current_state: ActionState, missing: list) -> ActionResponse:
         options_str = ", ".join(first_missing["options"])
         message += f"\n\n({label} 옵션: {options_str})"
 
+    message += "\n\n(다른 질문을 하시려면 \"취소\"라고 입력해주세요)"
+
     return ActionResponse(
         type="ask",
         message=message,
@@ -377,3 +411,14 @@ def _error_response(message: str, session_id: Optional[str]) -> ActionResponse:
 def _get_weekday_korean(target_date: date) -> str:
     weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
     return weekdays[target_date.weekday()]
+
+
+def _is_cancel_intent(question: str) -> bool:
+    """사용자 입력이 취소/중단 의도인지 감지"""
+    cancel_keywords = [
+        "취소", "그만", "안할래", "안할게", "관둬", "중단",
+        "됐어", "필요없어", "그만할래", "스톱", "stop",
+        "다른 질문", "다른거", "다른 거"
+    ]
+    question_lower = question.strip().lower()
+    return any(kw in question_lower for kw in cancel_keywords)

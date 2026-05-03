@@ -75,10 +75,11 @@ public class ApprovalRequestController {
     public ResponseEntity<?> update(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestHeader("X-User-MemberPositionId") UUID memberPositionId,
             @PathVariable UUID requestId,
             @Valid @RequestBody ApprovalRequestCreateReqDto reqDto) {
         ApprovalRequestResDto resDto =
-                approvalRequestService.update(companyId, memberId, requestId, reqDto);
+                approvalRequestService.update(companyId, memberId,memberPositionId, requestId, reqDto);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "결재 요청이 수정되었습니다."),
                 HttpStatus.OK

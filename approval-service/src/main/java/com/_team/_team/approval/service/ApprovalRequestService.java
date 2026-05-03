@@ -409,7 +409,7 @@ public class ApprovalRequestService {
     }
 
 //    임시저장 수정 (DRAFT 상태인 경우)
-    public ApprovalRequestResDto update(UUID companyId, UUID memberId, UUID requestId, ApprovalRequestCreateReqDto reqDto){
+    public ApprovalRequestResDto update(UUID companyId, UUID memberId, UUID requestId, UUID memberPositionId, ApprovalRequestCreateReqDto reqDto){
 //        결재요청 조회 및 검증
         ApprovalRequest request = approvalRequestRepository.findByIdWithDocument(requestId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
