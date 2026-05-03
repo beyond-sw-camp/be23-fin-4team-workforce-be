@@ -4,7 +4,7 @@ import com._team._team.attendance.domain.OvertimePolicy;
 import com._team._team.attendance.dto.reqDto.OvertimePolicyCreateReqDto;
 import com._team._team.attendance.dto.reqDto.OvertimePolicyUpdateReqDto;
 import com._team._team.attendance.dto.resDto.OvertimePolicyResDto;
-import com._team._team.attendance.kafka.RagSyncAttendanceEventPublisher;
+import com._team._team.attendance.publisher.RagSyncAttendanceEventPublisher;
 import com._team._team.attendance.repository.OvertimePolicyRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.event.RagSyncAttendanceEvent;

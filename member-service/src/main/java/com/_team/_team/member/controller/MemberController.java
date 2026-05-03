@@ -128,8 +128,6 @@ public class MemberController {
     }
 
     // 직원 검색 (QueryDSL 동적쿼리 + 페이징)
-    // 같은 회사 안에서만 검색됨, 회사ID는 서비스가 호출자 기준으로 강제 주입
-    // 쿼리 예: GET /member/search?keyword=홍길&memberStatus=ACTIVE&page=0&size=20&sort=name,asc
     @CheckPermission(resource = Resource.MEMBER, action = Action.READ)
     @GetMapping("/search")
     public ResponseEntity<?> searchMembers(
@@ -399,8 +397,6 @@ public class MemberController {
 
     /**
      * 회사별 재직 사원 전체 조회
-     * salary-service의 연차 부여 배치(@Scheduled)에서 Feign으로 호출
-     * → MemberFeignClient.getMembersByCompany()
      */
     @GetMapping("/internal/by-company")
     public ResponseEntity<?> findAllByCompanyIdForBatch(
@@ -524,4 +520,6 @@ public class MemberController {
     public MemberContractInfoResDto getMemberInfoInternal(@PathVariable UUID memberId) {
         return memberService.getMemberContractInfo(memberId);
     }
+
+
 }

@@ -5,7 +5,7 @@ import com._team._team.attendance.dto.reqDto.CompanyHolidayCreateReqDto;
 import com._team._team.attendance.dto.reqDto.CompanyHolidayUpdateReqDto;
 import com._team._team.attendance.dto.resDto.CompanyHolidayResDto;
 import com._team._team.attendance.feignClients.MemberCalendarClient;
-import com._team._team.attendance.kafka.RagSyncAttendanceEventPublisher;
+import com._team._team.attendance.publisher.RagSyncAttendanceEventPublisher;
 import com._team._team.attendance.repository.CompanyHolidayRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.attendance.dto.resDto.LegalHolidayResDto;
