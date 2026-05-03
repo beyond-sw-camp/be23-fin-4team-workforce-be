@@ -80,7 +80,7 @@ public class Payroll extends BaseTimeEntity {
     @Builder.Default
     private PayrollStatus payrollStatus = PayrollStatus.DRAFT;
 
-    /** 급여 구분 (정기급여 / 성과급 / 특별상여 / 소급분) */
+    /** 급여 구분 (정기급여 / 성과급 / 특별상여 / 소급분 / 퇴직 정산) */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     @Builder.Default
