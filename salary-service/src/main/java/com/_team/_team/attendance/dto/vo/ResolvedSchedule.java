@@ -6,7 +6,7 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 /**
- * 스케줄 해석 결과 (값 객체, DB 저장 X).
+ * 스케줄 해석 결과 (값 객체, DB 저장 X)
  * 한 직원의 특정 일자에 적용되는 최종 근무, 휴게 정보를 담음
  */
 public record ResolvedSchedule(
@@ -16,7 +16,9 @@ public record ResolvedSchedule(
         LocalTime startTime,
         LocalTime endTime,
         Integer workMinutes,
-        Integer breakMinutes
+        Integer breakMinutes,
+        LocalTime breakStart,    // 휴게 시작 시각 (점심 등)
+        LocalTime breakEnd       // 휴게 종료 시각
 ) {
 
     // FIXED 스케줄에서 조립 - 회사 정책 휴게시간 사용
@@ -25,7 +27,9 @@ public record ResolvedSchedule(
             LocalTime startTime,
             LocalTime endTime,
             Integer workMinutes,
-            Integer breakMinutes) {
+            Integer breakMinutes,
+            LocalTime breakStart,
+            LocalTime breakEnd) {
         return new ResolvedSchedule(
                 workScheduleId,
                 null,
@@ -33,7 +37,9 @@ public record ResolvedSchedule(
                 startTime,
                 endTime,
                 workMinutes,
-                breakMinutes
+                breakMinutes,
+                breakStart,
+                breakEnd
         );
     }
 
@@ -44,7 +50,9 @@ public record ResolvedSchedule(
             LocalTime startTime,
             LocalTime endTime,
             Integer workMinutes,
-            Integer breakMinutes) {
+            Integer breakMinutes,
+            LocalTime breakStart,
+            LocalTime breakEnd) {
         return new ResolvedSchedule(
                 workScheduleId,
                 flexibleSlotId,
@@ -52,7 +60,9 @@ public record ResolvedSchedule(
                 startTime,
                 endTime,
                 workMinutes,
-                breakMinutes
+                breakMinutes,
+                breakStart,
+                breakEnd
         );
     }
 }

@@ -50,9 +50,10 @@ public class WorkTimeClassifier {
                 daily.getLastClockOut()
         ).toMinutes();
 
-        // 2. 휴게 차감
-        int breakMinutes = schedule.breakMinutes() != null ? schedule.breakMinutes() : 0;
-        int payable = Math.max(0, stayMinutes - breakMinutes);
+        // 2. 휴게 차감 - 실제 체류 구간과 휴게 구간의 교집합만 차감
+        //  체류시간에 휴게 시간을 포함 안 하면 차감 0 (예: 17:33-18:00 출근시 점심 12-13 차감 X)
+        int breakOverlap = computeBreakOverlap(daily, schedule);
+        int payable = Math.max(0, stayMinutes - breakOverlap);
 
         // 3. 야간 교차분 계산 (공휴일 여부 무관)
         int night = calculateNightMinutes(
@@ -103,6 +104,26 @@ public class WorkTimeClassifier {
         }
         // 결근 또는 미기록
         return WorkTimeBreakdown.empty();
+    }
+
+    // 체류 구간과 휴게 구간의 교집합 계산
+    // breakStart/End 가 있으면 그 시간대와 체류 시간 겹친 분만 차감
+    // 시각 정보 없으면 fallback - schedule.breakMinutes() 단순 차감 (옛 동작 호환)
+    private int computeBreakOverlap(DailyAttendance daily, ResolvedSchedule schedule) {
+        int fallback = schedule.breakMinutes() != null ? schedule.breakMinutes() : 0;
+        if (schedule.breakStart() == null || schedule.breakEnd() == null) {
+            return fallback;
+        }
+        LocalDate startDate = daily.getFirstClockIn().toLocalDate();
+        LocalDateTime breakStart = startDate.atTime(schedule.breakStart());
+        LocalDateTime breakEnd = startDate.atTime(schedule.breakEnd());
+        // 휴게 종료가 시작보다 빠르면 익일로 넘어가는 케이스 보정
+        if (!breakEnd.isAfter(breakStart)) {
+            breakEnd = breakEnd.plusDays(1);
+        }
+        return overlapMinutes(
+                daily.getFirstClockIn(), daily.getLastClockOut(),
+                breakStart, breakEnd);
     }
 
     // 체류 구간과 야간 시간대(22:00-06:00)의 교집합 계산
