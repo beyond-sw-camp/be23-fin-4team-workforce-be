@@ -1749,6 +1749,37 @@ public class MemberService {
     }
 
     /**
+     * 회사별 시스템 관리자 조회
+     * 알림 발송 대상 (예: 주 52시간 위반 알림)
+     */
+    @Transactional(readOnly = true)
+    public List<MemberResDto> findAdminsByCompanyId(UUID companyId) {
+        List<Member> members = memberRepository
+                .findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE);
+        if (members.isEmpty()) return java.util.Collections.emptyList();
+        java.util.Set<UUID> memberIds = members.stream()
+                .map(Member::getMemberId)
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.Map<UUID, MemberPosition> positionByMember = memberPositionRepository
+                .findActivePositionsByMemberIds(memberIds)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        mp -> mp.getMember().getMemberId(),
+                        mp -> mp,
+                        (a, b) -> a));
+        return members.stream()
+                .filter(m -> {
+                    MemberPosition mp = positionByMember.get(m.getMemberId());
+                    return mp != null && "YES".equals(mp.getIsSystemAdminYn());
+                })
+                .map(m -> {
+                    MemberPosition mp = positionByMember.get(m.getMemberId());
+                    return MemberResDto.fromEntity(m, mp);
+                })
+                .toList();
+    }
+
+    /**
      * 회사별 재직 사원 조회
      */
     @Transactional(readOnly = true)

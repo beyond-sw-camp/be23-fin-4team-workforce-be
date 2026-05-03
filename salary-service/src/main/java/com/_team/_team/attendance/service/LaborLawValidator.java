@@ -298,6 +298,17 @@ public class LaborLawValidator {
         int totalLimit = policy.getWeeklyTotalLimitMinutes();
         int overtimeLimit = policy.getWeeklyOvertimeLimitMinutes();
 
+        // 월 누적 초과근무
+        LocalDate monthStart = date.withDayOfMonth(1);
+        List<DailyAttendance> monthly = dailyAttendanceRepository
+                .findAllByMemberInRange(memberId, monthStart, date);
+        int monthlyOvertime = monthly.stream()
+                .mapToInt(d -> d.getOvertimeMinutes() == null ? 0 : d.getOvertimeMinutes())
+                .sum();
+        Integer monthlyLimit = policy.getMonthlyOvertimeLimitMinutes();
+        Integer monthlyUsagePercent = monthlyLimit != null && monthlyLimit > 0
+                ? calcPercent(monthlyOvertime, monthlyLimit) : null;
+
         // 주휴수당 자격, 주 소정근로 15시간 이상 + 개근 (ABSENT 0일)
         int absentDays = (int) weekly.stream()
                 .filter(d -> d.getStatus() == AttendanceStatus.ABSENT)
@@ -316,6 +327,9 @@ public class LaborLawValidator {
                 .overtimeApprovedMinutes(overtimeApproved)
                 .overtimeLimitMinutes(overtimeLimit)
                 .overtimeUsagePercent(calcPercent(overtimeApproved, overtimeLimit))
+                .monthlyOvertimeMinutes(monthlyOvertime)
+                .monthlyOvertimeLimitMinutes(monthlyLimit)
+                .monthlyOvertimeUsagePercent(monthlyUsagePercent)
                 .weeklyHolidayEligible(eligible)
                 .weeklyHolidayMinRequiredMinutes(WEEKLY_HOLIDAY_MIN_MINUTES)
                 .weeklyAbsentDays(absentDays)

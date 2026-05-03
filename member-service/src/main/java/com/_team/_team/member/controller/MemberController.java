@@ -408,6 +408,20 @@ public class MemberController {
         );
     }
 
+    /**
+     * 회사별 시스템 관리자 (인사/대표 등) 조회 - 알림 발송 대상
+     * - MemberPosition.isSystemAdminYn = 'YES' 인 활성 직원
+     */
+    @GetMapping("/internal/admins-by-company")
+    public ResponseEntity<?> findAdminsByCompany(
+            @RequestParam UUID companyId) {
+        List<MemberResDto> result = memberService.findAdminsByCompanyId(companyId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "회사 관리자 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
     // 대시보드용 내 프로필
     @GetMapping("/dashboard-profile")
     public ResponseEntity<?> getDashboardProfile(
