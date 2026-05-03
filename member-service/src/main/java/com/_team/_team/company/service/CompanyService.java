@@ -264,6 +264,11 @@ public class CompanyService {
 
         Company company = member.getCompany();
 
+        // 기존 직인 삭제
+        if (company.getSealImageUrl() != null) {
+            s3Uploader.delete(company.getSealImageUrl());
+        }
+
         String sealUrl = s3Uploader.upload(seal, "company/" + company.getCompanyId() + "/seal");
         company.updateSealImageUrl(sealUrl);
     }

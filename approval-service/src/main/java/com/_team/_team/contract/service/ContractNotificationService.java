@@ -66,12 +66,21 @@ public class ContractNotificationService {
                 contractId);
     }
 
-//    public void notifyContractCanceled(UUID employeeMemberId, UUID senderMemberId,
-//                                       UUID contractId, String templateName) {
-//        publish(employeeMemberId, senderMemberId,
-//                NotificationType.CONTRACT_CANCELED,
-//                "[" + templateName + "] 전자계약서가 회수되었습니다.",
-//                contractId);
-//    }
+    public void notifyContractCanceled(UUID employeeMemberId, UUID senderMemberId,
+                                       UUID contractId, String templateName) {
+        publish(employeeMemberId, senderMemberId,
+                NotificationType.CONTRACT_CANCELED,
+                "[" + templateName + "] 전자계약서가 회수되었습니다.",
+                contractId);
+    }
+
+    // 미서명 리마인드 알림
+    public void notifySignReminder(UUID employeeMemberId, UUID senderMemberId,
+                                   UUID contractId, String templateName) {
+        publish(employeeMemberId, senderMemberId,
+                NotificationType.CONTRACT_REMIND,
+                "[" + templateName + "] 서명 대기 중인 전자계약서가 있습니다. 확인해주세요.",
+                contractId);
+    }
 
 }

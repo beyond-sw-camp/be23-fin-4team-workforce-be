@@ -35,6 +35,7 @@ public enum NotificationType {
     CONTRACT_SIGNED,         // 계약서 서명 완료 (인사팀에게)
     CONTRACT_REJECTED,       // 계약서 거절됨 (인사팀에게)
     CONTRACT_CANCELED,       // 계약서 회수됨 (직원에게)
+    CONTRACT_REMIND,       // 계약 서명 리마인드
 
     // 급여
     SALARY_PUBLISHED,        // 급여 명세서 발행 (확정)

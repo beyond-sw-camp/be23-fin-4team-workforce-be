@@ -83,12 +83,25 @@ public class ContractController {
                 HttpStatus.OK);
     }
 
-    // 계약 상세
+    // 계약 상세 (인사팀용)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.READ)
     @GetMapping("/{contractId}")
     public ResponseEntity<?> findById(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @PathVariable UUID contractId) {
         ContractResDto resDto = contractService.findById(companyId, contractId);
+        return new ResponseEntity<>(
+                ApiResponse.success(resDto, "계약 상세 조회 성공"),
+                HttpStatus.OK);
+    }
+
+    // 계약 상세 (직원용 — 본인 계약만)
+    @GetMapping("/{contractId}/my")
+    public ResponseEntity<?> findMyContractById(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID contractId) {
+        ContractResDto resDto = contractService.findMyContractById(companyId, memberId, contractId);
         return new ResponseEntity<>(
                 ApiResponse.success(resDto, "계약 상세 조회 성공"),
                 HttpStatus.OK);
@@ -183,7 +196,8 @@ public class ContractController {
                 HttpStatus.CREATED);
     }
 
-    // 이력 조회
+    // 이력 조회 (인사팀용)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.READ)
     @GetMapping("/{contractId}/history")
     public ResponseEntity<?> findHistory(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -191,6 +205,44 @@ public class ContractController {
         List<ContractResDto> result = contractService.findHistory(companyId, contractId);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "계약 이력 조회 성공"),
+                HttpStatus.OK);
+    }
+
+    // 이력 조회 (직원용 — 본인 계약만)
+    @GetMapping("/{contractId}/history/my")
+    public ResponseEntity<?> findMyContractHistory(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID contractId) {
+        List<ContractResDto> result = contractService.findMyContractHistory(companyId, memberId, contractId);
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "계약 이력 조회 성공"),
+                HttpStatus.OK);
+    }
+
+    // 개별 서명 리마인드
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.CREATE)
+    @PostMapping("/{contractId}/remind")
+    public ResponseEntity<?> remind(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID contractId) {
+        contractService.remindSign(companyId, memberId, contractId);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "서명 리마인드 알림이 발송되었습니다."),
+                HttpStatus.OK);
+    }
+
+    // 배치 미서명자 일괄 리마인드
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.CREATE)
+    @PostMapping("/batches/{batchId}/remind")
+    public ResponseEntity<?> remindBatch(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID batchId) {
+        int count = contractService.remindBatch(companyId, memberId, batchId);
+        return new ResponseEntity<>(
+                ApiResponse.success(count, count + "명에게 리마인드 알림이 발송되었습니다."),
                 HttpStatus.OK);
     }
 }

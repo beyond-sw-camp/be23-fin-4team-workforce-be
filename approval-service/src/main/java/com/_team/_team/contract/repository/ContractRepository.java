@@ -2,6 +2,7 @@ package com._team._team.contract.repository;
 
 import com._team._team.contract.domain.Contract;
 import com._team._team.contract.domain.enums.ContractStatus;
+import com._team._team.contract.domain.enums.ContractType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +16,7 @@ import java.util.UUID;
 public interface ContractRepository extends JpaRepository<Contract, UUID> {
     // 직원 본인 계약 목록
     List<Contract> findByEmployeeMemberIdAndDelYnOrderByCreatedAtDesc(UUID memberId, String delYn);
-    
+
 
     // 배치별 계약 목록
     List<Contract> findByContractBatchBatchIdAndDelYn(UUID batchId, String delYn);
@@ -47,4 +48,12 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     // 상태 필터링 조회
     List<Contract> findByEmployeeMemberIdAndContractStatusAndDelYnOrderByCreatedAtDesc(
             UUID employeeMemberId, ContractStatus contractStatus, String delYn);
+
+    @Query("SELECT COUNT(c) FROM Contract c " +
+            "WHERE c.contractType = :contractType " +
+            "  AND c.contractNumber IS NOT NULL " +
+            "  AND FUNCTION('YEAR', c.createdAt) = :year " +
+            "  AND c.delYn = 'N'")
+    long countByContractTypeInYear(@Param("contractType") ContractType contractType,
+                                   @Param("year") int year);
 }
