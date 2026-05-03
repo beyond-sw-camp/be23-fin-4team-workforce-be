@@ -40,6 +40,7 @@ public enum NotificationType {
     // 급여
     SALARY_PUBLISHED,        // 급여 명세서 발행 (확정)
     SALARY_PAID,             // 급여 지급 완료 (계좌 입금)
+    BONUS_PAYMENT,           // 정기 상여 지급일 알림
 
     // 목표
     GOAL_EVALUATED,               // 목표 평가 완료

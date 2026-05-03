@@ -37,6 +37,10 @@ public class GoalSnapshotDto {
     private BigDecimal achievementPctAtSnapshot;
     private BigDecimal rolledAchievementPctAtSnapshot;
     private BigDecimal weightPct;
+    private String gradeS;
+    private String gradeA;
+    private String gradeB;
+    private String gradeC;
 
     private LocalDate startDate;
     private LocalDate endDate;
@@ -53,10 +57,11 @@ public class GoalSnapshotDto {
                 .description(goal.getDescription())
                 .statusAtSnapshot(goal.getStatus())
                 .cycle(goal.getCycle())
-                .actualValueAtSnapshot(goal.getActualValue())
-                .achievementPctAtSnapshot(goal.getAchievementPct())
-                .rolledAchievementPctAtSnapshot(goal.getRolledAchievementPct())
                 .weightPct(BigDecimal.valueOf(goal.getWeightPct()))
+                .gradeS(goal.getGradeSCriteria())
+                .gradeA(goal.getGradeACriteria())
+                .gradeB(goal.getGradeBCriteria())
+                .gradeC(goal.getGradeCCriteria())
                 .startDate(goal.getCycleStartDate())
                 .endDate(goal.getCycleEndDate())
                 .ownerId(goal.getOwnerId())

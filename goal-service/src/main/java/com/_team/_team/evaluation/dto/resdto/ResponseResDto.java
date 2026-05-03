@@ -48,6 +48,10 @@ public class ResponseResDto {
     private BigDecimal normalizedScore;
     /** 평가 시즌 시작 시점에 캡처된 타깃 목표 스냅샷 (List&lt;GoalSnapshotDto&gt; 직렬화). */
     private String goalSnapshotJson;
+    private String confirmedGrade;
+    private BigDecimal finalScoreSnapshot;
+    private UUID confirmedBy;
+    private LocalDateTime confirmedAt;
     // [D-5] targetGoalIdsJson 제거 — goalSnapshotJson 안에 goalId 가 이미 포함됨
 
     /**
@@ -76,6 +80,10 @@ public class ResponseResDto {
                 .calibrationJson(e.getCalibrationJson())
                 .normalizedScore(e.getNormalizedScore())
                 .goalSnapshotJson(e.getGoalSnapshotJson())
+                .confirmedGrade(e.getConfirmedGrade())
+                .finalScoreSnapshot(e.getFinalScoreSnapshot())
+                .confirmedBy(e.getConfirmedBy())
+                .confirmedAt(e.getConfirmedAt())
                 .build();
     }
 }

@@ -36,19 +36,9 @@ import java.util.UUID;
 
 /**
  * 출퇴근 정정 신청, 승인, 반려 서비스
- *
- * 설계: 새 테이블/컬럼 추가 없이 기존 자원만 활용
- *  - DailyAttendance.closureStatus = UNDER_REVIEW 가 정정 검토 큐
- *  - AttendanceLog.sourceType = ADMIN_MANUAL 이 정정 채널 마킹
- *
- * 흐름:
- *  - 신청: DA upsert + 정정 AttendanceLog upsert + closureStatus → UNDER_REVIEW
- *  - 승인: 정정 로그에 markCorrected(adminId) + 재계산 → FINALIZED
- *  - 반려: 정정 로그 삭제 + 원본 시각 복구 + closureStatus → OPEN
- *
  * 배치와의 관계:
  *  - 02:00 DRAFT 배치는 OPEN 만, 14:00 FINAL 배치는 DRAFT 만 처리
- *  - UNDER_REVIEW 는 두 배치 모두 무시 → 정정 중인 행은 안전하게 격리
+ *  - 관리자가 확인하는 근태 상태(UNDER_REVIEW) 는 두 배치 모두 무시 -> 정정 중 기간 고려해서 무시
  */
 @Slf4j
 @Service
@@ -311,7 +301,164 @@ public class AttendanceCorrectionService {
     }
 
     /**
-     * 5. 직원: 누락 후보 일자 (휴가·휴직 복귀 안전망)
+     * 결재 통합 정정 - 결재 올리는 시점에 일일근태 격리(UNDER_REVIEW)
+     * 7일 + 본인 승인 휴가 일수 윈도우 검증, 위반 시 처리 안 함 (결재는 이미 상신됨, 승인 시 거부)
+     */
+    @Transactional
+    public void submitCorrection(UUID companyId, UUID memberId, UUID requestId,
+                                 LocalDate attendanceDate,
+                                 LocalDateTime requestedClockIn,
+                                 LocalDateTime requestedClockOut,
+                                 String reason) {
+        if (attendanceDate == null) {
+            log.warn("[AttendanceCorrection] submit 정정 일자 누락, memberId={}", memberId);
+            return;
+        }
+
+        // 7일 + 휴가 일수 윈도우 검증 - 위반 시 일일근태 격리 안 함
+        LocalDate today = LocalDate.now();
+        if (attendanceDate.isAfter(today)) {
+            log.warn("[AttendanceCorrection] submit 미래 일자 차단 memberId={} date={}", memberId, attendanceDate);
+            return;
+        }
+        long daysSince = ChronoUnit.DAYS.between(attendanceDate, today);
+        long leaveDays = countApprovedLeaveDays(memberId, attendanceDate, today);
+        long allowed = CORRECTION_WINDOW_DAYS + leaveDays;
+        if (daysSince > allowed) {
+            log.warn("[AttendanceCorrection] submit 윈도우 초과 memberId={} date={} daysSince={} allowed={}",
+                    memberId, attendanceDate, daysSince, allowed);
+            return;
+        }
+
+        // DA upsert - 없으면 신규 생성
+        DailyAttendance da = dailyAttendanceRepository
+                .findByCompanyIdAndMemberIdAndAttendanceDate(companyId, memberId, attendanceDate)
+                .orElseGet(() -> dailyAttendanceRepository.save(
+                        DailyAttendance.builder()
+                                .memberId(memberId)
+                                .companyId(companyId)
+                                .attendanceDate(attendanceDate)
+                                .status(AttendanceStatus.NORMAL)
+                                .closureStatus(ClosureStatus.OPEN)
+                                .build()));
+
+        // LOCKED 차단 (월마감 후)
+        if (da.getClosureStatus() == ClosureStatus.LOCKED) {
+            log.warn("[AttendanceCorrection] submit LOCKED 차단 memberId={} date={}", memberId, attendanceDate);
+            return;
+        }
+
+        // 출근 정정 - 기존 정정 로그 삭제 후 신규 추가, DA 시각 갱신
+        if (requestedClockIn != null) {
+            upsertCorrectionLog(da, EventType.CLOCK_IN, requestedClockIn, reason);
+            da.updateClockIn(requestedClockIn);
+        }
+        if (requestedClockOut != null) {
+            upsertCorrectionLog(da, EventType.CLOCK_OUT, requestedClockOut, reason);
+            da.updateClockOut(requestedClockOut);
+        }
+
+        // UNDER_REVIEW 격리 - 02:00/14:00 배치 모두 무시
+        if (da.getClosureStatus() != ClosureStatus.UNDER_REVIEW) {
+            da.transitionClosure(ClosureStatus.UNDER_REVIEW);
+        }
+
+        log.info("[AttendanceCorrection] submit 격리 완료 memberId={} date={} requestId={}",
+                memberId, attendanceDate, requestId);
+    }
+
+    /**
+     * 결재 통합 정정 반려 - UNDER_REVIEW 일일근태를 OPEN 으로 복구, 정정 로그 삭제 + 원본 시각 복구
+     */
+    @Transactional
+    public void cancelSubmittedCorrection(UUID companyId, UUID memberId,
+                                          LocalDate attendanceDate) {
+        if (attendanceDate == null) return;
+
+        DailyAttendance da = dailyAttendanceRepository
+                .findByCompanyIdAndMemberIdAndAttendanceDate(companyId, memberId, attendanceDate)
+                .orElse(null);
+        if (da == null) return;
+
+        // UNDER_REVIEW 가 아니면 복구 대상 아님
+        if (da.getClosureStatus() != ClosureStatus.UNDER_REVIEW) {
+            log.info("[AttendanceCorrection] cancel skip - 상태={} memberId={} date={}",
+                    da.getClosureStatus(), memberId, attendanceDate);
+            return;
+        }
+
+        // 정정 로그(ADMIN_MANUAL) 삭제
+        attendanceLogRepository
+                .findTop1ByDailyAttendanceAndEventTypeAndSourceTypeOrderByEventTimeDesc(
+                        da, EventType.CLOCK_IN, SourceType.ADMIN_MANUAL)
+                .ifPresent(attendanceLogRepository::delete);
+        attendanceLogRepository
+                .findTop1ByDailyAttendanceAndEventTypeAndSourceTypeOrderByEventTimeDesc(
+                        da, EventType.CLOCK_OUT, SourceType.ADMIN_MANUAL)
+                .ifPresent(attendanceLogRepository::delete);
+
+        // 원본 출/퇴근 시각 복구
+        LocalDateTime origIn = attendanceLogRepository
+                .findTop1ByDailyAttendanceAndEventTypeAndSourceTypeNotOrderByEventTimeDesc(
+                        da, EventType.CLOCK_IN, SourceType.ADMIN_MANUAL)
+                .map(AttendanceLog::getEventTime).orElse(null);
+        LocalDateTime origOut = attendanceLogRepository
+                .findTop1ByDailyAttendanceAndEventTypeAndSourceTypeNotOrderByEventTimeDesc(
+                        da, EventType.CLOCK_OUT, SourceType.ADMIN_MANUAL)
+                .map(AttendanceLog::getEventTime).orElse(null);
+
+        da.updateClockIn(origIn);
+        da.updateClockOut(origOut);
+
+        // 다음 배치가 자연스럽게 다시 잡도록 OPEN 으로 복귀
+        da.transitionClosure(ClosureStatus.OPEN);
+
+        log.info("[AttendanceCorrection] 결재 반려/취소 복구 완료 memberId={} date={}", memberId, attendanceDate);
+    }
+
+    /**
+     * 결재 통합 일일 근태 정정 승인
+     */
+    @Transactional
+    public void applyApprovedCorrection(UUID companyId, UUID memberId, UUID approverId,
+                                        LocalDate attendanceDate,
+                                        LocalDateTime requestedClockIn,
+                                        LocalDateTime requestedClockOut,
+                                        String reason) {
+        if (attendanceDate == null) {
+            log.warn("[AttendanceCorrection] 정정 일자 누락, memberId={}", memberId);
+            return;
+        }
+
+        DailyAttendance da = dailyAttendanceRepository
+                .findByCompanyIdAndMemberIdAndAttendanceDate(companyId, memberId, attendanceDate)
+                .orElse(null);
+
+        // submit 시점에 윈도우 위반/LOCKED 등으로 격리 안 된 경우 - 결재 승인되어도 일일근태 적용 안 함
+        if (da == null || da.getClosureStatus() != ClosureStatus.UNDER_REVIEW) {
+            log.warn("[AttendanceCorrection] approved but DA 격리 안 된 상태 - 적용 스킵 memberId={} date={} status={}",
+                    memberId, attendanceDate, da == null ? "NULL" : da.getClosureStatus());
+            return;
+        }
+
+        // 정정 로그 markCorrected (correctedBy = approverId)
+        attendanceLogRepository
+                .findTop1ByDailyAttendanceAndEventTypeAndSourceTypeOrderByEventTimeDesc(
+                        da, EventType.CLOCK_IN, SourceType.ADMIN_MANUAL)
+                .ifPresent(l -> l.markCorrected(approverId, l.getCorrectionReason()));
+        attendanceLogRepository
+                .findTop1ByDailyAttendanceAndEventTypeAndSourceTypeOrderByEventTimeDesc(
+                        da, EventType.CLOCK_OUT, SourceType.ADMIN_MANUAL)
+                .ifPresent(l -> l.markCorrected(approverId, l.getCorrectionReason()));
+
+        // 재계산 + FINALIZED (UNDER_REVIEW -> FINALIZED)
+        dailyAttendanceCloseService.recalculateAndFinalize(da.getDailyAttendanceId());
+
+        log.info("[AttendanceCorrection] 결재 승인 적용 완료 memberId={} date={}", memberId, attendanceDate);
+    }
+
+    /**
+     * 5. 직원: 누락 후보 일자 (휴가, 휴직 복귀 안전망)
      *    정정 가능 윈도우 안에서 출퇴근이 누락된 영업일을 찾아 보여줌
      */
     @Transactional(readOnly = true)

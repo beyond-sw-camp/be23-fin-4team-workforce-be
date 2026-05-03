@@ -38,5 +38,6 @@ public class SelfAnswersReqDto {
         @NotNull
         private Grade grade;
         private String comment;
+        private String evidenceUrl;
     }
 }

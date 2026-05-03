@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -98,9 +99,18 @@ public class PayrollService {
      */
     public PayrollResDto createPayroll(UUID companyId, PayrollCreateReqDto reqDto){
 
-        /** 1. 직원의 정산일 기준 적용 중인 급여 조회 */
+        /** 1. 직원의 정산기간 기준 적용된 급여 조회
+         *  - 1차: 정산일(payrollDate) 시점에 active 인 행 (정상 케이스)
+         *  - 2차: 정산일 시점엔 종료됐지만 정산기간 일부와 겹친 행 (월 중간 퇴직자)
+         */
+        SettlementPeriod settlementPeriod = payrollCalculationService
+                .calculateSettlementPeriod(companyId, reqDto.getPayrollYearMonthDay());
         Salary salary = salaryRepository.findActiveSalary(
                         reqDto.getMemberId(), companyId, reqDto.getPayrollYearMonthDay())
+                .or(() -> salaryRepository.findSalariesOverlappingPeriod(
+                                reqDto.getMemberId(), companyId,
+                                settlementPeriod.from(), settlementPeriod.to())
+                        .stream().findFirst())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "해당 직원의 적용 중인 급여 정보를 찾을 수 없습니다."));
 
@@ -119,9 +129,8 @@ public class PayrollService {
                     }
                 });
 
-        /** 3. 정산기간 계산 */
-        SettlementPeriod period = payrollCalculationService.calculateSettlementPeriod(
-                companyId, reqDto.getPayrollYearMonthDay());
+        /** 3. 정산기간 (1단계에서 이미 계산된 것 재사용) */
+        SettlementPeriod period = settlementPeriod;
 
         /** 3-1. 무급 휴직 일수 기반 기본급 비례율 계산 */
         int unpaidLeaveDays = calculateUnpaidLeaveDays(companyId, reqDto.getMemberId(), period);
@@ -209,83 +218,77 @@ public class PayrollService {
             }
         }
         /**
-         * 6. 월 장부 조회
+         * 6. 월 장부 조회 (
+         * 기본급 + 수당 + 4대보험 만으로 정산 진행
          */
         YearMonth targetMonth = YearMonth.from(period.from());
-        MonthlyAttendanceLedger ledger = payrollCalculationService.findLedger(
-                reqDto.getMemberId(), targetMonth);
+        Optional<MonthlyAttendanceLedger> ledgerOpt = payrollCalculationService
+                .findLedgerOptional(reqDto.getMemberId(), targetMonth);
+        if (ledgerOpt.isEmpty()) {
+            log.info("[PAYROLL] 월 장부 없음 - 출퇴근 기반 가산/공제 스킵. memberId={} yearMonth={}",
+                    reqDto.getMemberId(), targetMonth);
+        }
 
         /** 7. 활성 급여정책 재사용 (위에서 일할 계산용으로 이미 조회) */
         SalaryPolicy activePolicy = activePolicyForRatio;
 
-        /** 7-1. 초과근무수당 자동 계산 */
-        AutoPayrollItem overtimeItem = payrollCalculationService.calculateOvertimePay(
-                ledger,
-                ordinaryWage,
-                activePolicy);
+        // 월 장부 있는 경우만 출퇴근 기반 자동 항목 계산
+        if (ledgerOpt.isPresent()) {
+            MonthlyAttendanceLedger ledger = ledgerOpt.get();
 
-        if (overtimeItem != null){
-            PayrollItem payItem = buildPayrollItem(saved, overtimeItem);
-            payrollItems.add(payItem);
-            totalPayment += overtimeItem.amount();
-            // 초과근무수당은 과세이므로 과세 총액에 누적
-            if ("Y".equals(overtimeItem.isTaxableYn())) {
-                totalTaxableEarning += overtimeItem.amount();
+            /** 7-1. 초과근무수당 자동 계산 */
+            AutoPayrollItem overtimeItem = payrollCalculationService.calculateOvertimePay(
+                    ledger, ordinaryWage, activePolicy);
+            if (overtimeItem != null){
+                PayrollItem payItem = buildPayrollItem(saved, overtimeItem);
+                payrollItems.add(payItem);
+                totalPayment += overtimeItem.amount();
+                if ("Y".equals(overtimeItem.isTaxableYn())) {
+                    totalTaxableEarning += overtimeItem.amount();
+                }
             }
-        }
 
-        /** 8. 공휴일근무수당 자동 계산 */
-        AutoPayrollItem holidayItem = payrollCalculationService.calculateHolidayWorkPay(
-                ledger, ordinaryWage, activePolicy);
-
-        if(holidayItem != null){
-            PayrollItem payrollItem = buildPayrollItem(saved, holidayItem);
-            payrollItems.add(payrollItem);
-            totalPayment += holidayItem.amount();
-            // 공휴일근무수당은 과세
-            if ("Y".equals(holidayItem.isTaxableYn())) {
-                totalTaxableEarning += holidayItem.amount();
+            /** 8. 공휴일근무수당 자동 계산 */
+            AutoPayrollItem holidayItem = payrollCalculationService.calculateHolidayWorkPay(
+                    ledger, ordinaryWage, activePolicy);
+            if(holidayItem != null){
+                PayrollItem payrollItem = buildPayrollItem(saved, holidayItem);
+                payrollItems.add(payrollItem);
+                totalPayment += holidayItem.amount();
+                if ("Y".equals(holidayItem.isTaxableYn())) {
+                    totalTaxableEarning += holidayItem.amount();
+                }
             }
-        }
 
-        /** 8-1. 야간근무수당 자동 계산 (가산분 0.5배) */
-        AutoPayrollItem nightItem = payrollCalculationService.calculateNightWorkPay(
-                ledger, ordinaryWage, activePolicy);
-
-        if(nightItem != null){
-            PayrollItem payrollItem = buildPayrollItem(saved, nightItem);
-            payrollItems.add(payrollItem);
-            totalPayment += nightItem.amount();
-            // 야간근무수당은 과세
-            if ("Y".equals(nightItem.isTaxableYn())) {
-                totalTaxableEarning += nightItem.amount();
+            /** 8-1. 야간근무수당 자동 계산 (가산분 0.5배) */
+            AutoPayrollItem nightItem = payrollCalculationService.calculateNightWorkPay(
+                    ledger, ordinaryWage, activePolicy);
+            if(nightItem != null){
+                PayrollItem payrollItem = buildPayrollItem(saved, nightItem);
+                payrollItems.add(payrollItem);
+                totalPayment += nightItem.amount();
+                if ("Y".equals(nightItem.isTaxableYn())) {
+                    totalTaxableEarning += nightItem.amount();
+                }
             }
-        }
 
-        /**
-         * 8-2-pre. 지각·조퇴 공제 자동 계산
-         * 분 단위 정밀 차감 4대보험 base 는 기본급 유지
-         */
-        AutoPayrollItem tardyItem = payrollCalculationService.calculateTardyEarlyLeaveDeduction(
-                ledger, ordinaryWage, activePolicy);
+            /** 8-2-pre. 지각·조퇴 공제 자동 계산 */
+            AutoPayrollItem tardyItem = payrollCalculationService.calculateTardyEarlyLeaveDeduction(
+                    ledger, ordinaryWage, activePolicy);
+            if (tardyItem != null) {
+                PayrollItem payrollItem = buildPayrollItem(saved, tardyItem);
+                payrollItems.add(payrollItem);
+                totalDeduction += tardyItem.amount();
+            }
 
-        if (tardyItem != null) {
-            PayrollItem payrollItem = buildPayrollItem(saved, tardyItem);
-            payrollItems.add(payrollItem);
-            totalDeduction += tardyItem.amount();
-        }
-
-        /**
-         * 8-2. 결근 공제, 주휴수당 포함
-         * 4대보험 계산 전에 공제하여 명세서에 명시적 표시, 4대보험 base 는 기본급 유지
-         */
-        AutoPayrollItem absentItem = payrollCalculationService.calculateAbsentDeduction(
-                ledger, ordinaryWage, activePolicy);
-
-        if (absentItem != null) {
-            PayrollItem payrollItem = buildPayrollItem(saved, absentItem);
-            payrollItems.add(payrollItem);
-            totalDeduction += absentItem.amount();
+            /** 8-2. 결근 공제, 주휴수당 포함 */
+            AutoPayrollItem absentItem = payrollCalculationService.calculateAbsentDeduction(
+                    ledger, ordinaryWage, activePolicy);
+            if (absentItem != null) {
+                PayrollItem payrollItem = buildPayrollItem(saved, absentItem);
+                payrollItems.add(payrollItem);
+                totalDeduction += absentItem.amount();
+            }
         }
 
         /**

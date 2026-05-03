@@ -47,8 +47,8 @@ public class NotificationConsumer {
             Notification saved = notificationRepository.save(notification);
 
             // 2. Redis Pub/Sub 발행
-            // createdAt을 ID로 설정 (Last-Event-ID 용)
-            message.setEventId(saved.getCreatedAt().toString()); // ← 추가
+            // createdAt을 ID로 설정
+            message.setEventId(saved.getCreatedAt().toString());
             redisMessagePublisher.publish(
                     RedisChannel.NOTIFICATION_CHANNEL,
                     message

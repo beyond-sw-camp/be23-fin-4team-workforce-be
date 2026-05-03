@@ -30,6 +30,9 @@ public class LeavePolicyUpdateReqDto {
     /** 이월 가능 일수 */
     private Integer carryoverDays;
 
+    /** 이월 동의서 사용 여부 - 'Y' 면 직원별 동의 받아야 이월 처리 진행 */
+    private String isCarryoverConsentYn;
+
     /** 미사용 연차 수당 지급 여부 */
     private String isPayoutYn;
 

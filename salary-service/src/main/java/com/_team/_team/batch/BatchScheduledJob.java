@@ -84,6 +84,7 @@ public class BatchScheduledJob extends QuartzJobBean {
             case "dailyAttendanceFinalJob":
             case "weeklyLimitCheckJob":
             case "slotDeadlineAutoAssignJob":
+            case "regularBonusPaymentJob":
                 builder.addString("date", today.toString());
                 break;
             default:

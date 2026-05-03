@@ -16,6 +16,9 @@ public interface GoalApprovalBundleRepository extends JpaRepository<GoalApproval
     Optional<GoalApprovalBundle> findFirstByRequestedByAndCycleKeyAndStatus(
             UUID requestedBy, String cycleKey, BundleApprovalStatus status);
 
+    boolean existsByRequestedByAndCycleKeyAndStatus(
+            UUID requestedBy, String cycleKey, BundleApprovalStatus status);
+
     /** 내가 요청한 bundle 들 (히스토리 포함) */
     List<GoalApprovalBundle> findByRequestedByAndCompanyIdOrderByRequestedAtDesc(
             UUID requestedBy, UUID companyId);
@@ -24,12 +27,9 @@ public interface GoalApprovalBundleRepository extends JpaRepository<GoalApproval
     List<GoalApprovalBundle> findByRequestedByAndCompanyIdAndStatus(
             UUID requestedBy, UUID companyId, BundleApprovalStatus status);
 
-    /** 내가 처리해야 할 bundle (1차 승인자 또는 위임 받은 자) */
+    /** 내가 처리해야 할 bundle */
     List<GoalApprovalBundle> findByApproverIdAndCompanyIdAndStatusOrderByRequestedAtDesc(
             UUID approverId, UUID companyId, BundleApprovalStatus status);
-
-    List<GoalApprovalBundle> findByDelegateApproverIdAndCompanyIdAndStatusOrderByRequestedAtDesc(
-            UUID delegateApproverId, UUID companyId, BundleApprovalStatus status);
 
     Optional<GoalApprovalBundle> findFirstByRequestedByAndCycleKeyOrderByRevisionDesc(
             UUID requestedBy, String cycleKey);

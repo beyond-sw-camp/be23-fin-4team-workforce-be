@@ -50,6 +50,14 @@ public class BonusPolicyCreateReqDto {
     @NotNull(message = "지급 대상 범위는 필수입니다.")
     private BonusEligibilityScope eligibilityScope;
 
+    /** 최소 근속 월수 - null/0 이면 근속 무관 */
+    @Min(value = 0, message = "최소 근속 월수는 0 이상이어야 합니다.")
+    @Max(value = 240, message = "최소 근속 월수는 240 이하여야 합니다.")
+    private Integer minTenureMonths;
+
+    /** 휴직자 제외 여부 'Y' / 'N'. 기본 'Y' */
+    private String excludeOnLeaveYn;
+
     @NotNull(message = "적용 시작일은 필수입니다.")
     private LocalDate effectiveFrom;
 

@@ -6,7 +6,7 @@ import com._team._team.salary.domain.PayGradeTable;
 import com._team._team.salary.dto.reqdto.PayGradeTableBulkCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayGradeTableCreateReqDto;
 import com._team._team.salary.dto.reqdto.PayGradeTableUpdateReqDto;
-import com._team._team.salary.kafka.RagSyncSalaryEventPublisher;
+import com._team._team.salary.publisher.RagSyncSalaryEventPublisher;
 import com._team._team.salary.repository.PayGradeTableRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

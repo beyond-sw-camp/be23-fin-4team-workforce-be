@@ -1,6 +1,5 @@
 package com._team._team.goal.dto.reqdto;
 
-import com._team._team.goal.domain.enums.GoalVisibility;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -30,8 +29,6 @@ public class GoalUpdateReqDto {
 
     @Min(0) @Max(100)
     private Integer weightPct;
-
-    private GoalVisibility visibility;
 
     private UUID alignedOrgGoalId;
 

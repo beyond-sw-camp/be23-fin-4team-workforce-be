@@ -22,7 +22,6 @@ import java.util.UUID;
  * 이월 연차 자동 생성 배치 워커
  * ===== 실행 시점 =====
  * 매년 1/1 00:00 — ANNUAL 부여/만료 배치보다 먼저 실행
- * (전년도 ANNUAL 의 remaining 이 아직 살아있어야 읽을 수 있음)
  * - 처리 조건
  * 1. LeavePolicy.isCarryoverYn = 'Y'  인 회사만 대상
  * 2. 전년도 ANNUAL.remaining > 0 인 사원
@@ -78,13 +77,14 @@ public class CarryoverLeaveWorker {
     }
 
     /**
-     * 회사 단위 이월 처리 (REQUIRES_NEW 로 회사별 트랜잭션 격리)
+     * 회사 단위 이월 처리
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int[] carryoverForCompany(LeavePolicy policy, LocalDate baseDate) {
 
         UUID companyId = policy.getCompanyId();
         int carryoverCap = policy.getCarryoverDays();
+        boolean requireConsent = "Y".equals(policy.getIsCarryoverConsentYn());
 
         // 당해년도 이월 대상 기간 (1/1 ~ 12/31)
         LocalDate newYearStart = LocalDate.of(baseDate.getYear(), 1, 1);
@@ -105,6 +105,7 @@ public class CarryoverLeaveWorker {
 
         int successCount = 0;
         int skipCount = 0;
+        int skipNoConsent = 0;
         List<MemberBalance> buffer = new ArrayList<>(BATCH_SIZE);
 
         for (MemberBalance prev : prevAnnuals) {
@@ -114,6 +115,12 @@ public class CarryoverLeaveWorker {
             }
             if (prev.getRemaining() == null || prev.getRemaining() <= 0) {
                 skipCount++;
+                continue;
+            }
+
+            // 회사 정책이 동의 필요면, 직원 동의 회신한 잔고만 이월 처리
+            if (requireConsent && !prev.isCarryoverConsented()) {
+                skipNoConsent++;
                 continue;
             }
 
@@ -136,8 +143,8 @@ public class CarryoverLeaveWorker {
             flushBuffer(buffer);
         }
 
-        log.info("Carryover company={}: success={}, skip={}",
-                companyId, successCount, skipCount);
+        log.info("Carryover company={}: success={}, skip={}, skipNoConsent={} (requireConsent={})",
+                companyId, successCount, skipCount, skipNoConsent, requireConsent);
         return new int[]{successCount, skipCount};
     }
 

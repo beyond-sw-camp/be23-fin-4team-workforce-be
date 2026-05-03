@@ -39,4 +39,15 @@ public interface BonusPolicyRepository extends JpaRepository<BonusPolicy, UUID> 
         List<BonusPolicy> list = findActivePolicies(companyId, date);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
+
+    /**
+     * 정기 상여 사용 + 특정 시점에 활성인 모든 회사 정책 조회
+     * 정기상여 배치에서 사용
+     */
+    @Query("SELECT bp FROM BonusPolicy bp " +
+            "WHERE bp.delYn = 'N' " +
+            "AND bp.useRegularBonusYn = 'Y' " +
+            "AND bp.effectiveFrom <= :date " +
+            "AND (bp.effectiveTo IS NULL OR bp.effectiveTo >= :date)")
+    List<BonusPolicy> findAllActiveRegularBonusPoliciesAt(@Param("date") LocalDate date);
 }

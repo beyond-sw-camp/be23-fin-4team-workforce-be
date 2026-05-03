@@ -112,7 +112,31 @@ public class MemberBalanceService {
         return MemberBalanceResDto.fromEntity(memberBalance);
     }
 
-    // ===================== 내부 헬퍼 메서드 =====================
+    /**
+     * 직원 이월 동의 회신 - 회사 정책 isCarryoverConsentYn='Y' 일 때 본인 잔고에 대해 호출
+     */
+    public MemberBalanceResDto agreeCarryover(UUID companyId, UUID memberId, UUID memberBalanceId) {
+        MemberBalance balance = memberBalanceRepository.findById(memberBalanceId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "휴가 잔여를 찾을 수 없습니다."));
+        if (!balance.getCompanyId().equals(companyId) || !balance.getMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인 잔여만 동의 가능합니다.");
+        }
+        balance.agreeCarryover();
+        return MemberBalanceResDto.fromEntity(balance);
+    }
+
+    /** 이월 동의 철회 */
+    public MemberBalanceResDto revokeCarryoverConsent(UUID companyId, UUID memberId, UUID memberBalanceId) {
+        MemberBalance balance = memberBalanceRepository.findById(memberBalanceId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "휴가 잔여를 찾을 수 없습니다."));
+        if (!balance.getCompanyId().equals(companyId) || !balance.getMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인 잔여만 철회 가능합니다.");
+        }
+        balance.revokeCarryoverConsent();
+        return MemberBalanceResDto.fromEntity(balance);
+    }
+
+    // ===================== 내부 메서드 =====================
     /**
      * 연차-근태 연동: 휴가 승인 시 DailyAttendance.status 변경
      * - DailyAttendance가 없으면 → 새로 생성 (해당 날짜가 아직 안 왔을 수 있음)
