@@ -133,4 +133,22 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
                                                @Param("memberId") UUID memberId,
                                                @Param("from") LocalDate from,
                                                @Param("to") LocalDate to);
+
+    /**
+     * targetYearMonth (정산 대상 월) 기반 직원 연봉 조회용
+     */
+    @Query("""
+        SELECT DISTINCT p FROM Payroll p
+        LEFT JOIN FETCH p.payrollItemList
+        WHERE p.companyId = :companyId
+          AND p.memberId = :memberId
+          AND p.targetYearMonth IS NOT NULL
+          AND p.targetYearMonth BETWEEN :fromYm AND :toYm
+          AND p.delYn = 'N'
+        ORDER BY p.targetYearMonth ASC
+        """)
+    List<Payroll> findByTargetYearMonthRangeFetchItems(@Param("companyId") UUID companyId,
+                                                      @Param("memberId") UUID memberId,
+                                                      @Param("fromYm") String fromYm,
+                                                      @Param("toYm") String toYm);
 }

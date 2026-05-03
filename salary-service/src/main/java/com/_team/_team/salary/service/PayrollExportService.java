@@ -86,7 +86,7 @@ public class PayrollExportService {
 
             // 헤더 항상 작성
             Row header = sheet.createRow(rowIdx++);
-            String[] fixedHeaders = {"사번", "이름", "부서", "귀속일", "상태"};
+            String[] fixedHeaders = {"사번", "이름", "부서", "정산 대상 월", "지급일", "상태"};
             for (String h : fixedHeaders) {
                 Cell c = header.createCell(col++);
                 c.setCellValue(h);
@@ -126,6 +126,11 @@ public class PayrollExportService {
                             m != null && m.getName() != null ? m.getName() : "");
                     row.createCell(col++).setCellValue(
                             m != null && m.getOrganizationName() != null ? m.getOrganizationName() : "");
+                    // 정산 대상 월 (YYYY-MM) - targetYearMonth 우선, 없으면 지급일 기준 fallback
+                    String targetYm = p.getTargetYearMonth() != null
+                            ? p.getTargetYearMonth()
+                            : YearMonth.from(p.getPayrollYearMonthDay()).toString();
+                    row.createCell(col++).setCellValue(targetYm);
                     row.createCell(col++).setCellValue(p.getPayrollYearMonthDay().toString());
                     row.createCell(col++).setCellValue(statusKorean(p.getPayrollStatus().name()));
 

@@ -31,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
@@ -197,26 +198,45 @@ public class RetirementSimulationService {
             unusedLeaveAmount = sim.getOrdinaryDailyWage() * unusedLeaveDaysLong;
         }
 
-        // 퇴직월 일할 급여 - 해당월에 REGULAR_MONTHLY Payroll 이 없으면 일할로 가산
-        // 일할 = baseMonthly × 퇴직일까지 근무일수 / 해당월 일수
-        long proratedSalary = 0L;
+        // 퇴직월 일할 정산 - 한국 관행 자동 회수/추가지급 처리
+        // 시나리오:
+        //   (a) 해당월(targetYearMonth) REGULAR_MONTHLY 없음 -> 일할분 신규 EARNING 추가
+        //   (b) 해당월 REGULAR_MONTHLY 이미 있음 -> 정기급여가 풀 지급(31/31 가정) 됐으므로
+        //       실제 근무일(예: 28/31)과의 차이만큼 회수 또는 추가지급
+        //         차액 = baseMonthly × daysWorked/daysInMonth - 이미지급된기본급(=baseMonthly 가정)
+        //         음수: DEDUCTION "퇴직월 선급 정산 회수" - 회사가 직원에게서 회수
+        //         양수: EARNING "퇴직월 일할 정산 추가" - 회사가 직원에게 추가지급
+        // 회사 payCycleType 무관하게 targetYearMonth 로 매칭 (지급일이 6월이라도 5월분이면 매칭)
+        long proratedEarning = 0L;       // EARNING (양수만, 신규 일할 또는 추가지급)
+        long proratedRecovery = 0L;      // DEDUCTION (양수만, 선급 회수액)
         int proratedDaysWorked = 0;
         int proratedDaysInMonth = 0;
         long baseMonthlyForProrate = sim.getAvgMonthlyWage();
-        LocalDate monthStart = resignDate.withDayOfMonth(1);
-        LocalDate monthEnd = resignDate.withDayOfMonth(resignDate.lengthOfMonth());
+        String resignYmStr = YearMonth.from(resignDate).toString();
         boolean hasRegularThisMonth = payrollRepository
-                .findInYearByMemberFetchItems(companyId, memberId, monthStart, monthEnd)
+                .findByTargetYearMonthRangeFetchItems(companyId, memberId, resignYmStr, resignYmStr)
                 .stream()
                 .anyMatch(p -> p.getPayrollType() == null
                         || p.getPayrollType() == PayrollType.REGULAR_MONTHLY);
-        if (!hasRegularThisMonth && baseMonthlyForProrate > 0) {
+        if (baseMonthlyForProrate > 0) {
             proratedDaysWorked = resignDate.getDayOfMonth();
             proratedDaysInMonth = resignDate.lengthOfMonth();
-            proratedSalary = baseMonthlyForProrate * proratedDaysWorked / proratedDaysInMonth;
+            long expectedProrated = baseMonthlyForProrate * proratedDaysWorked / proratedDaysInMonth;
+            if (!hasRegularThisMonth) {
+                // 정기급여 미생성 - 일할분 신규 EARNING
+                proratedEarning = expectedProrated;
+            } else {
+                // 정기급여 이미 풀 지급 - 차액 산정 (음수=회수, 양수=추가지급)
+                long delta = expectedProrated - baseMonthlyForProrate;
+                if (delta < 0) {
+                    proratedRecovery = -delta;
+                } else if (delta > 0) {
+                    proratedEarning = delta;
+                }
+            }
         }
 
-        long totalPayment = retirementAmount + unusedLeaveAmount + proratedSalary;
+        long totalPayment = retirementAmount + unusedLeaveAmount + proratedEarning;
 
         // 활성 Salary 조회 - effectiveTo 가 resignDate 또는 그 이후
         Salary salary = salaryRepository
@@ -231,7 +251,8 @@ public class RetirementSimulationService {
                 RetirementIncomeTaxCalculator.calculate(retirementAmount, days);
 
         // 2) 일반 근로소득 (미사용연차 + 일할 급여) - 4대보험 + 소득세 + 지방세 일괄 계산
-        long ordinaryTaxableEarning = unusedLeaveAmount + proratedSalary;
+        // 일반 근로소득 과세 대상 = 미사용 연차 수당 + 일할 EARNING (회수 DEDUCTION 은 제외)
+        long ordinaryTaxableEarning = unusedLeaveAmount + proratedEarning;
         int dependents = salary.getDependentCount() != null ? salary.getDependentCount() : 1;
         int childUnder20 = salary.getChildUnder20Count() != null ? salary.getChildUnder20Count() : 0;
         List<AutoPayrollItem> ordinaryDeductions = ordinaryTaxableEarning > 0
@@ -242,7 +263,7 @@ public class RetirementSimulationService {
 
         long ordinaryDeductionSum = ordinaryDeductions.stream()
                 .mapToLong(AutoPayrollItem::amount).sum();
-        long totalDeduction = retiTax.incomeTax() + retiTax.localTax() + ordinaryDeductionSum;
+        long totalDeduction = retiTax.incomeTax() + retiTax.localTax() + ordinaryDeductionSum + proratedRecovery;
         long netPay = totalPayment - totalDeduction;
 
         Payroll payroll = Payroll.builder()
@@ -250,6 +271,7 @@ public class RetirementSimulationService {
                 .memberId(memberId)
                 .salaryId(salary.getSalaryId())
                 .payrollYearMonthDay(resignDate)
+                .targetYearMonth(YearMonth.from(resignDate).toString())
                 .totalPayment(totalPayment)
                 .totalDeduction(totalDeduction)
                 .netPay(netPay)
@@ -259,14 +281,16 @@ public class RetirementSimulationService {
 
         int order = 1;
 
-        // 퇴직월 일할 급여 - 일반 과세
-        if (proratedSalary > 0) {
+        // 퇴직월 일할 EARNING - 신규 일할 (정기급여 미생성 시) 또는 추가 지급 차액 (정기급여 < 일할 가정)
+        if (proratedEarning > 0) {
+            String label = hasRegularThisMonth
+                    ? String.format("퇴직월 일할 정산 추가 (%d/%d일)", proratedDaysWorked, proratedDaysInMonth)
+                    : String.format("퇴직월 일할 급여 (%d/%d일)", proratedDaysWorked, proratedDaysInMonth);
             PayrollItem proratedItem = PayrollItem.builder()
                     .payroll(saved)
-                    .itemName(String.format("퇴직월 일할 급여 (%d/%d일)",
-                            proratedDaysWorked, proratedDaysInMonth))
+                    .itemName(label)
                     .itemType(ItemType.EARNING)
-                    .amount(proratedSalary)
+                    .amount(proratedEarning)
                     .displayOrder(order++)
                     .isTaxableYn("Y")
                     .build();
@@ -300,6 +324,21 @@ public class RetirementSimulationService {
 
         // 공제 항목 표시 순서는 200번대 (일반 급여 관행과 일치)
         int deductionOrder = 200;
+
+        // 퇴직월 선급 정산 회수 - 정기급여 풀(31/31) 지급된 상태에서 일찍 퇴사 시 환수
+        if (proratedRecovery > 0) {
+            PayrollItem recoveryItem = PayrollItem.builder()
+                    .payroll(saved)
+                    .itemName(String.format("퇴직월 선급 정산 회수 (%d/%d일 근무, %d일치)",
+                            proratedDaysWorked, proratedDaysInMonth,
+                            proratedDaysInMonth - proratedDaysWorked))
+                    .itemType(ItemType.DEDUCTION)
+                    .amount(proratedRecovery)
+                    .displayOrder(deductionOrder++)
+                    .isTaxableYn("Y")
+                    .build();
+            saved.getPayrollItemList().add(recoveryItem);
+        }
 
         // 일반 근로소득 공제 (4대보험 + 소득세 + 지방소득세)
         for (AutoPayrollItem auto : ordinaryDeductions) {
@@ -340,10 +379,10 @@ public class RetirementSimulationService {
             saved.getPayrollItemList().add(retiLocalTaxItem);
         }
 
-        log.info("[RETIREMENT-SETTLEMENT] 생성 memberId={} resignDate={} type={} prorated={}/{} retirement={} unusedLeave={}일/{} retiTax={}/{} ordinaryDed={} netPay={} eligible={}",
+        log.info("[RETIREMENT-SETTLEMENT] 생성 memberId={} resignDate={} type={} proratedEarning={} proratedRecovery={} ({}일/{}) retirement={} unusedLeave={}일/{} retiTax={}/{} ordinaryDed={} netPay={} eligible={}",
                 memberId, resignDate, sim.getRetirementType(),
-                proratedSalary, proratedDaysInMonth > 0
-                        ? (proratedDaysWorked + "/" + proratedDaysInMonth) : "skip",
+                proratedEarning, proratedRecovery,
+                proratedDaysWorked, proratedDaysInMonth,
                 retirementAmount, unusedLeaveDaysLong, unusedLeaveAmount,
                 retiTax.incomeTax(), retiTax.localTax(),
                 ordinaryDeductionSum, netPay, sim.isEligible());
@@ -360,13 +399,20 @@ public class RetirementSimulationService {
                                            long baseMonthly) {
         AverageWage aw = new AverageWage();
 
-        // 1) 직전 3개월 정기급여 (REGULAR_MONTHLY) Payroll 임금총액
-        LocalDate threeMonthStart = resignDate.minusMonths(3).plusDays(1);
-        aw.basePeriodDays = (int) (ChronoUnit.DAYS.between(threeMonthStart, resignDate) + 1);
-        if (aw.basePeriodDays <= 0) aw.basePeriodDays = 90;
+        // 정산 대상 월 기준 - 회사의 payCycleType 무관하게 "근무한 월" 기준으로 묶음.
+        // 한국 평균임금 산정 = 사유 발생일 직전 3개월 임금총액 / 90일 일반화.
+        // YearMonth 기반 묶음으로 회사간 지급주기 차이(당월/전월)를 흡수.
+        YearMonth resignYm = YearMonth.from(resignDate);
+        YearMonth threeYmFrom = resignYm.minusMonths(3);  // 사유발생월 직전 3개월
+        YearMonth threeYmTo = resignYm.minusMonths(1);
 
-        List<Payroll> recentPayrolls = payrollRepository.findInYearByMemberFetchItems(
-                companyId, memberId, threeMonthStart, resignDate);
+        // 1) 직전 3개월 정기급여 (REGULAR_MONTHLY) Payroll 임금총액
+        aw.basePeriodDays = threeYmFrom.lengthOfMonth()
+                + threeYmFrom.plusMonths(1).lengthOfMonth()
+                + threeYmTo.lengthOfMonth();
+
+        List<Payroll> recentPayrolls = payrollRepository.findByTargetYearMonthRangeFetchItems(
+                companyId, memberId, threeYmFrom.toString(), threeYmTo.toString());
 
         // 정기급여만 합산 (보너스 별도 가산)
         long regularPayment = recentPayrolls.stream()
@@ -375,7 +421,7 @@ public class RetirementSimulationService {
                 .sum();
         aw.basePeriodPayment = regularPayment;
 
-        // 데이터 0 이면 baseMonthly × 3 로 fallback (신규 도입 회사)
+        // 데이터 0 이면 baseMonthly × 3 로 fallback (신규 도입 회사 / targetYearMonth 미마이그레이션 데이터)
         if (regularPayment <= 0) {
             regularPayment = baseMonthly * 3;
             aw.basePeriodPayment = regularPayment;
@@ -384,13 +430,16 @@ public class RetirementSimulationService {
         // 1-1) 시행령 제2조 평균임금 산정 제외 기간 계산
         //      ACTIVE / ENDED 상태 휴직 중 3개월 기간과 겹치는 일수 합산
         //      출산휴가 / 육아휴직 / 산재요양 / 병역 / 쟁의행위 등이 해당
+        // 3개월 범위 = threeYmFrom.atDay(1) ~ threeYmTo.atEndOfMonth()
+        LocalDate threeRangeStart = threeYmFrom.atDay(1);
+        LocalDate threeRangeEnd = threeYmTo.atEndOfMonth();
         List<MemberLeaveOfAbsence> loas = memberLeaveOfAbsenceRepository
                 .findInPeriod(companyId, memberId, resignDate);
 
         int excludedDays = 0;
         int excludedCount = 0;
         for (MemberLeaveOfAbsence loa : loas) {
-            // 신청 대기 / 반려 / 취소 상태는 무시 — findInPeriod 가 ACTIVE / ENDED 만 반환
+            // 신청 대기 / 반려 / 취소 상태는 무시 - findInPeriod 가 ACTIVE / ENDED 만 반환
             LocalDate effectiveEnd =
                     loa.getStatus() == LeaveOfAbsenceApprovalStatus.ENDED
                             && loa.getActualEndDate() != null
@@ -398,13 +447,13 @@ public class RetirementSimulationService {
                             : loa.getEndDate();
 
             // 3개월 기간 밖이면 제외
-            if (effectiveEnd.isBefore(threeMonthStart)) continue;
-            if (loa.getStartDate().isAfter(resignDate)) continue;
+            if (effectiveEnd.isBefore(threeRangeStart)) continue;
+            if (loa.getStartDate().isAfter(threeRangeEnd)) continue;
 
-            LocalDate overlapStart = loa.getStartDate().isBefore(threeMonthStart)
-                    ? threeMonthStart : loa.getStartDate();
-            LocalDate overlapEnd = effectiveEnd.isAfter(resignDate)
-                    ? resignDate : effectiveEnd;
+            LocalDate overlapStart = loa.getStartDate().isBefore(threeRangeStart)
+                    ? threeRangeStart : loa.getStartDate();
+            LocalDate overlapEnd = effectiveEnd.isAfter(threeRangeEnd)
+                    ? threeRangeEnd : effectiveEnd;
 
             if (!overlapStart.isAfter(overlapEnd)) {
                 excludedDays += (int) ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
@@ -424,9 +473,10 @@ public class RetirementSimulationService {
                 : 0;
 
         // 2) 직전 12개월 상여 환산 합계 × 3/12
-        LocalDate yearStart = resignDate.minusMonths(12).plusDays(1);
-        List<Payroll> yearlyPayrolls = payrollRepository.findInYearByMemberFetchItems(
-                companyId, memberId, yearStart, resignDate);
+        YearMonth yearYmFrom = resignYm.minusMonths(12);
+        YearMonth yearYmTo = resignYm.minusMonths(1);
+        List<Payroll> yearlyPayrolls = payrollRepository.findByTargetYearMonthRangeFetchItems(
+                companyId, memberId, yearYmFrom.toString(), yearYmTo.toString());
 
         long bonusYearlySum = yearlyPayrolls.stream()
                 .filter(p -> p.getPayrollType() == PayrollType.PERFORMANCE_BONUS

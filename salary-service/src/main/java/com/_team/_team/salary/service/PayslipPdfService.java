@@ -267,7 +267,7 @@ public class PayslipPdfService {
         Paragraph rp = new Paragraph();
         rp.setAlignment(Element.ALIGN_RIGHT);
         rp.add(new Phrase((korean ? "근무기간  " : "Period  "), label));
-        rp.add(new Phrase(periodText(payroll.getPayrollYearMonthDay()) + "    ", value));
+        rp.add(new Phrase(periodText(payroll) + "    ", value));
         rp.add(new Phrase((korean ? "지급일  " : "Pay date  "), label));
         rp.add(new Phrase(formatDateDot(payroll.getPaidAt() != null
                 ? payroll.getPaidAt() : payroll.getPayrollYearMonthDay()), value));
@@ -453,8 +453,24 @@ public class PayslipPdfService {
         return f;
     }
 
-    private String periodText(LocalDate ymd) {
-        if (ymd == null) return "—";
+    /**
+     * 근무기간 - targetYearMonth (정산 대상 월) 가 있으면 그 월의 1일 ~ 말일.
+     * 없으면 fallback 으로 payrollYearMonthDay 가 속한 월 사용 (구 데이터 호환).
+     */
+    private String periodText(Payroll payroll) {
+        String ym = payroll.getTargetYearMonth();
+        if (ym != null && !ym.isBlank()) {
+            try {
+                java.time.YearMonth ymObj = java.time.YearMonth.parse(ym);
+                LocalDate start = ymObj.atDay(1);
+                LocalDate end = ymObj.atEndOfMonth();
+                return String.format("%04d.%02d.%02d~%02d.%02d",
+                        start.getYear(), start.getMonthValue(), start.getDayOfMonth(),
+                        end.getMonthValue(), end.getDayOfMonth());
+            } catch (Exception ignore) { /* fallback */ }
+        }
+        LocalDate ymd = payroll.getPayrollYearMonthDay();
+        if (ymd == null) return "-";
         LocalDate start = ymd.withDayOfMonth(1);
         LocalDate end = ymd.withDayOfMonth(ymd.lengthOfMonth());
         return String.format("%04d.%02d.%02d~%02d.%02d",

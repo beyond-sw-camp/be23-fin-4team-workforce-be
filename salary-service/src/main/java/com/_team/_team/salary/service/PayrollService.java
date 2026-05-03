@@ -87,7 +87,6 @@ public class PayrollService {
 
     /**
      * 급여대장 생성
-     * [처리 흐름]
      * 1) 직원의 정산일 기준 적용 중인 Salary 자동 조회
      * 2) 동일 직원 + 동일 정산일 중복 체크
      * 3) 정산기간 산출 -> 월 장부(MonthlyAttendanceLedger) 조회
@@ -139,8 +138,13 @@ public class PayrollService {
                 companyId, reqDto.getPayrollYearMonthDay());
         double paidRatio = calculatePaidRatio(period, salary, unpaidLeaveDays, activePolicyForRatio);
 
-        /** 4. Payroll 생성 (금액은 0으로 초기화, 항목 생성 후 재계산) */
-        Payroll payroll = reqDto.toEntity(companyId, salary.getSalaryId());
+        /** 4. Payroll 생성 (금액은 0으로 초기화, 항목 생성 후 재계산)
+         *     targetYearMonth = SalaryPolicy.payCycleType 기준 정산 대상 월 (YYYY-MM)
+         *     활성 정책 없으면 fallback - 지급일이 속한 월 (CURRENT_MONTH 가정) */
+        String targetYearMonth = activePolicyForRatio != null
+                ? activePolicyForRatio.resolveTargetYearMonth(reqDto.getPayrollYearMonthDay()).toString()
+                : java.time.YearMonth.from(reqDto.getPayrollYearMonthDay()).toString();
+        Payroll payroll = reqDto.toEntity(companyId, salary.getSalaryId(), targetYearMonth);
         Payroll saved;
         try {
             saved = payrollRepository.saveAndFlush(payroll);
@@ -521,15 +525,15 @@ public class PayrollService {
     }
 
     // 직원 본인 연간 급여 집계 연봉조회 화면용
-    // 월별 행 12개 고정 (없는 달은 0)
+    // 월별 행 12개 고정 (없는 달은 0) - 정산 대상 월(targetYearMonth) 기준
     // 항목별 누적 (지급 / 공제 분리)
     @Transactional(readOnly = true)
     public MyAnnualSalaryResDto findMyAnnual(UUID companyId, UUID memberId, int year) {
-        LocalDate from = LocalDate.of(year, 1, 1);
-        LocalDate to = LocalDate.of(year, 12, 31);
-
+        // 전월형 회사의 1월분 (2월 10일 지급) 도 정확히 1월 행에 묶임
+        String fromYm = String.format("%04d-01", year);
+        String toYm = String.format("%04d-12", year);
         List<Payroll> payrolls = payrollRepository
-                .findInYearByMemberFetchItems(companyId, memberId, from, to);
+                .findByTargetYearMonthRangeFetchItems(companyId, memberId, fromYm, toYm);
 
         // 월별 행 1 ~ 12 빈 슬롯 먼저 생성
         Map<Integer, MyAnnualSalaryResDto.MonthlyRow> monthly = new LinkedHashMap<>();
@@ -555,7 +559,10 @@ public class PayrollService {
         int payrollCount = 0;
 
         for (Payroll p : payrolls) {
-            int month = p.getPayrollYearMonthDay().getMonthValue();
+            // 정산 대상 월(targetYearMonth) 기준으로 매핑. 누락 시 fallback
+            int month = p.getTargetYearMonth() != null
+                    ? Integer.parseInt(p.getTargetYearMonth().substring(5))
+                    : p.getPayrollYearMonthDay().getMonthValue();
             long pay = nz(p.getTotalPayment());
             long ded = nz(p.getTotalDeduction());
             long net = nz(p.getNetPay());
@@ -567,6 +574,7 @@ public class PayrollService {
                     .payrollId(p.getPayrollId() != null ? p.getPayrollId().toString() : null)
                     .payrollYearMonthDay(p.getPayrollYearMonthDay() != null
                             ? p.getPayrollYearMonthDay().toString() : null)
+                    .targetYearMonth(p.getTargetYearMonth())
                     .payrollStatus(p.getPayrollStatus())
                     .totalPayment(prev.getTotalPayment() + pay)
                     .totalDeduction(prev.getTotalDeduction() + ded)

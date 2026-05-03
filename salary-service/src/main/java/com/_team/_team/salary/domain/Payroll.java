@@ -50,9 +50,16 @@ public class Payroll extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID memberId;
 
-    /** 급여 연도 (예 : 2026-03-25) */
+    /** 급여 지급일  */
     @Column(nullable = false)
     private LocalDate payrollYearMonthDay;
+
+    /**
+     * 정산 대상 월 (YYYY-MM)
+     * - 어느 월분 급여인지, SalaryPolicy.payCycleType 에 따라 결정
+     */
+    @Column(length = 7)
+    private String targetYearMonth;
 
     /** 실제 지급일 (지급 완료 시 세팅) */
     private LocalDate paidAt;
