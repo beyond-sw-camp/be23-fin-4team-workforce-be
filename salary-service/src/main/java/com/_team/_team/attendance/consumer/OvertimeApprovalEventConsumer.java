@@ -1,4 +1,4 @@
-package com._team._team.attendance.kafka;
+package com._team._team.attendance.consumer;
 
 import com._team._team.attendance.service.OvertimeApprovalService;
 import com._team._team.event.OvertimeApprovalEvent;

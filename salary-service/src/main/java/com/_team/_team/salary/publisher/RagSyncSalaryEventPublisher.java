@@ -1,4 +1,4 @@
-package com._team._team.salary.kafka;
+package com._team._team.salary.publisher;
 
 import com._team._team.event.RagSyncSalaryEvent;
 import lombok.extern.slf4j.Slf4j;
