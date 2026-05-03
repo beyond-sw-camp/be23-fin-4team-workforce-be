@@ -208,7 +208,7 @@ public class Member extends BaseTimeEntity {
         this.isOnboardingYn = "NO";
     }
 
-    // 비즈 메서드 추가
+    // 퇴직 메서드 추가
     public void markResigned(LocalDate retireDate) {
         this.memberStatus = MemberStatus.LEAVE;
         this.retireDate = retireDate;

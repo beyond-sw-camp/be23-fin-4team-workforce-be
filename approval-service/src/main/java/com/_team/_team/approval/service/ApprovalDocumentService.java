@@ -146,9 +146,9 @@ public class ApprovalDocumentService {
                 {
                   "fields": [
                     { "name": "title", "label": "제목", "type": "text", "required": true },
-                    { "name": "type", "label": "휴직 종류", "type": "select", "options": ["출산휴가", "육아휴직", "장기병가", "무급휴직", "학업휴직", "군복무"] },
-                    { "name": "startDate", "label": "시작일", "type": "date" },
-                    { "name": "endDate", "label": "종료일", "type": "date" },
+                    { "name": "type", "label": "휴직 종류", "type": "select", "required": true, "options": ["출산휴가", "육아휴직", "장기병가", "무급휴직", "학업휴직", "군복무"] },
+                    { "name": "startDate", "label": "시작일", "type": "date", "required": true },
+                    { "name": "endDate", "label": "종료일", "type": "date", "required": true },
                     { "name": "reason", "label": "휴직 사유", "type": "textarea" },
                     { "name": "evidenceFileUrl", "label": "증빙 서류", "type": "file" },
                     { "name": "leaveOfAbsenceId", "label": "salary 연결 ID", "type": "hidden" }

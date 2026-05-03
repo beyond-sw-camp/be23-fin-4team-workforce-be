@@ -1,4 +1,4 @@
-package com._team._team.salary.kafka;
+package com._team._team.salary.consumer;
 
 import com._team._team.attendance.domain.enums.BalanceType;
 import com._team._team.attendance.domain.enums.ScheduleApprovalStatus;

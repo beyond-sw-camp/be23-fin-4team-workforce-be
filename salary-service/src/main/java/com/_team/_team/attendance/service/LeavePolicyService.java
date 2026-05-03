@@ -1,6 +1,6 @@
 package com._team._team.attendance.service;
 
-import com._team._team.attendance.kafka.RagSyncLeaveEventPublisher;
+import com._team._team.attendance.publisher.RagSyncLeaveEventPublisher;
 import com._team._team.attendance.repository.LeavePolicyRepository;
 import com._team._team.attendance.domain.LeavePolicy;
 import com._team._team.attendance.dto.reqDto.LeavePolicyCreateReqDto;

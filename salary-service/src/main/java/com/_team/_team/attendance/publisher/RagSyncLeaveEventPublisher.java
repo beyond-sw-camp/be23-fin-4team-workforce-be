@@ -1,4 +1,4 @@
-package com._team._team.attendance.kafka;
+package com._team._team.attendance.publisher;
 
 import com._team._team.event.RagSyncLeaveEvent;
 import lombok.extern.slf4j.Slf4j;

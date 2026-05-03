@@ -1,12 +1,10 @@
-package com._team._team.attendance.kafka;
+package com._team._team.attendance.consumer;
 
 import com._team._team.attendance.domain.CompanyLeaveType;
 import com._team._team.attendance.domain.LeaveRequest;
-import com._team._team.attendance.domain.MemberBalance;
 import com._team._team.attendance.domain.enums.BalanceType;
 import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.attendance.repository.LeaveRequestRepository;
-import com._team._team.attendance.repository.MemberBalanceRepository;
 import com._team._team.attendance.service.BalancePriorityResolver;
 import com._team._team.attendance.service.DailyAttendanceCloseService;
 import com._team._team.attendance.service.LeaveApprovalService;
@@ -23,7 +21,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
