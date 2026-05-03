@@ -2,7 +2,6 @@ package com._team._team.goal.controller;
 
 import com._team._team.dto.ApiResponse;
 import com._team._team.goal.dto.reqdto.BundleApproveReqDto;
-import com._team._team.goal.dto.reqdto.BundleDelegateReqDto;
 import com._team._team.goal.dto.reqdto.BundleRejectReqDto;
 import com._team._team.goal.dto.reqdto.SubmitCycleReqDto;
 import com._team._team.goal.dto.resdto.BundleResDto;
@@ -21,7 +20,6 @@ import java.util.UUID;
  *    POST   /goal/approval-bundles/{bundleId}/approve     — 승인
  *    POST   /goal/approval-bundles/{bundleId}/reject      — 반려
  *    POST   /goal/approval-bundles/{bundleId}/withdraw    — 회수
- *    POST   /goal/approval-bundles/{bundleId}/delegate    — 위임
  *    GET    /goal/approval-bundles/{bundleId}             — 단건
  *    GET    /goal/approval-bundles/me/requested           — 내가 요청한
  *    GET    /goal/approval-bundles/me/queue               — 내가 처리해야 할 (PENDING)
@@ -87,17 +85,6 @@ public class GoalApprovalController {
         return ApiResponse.success(
                 approvalService.withdraw(bundleId, UUID.fromString(memberId)),
                 "회수되었습니다."
-        );
-    }
-
-    @PostMapping("/goal/approval-bundles/{bundleId}/delegate")
-    public ApiResponse<BundleResDto> delegate(
-            @PathVariable UUID bundleId,
-            @RequestHeader("X-User-UUID") String approverId,
-            @RequestBody @Valid BundleDelegateReqDto dto) {
-        return ApiResponse.success(
-                approvalService.delegate(bundleId, UUID.fromString(approverId), dto),
-                "위임되었습니다."
         );
     }
 

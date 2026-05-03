@@ -61,6 +61,10 @@ public class EvaluationReportService {
         if (responses.isEmpty()) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "해당 시즌에 조회 가능한 평가 결과가 없습니다.");
         }
+        boolean published = responses.stream().anyMatch(r -> r.getSeasonResultsPublishedAt() != null);
+        if (!published) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "결과 공개 후에만 PDF 리포트를 다운로드할 수 있습니다.");
+        }
         String html = buildHtml(responses);
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
@@ -120,7 +124,9 @@ public class EvaluationReportService {
                 .orElse("-");
 
         String finalGrade = responses.stream()
-                .map(r -> extractGrade(r.getCalibrationJson()))
+                .map(r -> r.getConfirmedGrade() != null && !r.getConfirmedGrade().isBlank()
+                        ? r.getConfirmedGrade()
+                        : extractGrade(r.getCalibrationJson()))
                 .filter(g -> g != null && !g.isBlank())
                 .findFirst()
                 .orElse(null);
@@ -129,7 +135,11 @@ public class EvaluationReportService {
         List<ResponseResDto> others = responses.stream()
                 .filter(r -> !"SELF".equals(r.getEvaluationType() == null ? "" : r.getEvaluationType().name()))
                 .toList();
-        BigDecimal avgScore = averageScore(others);
+        BigDecimal avgScore = responses.stream()
+                .map(ResponseResDto::getFinalScoreSnapshot)
+                .filter(s -> s != null)
+                .findFirst()
+                .orElseGet(() -> averageScore(others));
 
         // 평가 유형별 그룹핑
         Map<String, List<ResponseResDto>> byType = new LinkedHashMap<>();

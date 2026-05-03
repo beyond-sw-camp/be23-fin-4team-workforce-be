@@ -85,11 +85,34 @@ public class EvaluationSeason extends BaseTimeEntity {
     @Builder.Default
     private Long version = 0L;
 
-    public void activate() {
-        this.status = SeasonStatus.ACTIVE;
+    public void openSelfEval() {
+        require(SeasonStatus.DRAFT, "Only draft seasons can open self evaluation.");
+        this.status = SeasonStatus.SELF_EVAL;
+    }
+
+    public void openManagerEval() {
+        require(SeasonStatus.SELF_EVAL, "Manager evaluation can open only after self evaluation.");
+        this.status = SeasonStatus.MANAGER_EVAL;
+    }
+
+    public void openGradeConfirm() {
+        require(SeasonStatus.MANAGER_EVAL, "Grade confirmation can open only after manager evaluation.");
+        this.status = SeasonStatus.GRADE_CONFIRM;
+    }
+
+    public void publishResults() {
+        require(SeasonStatus.GRADE_CONFIRM, "Results can be published only after grade confirmation.");
+        this.status = SeasonStatus.RESULT_PUBLISHED;
+        markResultsPublished();
+    }
+
+    public void openInterview() {
+        require(SeasonStatus.RESULT_PUBLISHED, "Interview can open only after result publication.");
+        this.status = SeasonStatus.INTERVIEW;
     }
 
     public void close() {
+        require(SeasonStatus.INTERVIEW, "Seasons can be closed only after interview.");
         this.status = SeasonStatus.CLOSED;
     }
 
@@ -104,11 +127,25 @@ public class EvaluationSeason extends BaseTimeEntity {
     }
 
     public boolean isResponseEditable() {
-        return this.status == SeasonStatus.ACTIVE && this.resultsPublishedAt == null;
+        return isSelfEvalEditable() || isManagerEvalEditable();
+    }
+
+    public boolean isSelfEvalEditable() {
+        return this.status == SeasonStatus.SELF_EVAL;
+    }
+
+    public boolean isManagerEvalEditable() {
+        return this.status == SeasonStatus.MANAGER_EVAL;
     }
 
     public boolean canCalibrate() {
-        return this.status == SeasonStatus.ACTIVE && this.resultsPublishedAt == null;
+        return this.status == SeasonStatus.GRADE_CONFIRM;
+    }
+
+    public boolean isResultVisible() {
+        return this.status == SeasonStatus.RESULT_PUBLISHED
+                || this.status == SeasonStatus.INTERVIEW
+                || this.status == SeasonStatus.CLOSED;
     }
 
     public void update(String name,
@@ -127,5 +164,11 @@ public class EvaluationSeason extends BaseTimeEntity {
         this.endDate = endDate;
         this.resultPublishDate = resultPublishDate;
         this.scheduleJson = scheduleJson;
+    }
+
+    private void require(SeasonStatus expected, String message) {
+        if (this.status != expected) {
+            throw new IllegalStateException(message);
+        }
     }
 }

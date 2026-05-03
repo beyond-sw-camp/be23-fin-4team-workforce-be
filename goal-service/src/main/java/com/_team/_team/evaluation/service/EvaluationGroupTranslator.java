@@ -2,9 +2,12 @@ package com._team._team.evaluation.service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.evaluation.domain.EvaluationGroup;
+import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.converter.EvaluatorMapping;
 import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.repository.EvaluationGroupRepository;
+import com._team._team.evaluation.repository.EvaluationSeasonRepository;
+import com._team._team.goal.repository.GoalRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
@@ -37,24 +40,37 @@ import java.util.UUID;
 public class EvaluationGroupTranslator {
 
     private final EvaluationGroupRepository groupRepository;
+    private final EvaluationSeasonRepository seasonRepository;
+    private final GoalRepository goalRepository;
     private final ObjectMapper objectMapper;
 
     public EvaluationGroupTranslator(EvaluationGroupRepository groupRepository,
+                                     EvaluationSeasonRepository seasonRepository,
+                                     GoalRepository goalRepository,
                                      ObjectMapper objectMapper) {
         this.groupRepository = groupRepository;
+        this.seasonRepository = seasonRepository;
+        this.goalRepository = goalRepository;
         this.objectMapper = objectMapper;
     }
 
     public List<SeasonActivationService.TargetSpec> translate(UUID seasonId) {
         List<EvaluationGroup> groups = groupRepository.findBySeason_SeasonId(seasonId);
         if (groups.isEmpty()) {
-            throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "시즌에 평가 그룹이 없습니다. 활성화 전 EvaluationGroup 을 먼저 구성하세요.");
+            groups = List.of(createAutoGroup(seasonId));
         }
 
         List<SeasonActivationService.TargetSpec> specs = new ArrayList<>();
         for (EvaluationGroup g : groups) {
-            List<UUID> targetMembers = parseUuidList(g.getTargetMemberIdsJson());
+            Set<UUID> mergedTargets = new HashSet<>(parseUuidList(g.getTargetMemberIdsJson()));
+            if (g.getSeason() != null) {
+                mergedTargets.addAll(goalRepository.findMemberIdsWithActiveGoalByCycle(
+                        g.getCompanyId(),
+                        g.getSeason().getTargetCycle(),
+                        g.getSeason().getTargetCycleStart()
+                ));
+            }
+            List<UUID> targetMembers = new ArrayList<>(mergedTargets);
             if (targetMembers.isEmpty()) continue;
 
             Map<UUID, UUID> leadMap = new HashMap<>();          // target → LEAD evaluator
@@ -87,6 +103,44 @@ public class EvaluationGroupTranslator {
             }
         }
         return specs;
+    }
+
+    private EvaluationGroup createAutoGroup(UUID seasonId) {
+        EvaluationSeason season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다."));
+        List<UUID> targetMembers = goalRepository.findMemberIdsWithActiveGoalByCycle(
+                season.getCompanyId(),
+                season.getTargetCycle(),
+                season.getTargetCycleStart()
+        );
+        if (targetMembers.isEmpty()) {
+            throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "해당 시즌 목표를 보유한 ACTIVE 구성원이 없습니다.");
+        }
+        try {
+            return groupRepository.save(EvaluationGroup.builder()
+                    .companyId(season.getCompanyId())
+                    .season(season)
+                    .name("자동 로드 평가 대상자")
+                    .evaluationTypesJson(objectMapper.writeValueAsString(List.of("SELF", "DOWNWARD")))
+                    .targetMemberIdsJson(objectMapper.writeValueAsString(targetMembers))
+                    .evaluatorMaps(buildSelfMappings(targetMembers))
+                    .build());
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "자동 평가 대상자 그룹 생성에 실패했습니다.");
+        }
+    }
+
+    private List<EvaluatorMapping> buildSelfMappings(List<UUID> targetMembers) {
+        List<EvaluatorMapping> mappings = new ArrayList<>();
+        for (UUID target : targetMembers) {
+            mappings.add(EvaluatorMapping.builder()
+                    .targetMemberId(target)
+                    .evaluatorId(target)
+                    .evaluationType(EvalType.SELF)
+                    .build());
+        }
+        return mappings;
     }
 
     // -----------------------------------------------------------------

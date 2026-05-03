@@ -125,6 +125,7 @@ public class EvaluationResponseService {
                                              SelfAnswersReqDto dto) {
         EvaluationResponse r = mustGet(responseId);
         ensureSelf(r, memberId);
+        ensureSelfEvalOpen(r);
         r.saveSelfAnswers(serialize(dto));
         return EvaluationResponseResDto.from(r);
     }
@@ -135,6 +136,7 @@ public class EvaluationResponseService {
                                                SelfAnswersReqDto dto) {
         EvaluationResponse r = mustGet(responseId);
         ensureSelf(r, memberId);
+        ensureSelfEvalOpen(r);
         r.submitSelf(serialize(dto));
         return EvaluationResponseResDto.from(r);
     }
@@ -157,6 +159,39 @@ public class EvaluationResponseService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<EvaluationResponseResDto> listSeasonResponses(UUID seasonId, UUID companyId) {
+        return responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> companyId.equals(r.getCompanyId()))
+                .sorted(Comparator.comparing(EvaluationResponse::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(EvaluationResponseResDto::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<EvaluationResponseResDto> listSeasonResponses(
+            UUID seasonId,
+            UUID companyId,
+            EvaluationAccessScopeService.AccessScope scope
+    ) {
+        return responseRepository.findByGroup_Season_SeasonId(seasonId).stream()
+                .filter(r -> companyId.equals(r.getCompanyId()))
+                .filter(r -> canSeeInOperation(r, scope))
+                .sorted(Comparator.comparing(EvaluationResponse::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(EvaluationResponseResDto::from)
+                .collect(Collectors.toList());
+    }
+
+    private boolean canSeeInOperation(EvaluationResponse response, EvaluationAccessScopeService.AccessScope scope) {
+        if (scope == null || scope.companyWide()) {
+            return true;
+        }
+        return scope.canSeeTarget(response.getTargetMemberId())
+                || scope.isRequester(response.getEvaluatorId());
+    }
+
     private EvaluationResponse mustGet(UUID responseId) {
         return responseRepository.findById(responseId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 응답을 찾을 수 없습니다."));
@@ -173,6 +208,13 @@ public class EvaluationResponseService {
             return objectMapper.writeValueAsString(dto);
         } catch (JsonProcessingException e) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "자기평가 직렬화 실패");
+        }
+    }
+
+    private void ensureSelfEvalOpen(EvaluationResponse r) {
+        if (r.getGroup() == null || r.getGroup().getSeason() == null
+                || !r.getGroup().getSeason().isSelfEvalEditable()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Self evaluation is not open.");
         }
     }
 

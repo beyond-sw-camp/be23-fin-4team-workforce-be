@@ -34,7 +34,6 @@ public class BundleResDto {
     private GoalApprovalDecision decision;
 
     private UUID approverId;
-    private UUID delegateApproverId;
     private LocalDateTime decidedAt;
 
     private String commentText;
@@ -61,7 +60,6 @@ public class BundleResDto {
                 .status(b.getStatus())
                 .decision(b.getDecision())
                 .approverId(b.getApproverId())
-                .delegateApproverId(b.getDelegateApproverId())
                 .decidedAt(b.getDecidedAt())
                 .commentText(b.getCommentText())
                 .rejectionReason(b.getRejectionReason())

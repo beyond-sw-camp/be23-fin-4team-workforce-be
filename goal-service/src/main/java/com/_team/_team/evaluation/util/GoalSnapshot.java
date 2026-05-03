@@ -55,10 +55,10 @@ public class GoalSnapshot {
                 .weightPct(g.getWeightPct())
                 .objectiveGoalId(objective != null ? objective.getGoalId() : null)
                 .objectiveTitle(objective != null ? objective.getTitle() : null)
-                .gradeS(objective != null ? objective.getGradeSCriteria() : null)
-                .gradeA(objective != null ? objective.getGradeACriteria() : null)
-                .gradeB(objective != null ? objective.getGradeBCriteria() : null)
-                .gradeC(objective != null ? objective.getGradeCCriteria() : null)
+                .gradeS(g.getGradeSCriteria())
+                .gradeA(g.getGradeACriteria())
+                .gradeB(g.getGradeBCriteria())
+                .gradeC(g.getGradeCCriteria())
                 .build();
     }
 }
