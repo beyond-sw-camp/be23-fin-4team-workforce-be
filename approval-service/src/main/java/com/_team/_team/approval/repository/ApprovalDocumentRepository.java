@@ -27,4 +27,9 @@ public interface ApprovalDocumentRepository extends JpaRepository<ApprovalDocume
     // 같은 회사 내 문서 이름 중복 체크 (자기 자신 제외, 수정 시 사용)
     boolean existsByCompanyIdAndDocumentNameAndDocumentIdNot(
             UUID companyId, String documentName, UUID documentId);
+
+    // 부팅 시 멱등 보강 - 시드된 모든 회사 ID
+    @org.springframework.data.jpa.repository.Query(
+            "select distinct d.companyId from ApprovalDocument d")
+    List<UUID> findDistinctCompanyIds();
 }

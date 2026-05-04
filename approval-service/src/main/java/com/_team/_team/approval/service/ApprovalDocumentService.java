@@ -335,6 +335,9 @@ public class ApprovalDocumentService {
             """)
                 .build());
 
+        // 인사발령품의서 (조직 개편 시뮬 -> 결재 cascade 용 단일 양식)
+        savePersonnelOrderDocument(companyId);
+
         // RAG 동기화 이벤트 발행 (BULK)
         ragSyncApprovalEventPublisher.publish(
                 RagSyncApprovalEvent.builder()
@@ -347,6 +350,43 @@ public class ApprovalDocumentService {
                         .triggeredBy("system")
                         .build()
         );
+    }
+
+    /** "인사발령품의서" */
+    private void savePersonnelOrderDocument(UUID companyId) {
+        if (approvalDocumentRepository.existsByCompanyIdAndDocumentName(companyId, "인사발령품의서")) {
+            return;
+        }
+        approvalDocumentRepository.save(ApprovalDocument.builder()
+                .companyId(companyId)
+                .documentName("인사발령품의서")
+                .requestType(RequestType.HR)
+                .formSchema("""
+                {
+                  "fields": [
+                    { "name": "effectiveDate",       "label": "효력 시작일", "type": "date",     "required": true },
+                    { "name": "orderCategoryLabel",  "label": "발령 종류",   "type": "text"                       },
+                    { "name": "reason",              "label": "발령 사유",   "type": "textarea"                   },
+                    { "name": "contentJsonText",     "label": "발령 명세",   "type": "textarea"                   }
+                  ]
+                }
+                """)
+                .build());
+    }
+
+    /**
+     * 부팅 시 모든 기존 회사에 "인사발령품의서" 양식 등록
+     */
+    public int ensurePersonnelOrderDocumentForAllCompanies() {
+        List<UUID> companyIds = approvalDocumentRepository.findDistinctCompanyIds();
+        int inserted = 0;
+        for (UUID cid : companyIds) {
+            if (!approvalDocumentRepository.existsByCompanyIdAndDocumentName(cid, "인사발령품의서")) {
+                savePersonnelOrderDocument(cid);
+                inserted++;
+            }
+        }
+        return inserted;
     }
 
     // 결재 양식 생성
@@ -540,12 +580,22 @@ public class ApprovalDocumentService {
         return ApprovalDocumentResDto.fromEntity(document);
     }
 
-    // 회사별 활성 양식 목록 조회
+    // 회사별 활성 양식 목록 조회 - 호환용 (모두 노출)
     @Transactional(readOnly = true)
     public List<ApprovalDocumentResDto> findActiveByCompanyId(UUID companyId) {
+        return findActiveByCompanyId(companyId, true);
+    }
+
+    /**
+     * 회사별 활성 양식 목록 조회
+     * isSystemAdmin = false 인 일반 사용자는 "인사발령품의서" 같은 인사 관리자 전용 양식이 숨겨짐
+     */
+    @Transactional(readOnly = true)
+    public List<ApprovalDocumentResDto> findActiveByCompanyId(UUID companyId, boolean isSystemAdmin) {
         return approvalDocumentRepository
                 .findByCompanyIdAndIsActiveYn(companyId, "Y")
                 .stream()
+                .filter(d -> isSystemAdmin || !"인사발령품의서".equals(d.getDocumentName()))
                 .map(ApprovalDocumentResDto::fromEntity)
                 .toList();
     }

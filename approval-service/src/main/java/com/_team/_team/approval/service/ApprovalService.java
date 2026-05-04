@@ -9,6 +9,7 @@ import com._team._team.approval.dto.resdto.ApprovalRequestResDto;
 import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
 import com._team._team.approval.feignclients.MemberServiceClient;
 import com._team._team.approval.feignclients.dto.SignatureResDto;
+import com._team._team.approval.publisher.*;
 import com._team._team.approval.repository.AbsenceProxyRepository;
 import com._team._team.approval.repository.ApprovalRepository;
 import com._team._team.approval.repository.ApprovalViewerRepository;
@@ -26,7 +27,6 @@ import java.time.LocalTime;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,13 +50,14 @@ public class ApprovalService {
     private final ObjectMapper objectMapper;
     private final OfficialRecipientRepository officialRecipientRepository;
     private final MemberServiceClient memberServiceClient;
-    private final CalendarApprovalEventPublisher calendarApprovalEventPublisher;
+    private final LeaveOfAbsenceApprovalEventPublisher.CalendarApprovalEventPublisher calendarApprovalEventPublisher;
     private final ResignationApprovalEventPublisher resignationApprovalEventPublisher;
     private final AttendanceCorrectionApprovalEventPublisher attendanceCorrectionApprovalEventPublisher;
     private final EarlyLeaveApprovalEventPublisher earlyLeaveApprovalEventPublisher;
 
     private final ApplicationEventPublisher eventPublisher;
     private final LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher;
+    private final PersonnelOrderApprovalEventPublisher personnelOrderApprovalEventPublisher;
 
     @Autowired
     public ApprovalService(ApprovalRepository approvalRepository,
@@ -70,11 +71,12 @@ public class ApprovalService {
                            ObjectMapper objectMapper,
                            OfficialRecipientRepository officialRecipientRepository,
                            MemberServiceClient memberServiceClient,
-                           CalendarApprovalEventPublisher calendarApprovalEventPublisher, ResignationApprovalEventPublisher resignationApprovalEventPublisher,
+                           LeaveOfAbsenceApprovalEventPublisher.CalendarApprovalEventPublisher calendarApprovalEventPublisher, ResignationApprovalEventPublisher resignationApprovalEventPublisher,
                            AttendanceCorrectionApprovalEventPublisher attendanceCorrectionApprovalEventPublisher,
                            EarlyLeaveApprovalEventPublisher earlyLeaveApprovalEventPublisher,
                            ApplicationEventPublisher eventPublisher,
-                           LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher) {
+                           LeaveOfAbsenceApprovalEventPublisher leaveOfAbsenceApprovalEventPublisher,
+                           PersonnelOrderApprovalEventPublisher personnelOrderApprovalEventPublisher) {
         this.approvalRepository = approvalRepository;
         this.approvalViewerRepository = approvalViewerRepository;
         this.absenceProxyRepository = absenceProxyRepository;
@@ -92,6 +94,7 @@ public class ApprovalService {
         this.earlyLeaveApprovalEventPublisher = earlyLeaveApprovalEventPublisher;
         this.eventPublisher = eventPublisher;
         this.leaveOfAbsenceApprovalEventPublisher = leaveOfAbsenceApprovalEventPublisher;
+        this.personnelOrderApprovalEventPublisher = personnelOrderApprovalEventPublisher;
     }
 
 
@@ -211,6 +214,7 @@ public class ApprovalService {
             publishResignationEventIfApplicable(request, actualMemberId, ResignationApprovalEvent.Action.APPROVE, null);
             publishAttendanceCorrectionEventIfApplicable(request, actualMemberId, AttendanceCorrectionApprovalEvent.Action.APPROVE, null);
             publishEarlyLeaveEventIfApplicable(request, actualMemberId, EarlyLeaveApprovalEvent.Action.APPROVE, null);
+            publishPersonnelOrderEventIfApplicable(request, actualMemberId);
         }
 
         List<Approval> allApprovals =
@@ -599,6 +603,66 @@ public class ApprovalService {
         );
     }
 
+    /**
+     * 인사발령 문서일 때
+     */
+    private void publishPersonnelOrderEventIfApplicable(ApprovalRequest request, UUID approverId) {
+        String docName = request.getApprovalDocument().getDocumentName();
+        // 종류(전보/승진/강등/복합/정기)는 contentJson.orderCategory 로 구분
+        if (docName == null) return;
+        boolean isPersonnelOrder = "인사발령품의서".equals(docName)
+                || docName.startsWith("인사발령")
+                || "정기 인사발령".equals(docName);
+        if (!isPersonnelOrder) return;
+
+        JsonNode node = readContent(request.getContentJson());
+        if (node == null) return;
+
+        LocalDate effectiveDate = dateOrNull(node, "effectiveDate");
+        if (effectiveDate == null) effectiveDate = LocalDate.now();
+
+        JsonNode itemsNode = node.get("items");
+        if (itemsNode == null || !itemsNode.isArray() || itemsNode.isEmpty()) {
+            log.warn("[PersonnelOrder] items 비어있음 - 발령 이벤트 skip. requestId={}", request.getRequestId());
+            return;
+        }
+
+        java.util.List<PersonnelOrderApprovedEvent.Item> items = new java.util.ArrayList<>();
+        for (JsonNode it : itemsNode) {
+            UUID memberId = uuidOrNull(it, "memberId");
+            if (memberId == null) continue;
+            items.add(PersonnelOrderApprovedEvent.Item.builder()
+                    .memberId(memberId)
+                    .memberName(textOrNull(it, "memberName"))
+                    .orderType(textOrNull(it, "orderType"))
+                    .beforeOrganizationId(uuidOrNull(it, "beforeOrganizationId"))
+                    .afterOrganizationId(uuidOrNull(it, "afterOrganizationId"))
+                    .beforeOrganizationName(textOrNull(it, "beforeOrganizationName"))
+                    .afterOrganizationName(textOrNull(it, "afterOrganizationName"))
+                    .beforeJobGradeName(textOrNull(it, "beforeJobGradeName"))
+                    .afterJobGradeName(textOrNull(it, "afterJobGradeName"))
+                    .beforeJobTitleName(textOrNull(it, "beforeJobTitleName"))
+                    .afterJobTitleName(textOrNull(it, "afterJobTitleName"))
+                    .reason(textOrNull(it, "reason"))
+                    .build());
+        }
+        if (items.isEmpty()) {
+            log.warn("[PersonnelOrder] 유효 item 없음 - skip. requestId={}", request.getRequestId());
+            return;
+        }
+
+        personnelOrderApprovalEventPublisher.publish(
+                PersonnelOrderApprovedEvent.builder()
+                        .companyId(request.getApprovalDocument().getCompanyId())
+                        .approvalDocumentId(request.getApprovalDocument().getDocumentId())
+                        .approverId(approverId)
+                        .decidedAt(LocalDateTime.now())
+                        .effectiveDate(effectiveDate)
+                        .items(items)
+                        .build()
+        );
+    }
+
     // 사직서 문서일 때만 resignation 이벤트 발행
     private void publishResignationEventIfApplicable(ApprovalRequest request,
                                                      UUID approverId,
@@ -757,6 +821,17 @@ public class ApprovalService {
         if (text == null || text.isBlank()) return null;
         try {
             return LocalDate.parse(text);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // UUID 문자열 파싱
+    private UUID uuidOrNull(JsonNode node, String field) {
+        String text = textOrNull(node, field);
+        if (text == null || text.isBlank()) return null;
+        try {
+            return UUID.fromString(text);
         } catch (Exception e) {
             return null;
         }
