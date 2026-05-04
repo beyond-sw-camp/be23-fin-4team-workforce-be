@@ -6,7 +6,6 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.UUID;
 
 /**
@@ -45,12 +44,6 @@ public class OvertimePolicyCreateReqDto {
     private Integer monthlyOvertimeLimitMinutes;
 
     @NotNull
-    private LocalTime nightStartTime;
-
-    @NotNull
-    private LocalTime nightEndTime;
-
-    @NotNull
     private Boolean holidayWorkRequiresApproval;
 
     @NotNull
@@ -75,8 +68,6 @@ public class OvertimePolicyCreateReqDto {
                 .weeklyTotalLimitMinutes(weeklyTotalLimitMinutes)
                 .dailyOvertimeLimitMinutes(dailyOvertimeLimitMinutes)
                 .monthlyOvertimeLimitMinutes(monthlyOvertimeLimitMinutes)
-                .nightStartTime(nightStartTime)
-                .nightEndTime(nightEndTime)
                 .holidayWorkRequiresApproval(holidayWorkRequiresApproval)
                 .effectiveFrom(effectiveFrom)
                 .effectiveTo(effectiveTo)

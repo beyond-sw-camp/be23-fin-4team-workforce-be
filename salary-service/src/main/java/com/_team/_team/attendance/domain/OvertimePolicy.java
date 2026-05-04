@@ -6,14 +6,11 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.UUID;
 
 /**
  * 연장근로 정책
  * 법정 한도 vs 회사 한도 구분
- *   법정       weeklyOvertimeLimitMinutes(주 12시간), weeklyTotalLimitMinutes(주 52시간)
- *   회사 자체   dailyOvertimeLimitMinutes, monthlyOvertimeLimitMinutes
  */
 @AllArgsConstructor
 @NoArgsConstructor
@@ -88,22 +85,6 @@ public class OvertimePolicy extends BaseTimeEntity {
     private Integer monthlyOvertimeLimitMinutes;
 
     /**
-     * 야간근로 시작 시각
-     * 근로기준법 기본 22:00
-     */
-    @Column(nullable = false)
-    @Builder.Default
-    private LocalTime nightStartTime = LocalTime.of(22, 0);
-
-    /**
-     * 야간근로 종료 시각
-     * 근로기준법 기본 06:00 (익일)
-     */
-    @Column(nullable = false)
-    @Builder.Default
-    private LocalTime nightEndTime = LocalTime.of(6, 0);
-
-    /**
      * 공휴일 근무 시 사전 승인 필요 여부
      * true면 공휴일전에 미리 결재 받아야 함
      */
@@ -131,8 +112,6 @@ public class OvertimePolicy extends BaseTimeEntity {
                        Integer weeklyTotalLimitMinutes,
                        Integer dailyOvertimeLimitMinutes,
                        Integer monthlyOvertimeLimitMinutes,
-                       LocalTime nightStartTime,
-                       LocalTime nightEndTime,
                        Boolean holidayWorkRequiresApproval) {
         if (overtimeFloorMinutes != null) this.overtimeFloorMinutes = overtimeFloorMinutes;
         if (approvalMode != null) this.approvalMode = approvalMode;
@@ -141,8 +120,6 @@ public class OvertimePolicy extends BaseTimeEntity {
         if (weeklyTotalLimitMinutes != null) this.weeklyTotalLimitMinutes = weeklyTotalLimitMinutes;
         if (dailyOvertimeLimitMinutes != null) this.dailyOvertimeLimitMinutes = dailyOvertimeLimitMinutes;
         if (monthlyOvertimeLimitMinutes != null) this.monthlyOvertimeLimitMinutes = monthlyOvertimeLimitMinutes;
-        if (nightStartTime != null) this.nightStartTime = nightStartTime;
-        if (nightEndTime != null) this.nightEndTime = nightEndTime;
         if (holidayWorkRequiresApproval != null) this.holidayWorkRequiresApproval = holidayWorkRequiresApproval;
     }
 }
