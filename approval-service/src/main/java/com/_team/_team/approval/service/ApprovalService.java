@@ -19,14 +19,12 @@ import com._team._team.event.*;
 import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com._team._team.event.ApprovalChangedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -402,6 +400,7 @@ public class ApprovalService {
         // 반려 시 REJECT 이벤트 발행
         publishLeaveEventIfApplicable(request, actualMemberId,
                 LeaveApprovalEvent.Action.REJECT, reqDto.getComment());
+        publishScheduleEventIfApplicable(request, ScheduleApprovalEvent.Action.REJECT);
 
         List<ApprovalViewer> viewers = approvalViewerRepository.findByRequestId(requestId);
 

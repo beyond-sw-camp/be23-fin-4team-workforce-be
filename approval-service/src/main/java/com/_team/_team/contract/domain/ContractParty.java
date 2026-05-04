@@ -47,7 +47,7 @@ public class ContractParty extends BaseTimeEntity {
         this.signatureImageUrl = signatureImageUrl;
     }
 
-    public void reject(String reason) {
+    public void reject() {
         this.signStatus = SignStatus.REJECTED;
     }
 
