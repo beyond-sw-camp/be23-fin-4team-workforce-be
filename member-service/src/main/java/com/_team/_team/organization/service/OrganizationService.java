@@ -271,6 +271,7 @@ public class OrganizationService {
         }
 
         jobGrade.updateName(reqDto.getName());
+        jobGrade.updateDisplayOrder(reqDto.getDisplayOrder());
     }
 
     // 직급 삭제
@@ -299,6 +300,42 @@ public class OrganizationService {
         }
 
         jobGrade.delete();
+    }
+
+    public void reorderJobGrade(UUID memberId, List<UUID> jobGradeIdList) {
+
+        if (jobGradeIdList == null || jobGradeIdList.isEmpty()) return;
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+        UUID companyId = member.getCompany().getCompanyId();
+
+        List<JobGrade> jobGrades = jobGradeRepository.findAllById(jobGradeIdList);
+        if (jobGrades.size() != jobGradeIdList.size()) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 직급이 포함되어 있습니다.");
+        }
+
+        for (JobGrade jobGrade : jobGrades) {
+            if (!jobGrade.getCompany().getCompanyId().equals(companyId)) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직급입니다.");
+            }
+            if (!"NO".equals(jobGrade.getDelYn())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "삭제된 직급은 순서를 변경할 수 없습니다.");
+            }
+        }
+
+        for (int i = 0; i < jobGradeIdList.size(); i++) {
+            UUID id = jobGradeIdList.get(i);
+            int order = i;
+            jobGrades.stream()
+                    .filter(jobGrade -> jobGrade.getJobGradeId().equals(id))
+                    .findFirst()
+                    .ifPresent(jobGrade -> jobGrade.updateDisplayOrder(order));
+        }
+
+        jobGradeRepository.saveAll(jobGrades);
     }
 
     // 직책 생성
@@ -363,6 +400,7 @@ public class OrganizationService {
         }
 
         jobTitle.updateName(reqDto.getName());
+        jobTitle.updateDisplayOrder(reqDto.getDisplayOrder());
     }
 
     // 직책 삭제
@@ -391,6 +429,41 @@ public class OrganizationService {
         }
 
         jobTitle.delete();
+    }
+    public void reorderJobTitle(UUID memberId, List<UUID> jobTitleIdList) {
+
+        if (jobTitleIdList == null || jobTitleIdList.isEmpty()) return;
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."
+                ));
+        UUID companyId = member.getCompany().getCompanyId();
+
+        List<JobTitle> jobTitles = jobTitleRepository.findAllById(jobTitleIdList);
+        if (jobTitles.size() != jobTitleIdList.size()) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "존재하지 않는 직책이 포함되어 있습니다.");
+        }
+
+        for (JobTitle jobTitle : jobTitles) {
+            if (!jobTitle.getCompany().getCompanyId().equals(companyId)) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 직책입니다.");
+            }
+            if (!"NO".equals(jobTitle.getDelYn())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "삭제된 직책은 순서를 변경할 수 없습니다.");
+            }
+        }
+
+        for (int i = 0; i < jobTitleIdList.size(); i++) {
+            UUID id = jobTitleIdList.get(i);
+            int order = i;
+            jobTitles.stream()
+                    .filter(jobTitle -> jobTitle.getJobTitleId().equals(id))
+                    .findFirst()
+                    .ifPresent(jobTitle -> jobTitle.updateDisplayOrder(order));
+        }
+
+        jobTitleRepository.saveAll(jobTitles);
     }
     public void reorderOrganization(List<UUID> organizationIdList) {
 
