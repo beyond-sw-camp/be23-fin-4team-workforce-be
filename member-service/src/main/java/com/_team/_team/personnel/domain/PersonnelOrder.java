@@ -12,8 +12,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * 인사발령 이력 - 결재 통과로 적용된 인사 변경 사항을 시간순으로 기록
- *  - 결재 1건에 N명이 변경되면 N개 행 생성
+ * 인사발령 이력
  */
 @AllArgsConstructor
 @NoArgsConstructor
@@ -81,4 +80,16 @@ public class PersonnelOrder extends BaseTimeEntity {
 
     /** 결재 승인자 ID */
     private UUID approverId;
+
+    /**
+     * 실제 적용 여부 , 'Y' 즉시 적용, 'N' 미래 발령
+     */
+    @Column(nullable = false, length = 1)
+    @Builder.Default
+    private String appliedYn = "N";
+
+    /** 적용 완료 - 배치/즉시 모두 호출 */
+    public void markApplied() {
+        this.appliedYn = "Y";
+    }
 }

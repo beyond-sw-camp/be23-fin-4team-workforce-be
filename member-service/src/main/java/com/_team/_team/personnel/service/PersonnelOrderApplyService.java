@@ -67,8 +67,9 @@ public class PersonnelOrderApplyService {
             return;
         }
         UUID companyId = event.getCompanyId();
+        boolean isFuture = effectiveDate.isAfter(LocalDate.now());
 
-        // 1) 이력 INSERT - 이벤트의 before/after 값을 그대로 저장 (이벤트 발행자가 시뮬 결과 packing)
+        //    미래 발령이면 appliedYn='N' 으로 저장, 즉시 발령이면 적용 후 'Y'
         PersonnelOrderType orderType = parseOrderType(item.getOrderType());
         PersonnelOrder order = PersonnelOrder.builder()
                 .memberId(memberId)
@@ -86,10 +87,27 @@ public class PersonnelOrderApplyService {
                 .afterJobTitleName(item.getAfterJobTitleName())
                 .reason(item.getReason())
                 .approverId(event.getApproverId())
+                .appliedYn("N")
                 .build();
         personnelOrderRepository.save(order);
 
-        // 2) MemberPosition UPDATE - 현재 활성 포지션의 organization / jobGrade / jobTitle 변경
+        if (isFuture) {
+            log.info("[PersonnelOrder] scheduled - memberId={} effectiveDate={} (배치가 효력일에 적용)",
+                    memberId, effectiveDate);
+            return;
+        }
+
+        // 2) 효력일 도래 - 즉시 MemberPosition 반영
+        applyToMemberPosition(order, item);
+    }
+
+    /**
+     * 즉시 발령 또는 배치 호출 진입점
+     */
+    @Transactional
+    public void applyToMemberPosition(PersonnelOrder order, PersonnelOrderApprovedEvent.Item itemHint) {
+        UUID memberId = order.getMemberId();
+        UUID companyId = order.getCompanyId();
         MemberPosition mp = memberPositionRepository
                 .findActivePositionsByMemberIds(java.util.Set.of(memberId))
                 .stream().findFirst().orElse(null);
@@ -98,22 +116,56 @@ public class PersonnelOrderApplyService {
             return;
         }
 
-        Organization newOrg = item.getAfterOrganizationId() != null
-                ? organizationRepository.findById(item.getAfterOrganizationId()).orElse(mp.getOrganization())
+        UUID afterOrgId = order.getAfterOrganizationId();
+        Organization newOrg = afterOrgId != null
+                ? organizationRepository.findById(afterOrgId).orElse(mp.getOrganization())
                 : mp.getOrganization();
-        JobGrade newGrade = item.getAfterJobGradeName() != null
-                ? findJobGradeByName(companyId, item.getAfterJobGradeName()).orElse(mp.getJobGrade())
+        JobGrade newGrade = order.getAfterJobGradeName() != null
+                ? findJobGradeByName(companyId, order.getAfterJobGradeName()).orElse(mp.getJobGrade())
                 : mp.getJobGrade();
-        JobTitle newTitle = item.getAfterJobTitleName() != null
-                ? findJobTitleByName(companyId, item.getAfterJobTitleName()).orElse(mp.getJobTitle())
-                : mp.getJobTitle();
+
+        // 직책 처리 분기
+        JobTitle newTitle;
+        String afterTitleName = order.getAfterJobTitleName();
+        if (afterTitleName == null) {
+            newTitle = mp.getJobTitle();
+        } else if (afterTitleName.isBlank()) {
+            newTitle = null;
+        } else {
+            newTitle = findJobTitleByName(companyId, afterTitleName).orElse(mp.getJobTitle());
+        }
 
         mp.update(newOrg, newGrade, newTitle, mp.getRole());
-        log.info("[PersonnelOrder] applied - memberId={} type={} orgAfter={} gradeAfter={} titleAfter={}",
-                memberId, orderType,
-                item.getAfterOrganizationName(),
-                item.getAfterJobGradeName(),
-                item.getAfterJobTitleName());
+        order.markApplied();
+        log.info("[PersonnelOrder] applied - memberId={} type={} effectiveDate={} orgAfter={} gradeAfter={} titleAfter={}",
+                memberId, order.getOrderType(), order.getEffectiveDate(),
+                order.getAfterOrganizationName(),
+                order.getAfterJobGradeName(),
+                order.getAfterJobTitleName());
+    }
+
+    /**
+     * 미래 발령 자동 적용 - 매일 새벽 배치 호출
+     */
+    @Transactional
+    public int applyDuePendingOrders() {
+        LocalDate today = LocalDate.now();
+        List<PersonnelOrder> due = personnelOrderRepository
+                .findByAppliedYnAndEffectiveDateLessThanEqual("N", today);
+        int success = 0;
+        for (PersonnelOrder order : due) {
+            try {
+                applyToMemberPosition(order, null);
+                success++;
+            } catch (Exception e) {
+                log.error("[PersonnelOrder] batch apply failed - personnelOrderId={} - {}",
+                        order.getPersonnelOrderId(), e.getMessage(), e);
+            }
+        }
+        if (!due.isEmpty()) {
+            log.info("[PersonnelOrder] 배치 적용 완료 - 대상 {} 건 / 성공 {} 건", due.size(), success);
+        }
+        return success;
     }
 
     private PersonnelOrderType parseOrderType(String s) {

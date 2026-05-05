@@ -5,7 +5,6 @@ import com._team._team.personnel.service.PersonnelOrderApplyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,15 +20,16 @@ public class PersonnelOrderApprovalConsumer {
     @KafkaListener(
             topics = PersonnelOrderApprovedEvent.TOPIC,
             groupId = "member-service-personnel-order",
-            properties = {
-                    JsonDeserializer.VALUE_DEFAULT_TYPE +
-                            "=com._team._team.event.PersonnelOrderApprovedEvent"
-            }
+            containerFactory = "personnelOrderListenerContainerFactory",
+            properties = { "auto.offset.reset=latest" }
     )
     public void consume(PersonnelOrderApprovedEvent event) {
+        if (event == null || event.getItems() == null || event.getItems().isEmpty()) {
+            log.warn("[PersonnelOrder] no items - skip.");
+            return;
+        }
         log.info("[PersonnelOrder] received. approvalDocumentId={} items={}",
-                event.getApprovalDocumentId(),
-                event.getItems() != null ? event.getItems().size() : 0);
+                event.getApprovalDocumentId(), event.getItems().size());
         applyService.apply(event);
     }
 }

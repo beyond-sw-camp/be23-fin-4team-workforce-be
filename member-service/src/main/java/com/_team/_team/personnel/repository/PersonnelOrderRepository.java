@@ -4,6 +4,7 @@ import com._team._team.personnel.domain.PersonnelOrder;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,4 +17,6 @@ public interface PersonnelOrderRepository extends JpaRepository<PersonnelOrder, 
     /** 회사 발령 이력 - 시간 역순 */
     List<PersonnelOrder> findByCompanyIdOrderByEffectiveDateDescCreatedAtDesc(UUID companyId);
 
+    /** 효력일 도래 + 미적용 - 배치 처리 대상 */
+    List<PersonnelOrder> findByAppliedYnAndEffectiveDateLessThanEqual(String appliedYn, LocalDate effectiveDate);
 }
