@@ -55,9 +55,9 @@ public class RegularBonusPaymentWorker {
     public Result run(LocalDate today) {
         Result result = new Result();
 
-        // 0. 표준 지급일이 아닌 날은 스킵
+        // 표준 지급일이 아니면 스킵
         if (today.getDayOfMonth() != STANDARD_PAYMENT_DAY_OF_MONTH) {
-            log.info("[RegularBonus] today={} 표준 지급일(25일)이 아님 - 스킵", today);
+            log.info("[RegularBonus] today={} 표준 지급일(25일) 아님, 스킵", today);
             return result;
         }
 
@@ -79,6 +79,37 @@ public class RegularBonusPaymentWorker {
 
         log.info("[RegularBonus] 완료 date={} eligibleMembers={} skippedMembers={} skipPolicy={} errorPolicy={}",
                 today, result.eligibleMembers, result.skippedMembers, result.skipPolicy, result.errorPolicy);
+        return result;
+    }
+
+    // 회사별 호출, 회사 1곳의 활성 정기상여 정책만 처리
+    @Transactional
+    public Result runForCompany(UUID companyId, LocalDate today) {
+        Result result = new Result();
+
+        if (today.getDayOfMonth() != STANDARD_PAYMENT_DAY_OF_MONTH) {
+            log.info("[RegularBonus] companyId={} today={} 표준 지급일 아님, 스킵", companyId, today);
+            return result;
+        }
+
+        List<BonusPolicy> all = bonusPolicyRepository.findAllActiveRegularBonusPoliciesAt(today);
+        List<BonusPolicy> policies = all.stream().filter(p -> companyId.equals(p.getCompanyId())).toList();
+
+        for (BonusPolicy policy : policies) {
+            if (!isPaymentMonth(today, policy.getRegularBonusPaymentCount())) {
+                result.skipPolicy++;
+                continue;
+            }
+            try {
+                processPolicy(policy, today, result);
+            } catch (Exception e) {
+                log.error("[RegularBonus] companyId={} policy={} 처리 실패", companyId, policy.getBonusPolicyId(), e);
+                result.errorPolicy++;
+            }
+        }
+
+        log.info("[RegularBonus] 회사별 완료 companyId={} date={} eligibleMembers={} skippedMembers={}",
+                companyId, today, result.eligibleMembers, result.skippedMembers);
         return result;
     }
 

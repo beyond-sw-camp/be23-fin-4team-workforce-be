@@ -8,11 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -37,9 +37,10 @@ public class SaasScheduleController {
         );
     }
 
-    @PutMapping("/{jobKey}")
+    // jobKey 는 query parameter
+    @PutMapping
     public ResponseEntity<?> updateCron(
-            @PathVariable String jobKey,
+            @RequestParam String jobKey,
             @Valid @RequestBody SaasScheduleUpdateReqDto reqDto) {
         saasScheduleService.updateCron(jobKey, reqDto.getCron());
         return new ResponseEntity<>(
@@ -48,12 +49,15 @@ public class SaasScheduleController {
         );
     }
 
-    @PostMapping("/{jobKey}/toggle-pause")
-    public ResponseEntity<?> togglePause(@PathVariable String jobKey) {
-        boolean paused = saasScheduleService.togglePause(jobKey);
-        return new ResponseEntity<>(
-                ApiResponse.success(paused, paused ? "일시중지 됨" : "재개 됨"),
-                HttpStatus.OK
-        );
+    @PostMapping("/pause")
+    public ResponseEntity<?> pause(@RequestParam String jobKey) {
+        saasScheduleService.pause(jobKey);
+        return new ResponseEntity<>(ApiResponse.success(null, "일시중지 됨"), HttpStatus.OK);
+    }
+
+    @PostMapping("/resume")
+    public ResponseEntity<?> resume(@RequestParam String jobKey) {
+        saasScheduleService.resume(jobKey);
+        return new ResponseEntity<>(ApiResponse.success(null, "재개 됨"), HttpStatus.OK);
     }
 }

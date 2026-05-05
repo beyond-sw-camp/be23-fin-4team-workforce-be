@@ -11,55 +11,75 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
-import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
 /**
  * SaaS 운영자용 Quartz 스케줄 조회/수정/일시중지
+ * listAll 은 qrtz_triggers 직접 SELECT (Quartz API 락 회피)
  */
 @Slf4j
 @Service
 public class SaasScheduleService {
 
     final Scheduler scheduler;
+    final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    public SaasScheduleService(Scheduler scheduler) {
+    public SaasScheduleService(Scheduler scheduler, JdbcTemplate jdbcTemplate) {
         this.scheduler = scheduler;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public List<SaasScheduleResDto> listAll() {
-        List<SaasScheduleResDto> result = new ArrayList<>();
+        String sql =
+                "SELECT t.JOB_NAME, t.JOB_GROUP, t.TRIGGER_NAME, t.TRIGGER_GROUP, " +
+                "       t.NEXT_FIRE_TIME, t.PREV_FIRE_TIME, t.TRIGGER_STATE, " +
+                "       c.CRON_EXPRESSION " +
+                "FROM QRTZ_TRIGGERS t " +
+                "LEFT JOIN QRTZ_CRON_TRIGGERS c " +
+                "  ON t.SCHED_NAME = c.SCHED_NAME " +
+                "  AND t.TRIGGER_NAME = c.TRIGGER_NAME " +
+                "  AND t.TRIGGER_GROUP = c.TRIGGER_GROUP " +
+                "WHERE t.SCHED_NAME = ? " +
+                "ORDER BY t.JOB_GROUP, t.JOB_NAME";
         try {
-            for (String groupName : scheduler.getJobGroupNames()) {
-                for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.jobGroupEquals(groupName))) {
-                    List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
-                    for (Trigger t : triggers) {
-                        String cron = (t instanceof CronTrigger ct) ? ct.getCronExpression() : null;
-                        Trigger.TriggerState state = scheduler.getTriggerState(t.getKey());
-                        boolean paused = state == Trigger.TriggerState.PAUSED;
-                        result.add(SaasScheduleResDto.builder()
-                                .jobKey(jobKey.getName() + "::" + jobKey.getGroup())
-                                .triggerKey(t.getKey().getName() + "::" + t.getKey().getGroup())
-                                .cronExpression(cron)
-                                .nextFireTime(t.getNextFireTime())
-                                .previousFireTime(t.getPreviousFireTime())
-                                .paused(paused)
-                                .build());
-                    }
-                }
-            }
+            String schedName = scheduler.getSchedulerName();
+            List<SaasScheduleResDto> result = new ArrayList<>();
+            jdbcTemplate.query(sql, rs -> {
+                String jobName = rs.getString("JOB_NAME");
+                String jobGroup = rs.getString("JOB_GROUP");
+                String triggerName = rs.getString("TRIGGER_NAME");
+                String triggerGroup = rs.getString("TRIGGER_GROUP");
+                long nextMs = rs.getLong("NEXT_FIRE_TIME");
+                long prevMs = rs.getLong("PREV_FIRE_TIME");
+                String state = rs.getString("TRIGGER_STATE");
+                String cron = rs.getString("CRON_EXPRESSION");
+                boolean paused = "PAUSED".equals(state) || "PAUSED_BLOCKED".equals(state);
+                result.add(SaasScheduleResDto.builder()
+                        .jobKey(jobName + "::" + jobGroup)
+                        .triggerKey(triggerName + "::" + triggerGroup)
+                        .cronExpression(cron)
+                        .nextFireTime(nextMs > 0 ? new Date(nextMs) : null)
+                        .previousFireTime(prevMs > 0 ? new Date(prevMs) : null)
+                        .paused(paused)
+                        .build());
+            }, schedName);
+            return result;
         } catch (SchedulerException e) {
+            log.error("[SaaS][Schedule] schedulerName 조회 실패", e);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "스케줄 조회 실패");
+        } catch (RuntimeException e) {
             log.error("[SaaS][Schedule] 목록 조회 실패", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "스케줄 조회 실패");
         }
-        return result;
     }
 
     public void updateCron(String jobKey, String newCron) {
@@ -88,25 +108,25 @@ public class SaasScheduleService {
         }
     }
 
-    public boolean togglePause(String jobKey) {
+    public void pause(String jobKey) {
         JobKey jk = parseJobKey(jobKey);
         try {
-            if (!scheduler.checkExists(jk)) {
-                throw new BusinessException(HttpStatus.NOT_FOUND, "잡을 찾을 수 없습니다.");
-            }
-            List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jk);
-            if (triggers.isEmpty()) {
-                throw new BusinessException(HttpStatus.NOT_FOUND, "트리거가 없습니다.");
-            }
-            Trigger.TriggerState first = scheduler.getTriggerState(triggers.get(0).getKey());
-            boolean willPause = first != Trigger.TriggerState.PAUSED;
-            if (willPause) scheduler.pauseJob(jk);
-            else scheduler.resumeJob(jk);
-            log.info("[SaaS][Schedule] {} jobKey={}", willPause ? "일시중지" : "재개", jobKey);
-            return willPause;
+            if (!scheduler.checkExists(jk)) throw new BusinessException(HttpStatus.NOT_FOUND, "잡을 찾을 수 없습니다.");
+            scheduler.pauseJob(jk);
+            log.info("[SaaS][Schedule] 일시중지 jobKey={}", jobKey);
         } catch (SchedulerException e) {
-            log.error("[SaaS][Schedule] 토글 실패 jobKey={}", jobKey, e);
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "스케줄 토글 실패");
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "일시중지 실패");
+        }
+    }
+
+    public void resume(String jobKey) {
+        JobKey jk = parseJobKey(jobKey);
+        try {
+            if (!scheduler.checkExists(jk)) throw new BusinessException(HttpStatus.NOT_FOUND, "잡을 찾을 수 없습니다.");
+            scheduler.resumeJob(jk);
+            log.info("[SaaS][Schedule] 재개 jobKey={}", jobKey);
+        } catch (SchedulerException e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "재개 실패");
         }
     }
 

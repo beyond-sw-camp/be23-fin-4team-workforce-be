@@ -8,7 +8,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Quartz 스케줄 등록을 YAML에서 제어
+ * Quartz 스케줄 등록, YAML 에서 제어
+ * jobs: 글로벌 1회 등록 (회사 구분 없는 잡 - 주52시간 감지, 만료 처리 등)
+ * 회사마다 다른 시각 가능 - 급여, 출퇴근 마감, 연차 부여 등
  */
 @Getter
 @Setter
@@ -21,7 +23,14 @@ public class BatchSchedulerProperties {
     private boolean enabled = false;
 
     /**
-     * Spring Batch Job 이름 → Quartz Cron 문자열.
+     * 글로벌 잡
+     * (회사 구분 없이 1회 등록되는 잡)
      */
     private Map<String, String> jobs = new LinkedHashMap<>();
+
+    /**
+     * 회사별 잡
+     * (회사 신규 가입 시 이 cron 으로 시드, 회사 관리자가 이후 변경 가능)
+     */
+    private Map<String, String> perCompanyJobs = new LinkedHashMap<>();
 }

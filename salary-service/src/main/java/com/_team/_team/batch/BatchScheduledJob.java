@@ -43,29 +43,34 @@ public class BatchScheduledJob extends QuartzJobBean {
     @Override
     protected void executeInternal(JobExecutionContext context) throws JobExecutionException {
         String jobName = context.getMergedJobDataMap().getString("jobName");
-        log.info("Quartz Triggered! Starting Spring Batch Job: {}", jobName);
+        // 회사별 잡이면 companyId 도 함께 전달, 글로벌 잡이면 null
+        String companyId = context.getMergedJobDataMap().getString("companyId");
+        log.info("Quartz Triggered! Starting Spring Batch Job: {} companyId={}", jobName, companyId);
 
         try {
             Job job = jobLocator.getJob(jobName);
 
             // BATCH_JOB_INSTANCE 추적성 확보용으로 의미있는 비즈니스 키 추가
             // time 은 매번 다른 인스턴스 보장, yearMonth/date 는 운영 가시성용
-            JobParameters jobParameters = buildJobParameters(jobName);
+            JobParameters jobParameters = buildJobParameters(jobName, companyId);
 
             jobLauncher.run(job, jobParameters);
 
-            log.info("Successfully completed Spring Batch Job: {}", jobName);
+            log.info("Successfully completed Spring Batch Job: {} companyId={}", jobName, companyId);
 
         } catch (Exception e) {
-            log.error("Failed to execute Spring Batch Job: {}", jobName, e);
+            log.error("Failed to execute Spring Batch Job: {} companyId={}", jobName, companyId, e);
             throw new JobExecutionException("Batch Job Execution Failed: " + jobName, e);
         }
     }
 
-    // jobName 별로 의미있는 파라미터 부여 - SELECT * FROM BATCH_JOB_EXECUTION_PARAMS 로 추적
-    private JobParameters buildJobParameters(String jobName) {
+    //  BATCH_JOB_EXECUTION_PARAMS
+    private JobParameters buildJobParameters(String jobName, String companyId) {
         JobParametersBuilder builder = new JobParametersBuilder()
                 .addDate("time", new Date());
+        if (companyId != null && !companyId.isBlank()) {
+            builder.addString("companyId", companyId);
+        }
 
         LocalDate today = LocalDate.now(KST);
         switch (jobName) {
