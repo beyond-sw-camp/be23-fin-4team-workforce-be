@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 출퇴근 정정 신청, 승인, 반려 서비스
@@ -505,7 +506,7 @@ public class AttendanceCorrectionService {
                 .findAllInRange(companyId, windowStart, today)
                 .stream()
                 .map(h -> h.getHolidayDate())
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
 
         // 4. 일자별 매핑
         List<DailyAttendance> myDas = dailyAttendanceRepository
