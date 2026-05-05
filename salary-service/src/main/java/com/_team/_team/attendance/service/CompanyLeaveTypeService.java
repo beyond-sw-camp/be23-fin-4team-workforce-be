@@ -9,6 +9,8 @@ import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.event.RagSyncLeaveEvent;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -144,8 +146,9 @@ public class CompanyLeaveTypeService {
     ) {}
 
     /**
-     * 관리자 커스텀 휴가 생성
+     * 관리자 커스텀 휴가 생성 - 캐시 무효화
      */
+    @CacheEvict(value = "companyLeaveTypes", key = "#companyId")
     public CompanyLeaveType create(UUID companyId, CompanyLeaveTypeCreateReqDto reqDto) {
         String resolvedCode = resolveCodeForCreate(companyId, reqDto.getCode(), reqDto.getName());
 
@@ -228,8 +231,9 @@ public class CompanyLeaveTypeService {
     }
 
     /**
-     * 수정, 시스템 기본은 name, displayOrder 만 허용
+     * 수정, 시스템 기본은 name, displayOrder 만 허용 - 캐시 무효화
      */
+    @CacheEvict(value = "companyLeaveTypes", key = "#companyId")
     public CompanyLeaveType update(UUID companyId, UUID companyLeaveTypeId,
                                    CompanyLeaveTypeUpdateReqDto reqDto) {
         CompanyLeaveType entity = findActive(companyId, companyLeaveTypeId);
@@ -282,8 +286,9 @@ public class CompanyLeaveTypeService {
     }
 
     /**
-     * 삭제, 시스템 기본은 불가
+     * 삭제, 시스템 기본은 불가 - 캐시 무효화
      */
+    @CacheEvict(value = "companyLeaveTypes", key = "#companyId")
     public void delete(UUID companyId, UUID companyLeaveTypeId) {
         CompanyLeaveType entity = findActive(companyId, companyLeaveTypeId);
         entity.softDelete();
@@ -302,7 +307,9 @@ public class CompanyLeaveTypeService {
         );
     }
 
+    // 회사 휴가 종류 list - 마스터 데이터, Redis 10분 캐시
     @Transactional(readOnly = true)
+    @Cacheable(value = "companyLeaveTypes", key = "#companyId")
     public List<CompanyLeaveType> findAll(UUID companyId) {
         return repository.findAllByCompanyIdAndDelYnOrderByDisplayOrder(companyId, "N");
     }

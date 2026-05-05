@@ -12,6 +12,8 @@ import com._team._team.attendance.dto.resDto.LegalHolidayResDto;
 import com._team._team.event.RagSyncAttendanceEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +44,7 @@ public class CompanyHolidayService {
     /**
      * 공휴일 등록
      */
+    @CacheEvict(value = "companyHolidays", key = "#companyId")
     public CompanyHolidayResDto createHoliday(UUID companyId, CompanyHolidayCreateReqDto reqDto) {
         boolean duplicated = companyHolidayRepository
                 .existsByCompanyIdAndHolidayDateAndDelYn(
@@ -70,8 +73,9 @@ public class CompanyHolidayService {
         return CompanyHolidayResDto.fromEntity(saved);
     }
 
-    /** 공휴일 전체 목록 조회 */
+    /** 공휴일 전체 목록 조회 - Redis 10분간 캐시 처리 */
     @Transactional(readOnly = true)
+    @Cacheable(value = "companyHolidays", key = "#companyId")
     public List<CompanyHolidayResDto> findHolidays(UUID companyId) {
         List<CompanyHoliday> holidays = companyHolidayRepository
                 .findByCompanyIdAndDelYnOrderByHolidayDate(companyId, "N");
@@ -81,8 +85,9 @@ public class CompanyHolidayService {
     }
 
     /**
-     * 공휴일 수정 (커스텀만)
+     * 공휴일 수정 (커스텀만)  // 메서드 실행 후 지정된 캐시에서 특정 키의 항목을 삭제 어노테이션 추가
      */
+    @CacheEvict(value = "companyHolidays", key = "#companyId")
     public CompanyHolidayResDto updateHoliday(UUID companyId, UUID companyHolidayId, CompanyHolidayUpdateReqDto reqDto) {
         CompanyHoliday holiday = findActive(companyId, companyHolidayId);
 
@@ -110,8 +115,9 @@ public class CompanyHolidayService {
     }
 
     /**
-     * 공휴일 삭제 (커스텀만)
+     * 공휴일 삭제 (커스텀만) // 메서드 실행 후 지정된 캐시에서 특정 키의 항목을 삭제 어노테이션 추가
      */
+    @CacheEvict(value = "companyHolidays", key = "#companyId")
     public void deleteHoliday(UUID companyId, UUID companyHolidayId) {
         CompanyHoliday holiday = findActive(companyId, companyHolidayId);
 

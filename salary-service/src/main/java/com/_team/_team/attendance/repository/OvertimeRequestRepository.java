@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface OvertimeRequestRepository extends JpaRepository<OvertimeRequest, UUID>{
+public interface OvertimeRequestRepository extends JpaRepository<OvertimeRequest, UUID>, OvertimeRequestRepositoryQuerydsl {
 
     /**
      * 해당 일자의 승인된 OverTime 합계 (부분 승인 고려해 approvedMinutes 합산)
