@@ -5,6 +5,7 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.service.MailService;
 import com._team._team.dto.BusinessException;
+import com._team._team.saas.config.SaasOperatorProperties;
 import com._team._team.dto.NotificationMessage;
 import com._team._team.event.MemberChangedEvent;
 import com._team._team.event.MemberDeletedEvent;
@@ -88,9 +89,10 @@ public class MemberService {
     private final SearchOutboxEventRepository searchOutboxEventRepository;
     private final ObjectMapper objectMapper;
     private final CalendarEventRepository calendarEventRepository;
+    private final SaasOperatorProperties saasOperatorProperties;
 
     @Autowired
-    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper, CalendarEventRepository calendarEventRepository) {
+    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper, CalendarEventRepository calendarEventRepository, SaasOperatorProperties saasOperatorProperties) {
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.roleRepository = roleRepository;
@@ -111,6 +113,7 @@ public class MemberService {
         this.searchOutboxEventRepository = searchOutboxEventRepository;
         this.objectMapper = objectMapper;
         this.calendarEventRepository = calendarEventRepository;
+        this.saasOperatorProperties = saasOperatorProperties;
     }
 
     // 온보딩 시 기본 역할 4개 + 권한 생성
@@ -435,17 +438,38 @@ public class MemberService {
         member.resetLoginFailCount();
         memberRepository.save(member);
 
-        // 6. defaultPosition 조회
+        // 6. SaaS 운영자 분기 - 시스템 회사 소속이면 운영자
+        boolean isSaasOperator = saasOperatorProperties.getSystemCompanyId() != null
+                && member.getCompany() != null
+                && saasOperatorProperties.getSystemCompanyId()
+                        .equals(member.getCompany().getCompanyId().toString());
+        if (isSaasOperator) {
+            String operatorAt = jwtTokenProvider.createAtToken(member, null);
+            String operatorRt = jwtTokenProvider.createRtToken(member);
+            jwtTokenProvider.setRtCookie(response, operatorRt);
+            return LoginResDto.builder()
+                    .accessToken(operatorAt)
+                    .name(member.getName())
+                    .memberId(member.getMemberId())
+                    .memberPositionId(null)
+                    .isFirstLoginYn(member.getIsFirstLoginYn())
+                    .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
+                    .isOnboardingYn(member.getIsOnboardingYn())
+                    .permissions(List.of())
+                    .build();
+        }
+
+        // 7. defaultPosition 조회
         MemberPosition memberPosition = memberPositionRepository
                 .findByIdWithRoleAndPermissions(member.getDefaultPositionId())
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
                 ));
 
-        // 7. AT 발급
+        // 8. AT 발급
         String accessToken = jwtTokenProvider.createAtToken(member, memberPosition);
 
-        // 8. RT 발급 + 쿠키 저장
+        // 9. RT 발급 + 쿠키 저장
         String refreshToken = jwtTokenProvider.createRtToken(member);
         jwtTokenProvider.setRtCookie(response, refreshToken);
 

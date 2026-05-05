@@ -12,7 +12,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.TimeZone;
 
 /**
- * salary-service 배치용 Quartz 크론 등록 지점
+ * salary-service 배치용 Quartz
  */
 @Slf4j
 @Configuration
@@ -54,6 +54,14 @@ public class BatchScheduler {
     }
 
     private void registerJob(String jobName, String cronExpression) throws SchedulerException {
+        TriggerKey triggerKey = TriggerKey.triggerKey(jobName + "_Trigger", QUARTZ_GROUP);
+
+        // SaaS 운영자가 변경한 cron 보존
+        if (scheduler.checkExists(triggerKey)) {
+            log.info("[Batch][Quartz] 기존 트리거 유지 jobName={}", jobName);
+            return;
+        }
+
         JobDetail jobDetail = JobBuilder.newJob(BatchScheduledJob.class)
                 .withIdentity(jobName + "_Detail", QUARTZ_GROUP)
                 .usingJobData("jobName", jobName)
@@ -61,24 +69,12 @@ public class BatchScheduler {
                 .build();
 
         Trigger trigger = TriggerBuilder.newTrigger()
-                .withIdentity(jobName + "_Trigger", QUARTZ_GROUP)
+                .withIdentity(triggerKey)
                 .forJob(jobDetail)
                 .withSchedule(CronScheduleBuilder.cronSchedule(cronExpression)
                         .inTimeZone(TimeZone.getTimeZone("Asia/Seoul")))
                 .build();
-
-        if (!scheduler.checkExists(jobDetail.getKey())) {
-            scheduler.scheduleJob(jobDetail, trigger);
-            log.info("Registered Quartz Schedule: {} with Cron: {}", jobName, cronExpression);
-            return;
-        }
-        scheduler.addJob(jobDetail, true, true);
-        TriggerKey triggerKey = trigger.getKey();
-        if (scheduler.checkExists(triggerKey)) {
-            scheduler.rescheduleJob(triggerKey, trigger);
-        } else {
-            scheduler.scheduleJob(trigger);
-        }
-        log.info("Updated existing Quartz Schedule: {}", jobName);
+        scheduler.scheduleJob(jobDetail, trigger);
+        log.info("[Batch][Quartz] 최초 등록 jobName={} cron={}", jobName, cronExpression);
     }
 }

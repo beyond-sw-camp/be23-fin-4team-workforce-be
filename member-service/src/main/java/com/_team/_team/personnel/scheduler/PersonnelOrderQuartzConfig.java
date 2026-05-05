@@ -18,7 +18,6 @@ import java.util.TimeZone;
 
 /**
  * 인사발령 자동 적용 배치
- * 매일 00:05- 미적용 발령 적용
  */
 @Slf4j
 @Configuration
@@ -43,30 +42,26 @@ public class PersonnelOrderQuartzConfig {
     @PostConstruct
     public void register() {
         try {
-            JobDetail jobDetail = JobBuilder.newJob(PersonnelOrderApplyJob.class)
-                    .withIdentity(JOB_NAME + "_Detail", GROUP)
-                    .storeDurably()
-                    .build();
+            TriggerKey triggerKey = TriggerKey.triggerKey(JOB_NAME + "_Trigger", GROUP);
 
-            Trigger trigger = TriggerBuilder.newTrigger()
-                    .withIdentity(JOB_NAME + "_Trigger", GROUP)
-                    .forJob(jobDetail)
-                    .withSchedule(CronScheduleBuilder.cronSchedule(CRON_DAILY)
-                            .inTimeZone(TimeZone.getTimeZone("Asia/Seoul")))
-                    .build();
-
-            if (!scheduler.checkExists(jobDetail.getKey())) {
-                scheduler.scheduleJob(jobDetail, trigger);
-                log.info("[PersonnelOrder][Quartz] 등록 완료 - cron='{}'", CRON_DAILY);
+            // 트리거 이미 있으면 그대로 - SaaS 운영자가 변경한 cron 보존
+            if (scheduler.checkExists(triggerKey)) {
+                log.info("[PersonnelOrder][Quartz] 기존 트리거 유지");
             } else {
-                scheduler.addJob(jobDetail, true, true);
-                TriggerKey triggerKey = trigger.getKey();
-                if (scheduler.checkExists(triggerKey)) {
-                    scheduler.rescheduleJob(triggerKey, trigger);
-                } else {
-                    scheduler.scheduleJob(trigger);
-                }
-                log.info("[PersonnelOrder][Quartz] 재등록 완료 - cron='{}'", CRON_DAILY);
+                // 최초 등록만 yml 기본 cron 사용
+                JobDetail jobDetail = JobBuilder.newJob(PersonnelOrderApplyJob.class)
+                        .withIdentity(JOB_NAME + "_Detail", GROUP)
+                        .storeDurably()
+                        .build();
+
+                Trigger trigger = TriggerBuilder.newTrigger()
+                        .withIdentity(triggerKey)
+                        .forJob(jobDetail)
+                        .withSchedule(CronScheduleBuilder.cronSchedule(CRON_DAILY)
+                                .inTimeZone(TimeZone.getTimeZone("Asia/Seoul")))
+                        .build();
+                scheduler.scheduleJob(jobDetail, trigger);
+                log.info("[PersonnelOrder][Quartz] 최초 등록 완료 cron='{}'", CRON_DAILY);
             }
         } catch (SchedulerException e) {
             log.error("[PersonnelOrder][Quartz] 등록 실패", e);
