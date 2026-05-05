@@ -14,8 +14,8 @@ import java.time.LocalDate;
 @Data
 public class WorkTimeSummaryResDto {
 
-    private LocalDate weekStart;   // 월요일
-    private LocalDate weekEnd;     // 일요일
+    private LocalDate weekStart;   // 일요일
+    private LocalDate weekEnd;     // 토요일
 
     // 주 총 근무시간 (DailyAttendance.workedMinutes 합, 연장근무 포함 실 근무분)
     private Integer totalWorkedMinutes;
