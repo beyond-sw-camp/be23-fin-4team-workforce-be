@@ -11,6 +11,7 @@ import com._team._team.dto.BusinessException;
 import com._team._team.event.RagSyncApprovalEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @Transactional
 public class ApprovalDocumentService {
@@ -352,7 +354,10 @@ public class ApprovalDocumentService {
         );
     }
 
-    /** "인사발령품의서" */
+    /**
+     * "인사발령품의서"
+     * 승인 다 끝난후 [발송] 버튼 눌러 공문으로 전 부서 부서문서함에 노출
+     */
     private void savePersonnelOrderDocument(UUID companyId) {
         if (approvalDocumentRepository.existsByCompanyIdAndDocumentName(companyId, "인사발령품의서")) {
             return;
@@ -360,7 +365,7 @@ public class ApprovalDocumentService {
         approvalDocumentRepository.save(ApprovalDocument.builder()
                 .companyId(companyId)
                 .documentName("인사발령품의서")
-                .requestType(RequestType.HR)
+                .requestType(RequestType.OFFICIAL)
                 .formSchema("""
                 {
                   "fields": [
@@ -374,20 +379,6 @@ public class ApprovalDocumentService {
                 .build());
     }
 
-    /**
-     * 부팅 시 모든 기존 회사에 "인사발령품의서" 양식 등록
-     */
-    public int ensurePersonnelOrderDocumentForAllCompanies() {
-        List<UUID> companyIds = approvalDocumentRepository.findDistinctCompanyIds();
-        int inserted = 0;
-        for (UUID cid : companyIds) {
-            if (!approvalDocumentRepository.existsByCompanyIdAndDocumentName(cid, "인사발령품의서")) {
-                savePersonnelOrderDocument(cid);
-                inserted++;
-            }
-        }
-        return inserted;
-    }
 
     // 결재 양식 생성
     public ApprovalDocumentResDto create(UUID companyId, ApprovalDocumentCreateReqDto reqDto) {

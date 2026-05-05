@@ -608,15 +608,26 @@ public class ApprovalService {
      */
     private void publishPersonnelOrderEventIfApplicable(ApprovalRequest request, UUID approverId) {
         String docName = request.getApprovalDocument().getDocumentName();
-        // 종류(전보/승진/강등/복합/정기)는 contentJson.orderCategory 로 구분
-        if (docName == null) return;
+        log.info("[PersonnelOrder][DBG] publishPersonnelOrderEventIfApplicable 진입. requestId={} docName='{}'",
+                request.getRequestId(), docName);
+        // 종류(전보/승진/강등/복합/정기) 구분
+        if (docName == null) {
+            log.warn("[PersonnelOrder][DBG] docName=null -> skip");
+            return;
+        }
         boolean isPersonnelOrder = "인사발령품의서".equals(docName)
                 || docName.startsWith("인사발령")
                 || "정기 인사발령".equals(docName);
-        if (!isPersonnelOrder) return;
+        if (!isPersonnelOrder) {
+            log.warn("[PersonnelOrder][DBG] docName 매칭 실패 '{}' -> skip", docName);
+            return;
+        }
 
         JsonNode node = readContent(request.getContentJson());
-        if (node == null) return;
+        if (node == null) {
+            log.warn("[PersonnelOrder][DBG] contentJson 파싱 실패 -> skip. requestId={}", request.getRequestId());
+            return;
+        }
 
         LocalDate effectiveDate = dateOrNull(node, "effectiveDate");
         if (effectiveDate == null) effectiveDate = LocalDate.now();
