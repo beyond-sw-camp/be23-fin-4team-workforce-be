@@ -28,6 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -646,7 +648,7 @@ public class ContractService {
     public List<ContractResDto> findHistory(UUID companyId, UUID contractId) {
         Contract current = findContractWithPermission(companyId, contractId);
 
-        List<ContractResDto> history = new java.util.ArrayList<>();
+        List<ContractResDto> history = new ArrayList<>();
 
         Contract c = current;
         int maxDepth = 10;
@@ -663,7 +665,7 @@ public class ContractService {
             depth++;
         }
 
-        history.sort(java.util.Comparator.comparingInt(ContractResDto::getRevision));
+        history.sort(Comparator.comparingInt(ContractResDto::getRevision));
         return history;
     }
 }

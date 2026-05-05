@@ -17,6 +17,7 @@ import com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto;
 import com._team._team.evaluation.repository.EvaluationDesignRepository;
 import com._team._team.evaluation.repository.EvaluationGroupRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -72,11 +73,11 @@ public class EvaluationGroupService {
         try {
             targets = group.getTargetMemberIdsJson() != null
                     ? objectMapper.readValue(group.getTargetMemberIdsJson(),
-                            new com.fasterxml.jackson.core.type.TypeReference<List<UUID>>() {})
+                            new TypeReference<List<UUID>>() {})
                     : List.of();
             evalTypes = group.getEvaluationTypesJson() != null
                     ? objectMapper.readValue(group.getEvaluationTypesJson(),
-                            new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {})
+                            new TypeReference<List<String>>() {})
                     : List.of();
         } catch (Exception e) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "그룹 설정 JSON 이 올바르지 않습니다.");
