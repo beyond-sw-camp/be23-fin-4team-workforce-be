@@ -11,6 +11,8 @@ import com._team._team.salary.dto.reqdto.SalaryItemTemplateUpdateReqDto;
 import com._team._team.salary.dto.resdto.SalaryItemTemplateResDto;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +40,8 @@ public class SalaryItemTemplateService {
         this.ragSyncSalaryEventPublisher = ragSyncSalaryEventPublisher;
     }
 
-    /** 급여 항목 템플릿 생성 */
+    /** 급여 항목 템플릿 생성 - 캐시 무효화 */
+    @CacheEvict(value = "salaryItemTemplates", key = "#companyId")
     public SalaryItemTemplateResDto save(UUID companyId, SalaryItemTemplateCreateReqDto reqDto) {
         validateDuplicateItemName(companyId, reqDto.getItemName());
 
@@ -73,15 +76,17 @@ public class SalaryItemTemplateService {
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
-    /** 회사별 급여 항목 템플릿 목록 조회 */
+    /** 회사별 급여 항목 템플릿 목록 조회 - Redis 10분 캐시 */
     @Transactional(readOnly = true)
+    @Cacheable(value = "salaryItemTemplates", key = "#companyId")
     public List<SalaryItemTemplateResDto> findByCompanyId(UUID companyId) {
         return salaryItemTemplateRepository.findByCompanyIdAndDelYn(companyId, "N").stream()
                 .map(SalaryItemTemplateResDto::fromEntity)
                 .toList();
     }
 
-    /** 급여 항목 템플릿 수정 (더티체킹) */
+    /** 급여 항목 템플릿 수정 (더티체킹) - 캐시 무효화 */
+    @CacheEvict(value = "salaryItemTemplates", key = "#companyId")
     public SalaryItemTemplateResDto update(UUID companyId, UUID salaryItemTemplateId, SalaryItemTemplateUpdateReqDto reqDto) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
@@ -107,7 +112,8 @@ public class SalaryItemTemplateService {
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
-    /** 급여 항목 템플릿 삭제 */
+    /** 급여 항목 템플릿 삭제 - 캐시 무효화 */
+    @CacheEvict(value = "salaryItemTemplates", key = "#companyId")
     public void delete(UUID companyId, UUID salaryItemTemplateId) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));

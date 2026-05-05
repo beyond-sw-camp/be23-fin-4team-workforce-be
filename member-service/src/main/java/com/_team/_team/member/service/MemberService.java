@@ -53,8 +53,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -1873,16 +1877,15 @@ public class MemberService {
      * defaultPositionId 가 있는 경우 해당 포지션의 조직/직책 이름까지 채운다.
      */
     @Transactional(readOnly = true)
-    public java.util.Map<UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto>
-    findMinimalProfilesByIds(java.util.Collection<UUID> memberIds) {
-        if (memberIds == null || memberIds.isEmpty()) return java.util.Collections.emptyMap();
-        java.util.Map<UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto> result = new java.util.HashMap<>();
-        java.util.List<Member> members = memberRepository.findAllById(memberIds);
+    public Map<UUID, MemberMinimalProfileResDto> findMinimalProfilesByIds(Collection<UUID> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) return Collections.emptyMap();
+        Map<UUID, MemberMinimalProfileResDto> result = new HashMap<>();
+        List<Member> members = memberRepository.findAllById(memberIds);
         for (Member m : members) {
             String department = null;
             String positionName = null;
             if (m.getDefaultPositionId() != null) {
-                java.util.Optional<MemberPosition> posOpt = memberPositionRepository.findByIdWithDetails(m.getDefaultPositionId());
+                Optional<MemberPosition> posOpt = memberPositionRepository.findByIdWithDetails(m.getDefaultPositionId());
                 if (posOpt.isPresent()) {
                     MemberPosition p = posOpt.get();
                     if (p.getOrganization() != null) {
@@ -1894,7 +1897,7 @@ public class MemberService {
                 }
             }
             result.put(m.getMemberId(),
-                    com._team._team.member.dto.resdto.MemberMinimalProfileResDto.builder()
+                    MemberMinimalProfileResDto.builder()
                             .name(m.getName())
                             .department(department)
                             .positionName(positionName)

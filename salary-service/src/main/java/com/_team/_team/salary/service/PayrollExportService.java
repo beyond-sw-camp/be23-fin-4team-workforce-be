@@ -48,16 +48,16 @@ public class PayrollExportService {
     private static final String STATUS_PAID_KO = "지급완료";
 
     private final PayrollRepository payrollRepository;
-    private final MemberFeignClient memberFeignClient;
     private final TaxSummaryService taxSummaryService;
+    private final CachedMemberLookupService cachedMemberLookup;
 
     @Autowired
     public PayrollExportService(PayrollRepository payrollRepository,
-                                MemberFeignClient memberFeignClient,
-                                TaxSummaryService taxSummaryService) {
+                                TaxSummaryService taxSummaryService,
+                                CachedMemberLookupService cachedMemberLookup) {
         this.payrollRepository = payrollRepository;
-        this.memberFeignClient = memberFeignClient;
         this.taxSummaryService = taxSummaryService;
+        this.cachedMemberLookup = cachedMemberLookup;
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +65,9 @@ public class PayrollExportService {
         LocalDate from = ym.atDay(1);
         LocalDate to = ym.atEndOfMonth();
 
-        List<Payroll> payrolls = payrollRepository.findInMonthFetchItems(companyId, from, to);
+        // QueryDSL 기반 동적 검색 호출 (관리자 목록과 동일 메서드 공유)
+        List<Payroll> payrolls = payrollRepository.searchAdminListInMonth(
+                companyId, from, to, null, null, null);
         Map<UUID, MemberResDto> memberMap = fetchMemberMap(companyId);
 
         // 데이터 없으면 EARNING DEDUCTION 헤더 동적 추출 불가
@@ -332,16 +334,10 @@ public class PayrollExportService {
         return s;
     }
 
+    // 캐시(5분 TTL) 활용
     private Map<UUID, MemberResDto> fetchMemberMap(UUID companyId) {
-        try {
-            var res = memberFeignClient.getMembersByCompany(companyId);
-            if (res == null || res.getData() == null) return Collections.emptyMap();
-            return res.getData().stream()
-                    .collect(Collectors.toMap(MemberResDto::getMemberId, m -> m, (a, b) -> a));
-        } catch (Exception e) {
-            log.warn("[PAYROLL-EXPORT] 직원 조회 실패 companyId={} 빈 Map 반환", companyId, e);
-            return Collections.emptyMap();
-        }
+        return cachedMemberLookup.getMembersByCompany(companyId).stream()
+                .collect(Collectors.toMap(MemberResDto::getMemberId, m -> m, (a, b) -> a));
     }
 
     private List<String> collectItemNames(List<Payroll> payrolls, ItemType type) {
