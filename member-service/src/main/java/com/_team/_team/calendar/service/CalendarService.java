@@ -7,7 +7,6 @@ import com._team._team.calendar.dto.reqdto.CalendarEventUpdateReqDto;
 import com._team._team.calendar.dto.resdto.CalendarEventResDto;
 import com._team._team.calendar.dto.resdto.CalendarMonthlyResDto;
 import com._team._team.calendar.repository.CalendarEventRepository;
-import com._team._team.calendar.repository.LegalHolidayRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.dto.NotificationMessage;
 import com._team._team.member.domain.Member;
@@ -43,16 +42,14 @@ public class CalendarService {
     private final MemberPositionRepository memberPositionRepository;
     private final OrganizationRepository organizationRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final LegalHolidayService legalHolidayService;
 
     @Autowired
-    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, OrganizationRepository organizationRepository, ApplicationEventPublisher eventPublisher, LegalHolidayService legalHolidayService) {
+    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, OrganizationRepository organizationRepository, ApplicationEventPublisher eventPublisher) {
         this.calendarEventRepository = calendarEventRepository;
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.organizationRepository = organizationRepository;
         this.eventPublisher = eventPublisher;
-        this.legalHolidayService = legalHolidayService;
     }
 
 
@@ -242,22 +239,11 @@ public class CalendarService {
         LocalDateTime startAt = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endAt = yearMonth.atEndOfMonth().atTime(23, 59, 59);
 
-        // 기존 일정 조회
         List<CalendarEventResDto> events = getEvents(member, startAt, endAt, eventType);
-
-        // 공휴일 조회 후 해당 월만 필터링
-        List<CalendarMonthlyResDto.HolidayDto> monthHolidays =
-                legalHolidayService.getHolidays(year).stream()
-                        .filter(h -> h.getHolidayDate().getMonthValue() == month)
-                        .map(h -> CalendarMonthlyResDto.HolidayDto.builder()
-                                .holidayDate(h.getHolidayDate())
-                                .holidayName(h.getHolidayName())
-                                .build())
-                        .collect(Collectors.toList());
 
         return CalendarMonthlyResDto.builder()
                 .events(events)
-                .holidays(monthHolidays)
+                .holidays(List.of())
                 .build();
     }
 
