@@ -43,12 +43,11 @@ public class ComprehensiveOvertimeService {
     private final CachedMemberLookupService cachedMemberLookup;
 
     /**
-     * 회사 전체 포괄임금제 직원의 baseDate 기준 월간 OT 누적 현황
+     * 회사 전체 포괄임금제 직원 -> 기준일 기준 월간 초과근무시간 누적 현황
      * 기준일로 속한 월의 1일 ~ 말일까지 합산
      * 사용률 50% 미만은 결과에서 제외 (화면 정책)
      */
     @Transactional(readOnly = true)
-    @Cacheable(value = "comprehensiveOvertimeStatus", key = "#companyId + ':' + #baseDate")
     public List<ComprehensiveOvertimeStatusResDto> getStatus(UUID companyId, LocalDate baseDate) {
         YearMonth ym = YearMonth.from(baseDate);
         LocalDate from = ym.atDay(1);
