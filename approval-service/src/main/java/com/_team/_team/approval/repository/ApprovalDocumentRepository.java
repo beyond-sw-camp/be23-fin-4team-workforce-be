@@ -3,6 +3,7 @@ package com._team._team.approval.repository;
 import com._team._team.approval.domain.ApprovalDocument;
 import com._team._team.approval.domain.enums.RequestType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -29,7 +30,6 @@ public interface ApprovalDocumentRepository extends JpaRepository<ApprovalDocume
             UUID companyId, String documentName, UUID documentId);
 
     // 부팅 시 멱등 보강 - 시드된 모든 회사 ID
-    @org.springframework.data.jpa.repository.Query(
-            "select distinct d.companyId from ApprovalDocument d")
+    @Query("select distinct d.companyId from ApprovalDocument d")
     List<UUID> findDistinctCompanyIds();
 }
