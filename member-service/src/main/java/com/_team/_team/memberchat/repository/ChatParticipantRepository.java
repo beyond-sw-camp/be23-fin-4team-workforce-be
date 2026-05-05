@@ -29,9 +29,16 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             select p.lastReadMessageId from ChatParticipant p
             where p.chatRoom.id = :roomId
               and p.memberId <> :me
-              and p.status = com._team._team.memberchat.domain.enums.ChatParticipantStatus.JOINED
+              and p.status = :status
             """)
-    List<Long> findOtherPartyLastRead(@Param("roomId") Long roomId, @Param("me") UUID me);
+    List<Long> findOtherPartyLastRead(@Param("roomId") Long roomId,
+                                      @Param("me") UUID me,
+                                      @Param("status") ChatParticipantStatus status);
+
+    /** 호출자 편의 - JOINED 고정 */
+    default List<Long> findOtherPartyLastRead(Long roomId, UUID me) {
+        return findOtherPartyLastRead(roomId, me, ChatParticipantStatus.JOINED);
+    }
 
     /**
      * 그룹 방의 "이 메시지를 읽은 참여자 수" 계산용.
@@ -42,11 +49,17 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             select count(p) from ChatParticipant p
             where p.chatRoom.id = :roomId
               and p.memberId <> :senderId
-              and p.status = com._team._team.memberchat.domain.enums.ChatParticipantStatus.JOINED
+              and p.status = :status
               and p.lastReadMessageId is not null
               and p.lastReadMessageId >= :messageId
             """)
     long countReadersAtOrAfter(@Param("roomId") Long roomId,
                                @Param("messageId") Long messageId,
-                               @Param("senderId") UUID senderId);
+                               @Param("senderId") UUID senderId,
+                               @Param("status") ChatParticipantStatus status);
+
+    /** 호출자 편의 - JOINED 고정 */
+    default long countReadersAtOrAfter(Long roomId, Long messageId, UUID senderId) {
+        return countReadersAtOrAfter(roomId, messageId, senderId, ChatParticipantStatus.JOINED);
+    }
 }

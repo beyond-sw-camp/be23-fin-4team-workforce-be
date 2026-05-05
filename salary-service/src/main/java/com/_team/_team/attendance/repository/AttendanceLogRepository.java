@@ -63,9 +63,16 @@ public interface AttendanceLogRepository extends JpaRepository<AttendanceLog, UU
      */
     @Query("""
        SELECT log FROM AttendanceLog log
-       WHERE log.dailyAttendance.dailyAttendanceId IN :daIds
-         AND log.sourceType = com._team._team.attendance.domain.enums.SourceType.ADMIN_MANUAL
+       JOIN FETCH log.dailyAttendance da
+       WHERE da.dailyAttendanceId IN :daIds
+         AND log.sourceType = :sourceType
        """)
     List<AttendanceLog> findAdminManualByDailyAttendanceIds(
-            @Param("daIds") Collection<UUID> daIds);
+            @Param("daIds") Collection<UUID> daIds,
+            @Param("sourceType") SourceType sourceType);
+
+    /** 호출자 편의 - ADMIN_MANUAL 고정 조회 */
+    default List<AttendanceLog> findAdminManualByDailyAttendanceIds(Collection<UUID> daIds) {
+        return findAdminManualByDailyAttendanceIds(daIds, SourceType.ADMIN_MANUAL);
+    }
 }
