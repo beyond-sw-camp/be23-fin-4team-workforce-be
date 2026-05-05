@@ -627,7 +627,7 @@ public class ApprovalService {
             return;
         }
 
-        java.util.List<PersonnelOrderApprovedEvent.Item> items = new java.util.ArrayList<>();
+        List<PersonnelOrderApprovedEvent.Item> items = new ArrayList<>();
         for (JsonNode it : itemsNode) {
             UUID memberId = uuidOrNull(it, "memberId");
             if (memberId == null) continue;
@@ -870,7 +870,7 @@ public class ApprovalService {
                         .requestId(request.getRequestId())
                         .selectionId(selectionId)
                         .approverId(request.getMemberId())
-                        .decidedAt(java.time.LocalDateTime.now())
+                        .decidedAt(LocalDateTime.now())
                         .note(null)
                         .action(action)
                         .build()
