@@ -103,14 +103,14 @@ public class DailyAttendanceService {
     /**
      * 특정 날짜 근태 조회 (응답 DTO 변환)
      * - 사원이 자기 근태 확인할 때 사용
+     * - 기록이 없는 날(예: 미출근일)은 null 반환
      */
     @Transactional(readOnly = true)
     public DailyAttendanceResDto findDailyAttendance(UUID companyId, UUID memberId, LocalDate date) {
-        DailyAttendance daily = dailyAttendanceRepository
+        return dailyAttendanceRepository
                 .findByCompanyIdAndMemberIdAndAttendanceDate(companyId, memberId, date)
-                .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "해당 날짜의 근태 기록이 없습니다."));
-        return DailyAttendanceResDto.fromEntity(daily);
+                .map(DailyAttendanceResDto::fromEntity)
+                .orElse(null);
     }
 
     /**
