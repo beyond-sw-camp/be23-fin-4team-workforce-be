@@ -27,7 +27,13 @@ public class ContractSignedEventConsumer {
         this.salaryPolicyRepository = salaryPolicyRepository;
     }
 
-    @KafkaListener(topics = "contract-signed", groupId = "salary-service")
+    @KafkaListener(
+            topics = "contract-signed",
+            groupId = "salary-service",
+            properties = {
+                    "spring.json.value.default.type=com._team._team.event.ContractSignedEvent"
+            }
+    )
     @Transactional
     public void consume(ContractSignedEvent event) {
         log.info("[Contract→Salary] 수신. contractId={}, memberId={}, newSalary={}, effectiveDate={}",
