@@ -74,6 +74,10 @@ public class LeaveRequest extends BaseTimeEntity {
     @Column(length = 500)
     private String reason;
 
+    // 비연속 사용 날짜 JSON 배열 (예: ["2026-05-22","2026-05-29"])
+    @Column(length = 500)
+    private String plannedDatesJson;
+
     // 증빙 서류 URL, 병가/경조 등에서 필수
     @Column(length = 500)
     private String evidenceFileUrl;
