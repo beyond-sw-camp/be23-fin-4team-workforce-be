@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -20,5 +21,5 @@ public class ContractSendReqDto {
     private UUID employeeMemberId;
 
     // ADMIN_INPUT 필드 값 (신규연봉, 특약사항 등)
-    private String adminInputJson;
+    private Map<String, Object> adminInputJson;
 }
