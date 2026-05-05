@@ -41,11 +41,24 @@ public class SimplifiedTaxTableService {
      * 기존 연도 데이터가 있으면 소프트 삭제 후 새로 삽입
      */
     public int uploadTaxTable(Integer effectiveYear, MultipartFile file) {
+        return uploadTaxTable(effectiveYear, file, false);
+    }
+
+    /**
+     * 이미 같은 연도 있어도 덮어씀
+     */
+    public int uploadTaxTable(Integer effectiveYear, MultipartFile file, boolean force) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "파일이 비어있습니다.");
         }
 
-        repository.softDeleteByYear(effectiveYear);
+        long existing = repository.countByEffectiveYearAndDelYn(effectiveYear, "N");
+        if (existing > 0 && !force) {
+            throw new BusinessException(HttpStatus.CONFLICT,
+                    effectiveYear + "년 간이세액표가 이미 등록되어 있어요. 덮어쓰려면 다시 시도해주세요.");
+        }
+        // 이미 등록된 연도 재업로드
+        repository.hardDeleteByYear(effectiveYear);
 
         List<SimplifiedTaxTable> rows = new ArrayList<>();
 

@@ -34,6 +34,12 @@ public interface SimplifiedTaxTableRepository extends JpaRepository<SimplifiedTa
            """)
     int softDeleteByYear(@Param("year") Integer year);
 
+    // hard delete
+    // 운영자 재업로드 시 기존 행 완전 제거 후 재등록 용도
+    @Modifying
+    @Query("DELETE FROM SimplifiedTaxTable t WHERE t.effectiveYear = :year")
+    int hardDeleteByYear(@Param("year") Integer year);
+
     // 등록된 연도 목록 화면 표시용
     @Query("""
            SELECT DISTINCT t.effectiveYear FROM SimplifiedTaxTable t
