@@ -7,6 +7,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.UUID;
@@ -44,5 +45,5 @@ public interface MemberFeignClient {
      * 회사 시스템 관리자 (isSystemAdminYn=YES) 조회 - 알림 발송 대상
      */
     @GetMapping("/member/internal/admins-by-company")
-    ApiResponse<List<MemberResDto>> getAdminsByCompany(@org.springframework.web.bind.annotation.RequestParam("companyId") UUID companyId);
+    ApiResponse<List<MemberResDto>> getAdminsByCompany(@RequestParam("companyId") UUID companyId);
 }
