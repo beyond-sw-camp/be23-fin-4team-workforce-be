@@ -46,20 +46,20 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    // 부서 문서함 - requesterOrganizationId 기준, isDeptVisibleYn='Y', 승인완료/반려만
-    @Query("SELECT ar FROM ApprovalRequest ar " +
-            "JOIN FETCH ar.approvalDocument doc " +
-            "WHERE doc.companyId = :companyId " +
-            "AND ar.requesterOrganizationId = :organizationId " +
-            "AND ar.requestStatus IN (" +
-            "   com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
-            "   com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
-            ") " +
-            "AND ar.delYn = 'N' " +
-            "ORDER BY ar.createdAt DESC")
-    List<ApprovalRequest> findDepartmentRequests(
-            @Param("companyId") UUID companyId,
-            @Param("organizationId") UUID organizationId);
+//    // 부서 문서함 - requesterOrganizationId 기준, isDeptVisibleYn='Y', 승인완료/반려만
+//    @Query("SELECT ar FROM ApprovalRequest ar " +
+//            "JOIN FETCH ar.approvalDocument doc " +
+//            "WHERE doc.companyId = :companyId " +
+//            "AND ar.requesterOrganizationId = :organizationId " +
+//            "AND ar.requestStatus IN (" +
+//            "   com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+//            "   com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+//            ") " +
+//            "AND ar.delYn = 'N' " +
+//            "ORDER BY ar.createdAt DESC")
+//    List<ApprovalRequest> findDepartmentRequests(
+//            @Param("companyId") UUID companyId,
+//            @Param("organizationId") UUID organizationId);
 
     @Query("SELECT COUNT(r) FROM ApprovalRequest r " +
             "WHERE r.requestType = :requestType " +
@@ -69,21 +69,21 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     long countByRequestTypeInYear(@Param("requestType") RequestType requestType,
                                   @Param("year") int year);
 
-    @Query("SELECT r FROM ApprovalRequest r " +
-            "JOIN FETCH r.approvalDocument doc " +
-            "WHERE doc.companyId = :companyId " +
-            "  AND r.requesterOrganizationId = :organizationId " +
-            "  AND r.requestType = :requestType " +
-            "  AND r.requestStatus IN (" +
-            "    com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
-            "    com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
-            "  ) " +
-            "  AND r.delYn = 'N' " +
-            "ORDER BY r.createdAt DESC")
-    List<ApprovalRequest> findDepartmentRequestsByType(
-            @Param("companyId") UUID companyId,
-            @Param("organizationId") UUID organizationId,
-            @Param("requestType") RequestType requestType);
+//    @Query("SELECT r FROM ApprovalRequest r " +
+//            "JOIN FETCH r.approvalDocument doc " +
+//            "WHERE doc.companyId = :companyId " +
+//            "  AND r.requesterOrganizationId = :organizationId " +
+//            "  AND r.requestType = :requestType " +
+//            "  AND r.requestStatus IN (" +
+//            "    com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+//            "    com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+//            "  ) " +
+//            "  AND r.delYn = 'N' " +
+//            "ORDER BY r.createdAt DESC")
+//    List<ApprovalRequest> findDepartmentRequestsByType(
+//            @Param("companyId") UUID companyId,
+//            @Param("organizationId") UUID organizationId,
+//            @Param("requestType") RequestType requestType);
 
     @Query("SELECT r FROM ApprovalRequest r " +
             "WHERE r.requestId IN :requestIds " +
@@ -125,5 +125,53 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("status") RequestStatus status,
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("startOfNextDay") LocalDateTime startOfNextDay);
+
+    // 부서 문서함 - 작성자 부서이거나, 공문 발송 수신 부서인 경우
+    @Query("SELECT DISTINCT ar FROM ApprovalRequest ar " +
+            "JOIN FETCH ar.approvalDocument doc " +
+            "LEFT JOIN OfficialRecipient orc ON orc.approvalRequest = ar " +
+            "WHERE doc.companyId = :companyId " +
+            "AND ( " +
+            "   ar.requesterOrganizationId = :organizationId " +
+            "   OR ( " +
+            "       ar.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
+            "       AND ar.sendYn = 'Y' " +
+            "       AND orc.recipientOrganizationId = :organizationId " +
+            "   ) " +
+            ") " +
+            "AND ar.requestStatus IN (" +
+            "   com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+            "   com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+            ") " +
+            "AND ar.delYn = 'N' " +
+            "ORDER BY ar.createdAt DESC")
+    List<ApprovalRequest> findDepartmentRequests(
+            @Param("companyId") UUID companyId,
+            @Param("organizationId") UUID organizationId);
+
+
+    @Query("SELECT DISTINCT r FROM ApprovalRequest r " +
+            "JOIN FETCH r.approvalDocument doc " +
+            "LEFT JOIN OfficialRecipient orc ON orc.approvalRequest = r " +
+            "WHERE doc.companyId = :companyId " +
+            "  AND r.requestType = :requestType " +
+            "  AND ( " +
+            "      r.requesterOrganizationId = :organizationId " +
+            "      OR ( " +
+            "          r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
+            "          AND r.sendYn = 'Y' " +
+            "          AND orc.recipientOrganizationId = :organizationId " +
+            "      ) " +
+            "  ) " +
+            "  AND r.requestStatus IN (" +
+            "    com._team._team.approval.domain.enums.RequestStatus.APPROVED, " +
+            "    com._team._team.approval.domain.enums.RequestStatus.REJECTED" +
+            "  ) " +
+            "  AND r.delYn = 'N' " +
+            "ORDER BY r.createdAt DESC")
+    List<ApprovalRequest> findDepartmentRequestsByType(
+            @Param("companyId") UUID companyId,
+            @Param("organizationId") UUID organizationId,
+            @Param("requestType") RequestType requestType);
 
 }
