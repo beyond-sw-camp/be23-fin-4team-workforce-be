@@ -5,12 +5,15 @@ import com._team._team.evaluation.domain.EvaluationDesign;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationSeason;
 import com._team._team.evaluation.domain.converter.EvaluatorMapping;
+import com._team._team.evaluation.domain.enums.EvalType;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.EvaluatorMapUpdateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupCreateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.EvaluatorMappingResDto;
 import com._team._team.evaluation.dto.resdto.GroupResDto;
+import com._team._team.evaluation.feignclients.MemberServiceClient;
+import com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto;
 import com._team._team.evaluation.repository.EvaluationDesignRepository;
 import com._team._team.evaluation.repository.EvaluationGroupRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
@@ -19,9 +22,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -33,13 +38,13 @@ public class EvaluationGroupService {
     private final EvaluationSeasonRepository seasonRepository;
     private final EvaluationDesignRepository designRepository;
     private final ObjectMapper objectMapper;
-    private final com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient;
+    private final MemberServiceClient memberServiceClient;
 
     public EvaluationGroupService(EvaluationGroupRepository groupRepository,
                                    EvaluationSeasonRepository seasonRepository,
                                    EvaluationDesignRepository designRepository,
                                    ObjectMapper objectMapper,
-                                   com._team._team.evaluation.feignclients.MemberServiceClient memberServiceClient) {
+                                   MemberServiceClient memberServiceClient) {
         this.groupRepository = groupRepository;
         this.seasonRepository = seasonRepository;
         this.designRepository = designRepository;
@@ -78,18 +83,18 @@ public class EvaluationGroupService {
         }
 
         // [D-3] 타입 세이프 List<EvaluatorMapping> 로 직접 구성. 더 이상 수동 JSON 작성 불필요.
-        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> newMaps = new java.util.ArrayList<>();
+        List<EvaluatorMapping> newMaps = new ArrayList<>();
         for (UUID targetId : targets) {
             for (String rawType : evalTypes) {
                 String type = rawType == null ? "" : rawType.trim().toUpperCase();
-                com._team._team.evaluation.domain.enums.EvalType evalType;
+                EvalType evalType;
                 try {
-                    evalType = com._team._team.evaluation.domain.enums.EvalType.valueOf(type);
+                    evalType = EvalType.valueOf(type);
                 } catch (IllegalArgumentException ex) {
                     continue;
                 }
-                if (evalType == com._team._team.evaluation.domain.enums.EvalType.SELF) {
-                    newMaps.add(com._team._team.evaluation.domain.converter.EvaluatorMapping.builder()
+                if (evalType == EvalType.SELF) {
+                    newMaps.add(EvaluatorMapping.builder()
                             .targetMemberId(targetId)
                             .evaluatorId(targetId)
                             .evaluationType(evalType)
@@ -104,7 +109,7 @@ public class EvaluationGroupService {
                 }
                 if (candidates == null || candidates.isEmpty()) continue;
                 UUID evaluatorId = candidates.get(0);
-                newMaps.add(com._team._team.evaluation.domain.converter.EvaluatorMapping.builder()
+                newMaps.add(EvaluatorMapping.builder()
                         .targetMemberId(targetId)
                         .evaluatorId(evaluatorId)
                         .evaluationType(evalType)
@@ -206,16 +211,16 @@ public class EvaluationGroupService {
     @Transactional
     public GroupResDto updateEvaluatorMaps(UUID groupId, UUID companyId, List<EvaluatorMapUpdateReqDto.EvaluatorMapItemReqDto> evaluatorMaps) {
         EvaluationGroup group = findGroupOrThrow(groupId, companyId);
-        List<com._team._team.evaluation.domain.converter.EvaluatorMapping> maps = evaluatorMaps == null
-                ? new java.util.ArrayList<>()
+        List<EvaluatorMapping> maps = evaluatorMaps == null
+                ? new ArrayList<>()
                 : evaluatorMaps.stream()
-                .filter(java.util.Objects::nonNull)
-                .map(m -> com._team._team.evaluation.domain.converter.EvaluatorMapping.builder()
+                .filter(Objects::nonNull)
+                .map(m -> EvaluatorMapping.builder()
                         .targetMemberId(m.getTargetMemberId())
                         .evaluatorId(m.getEvaluatorId())
                         .evaluationType(m.getEvaluationType())
                         .build())
-                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+                .collect(Collectors.toCollection(ArrayList::new));
         group.updateEvaluatorMaps(maps);
         syncGroupScopeFieldsFromMaps(group, maps);
         groupRepository.save(group);
@@ -243,7 +248,7 @@ public class EvaluationGroupService {
             if (map.getEvaluatorId() != null) memberIds.add(map.getEvaluatorId());
         }
 
-        Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> fetchedProfiles = Map.of();
+        Map<UUID, MemberMinimalProfileDto> fetchedProfiles = Map.of();
         if (!memberIds.isEmpty()) {
             try {
                 fetchedProfiles = memberServiceClient.getProfilesByIds(List.copyOf(memberIds));
@@ -251,14 +256,12 @@ public class EvaluationGroupService {
                 fetchedProfiles = Map.of();
             }
         }
-        final Map<UUID, com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto> profiles = fetchedProfiles;
+        final Map<UUID, MemberMinimalProfileDto> profiles = fetchedProfiles;
 
         List<EvaluatorMappingResDto> resMaps = maps.stream()
                 .map(map -> {
-                    com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto targetProfile =
-                            profiles.get(map.getTargetMemberId());
-                    com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto evaluatorProfile =
-                            profiles.get(map.getEvaluatorId());
+                    MemberMinimalProfileDto targetProfile = profiles.get(map.getTargetMemberId());
+                    MemberMinimalProfileDto evaluatorProfile = profiles.get(map.getEvaluatorId());
                     return EvaluatorMappingResDto.builder()
                             .targetMemberId(map.getTargetMemberId())
                             .evaluatorId(map.getEvaluatorId())
@@ -279,17 +282,17 @@ public class EvaluationGroupService {
     private List<EvaluatorMapping> buildInitialEvaluatorMappings(List<String> evaluationTypes, List<UUID> targetMemberIds) {
         if (evaluationTypes == null || targetMemberIds == null) return List.of();
         boolean hasSelf = evaluationTypes.stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(v -> v.trim().toUpperCase())
                 .anyMatch("SELF"::equals);
         if (!hasSelf) return List.of();
         return targetMemberIds.stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .distinct()
                 .map(targetId -> EvaluatorMapping.builder()
                         .targetMemberId(targetId)
                         .evaluatorId(targetId)
-                        .evaluationType(com._team._team.evaluation.domain.enums.EvalType.SELF)
+                        .evaluationType(EvalType.SELF)
                         .build())
                 .collect(Collectors.toList());
     }
