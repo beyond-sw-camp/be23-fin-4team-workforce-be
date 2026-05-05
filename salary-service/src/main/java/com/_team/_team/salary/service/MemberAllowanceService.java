@@ -152,8 +152,32 @@ public class MemberAllowanceService {
     }
 
     /**
-     * 관리자가 단건 수당을 소프트 삭제
-     * [수당 관리] 화면의 행별 [삭제] 버튼에서 호출
+     * 관리자가 단건 수당을 종료 처리 + 이력 보존
+     * [수당 관리] 화면의 칩 X 버튼에서 호출
+     */
+    public void adminCloseOne(UUID memberAllowanceId, UUID companyId, LocalDate closeAt) {
+        MemberAllowance entity = repository.findById(memberAllowanceId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "수당 내역을 찾을 수 없습니다."));
+        if (!entity.getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "다른 회사의 수당입니다.");
+        }
+        if (entity.getEffectiveTo() != null
+                && entity.getEffectiveTo().isBefore(LocalDate.now())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "이미 종료된 수당입니다.");
+        }
+        LocalDate at = closeAt == null ? LocalDate.now() : closeAt;
+        if (entity.getEffectiveFrom() != null && at.isBefore(entity.getEffectiveFrom())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "종료일은 시작일 이후여야 합니다.");
+        }
+        entity.closeEffectivePeriod(at);
+    }
+
+    /**
+     * 관리자가 단건 수당을 소프트 삭제 (실수 정정용)
+     * [수당 관리] 화면의 행별 [완전 삭제] 버튼에서 호출
      */
     public void adminSoftDeleteOne(UUID memberAllowanceId, UUID companyId) {
         MemberAllowance entity = repository.findById(memberAllowanceId)
@@ -214,6 +238,14 @@ public class MemberAllowanceService {
         return status == null
                 ? repository.findCompanyAllowancesActiveInMonth(companyId, start, end)
                 : repository.findCompanyAllowancesActiveInMonthByStatus(companyId, status, start, end);
+    }
+
+    /**
+     * 관리자 - 회사 전체 이력 (활성 + 종료, 효력일 역순)
+     */
+    @Transactional(readOnly = true)
+    public List<MemberAllowance> findCompanyAllHistory(UUID companyId) {
+        return repository.findCompanyAllHistory(companyId);
     }
 
     /**
