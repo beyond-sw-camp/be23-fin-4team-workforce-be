@@ -73,23 +73,35 @@ public class OrganizationService {
     }
 
     // 온보딩 시 기본 직급 생성
-    public JobGrade createDefaultJobGrade(Company company) {
-        JobGrade jobGrade = JobGrade.builder()
-                .company(company)
-                .name("관리자")
-                .displayOrder(0)
-                .build();
-        return jobGradeRepository.save(jobGrade);
+    public void createDefaultJobGrade(Company company) {
+        String[] defaultGrades = {
+                "관리자", "임원", "부장", "차장", "과장", "대리", "주임", "사원"
+        };
+
+        for (int i = 0; i < defaultGrades.length; i++) {
+            JobGrade jobGrade = JobGrade.builder()
+                    .company(company)
+                    .name(defaultGrades[i])
+                    .displayOrder(i)
+                    .build();
+            jobGradeRepository.save(jobGrade);
+        }
     }
 
     // 온보딩 시 기본 직책 생성
-    public JobTitle createDefaultJobTitle(Company company) {
-        JobTitle jobTitle = JobTitle.builder()
-                .company(company)
-                .name("관리자")
-                .displayOrder(0)
-                .build();
-        return jobTitleRepository.save(jobTitle);
+    public void createDefaultJobTitle(Company company) {
+        String[] defaultTitles = {
+                "관리자", "CEO", "본부장", "실장", "팀장", "파트장", "팀원"
+        };
+
+        for (int i = 0; i < defaultTitles.length; i++) {
+            JobTitle jobTitle = JobTitle.builder()
+                    .company(company)
+                    .name(defaultTitles[i])
+                    .displayOrder(i)
+                    .build();
+            jobTitleRepository.save(jobTitle);
+        }
     }
 
     // 조직 생성
