@@ -2,6 +2,7 @@ package com._team._team.salary.repository;
 
 import com._team._team.salary.domain.SimplifiedTaxTable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -26,7 +27,7 @@ public interface SimplifiedTaxTableRepository extends JpaRepository<SimplifiedTa
             @Param("dependents") Integer dependents);
 
     // 연도별 삭제, 재업로드 시 기존 데이터 삭제
-    @org.springframework.data.jpa.repository.Modifying
+    @Modifying
     @Query("""
            UPDATE SimplifiedTaxTable t SET t.delYn = 'Y'
            WHERE t.effectiveYear = :year AND t.delYn = 'N'
