@@ -10,6 +10,7 @@ import com._team._team.salary.repository.SalaryRepository;
 import com._team._team.salary.domain.*;
 import com._team._team.salary.domain.enums.ItemType;
 import com._team._team.salary.domain.enums.PayrollStatus;
+import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.domain.vo.AutoPayrollItem;
 import com._team._team.salary.domain.vo.SettlementPeriod;
 import com._team._team.salary.dto.reqdto.PayrollCreateReqDto;
@@ -62,7 +63,7 @@ public class PayrollService {
     private final MemberAllowanceService memberAllowanceService;
     private final MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final MemberFeignClient memberFeignClient;
+    private final CachedMemberLookupService cachedMemberLookup;
 
     @Autowired
     public PayrollService(PayrollRepository payrollRepository,
@@ -73,7 +74,7 @@ public class PayrollService {
                           MemberAllowanceService memberAllowanceService,
                           MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository,
                           ApplicationEventPublisher eventPublisher,
-                          MemberFeignClient memberFeignClient){
+                          CachedMemberLookupService cachedMemberLookup){
         this.payrollRepository = payrollRepository;
         this.payrollItemRepository = payrollItemRepository;
         this.salaryRepository = salaryRepository;
@@ -82,7 +83,7 @@ public class PayrollService {
         this.memberAllowanceService = memberAllowanceService;
         this.memberLeaveOfAbsenceRepository = memberLeaveOfAbsenceRepository;
         this.eventPublisher = eventPublisher;
-        this.memberFeignClient = memberFeignClient;
+        this.cachedMemberLookup = cachedMemberLookup;
     }
 
     /**
@@ -448,7 +449,9 @@ public class PayrollService {
         LocalDate from = ym.atDay(1);
         LocalDate to = ym.atEndOfMonth();
 
-        List<Payroll> payrolls = payrollRepository.findInMonthFetchItems(companyId, from, to);
+        // QueryDSL 기반 동적 검색으로 통합
+        List<Payroll> payrolls = payrollRepository.searchAdminListInMonth(
+                companyId, from, to, null, null, null);
         if (payrolls.isEmpty()) {
             return Collections.emptyList();
         }
@@ -630,18 +633,11 @@ public class PayrollService {
         return rows;
     }
 
-    // 회사 직원 정보 일괄 조회 헬퍼
+    // 회사 직원 정보 일괄 조회 헬퍼 - Redis 캐시(5분 TTL) 활용
     private Map<UUID, MemberResDto> fetchMemberMap(UUID companyId) {
-        try {
-            var res = memberFeignClient.getMembersByCompany(companyId);
-            if (res == null || res.getData() == null) return Collections.emptyMap();
-            return res.getData().stream()
-                    .collect(Collectors.toMap(
-                            MemberResDto::getMemberId, m -> m, (a, b) -> a));
-        } catch (Exception e) {
-            log.warn("[PAYROLL-LIST] 직원 조회 실패 companyId={} 빈 Map 반환", companyId, e);
-            return Collections.emptyMap();
-        }
+        return cachedMemberLookup.getMembersByCompany(companyId).stream()
+                .collect(Collectors.toMap(
+                        MemberResDto::getMemberId, m -> m, (a, b) -> a));
     }
 
     // 급여대장 항목
@@ -824,10 +820,10 @@ public class PayrollService {
         workDays = Math.max(0, workDays - unpaidLeaveDays);
 
         // 정책 분기 분모 결정
-        com._team._team.salary.domain.enums.ProrationMethod method =
+        ProrationMethod method =
                 policy != null && policy.getProrationMethod() != null
                         ? policy.getProrationMethod()
-                        : com._team._team.salary.domain.enums.ProrationMethod.DAYS_IN_MONTH;
+                        : ProrationMethod.DAYS_IN_MONTH;
 
         int denominator;
         switch (method) {

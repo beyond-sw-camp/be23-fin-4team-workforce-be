@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
+public interface PayrollRepository extends JpaRepository<Payroll, UUID>, PayrollRepositoryQuerydsl {
 
     /**
      * 급여대장 단건 조회 (회사 + 삭제되지 않은 것만)
@@ -106,20 +106,7 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
                                 @Param("from") LocalDate from,
                                 @Param("to") LocalDate to);
 
-    // 엑셀 다운로드용 회사 월 단위 전체 Payroll PayrollItem JOIN FETCH
-    @Query("""
-        SELECT DISTINCT p FROM Payroll p
-        LEFT JOIN FETCH p.payrollItemList
-        WHERE p.companyId = :companyId
-          AND p.payrollYearMonthDay BETWEEN :from AND :to
-          AND p.delYn = 'N'
-        ORDER BY p.payrollYearMonthDay ASC, p.memberId ASC
-        """)
-    List<Payroll> findInMonthFetchItems(@Param("companyId") UUID companyId,
-                                        @Param("from") LocalDate from,
-                                        @Param("to") LocalDate to);
-
-    // 직원 본인 연간 Payroll PayrollItem JOIN FETCH 연봉조회 화면용
+    // 직원 본인 연간 연봉조회 화면용
     @Query("""
         SELECT DISTINCT p FROM Payroll p
         LEFT JOIN FETCH p.payrollItemList
@@ -135,7 +122,7 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID> {
                                                @Param("to") LocalDate to);
 
     /**
-     * targetYearMonth (정산 대상 월) 기반 직원 연봉 조회용
+     *  (정산 대상 월) 기반 직원 연봉 조회용
      */
     @Query("""
         SELECT DISTINCT p FROM Payroll p
