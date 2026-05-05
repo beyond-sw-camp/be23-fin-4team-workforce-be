@@ -128,6 +128,11 @@ public class Payroll extends BaseTimeEntity {
         this.paidAt = LocalDate.now();
     }
 
+    /** 시드 전용 - 실제 지급일로 paidAt 보정 */
+    public void overridePaidAt(LocalDate actualPaidAt) {
+        this.paidAt = actualPaidAt;
+    }
+
     /** 소프트 삭제 */
     public void delete() {
         this.delYn = "Y";

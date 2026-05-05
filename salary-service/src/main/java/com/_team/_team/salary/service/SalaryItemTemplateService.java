@@ -76,9 +76,8 @@ public class SalaryItemTemplateService {
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
-    /** 회사별 급여 항목 템플릿 목록 조회 - Redis 10분 캐시 */
+    /** 회사별 급여 항목 템플릿 목록 조회 (캐시 일시 비활성) */
     @Transactional(readOnly = true)
-    @Cacheable(value = "salaryItemTemplates", key = "#companyId")
     public List<SalaryItemTemplateResDto> findByCompanyId(UUID companyId) {
         return salaryItemTemplateRepository.findByCompanyIdAndDelYn(companyId, "N").stream()
                 .map(SalaryItemTemplateResDto::fromEntity)
