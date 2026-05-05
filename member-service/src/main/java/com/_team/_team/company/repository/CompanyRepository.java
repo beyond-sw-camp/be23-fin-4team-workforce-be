@@ -14,4 +14,7 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
 
     // 사업자번호로 회사 조회
     Optional<Company> findByBusinessNumber(String businessNumber);
+
+    // 회사 도메인으로 회사 조회
+    Optional<Company> findByCompanyDomain(String companyDomain);
 }

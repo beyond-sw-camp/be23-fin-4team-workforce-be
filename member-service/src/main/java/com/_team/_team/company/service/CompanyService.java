@@ -273,4 +273,14 @@ public class CompanyService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
         return company.getSealImageUrl();
     }
+
+    /**
+     * 회사 도메인으로 회사 단건 조회 - 시드용
+     */
+    public CompanyInfoResDto findByDomain(String domain) {
+        Company company = companyRepository.findByCompanyDomain(domain)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "도메인으로 회사를 찾을 수 없습니다: " + domain));
+        return CompanyInfoResDto.fromEntity(company);
+    }
 }

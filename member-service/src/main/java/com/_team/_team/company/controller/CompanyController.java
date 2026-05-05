@@ -110,5 +110,13 @@ public class CompanyController {
         return companyService.getSealImageUrl(companyId);
     }
 
-
+    /**
+     * 회사 도메인으로 회사 단건 조회 - 시드용 (데모)
+     */
+    @GetMapping("/internal/by-domain/{domain}")
+    public ResponseEntity<?> findByDomain(@PathVariable String domain) {
+        return new ResponseEntity<>(
+                ApiResponse.success(companyService.findByDomain(domain), "회사 조회 성공"),
+                HttpStatus.OK);
+    }
 }

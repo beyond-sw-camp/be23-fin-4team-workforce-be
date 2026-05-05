@@ -73,9 +73,8 @@ public class CompanyHolidayService {
         return CompanyHolidayResDto.fromEntity(saved);
     }
 
-    /** 공휴일 전체 목록 조회 - Redis 10분간 캐시 처리 */
+    /** 공휴일 전체 목록 조회 (캐시 일시 비활성) */
     @Transactional(readOnly = true)
-    @Cacheable(value = "companyHolidays", key = "#companyId")
     public List<CompanyHolidayResDto> findHolidays(UUID companyId) {
         List<CompanyHoliday> holidays = companyHolidayRepository
                 .findByCompanyIdAndDelYnOrderByHolidayDate(companyId, "N");

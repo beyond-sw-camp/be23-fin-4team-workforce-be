@@ -307,9 +307,8 @@ public class CompanyLeaveTypeService {
         );
     }
 
-    // 회사 휴가 종류 list - 마스터 데이터, Redis 10분 캐시
+    // 회사 휴가 종류 list - 캐시 일시 비활성
     @Transactional(readOnly = true)
-    @Cacheable(value = "companyLeaveTypes", key = "#companyId")
     public List<CompanyLeaveType> findAll(UUID companyId) {
         return repository.findAllByCompanyIdAndDelYnOrderByDisplayOrder(companyId, "N");
     }
