@@ -34,5 +34,5 @@
 임시저장, 결재 회수, 결재 반려
 
 ■ 관련 메뉴
-관련 메뉴: /app/approvals?tab=compose&sideNav=request-compose
+관련 메뉴: /app/approvals
 화면명: 결재 요청 작성 (내 기안 문서 및 진행 상태)

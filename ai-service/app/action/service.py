@@ -339,6 +339,17 @@ def _ask_response(current_state: ActionState, missing: list) -> ActionResponse:
         options_str = ", ".join(first_missing["options"])
         message += f"\n\n({label} 옵션: {options_str})"
 
+    # 선택 항목 안내
+    optional_labels = _get_optional_field_labels(
+        current_state.form_schema, current_state.slots
+    )
+    if optional_labels:
+        optional_str = ", ".join(optional_labels)
+        message += (
+            f"\n\n선택 항목 ({optional_str})은 함께 알려주시면 반영되며, "
+            f"결재 화면에서도 입력 가능합니다."
+        )
+
     message += "\n\n(다른 질문을 하시려면 \"취소\"라고 입력해주세요)"
 
     return ActionResponse(
@@ -411,6 +422,34 @@ def _error_response(message: str, session_id: Optional[str]) -> ActionResponse:
 def _get_weekday_korean(target_date: date) -> str:
     weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
     return weekdays[target_date.weekday()]
+
+
+def _get_optional_field_labels(form_schema_str: str, slots: dict) -> list:
+    """선택 필드 라벨 목록 (이미 채워진 건 제외)"""
+    fields = form_builder.parse_form_schema(form_schema_str)
+    visible_fields = form_builder.get_visible_fields(fields)
+
+    optional_labels = []
+    for field in visible_fields:
+        # 조건부 필드는 조건 만족 시에만 검사
+        if not form_builder.is_field_visible(field, slots):
+            continue
+
+        # 필수 필드는 제외
+        if field.get("required"):
+            continue
+
+        # 이미 입력된 값 있으면 제외
+        name = field.get("name")
+        value = slots.get(name)
+        if value:
+            continue
+
+        label = field.get("label", name)
+        if label:
+            optional_labels.append(label)
+
+    return optional_labels
 
 
 def _is_cancel_intent(question: str) -> bool:

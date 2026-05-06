@@ -38,5 +38,5 @@
 휴가 신청서, 연차 신청서, 휴가 올리기
 
 ■ 관련 메뉴
-관련 메뉴: /app/approvals?tab=compose&sideNav=request-compose
+관련 메뉴: /app/approvals
 화면명: 결재 요청 작성

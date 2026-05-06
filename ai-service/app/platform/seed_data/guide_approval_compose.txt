@@ -47,5 +47,5 @@
 결재 진행 방법, 결재 절차, 결재 단계, 결재 흐름
 
 ■ 관련 메뉴
-관련 메뉴: /app/approvals?tab=compose&sideNav=request-compose
+관련 메뉴: /app/approvals
 화면명: 결재 요청 작성
