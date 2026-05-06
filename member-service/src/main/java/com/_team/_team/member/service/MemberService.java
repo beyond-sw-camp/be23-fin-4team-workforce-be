@@ -1874,6 +1874,7 @@ public class MemberService {
         // 같은 회사 내 활성 사원 중 같은 조직에 속한 사람을 후보로 모음
         java.util.List<Member> sameCompany = memberRepository.findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE);
         java.util.List<UUID> candidates = new java.util.ArrayList<>();
+        java.util.List<UUID> leaderCandidates = new java.util.ArrayList<>();
         for (Member m : sameCompany) {
             if (m.getMemberId().equals(targetMemberId)) continue;
             if (m.getDefaultPositionId() == null) continue;
@@ -1885,14 +1886,35 @@ public class MemberService {
             int order = p.getJobGrade().getDisplayOrder();
             boolean match;
             switch (evalType.toUpperCase()) {
-                case "DOWNWARD" -> match = order < targetRank;
+                case "DOWNWARD" -> {
+                    if (isLeaderPosition(p)) {
+                        leaderCandidates.add(m.getMemberId());
+                    }
+                    match = order < targetRank;
+                }
                 case "UPWARD"   -> match = order > targetRank;
                 case "PEER"     -> match = order == targetRank;
                 default -> match = false;
             }
             if (match) candidates.add(m.getMemberId());
         }
+        if ("DOWNWARD".equalsIgnoreCase(evalType) && !leaderCandidates.isEmpty()) {
+            return leaderCandidates;
+        }
         return candidates;
+    }
+
+    private boolean isLeaderPosition(MemberPosition position) {
+        if (position == null || position.getJobTitle() == null || position.getJobTitle().getName() == null) {
+            return false;
+        }
+        String title = position.getJobTitle().getName().trim().toLowerCase();
+        return title.contains("팀장")
+                || title.contains("파트장")
+                || title.contains("리더")
+                || title.contains("lead")
+                || title.contains("leader")
+                || title.contains("manager");
     }
 
     /**

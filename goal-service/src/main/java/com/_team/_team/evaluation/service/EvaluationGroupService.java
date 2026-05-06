@@ -4,8 +4,12 @@ import com._team._team.dto.BusinessException;
 import com._team._team.evaluation.domain.EvaluationDesign;
 import com._team._team.evaluation.domain.EvaluationGroup;
 import com._team._team.evaluation.domain.EvaluationSeason;
+import com._team._team.evaluation.domain.converter.DesignQuestion;
+import com._team._team.evaluation.domain.converter.EvaluationSection;
 import com._team._team.evaluation.domain.converter.EvaluatorMapping;
+import com._team._team.evaluation.domain.converter.GradeConfig;
 import com._team._team.evaluation.domain.enums.EvalType;
+import com._team._team.evaluation.domain.enums.SectionType;
 import com._team._team.evaluation.domain.enums.SeasonStatus;
 import com._team._team.evaluation.dto.reqdto.EvaluatorMapUpdateReqDto;
 import com._team._team.evaluation.dto.reqdto.GroupCreateReqDto;
@@ -17,15 +21,17 @@ import com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto;
 import com._team._team.evaluation.repository.EvaluationDesignRepository;
 import com._team._team.evaluation.repository.EvaluationGroupRepository;
 import com._team._team.evaluation.repository.EvaluationSeasonRepository;
+import com._team._team.goal.repository.GoalRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -38,17 +44,20 @@ public class EvaluationGroupService {
     private final EvaluationGroupRepository groupRepository;
     private final EvaluationSeasonRepository seasonRepository;
     private final EvaluationDesignRepository designRepository;
+    private final GoalRepository goalRepository;
     private final ObjectMapper objectMapper;
     private final MemberServiceClient memberServiceClient;
 
     public EvaluationGroupService(EvaluationGroupRepository groupRepository,
                                    EvaluationSeasonRepository seasonRepository,
                                    EvaluationDesignRepository designRepository,
+                                   GoalRepository goalRepository,
                                    ObjectMapper objectMapper,
                                    MemberServiceClient memberServiceClient) {
         this.groupRepository = groupRepository;
         this.seasonRepository = seasonRepository;
         this.designRepository = designRepository;
+        this.goalRepository = goalRepository;
         this.objectMapper = objectMapper;
         this.memberServiceClient = memberServiceClient;
     }
@@ -124,51 +133,77 @@ public class EvaluationGroupService {
         return toGroupResDto(group);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<GroupResDto> listGroups(UUID seasonId, UUID companyId) {
         EvaluationSeason season = seasonRepository.findById(seasonId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다."));
         if (!season.getCompanyId().equals(companyId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다.");
         }
-        return groupRepository.findBySeason_SeasonId(seasonId)
+
+        List<EvaluationGroup> groups = groupRepository.findBySeason_SeasonId(seasonId);
+        if (groups.isEmpty()) {
+            groups = autoCreateGroupFromActiveGoals(season);
+        }
+
+        return groups
                 .stream().map(this::toGroupResDto).collect(Collectors.toList());
     }
 
     @Transactional
+    public List<GroupResDto> listGroups(UUID seasonId, UUID companyId, EvaluationAccessScopeService.AccessScope scope) {
+        List<GroupResDto> groups = listGroups(seasonId, companyId);
+        if (scope == null || scope.companyWide()) {
+            return groups;
+        }
+        return groups.stream()
+                .map(group -> filterGroupForScope(group, scope))
+                .filter(group -> hasVisibleTargets(group) || hasVisibleMappings(group))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
     public GroupResDto createGroup(UUID seasonId, UUID companyId, GroupCreateReqDto dto) {
-        EvaluationSeason season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다."));
-        if (!season.getCompanyId().equals(companyId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "평가 시즌을 찾을 수 없습니다.");
+        throw new BusinessException(HttpStatus.BAD_REQUEST,
+                "평가 대상자는 목표 기간의 승인 완료 개인 목표 기준으로 자동 생성됩니다. 수동 그룹 생성은 지원하지 않습니다.");
+    }
+
+    private List<EvaluationGroup> autoCreateGroupFromActiveGoals(EvaluationSeason season) {
+        List<UUID> targetMemberIds = goalRepository.findMemberIdsWithActiveGoalByCycle(
+                season.getCompanyId(),
+                season.getTargetCycle(),
+                season.getTargetCycleStart()
+        );
+        if (targetMemberIds.isEmpty()) {
+            return List.of();
         }
 
-        EvaluationDesign design = null;
-        if (dto.getDesignId() != null) {
-            design = designRepository.findById(dto.getDesignId())
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "평가 설계를 찾을 수 없습니다."));
-        }
-
-        String evalTypesJson = null;
-        String targetMemberIdsJson = null;
         try {
-            if (dto.getEvaluationTypes() != null) evalTypesJson = objectMapper.writeValueAsString(dto.getEvaluationTypes());
-            if (dto.getTargetMemberIds() != null) targetMemberIdsJson = objectMapper.writeValueAsString(dto.getTargetMemberIds());
+            EvaluationGroup group = EvaluationGroup.builder()
+                    .companyId(season.getCompanyId())
+                    .season(season)
+                    .name("자동 로드 평가 대상자")
+                    .evaluationTypesJson(objectMapper.writeValueAsString(List.of("SELF", "DOWNWARD")))
+                    .targetMemberIdsJson(objectMapper.writeValueAsString(targetMemberIds))
+                    .evaluatorMaps(buildSelfMappings(targetMemberIds))
+                    .design(findOrCreateDefaultGoalPolicy(season.getCompanyId()))
+                    .build();
+            return List.of(groupRepository.save(group));
         } catch (Exception e) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "JSON 변환에 실패했습니다.");
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "평가 대상자 자동 로드에 실패했습니다.");
         }
+    }
 
-        EvaluationGroup group = EvaluationGroup.builder()
-                .companyId(companyId)
-                .season(season)
-                .name(dto.getName())
-                .evaluationTypesJson(evalTypesJson)
-                .targetMemberIdsJson(targetMemberIdsJson)
-                .evaluatorMaps(buildInitialEvaluatorMappings(dto.getEvaluationTypes(), dto.getTargetMemberIds()))
-                .design(design)
-                .build();
-
-        return toGroupResDto(groupRepository.save(group));
+    private List<EvaluatorMapping> buildSelfMappings(List<UUID> targetMemberIds) {
+        return targetMemberIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .map(targetId -> EvaluatorMapping.builder()
+                        .targetMemberId(targetId)
+                        .evaluatorId(targetId)
+                        .evaluationType(EvalType.SELF)
+                        .build())
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -237,6 +272,75 @@ public class EvaluationGroupService {
         return group;
     }
 
+    private EvaluationDesign findOrCreateDefaultGoalPolicy(UUID companyId) {
+        return designRepository.findFirstByCompanyIdAndDefaultTemplateTrue(companyId)
+                .or(() -> designRepository.findFirstByCompanyIdOrderByCreatedAtAsc(companyId))
+                .orElseGet(() -> designRepository.save(EvaluationDesign.builder()
+                        .companyId(companyId)
+                        .name("기본 목표 평가 정책")
+                        .sections(defaultGoalSections())
+                        .gradeConfig(defaultRelativeGradeConfig())
+                        .templateVersion(1)
+                        .defaultTemplate(true)
+                        .build()));
+    }
+
+    private List<EvaluationSection> defaultGoalSections() {
+        DesignQuestion goalGrade = DesignQuestion.builder()
+                .id("goal-grade")
+                .type("grade")
+                .title("목표별 등급")
+                .required(true)
+                .weight(BigDecimal.valueOf(100))
+                .build();
+        EvaluationSection goalSection = EvaluationSection.builder()
+                .sectionId("goal-performance")
+                .title("목표 성과")
+                .type(SectionType.MANUAL)
+                .weight(BigDecimal.valueOf(100))
+                .questions(new ArrayList<>(List.of(goalGrade)))
+                .build();
+        return new ArrayList<>(List.of(goalSection));
+    }
+
+    private GradeConfig defaultRelativeGradeConfig() {
+        return GradeConfig.builder()
+                .type("RELATIVE")
+                .grades(new ArrayList<>(List.of(
+                        GradeConfig.GradeBand.builder()
+                                .label("S")
+                                .minScore(BigDecimal.valueOf(92))
+                                .maxScore(BigDecimal.valueOf(100))
+                                .color("#2563eb")
+                                .build(),
+                        GradeConfig.GradeBand.builder()
+                                .label("A")
+                                .minScore(BigDecimal.valueOf(78))
+                                .maxScore(BigDecimal.valueOf(91.99))
+                                .color("#16a34a")
+                                .build(),
+                        GradeConfig.GradeBand.builder()
+                                .label("B")
+                                .minScore(BigDecimal.valueOf(63))
+                                .maxScore(BigDecimal.valueOf(77.99))
+                                .color("#f59e0b")
+                                .build(),
+                        GradeConfig.GradeBand.builder()
+                                .label("C")
+                                .minScore(BigDecimal.ZERO)
+                                .maxScore(BigDecimal.valueOf(62.99))
+                                .color("#64748b")
+                                .build()
+                )))
+                .targetDistribution(Map.of(
+                        "S", BigDecimal.valueOf(0.10),
+                        "A", BigDecimal.valueOf(0.20),
+                        "B", BigDecimal.valueOf(0.50),
+                        "C", BigDecimal.valueOf(0.20)
+                ))
+                .build();
+    }
+
     private GroupResDto toGroupResDto(EvaluationGroup group) {
         List<EvaluatorMapping> maps = group.getEvaluatorMaps() != null
                 ? group.getEvaluatorMaps()
@@ -274,6 +378,64 @@ public class EvaluationGroupService {
                 .collect(Collectors.toList());
 
         return GroupResDto.from(group, resMaps);
+    }
+
+    private GroupResDto filterGroupForScope(GroupResDto group, EvaluationAccessScopeService.AccessScope scope) {
+        List<EvaluatorMappingResDto> visibleMaps = group.getEvaluatorMaps() == null
+                ? List.of()
+                : group.getEvaluatorMaps().stream()
+                .filter(map -> scope.canSeeTarget(map.getTargetMemberId()) || scope.isRequester(map.getEvaluatorId()))
+                .collect(Collectors.toList());
+
+        Set<UUID> visibleTargets = new LinkedHashSet<>();
+        List<UUID> originalTargets = readTargetMemberIds(group.getTargetMemberIdsJson());
+        originalTargets.stream()
+                .filter(scope::canSeeTarget)
+                .forEach(visibleTargets::add);
+        visibleMaps.stream()
+                .map(EvaluatorMappingResDto::getTargetMemberId)
+                .filter(java.util.Objects::nonNull)
+                .forEach(visibleTargets::add);
+
+        String targetMemberIdsJson;
+        try {
+            targetMemberIdsJson = objectMapper.writeValueAsString(visibleTargets);
+        } catch (Exception e) {
+            targetMemberIdsJson = "[]";
+        }
+
+        return GroupResDto.builder()
+                .groupId(group.getGroupId())
+                .companyId(group.getCompanyId())
+                .seasonId(group.getSeasonId())
+                .name(group.getName())
+                .evaluationTypesJson(group.getEvaluationTypesJson())
+                .targetMemberIdsJson(targetMemberIdsJson)
+                .designId(group.getDesignId())
+                .evaluatorMaps(visibleMaps)
+                .build();
+    }
+
+    private boolean hasVisibleTargets(GroupResDto group) {
+        return !readTargetMemberIds(group.getTargetMemberIdsJson()).isEmpty();
+    }
+
+    private boolean hasVisibleMappings(GroupResDto group) {
+        return group.getEvaluatorMaps() != null && !group.getEvaluatorMaps().isEmpty();
+    }
+
+    private List<UUID> readTargetMemberIds(String targetMemberIdsJson) {
+        if (targetMemberIdsJson == null || targetMemberIdsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(
+                    targetMemberIdsJson,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<UUID>>() {}
+            );
+        } catch (Exception ignored) {
+            return List.of();
+        }
     }
 
     /**

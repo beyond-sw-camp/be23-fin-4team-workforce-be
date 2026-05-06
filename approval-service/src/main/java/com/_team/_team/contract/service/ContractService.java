@@ -48,9 +48,11 @@ public class ContractService {
     private final MemberServiceClient memberServiceClient;
     private final ContractNotificationService contractNotificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ContractNumberService contractNumberService;
+    private final ContractSignedEventPublisher contractSignedEventPublisher;
 
     @Autowired
-    public ContractService(ContractRepository contractRepository, ContractTemplateRepository templateRepository, ContractBatchRepository batchRepository, ContractPartyRepository partyRepository, SalaryServiceClient salaryServiceClient, MemberServiceClient memberServiceClient, ContractNotificationService contractNotificationService) {
+    public ContractService(ContractRepository contractRepository, ContractTemplateRepository templateRepository, ContractBatchRepository batchRepository, ContractPartyRepository partyRepository, SalaryServiceClient salaryServiceClient, MemberServiceClient memberServiceClient, ContractNotificationService contractNotificationService, ContractNumberService contractNumberService, ContractSignedEventPublisher contractSignedEventPublisher) {
         this.contractRepository = contractRepository;
         this.templateRepository = templateRepository;
         this.batchRepository = batchRepository;
@@ -58,10 +60,13 @@ public class ContractService {
         this.salaryServiceClient = salaryServiceClient;
         this.memberServiceClient = memberServiceClient;
         this.contractNotificationService = contractNotificationService;
+        this.contractNumberService = contractNumberService;
+        this.contractSignedEventPublisher = contractSignedEventPublisher;
     }
 
     //    개별 발송
     public ContractResDto sendToEmployee(UUID companyId, UUID senderMemberId, ContractSendReqDto reqDto) {
+        log.info("[Contract-Send] adminInputJson={}", reqDto.getAdminInputJson());
         ContractTemplate template = findActiveTemplate(companyId, reqDto.getTemplateId());
 
         String sealImageUrl = memberServiceClient.getCompanySealImageUrl(companyId);
@@ -79,6 +84,9 @@ public class ContractService {
         // contentJson 생성 (AUTO + ADMIN_INPUT 합치기)
         String contentJson = buildContentJson(template.getFormSchema(), salaryInfo, memberInfo, reqDto.getAdminInputJson());
 
+        // 문서번호 생성
+        String contractNumber = contractNumberService.generate(template.getContractType());
+
         // Contract 생성
         Contract contract = Contract.builder()
                 .companyId(companyId)
@@ -88,6 +96,8 @@ public class ContractService {
                 .contentJson(contentJson)
                 .formSchemaSnapshot(template.getFormSchema())
                 .contractStatus(ContractStatus.SENT)
+                .contractNumber(contractNumber)
+                .sealImageUrl(sealImageUrl)
                 .employeeName(memberInfo.getName())           // member에서
                 .employeeSabun(memberInfo.getSabun())          // member에서
                 .organizationName(memberInfo.getOrganizationName()) // member에서
@@ -140,11 +150,15 @@ public class ContractService {
 
         ContractBatch savedBatch = batchRepository.save(batch);
 
+
         // 직원별 계약 생성
         for (ContractBatchSendReqDto.BatchItem item : reqDto.getItems()) {
             SalaryInfoResDto salaryInfo = getCurrentSalary(companyId, item.getEmployeeMemberId());
             MemberContractInfoResDto memberInfo = memberServiceClient.getMemberContractInfo(item.getEmployeeMemberId());
             String contentJson = buildContentJson(template.getFormSchema(), salaryInfo, memberInfo, item.getAdminInputJson());
+
+            // 문서번호 생성
+            String contractNumber = contractNumberService.generate(template.getContractType());
 
             Contract contract = Contract.builder()
                     .companyId(companyId)
@@ -155,6 +169,8 @@ public class ContractService {
                     .contentJson(contentJson)
                     .formSchemaSnapshot(template.getFormSchema())
                     .contractStatus(ContractStatus.SENT)
+                    .contractNumber(contractNumber)
+                    .sealImageUrl(sealImageUrl)
                     .employeeName(memberInfo.getName())
                     .employeeSabun(memberInfo.getSabun())
                     .organizationName(memberInfo.getOrganizationName())
@@ -237,10 +253,48 @@ public class ContractService {
                         contract.getEmployeeName());
             }
 
+            // 연봉계약서 서명 완료 시 급여 반영 이벤트 발행
+            if (contract.getContractType() == ContractType.SALARY) {
+                publishSalaryContractEvent(contract);
+            }
+
+
             // TODO: PDF 생성 + S3 저장
         }
 
         return ContractResDto.fromEntity(contract, parties);
+    }
+
+    private void publishSalaryContractEvent(Contract contract) {
+        try {
+            Map<String, Object> content = objectMapper.readValue(
+                    contract.getContentJson(),
+                    new TypeReference<Map<String, Object>>() {});
+
+            Object newSalary = content.get("newSalary");
+            Object effectiveDate = content.get("effectiveDate");
+
+            if (newSalary == null || effectiveDate == null) {
+                log.warn("[Contract] 연봉계약서에 newSalary 또는 effectiveDate 누락. contractId={}",
+                        contract.getContractId());
+                return;
+            }
+
+            ContractSignedEvent event = ContractSignedEvent.builder()
+                    .companyId(contract.getCompanyId())
+                    .memberId(contract.getEmployeeMemberId())
+                    .contractId(contract.getContractId())
+                    .contractType("SALARY")
+                    .newSalary(Long.valueOf(newSalary.toString()))
+                    .effectiveDate(java.time.LocalDate.parse(effectiveDate.toString()))
+                    .signedAt(java.time.LocalDateTime.now())
+                    .build();
+
+            contractSignedEventPublisher.publish(event);
+        } catch (Exception e) {
+            log.error("[Contract] 급여 반영 이벤트 생성 실패. contractId={}",
+                    contract.getContractId(), e);
+        }
     }
 
     // 직원 거절
@@ -264,7 +318,7 @@ public class ContractService {
         }
 
         // 거절 처리
-        party.reject(reqDto.getRejectReason());
+        party.reject();
         contract.reject(reqDto.getRejectReason());
 
         if (contract.getContractBatch() != null) {
@@ -303,11 +357,13 @@ public class ContractService {
         } else {
             contracts = contractRepository.findByEmployeeMemberIdAndDelYnOrderByCreatedAtDesc(memberId, "N");
         }
+        List<UUID> contractIds = contracts.stream().map(Contract::getContractId).toList();
+        Map<UUID, List<ContractParty>> partyMap = partyRepository.findByContractIdIn(contractIds)
+                .stream()
+                .collect(Collectors.groupingBy(p -> p.getContract().getContractId()));
+
         return contracts.stream()
-                .map(c -> {
-                    List<ContractParty> parties = partyRepository.findByContractContractId(c.getContractId());
-                    return ContractResDto.fromEntity(c, parties);
-                })
+                .map(c -> ContractResDto.fromEntity(c, partyMap.getOrDefault(c.getContractId(), List.of())))
                 .toList();
     }
 
@@ -318,6 +374,20 @@ public class ContractService {
         List<ContractParty> parties = partyRepository.findByContractContractId(contractId);
         return ContractResDto.fromEntity(contract, parties);
     }
+
+    // 직원용 계약 상세 (본인 확인)
+    @Transactional(readOnly = true)
+    public ContractResDto findMyContractById(UUID companyId, UUID memberId, UUID contractId) {
+        Contract contract = findContractWithPermission(companyId, contractId);
+
+        if (!contract.getEmployeeMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인의 계약만 조회할 수 있습니다.");
+        }
+
+        List<ContractParty> parties = partyRepository.findByContractContractId(contractId);
+        return ContractResDto.fromEntity(contract, parties);
+    }
+
 
     // 배치별 계약 목록 (인사팀용)
     @Transactional(readOnly = true)
@@ -330,11 +400,13 @@ public class ContractService {
         }
 
         List<Contract> contracts = contractRepository.findByContractBatchBatchIdAndDelYn(batchId, "N");
+        List<UUID> contractIds = contracts.stream().map(Contract::getContractId).toList();
+        Map<UUID, List<ContractParty>> partyMap = partyRepository.findByContractIdIn(contractIds)
+                .stream()
+                .collect(Collectors.groupingBy(p -> p.getContract().getContractId()));
+
         return contracts.stream()
-                .map(c -> {
-                    List<ContractParty> parties = partyRepository.findByContractContractId(c.getContractId());
-                    return ContractResDto.fromEntity(c, parties);
-                })
+                .map(c -> ContractResDto.fromEntity(c, partyMap.getOrDefault(c.getContractId(), List.of())))
                 .toList();
     }
 
@@ -350,11 +422,14 @@ public class ContractService {
     @Transactional(readOnly = true)
     public List<ContractResDto> findAllByCompanyId(UUID companyId) {
         List<Contract> contracts = contractRepository.findByCompanyIdAndDelYnOrderByCreatedAtDesc(companyId, "N");
+
+        List<UUID> contractIds = contracts.stream().map(Contract::getContractId).toList();
+        Map<UUID, List<ContractParty>> partyMap = partyRepository.findByContractIdIn(contractIds)
+                .stream()
+                .collect(Collectors.groupingBy(p -> p.getContract().getContractId()));
+
         return contracts.stream()
-                .map(c -> {
-                    List<ContractParty> parties = partyRepository.findByContractContractId(c.getContractId());
-                    return ContractResDto.fromEntity(c, parties);
-                })
+                .map(c -> ContractResDto.fromEntity(c, partyMap.getOrDefault(c.getContractId(), List.of())))
                 .toList();
     }
 
@@ -407,7 +482,7 @@ public class ContractService {
     }
 
     private String buildContentJson(String formSchema, SalaryInfoResDto salaryInfo,
-                                    MemberContractInfoResDto memberInfo, String adminInputJson) {
+                                    MemberContractInfoResDto memberInfo, Map<String, Object> adminInputJson) {
         try {
             Map<String, Object> content = new LinkedHashMap<>();
             content.put("employeeName", memberInfo.getName());
@@ -416,10 +491,8 @@ public class ContractService {
             content.put("jobTitleName", memberInfo.getJobTitleName());
             content.put("baseSalary", salaryInfo.getBaseSalary());
 
-            if (adminInputJson != null && !adminInputJson.isBlank()) {
-                Map<String, Object> adminData = objectMapper.readValue(
-                        adminInputJson, new TypeReference<Map<String, Object>>() {});
-                content.putAll(adminData);
+            if (adminInputJson != null && !adminInputJson.isEmpty()) {
+                content.putAll(adminInputJson);
             }
 
             return objectMapper.writeValueAsString(content);
@@ -451,19 +524,25 @@ public class ContractService {
         contract.cancel(cancelReason);
         employeeParty.cancel();
 
+        // 배치 카운트 반영
+        if (contract.getContractBatch() != null) {
+            contract.getContractBatch().incrementRejectedCount();
+        }
+
+
         // 직원에게 회수 알림
-//        contractNotificationService.notifyContractCanceled(
-//                contract.getEmployeeMemberId(),
-//                memberId,
-//                contractId,
-//                contract.getContractTemplate().getTemplateName());
+        contractNotificationService.notifyContractCanceled(
+                contract.getEmployeeMemberId(),
+                memberId,
+                contractId,
+                contract.getContractTemplate().getTemplateName());
 
         List<ContractParty> parties = partyRepository.findByContractContractId(contractId);
         return ContractResDto.fromEntity(contract, parties);
     }
 
     // 개별 재발송
-    public ContractResDto resend(UUID companyId, UUID senderMemberId, UUID contractId, String adminInputJson) {
+    public ContractResDto resend(UUID companyId, UUID senderMemberId, UUID contractId, Map<String, Object> adminInputJson) {
         Contract original = findContractWithPermission(companyId, contractId);
 
         // 상태 검증: REJECTED 또는 CANCELED만 재발송 가능
@@ -494,6 +573,10 @@ public class ContractService {
         MemberContractInfoResDto memberInfo = memberServiceClient.getMemberContractInfo(original.getEmployeeMemberId());
         String contentJson = buildContentJson(template.getFormSchema(), salaryInfo, memberInfo, adminInputJson);
 
+        String contractNumber = contractNumberService.generate(template.getContractType());
+
+        String sealImageUrl = memberServiceClient.getCompanySealImageUrl(companyId);
+
         // 새 Contract 생성 (이력 연결)
         Contract contract = Contract.builder()
                 .companyId(companyId)
@@ -503,6 +586,8 @@ public class ContractService {
                 .contentJson(contentJson)
                 .formSchemaSnapshot(template.getFormSchema())
                 .contractStatus(ContractStatus.SENT)
+                .contractNumber(contractNumber)
+                .sealImageUrl(sealImageUrl)
                 .employeeName(memberInfo.getName())
                 .employeeSabun(memberInfo.getSabun())
                 .organizationName(memberInfo.getOrganizationName())
@@ -564,6 +649,8 @@ public class ContractService {
 
         ContractBatch savedBatch = batchRepository.save(newBatch);
 
+        String sealImageUrl = memberServiceClient.getCompanySealImageUrl(companyId);
+
         for (ContractBatchResendReqDto.BatchResendItem item : reqDto.getItems()) {
             Contract original = contractRepository.findByIdWithTemplate(item.getContractId())
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
@@ -598,6 +685,10 @@ public class ContractService {
             MemberContractInfoResDto memberInfo = memberServiceClient.getMemberContractInfo(original.getEmployeeMemberId());
             String contentJson = buildContentJson(template.getFormSchema(), salaryInfo, memberInfo, item.getAdminInputJson());
 
+            // 문서번호 생성
+            String contractNumber = contractNumberService.generate(template.getContractType());
+
+
             Contract contract = Contract.builder()
                     .companyId(companyId)
                     .contractTemplate(template)
@@ -607,6 +698,8 @@ public class ContractService {
                     .contentJson(contentJson)
                     .formSchemaSnapshot(template.getFormSchema())
                     .contractStatus(ContractStatus.SENT)
+                    .contractNumber(contractNumber)
+                    .sealImageUrl(sealImageUrl)
                     .employeeName(memberInfo.getName())
                     .employeeSabun(memberInfo.getSabun())
                     .organizationName(memberInfo.getOrganizationName())
@@ -647,7 +740,24 @@ public class ContractService {
     @Transactional(readOnly = true)
     public List<ContractResDto> findHistory(UUID companyId, UUID contractId) {
         Contract current = findContractWithPermission(companyId, contractId);
+        return buildHistory(current);
 
+    }
+
+    // 직원용 이력 조회 (본인 확인)
+    @Transactional(readOnly = true)
+    public List<ContractResDto> findMyContractHistory(UUID companyId, UUID memberId, UUID contractId) {
+        Contract current = findContractWithPermission(companyId, contractId);
+
+        if (!current.getEmployeeMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인의 계약 이력만 조회할 수 있습니다.");
+        }
+
+        return buildHistory(current);
+    }
+
+    // 공통 이력 조회 로직
+    private List<ContractResDto> buildHistory(Contract current) {
         List<ContractResDto> history = new ArrayList<>();
 
         Contract c = current;
@@ -667,5 +777,48 @@ public class ContractService {
 
         history.sort(Comparator.comparingInt(ContractResDto::getRevision));
         return history;
+    }
+
+    // 개별 서명 리마인드
+    public void remindSign(UUID companyId, UUID senderMemberId, UUID contractId) {
+        Contract contract = findContractWithPermission(companyId, contractId);
+
+        if (contract.getContractStatus() != ContractStatus.SENT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "발송 상태의 계약만 리마인드할 수 있습니다.");
+        }
+
+        contractNotificationService.notifySignReminder(
+                contract.getEmployeeMemberId(),
+                senderMemberId,
+                contractId,
+                contract.getContractTemplate().getTemplateName());
+    }
+
+    // 배치 미서명자 일괄 리마인드
+    public int remindBatch(UUID companyId, UUID senderMemberId, UUID batchId) {
+        List<Contract> unsignedContracts = contractRepository
+                .findByContractBatchBatchIdAndContractStatusAndDelYn(
+                        batchId, ContractStatus.SENT, "N");
+
+        if (unsignedContracts.isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "서명 대기 중인 계약이 없습니다.");
+        }
+
+        // 첫 건으로 companyId 검증
+        if (!unsignedContracts.get(0).getCompanyId().equals(companyId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
+
+        for (Contract contract : unsignedContracts) {
+            contractNotificationService.notifySignReminder(
+                    contract.getEmployeeMemberId(),
+                    senderMemberId,
+                    contract.getContractId(),
+                    contract.getContractTemplate().getTemplateName());
+        }
+
+        return unsignedContracts.size();
     }
 }

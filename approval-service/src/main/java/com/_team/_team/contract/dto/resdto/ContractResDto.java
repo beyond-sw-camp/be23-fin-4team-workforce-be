@@ -31,6 +31,7 @@ public class ContractResDto {
     private String formSchemaSnapshot;
     private ContractStatus contractStatus;
     private String signedPdfUrl;
+    private String sealImageUrl;
     private String employeeName;
     private String employeeSabun;
     private String organizationName;
@@ -42,6 +43,7 @@ public class ContractResDto {
     private UUID previousContractId;
     private Integer revision;
     private String cancelReason;
+    private String contractNumber;
 
     public static ContractResDto fromEntity(Contract entity, List<ContractParty> parties) {
         return ContractResDto.builder()
@@ -56,6 +58,7 @@ public class ContractResDto {
                 .formSchemaSnapshot(entity.getFormSchemaSnapshot())
                 .contractStatus(entity.getContractStatus())
                 .signedPdfUrl(entity.getSignedPdfUrl())
+                .sealImageUrl(entity.getSealImageUrl())
                 .employeeName(entity.getEmployeeName())
                 .employeeSabun(entity.getEmployeeSabun())
                 .organizationName(entity.getOrganizationName())
@@ -69,6 +72,7 @@ public class ContractResDto {
                 .previousContractId(entity.getPreviousContractId())
                 .revision(entity.getRevision())
                 .cancelReason(entity.getCancelReason())
+                .contractNumber(entity.getContractNumber())
                 .build();
     }
 

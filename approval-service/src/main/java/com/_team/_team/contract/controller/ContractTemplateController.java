@@ -29,7 +29,7 @@ public class ContractTemplateController {
     }
 
     // 템플릿 생성
-//    @CheckPermission(resource = Resource.CONTRACT, action = Action.CREATE)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.CREATE)
     @PostMapping
     public ResponseEntity<?> create(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -41,7 +41,7 @@ public class ContractTemplateController {
     }
 
     // 템플릿 수정
-//    @CheckPermission(resource = Resource.CONTRACT, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.UPDATE)
     @PutMapping("/{templateId}")
     public ResponseEntity<?> update(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -54,7 +54,7 @@ public class ContractTemplateController {
     }
 
     // 템플릿 단건 조회
-//    @CheckPermission(resource = Resource.CONTRACT, action = Action.READ)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.READ)
     @GetMapping("/{templateId}")
     public ResponseEntity<?> findById(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -66,7 +66,7 @@ public class ContractTemplateController {
     }
 
     // 전체 템플릿 목록 (관리자용)
-//    @CheckPermission(resource = Resource.CONTRACT, action = Action.READ)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.READ)
     @GetMapping
     public ResponseEntity<?> findAll(
             @RequestHeader("X-User-CompanyId") UUID companyId) {
@@ -87,7 +87,7 @@ public class ContractTemplateController {
     }
 
     // 활성화
-//    @CheckPermission(resource = Resource.CONTRACT, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.UPDATE)
     @PatchMapping("/{templateId}/activate")
     public ResponseEntity<?> activate(
             @RequestHeader("X-User-CompanyId") UUID companyId,
@@ -99,7 +99,7 @@ public class ContractTemplateController {
     }
 
     // 비활성화
-//    @CheckPermission(resource = Resource.CONTRACT, action = Action.UPDATE)
+    @CheckPermission(resource = Resource.CONTRACT, action = Action.UPDATE)
     @PatchMapping("/{templateId}/deactivate")
     public ResponseEntity<?> deactivate(
             @RequestHeader("X-User-CompanyId") UUID companyId,

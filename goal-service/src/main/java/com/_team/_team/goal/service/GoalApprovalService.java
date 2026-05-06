@@ -9,7 +9,6 @@ import com._team._team.goal.domain.enums.GoalOwnerType;
 import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.dto.reqdto.BundleApproveReqDto;
-import com._team._team.goal.dto.reqdto.BundleDelegateReqDto;
 import com._team._team.goal.dto.reqdto.BundleRejectReqDto;
 import com._team._team.goal.dto.reqdto.SubmitCycleReqDto;
 import com._team._team.goal.dto.resdto.BundleResDto;
@@ -64,6 +63,16 @@ public class GoalApprovalService {
                     "There is already a pending approval bundle for this cycle. bundleId=" + existingPending.get().getBundleId()
             );
         }
+        if (bundleRepository.existsByRequestedByAndCycleKeyAndStatus(
+                requesterId,
+                cycleKey,
+                BundleApprovalStatus.APPROVED
+        )) {
+            throw new BusinessException(
+                    HttpStatus.CONFLICT,
+                    "This cycle has already been approved. Approved goals cannot be resubmitted. cycleKey=" + cycleKey
+            );
+        }
 
         CycleKeyParsed parsed = parseCycleKey(cycleKey);
         Set<GoalStatus> draftSet = EnumSet.of(GoalStatus.DRAFT);
@@ -107,13 +116,13 @@ public class GoalApprovalService {
                         "Aligned goal must be an objective. goalId=" + goal.getGoalId()
                 );
             }
-            if (isBlank(objective.getGradeSCriteria())
-                    || isBlank(objective.getGradeACriteria())
-                    || isBlank(objective.getGradeBCriteria())
-                    || isBlank(objective.getGradeCCriteria())) {
+            if (isBlank(goal.getGradeSCriteria())
+                    || isBlank(goal.getGradeACriteria())
+                    || isBlank(goal.getGradeBCriteria())
+                    || isBlank(goal.getGradeCCriteria())) {
                 throw new BusinessException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
-                        "Aligned objective must define all S/A/B/C criteria. goalId=" + goal.getGoalId()
+                        "Personal goal must define all S/A/B/C criteria before submission. goalId=" + goal.getGoalId()
                 );
             }
         }
@@ -188,18 +197,6 @@ public class GoalApprovalService {
         return BundleResDto.from(bundle);
     }
 
-    @Transactional
-    public BundleResDto delegate(UUID bundleId, UUID approverId, BundleDelegateReqDto dto) {
-        GoalApprovalBundle bundle = mustGet(bundleId);
-        ensureApprover(bundle, approverId);
-        if (bundle.getStatus() != BundleApprovalStatus.PENDING) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Only pending bundles can be delegated.");
-        }
-        bundle.delegateTo(dto.getDelegateApproverId());
-        notifyBundleDelegated(bundle, approverId, dto.getDelegateApproverId());
-        return BundleResDto.from(bundle);
-    }
-
     @Transactional(readOnly = true)
     public BundleResDto get(UUID bundleId, UUID requesterId, UUID companyId) {
         GoalApprovalBundle bundle = mustGet(bundleId);
@@ -209,7 +206,6 @@ public class GoalApprovalService {
 
         boolean visible = bundle.getRequestedBy().equals(requesterId)
                 || bundle.getApproverId().equals(requesterId)
-                || (bundle.getDelegateApproverId() != null && bundle.getDelegateApproverId().equals(requesterId))
                 || bundle.getWatcherIds().contains(requesterId);
         if (!visible) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "You do not have permission to read this bundle.");
@@ -227,20 +223,12 @@ public class GoalApprovalService {
 
     @Transactional(readOnly = true)
     public List<BundleResDto> listMyApprovalQueue(UUID approverId, UUID companyId) {
-        List<BundleResDto> primary = bundleRepository
+        return bundleRepository
                 .findByApproverIdAndCompanyIdAndStatusOrderByRequestedAtDesc(
                         approverId, companyId, BundleApprovalStatus.PENDING)
                 .stream()
                 .map(BundleResDto::from)
                 .collect(Collectors.toList());
-        List<BundleResDto> delegated = bundleRepository
-                .findByDelegateApproverIdAndCompanyIdAndStatusOrderByRequestedAtDesc(
-                        approverId, companyId, BundleApprovalStatus.PENDING)
-                .stream()
-                .map(BundleResDto::from)
-                .collect(Collectors.toList());
-        primary.addAll(delegated);
-        return primary;
     }
 
     private GoalApprovalBundle mustGet(UUID bundleId) {
@@ -249,10 +237,7 @@ public class GoalApprovalService {
     }
 
     private void ensureApprover(GoalApprovalBundle bundle, UUID actorId) {
-        boolean isPrimary = bundle.getApproverId().equals(actorId);
-        boolean isDelegate = bundle.getDelegateApproverId() != null
-                && bundle.getDelegateApproverId().equals(actorId);
-        if (!isPrimary && !isDelegate) {
+        if (!bundle.getApproverId().equals(actorId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "You are not allowed to act on this bundle.");
         }
     }
@@ -299,16 +284,6 @@ public class GoalApprovalService {
                 "목표 승인 요청이 회수되었습니다. (" + bundle.getCycleKey() + ")",
                 bundle.getBundleId(),
                 "GOAL_BUNDLE_WITHDRAWN"
-        );
-    }
-
-    private void notifyBundleDelegated(GoalApprovalBundle bundle, UUID actorId, UUID delegateApproverId) {
-        publishGoalBundleNotification(
-                delegateApproverId,
-                actorId,
-                "목표 승인 요청이 위임되었습니다. (" + bundle.getCycleKey() + ")",
-                bundle.getBundleId(),
-                "GOAL_BUNDLE_DELEGATED"
         );
     }
 

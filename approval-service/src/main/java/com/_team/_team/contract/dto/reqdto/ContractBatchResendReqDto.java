@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -26,6 +27,6 @@ public class ContractBatchResendReqDto {
     @AllArgsConstructor
     public static class BatchResendItem {
         private UUID contractId;
-        private String adminInputJson;
+        private Map<String, Object> adminInputJson;
     }
 }

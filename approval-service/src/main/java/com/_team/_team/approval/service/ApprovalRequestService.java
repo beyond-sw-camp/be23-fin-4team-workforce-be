@@ -36,7 +36,6 @@ import com._team._team.event.EarlyLeaveApprovalEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.time.LocalTime;
-
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -728,9 +727,13 @@ public class ApprovalRequestService {
 
         return requests.stream()
                 .map(request -> {
+                    // 받은 공문 = 공문 타입 + 작성자 부서가 내 부서가 아님
+                    boolean isReceivedOfficial =
+                            request.getRequestType() == RequestType.OFFICIAL
+                                    && !organizationId.equals(request.getRequesterOrganizationId());
                     // 비공개 문서 + 작성자 본인이 아닌 경우 → 마스킹
                     if ("N".equals(request.getIsDeptVisibleYn())
-                            && !request.getMemberId().equals(memberId)) {
+                            && !request.getMemberId().equals(memberId) && !isReceivedOfficial) {
                         return ApprovalRequestResDto.maskedFromEntity(request);
                     }
                     return toResDtoWithRecipients(request);

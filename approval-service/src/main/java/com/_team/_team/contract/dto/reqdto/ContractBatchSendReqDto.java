@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -29,6 +30,6 @@ public class ContractBatchSendReqDto {
         private UUID employeeMemberId;
 
         // 직원별 ADMIN_INPUT (예: 개별 신규연봉)
-        private String adminInputJson;
+        private Map<String, Object> adminInputJson;
     }
 }
