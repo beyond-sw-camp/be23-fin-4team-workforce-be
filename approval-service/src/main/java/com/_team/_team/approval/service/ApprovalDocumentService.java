@@ -9,16 +9,12 @@ import com._team._team.approval.publisher.RagSyncApprovalEventPublisher;
 import com._team._team.approval.repository.ApprovalDocumentRepository;
 import com._team._team.dto.BusinessException;
 import com._team._team.event.RagSyncApprovalEvent;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Map;
-import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.util.List;
 import java.util.UUID;
@@ -28,15 +24,12 @@ import java.util.UUID;
 public class ApprovalDocumentService {
 
     private final ApprovalDocumentRepository approvalDocumentRepository;
-    private final ObjectMapper objectMapper;
     private final RagSyncApprovalEventPublisher ragSyncApprovalEventPublisher;
 
     @Autowired
     public ApprovalDocumentService(ApprovalDocumentRepository approvalDocumentRepository,
-                                   ObjectMapper objectMapper,
                                    RagSyncApprovalEventPublisher ragSyncApprovalEventPublisher) {
         this.approvalDocumentRepository = approvalDocumentRepository;
-        this.objectMapper = objectMapper;
         this.ragSyncApprovalEventPublisher = ragSyncApprovalEventPublisher;
     }
 
@@ -393,9 +386,6 @@ public class ApprovalDocumentService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
         }
 
-        // locked 필드 검증
-        validateLockedFields(document.getFormSchema(), reqDto.getFormSchema());
-
         // formSchema 업데이트
         document.updateFormSchema(reqDto.getFormSchema());
 
@@ -439,89 +429,6 @@ public class ApprovalDocumentService {
                 throw new BusinessException(HttpStatus.BAD_REQUEST,
                         "캘린더 연동 시 시작일 필드는 필수입니다.");
             }
-        }
-    }
-
-    /**
-     * locked 필드 검증
-     * 기존 formSchema에서 locked:true 인 필드가
-     * 새 formSchema에서 빠지거나, name/label/type/순서가 변경되었는지 확인
-     */
-    private void validateLockedFields(String oldSchemaJson, String newSchemaJson) {
-        try {
-            Map<String, Object> oldSchema = objectMapper.readValue(
-                    oldSchemaJson, new TypeReference<>() {});
-            Map<String, Object> newSchema = objectMapper.readValue(
-                    newSchemaJson, new TypeReference<>() {});
-
-            List<Map<String, Object>> oldFields = (List<Map<String, Object>>) oldSchema.get("fields");
-            List<Map<String, Object>> newFields = (List<Map<String, Object>>) newSchema.get("fields");
-
-            if (oldFields == null) return;
-
-            // locked 필드만 추출
-            List<Map<String, Object>> lockedFields = new ArrayList<>();
-            for (Map<String, Object> field : oldFields) {
-                Boolean locked = (Boolean) field.getOrDefault("locked", false);
-                if (Boolean.TRUE.equals(locked)) {
-                    lockedFields.add(field);
-                }
-            }
-
-            if (lockedFields.isEmpty()) return;
-
-            if (newFields == null) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST,
-                        "필수 항목이 포함된 formSchema가 필요합니다.");
-            }
-
-            // 새 formSchema에서 locked 필드 순서·내용 검증
-            int newIndex = 0;
-            for (Map<String, Object> locked : lockedFields) {
-                String lockedName = (String) locked.get("name");
-                String lockedLabel = (String) locked.get("label");
-                String lockedType = (String) locked.get("type");
-
-                boolean found = false;
-                for (int ni = newIndex; ni < newFields.size(); ni++) {
-                    Map<String, Object> newField = newFields.get(ni);
-                    if (lockedName.equals(newField.get("name"))) {
-                        // label 변경 검증
-                        if (!lockedLabel.equals(newField.get("label"))) {
-                            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                                    "필수 항목 '" + lockedLabel + "'의 이름(label)은 변경할 수 없습니다.");
-                        }
-                        // type 변경 검증
-                        if (!lockedType.equals(newField.get("type"))) {
-                            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                                    "필수 항목 '" + lockedLabel + "'의 타입(type)은 변경할 수 없습니다.");
-                        }
-                        // locked 플래그 유지 검증
-                        Boolean newLocked = (Boolean) newField.getOrDefault("locked", false);
-                        if (!Boolean.TRUE.equals(newLocked)) {
-                            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                                    "필수 항목 '" + lockedLabel + "'의 잠금 상태는 해제할 수 없습니다.");
-                        }
-                        // 순서 검증: locked 필드끼리의 상대 순서 유지
-                        if (ni < newIndex) {
-                            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                                    "필수 항목의 순서는 변경할 수 없습니다.");
-                        }
-                        newIndex = ni + 1;
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found) {
-                    throw new BusinessException(HttpStatus.BAD_REQUEST,
-                            "필수 항목 '" + lockedLabel + "'은(는) 삭제할 수 없습니다.");
-                }
-            }
-
-        } catch (JsonProcessingException e) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    "formSchema JSON 형식이 올바르지 않습니다.");
         }
     }
 

@@ -39,6 +39,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.9.0'
+    // 계약서 PDF 생성 (OpenPDF, MPL/LGPL)
+    implementation 'com.github.librepdf:openpdf:2.0.3'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
