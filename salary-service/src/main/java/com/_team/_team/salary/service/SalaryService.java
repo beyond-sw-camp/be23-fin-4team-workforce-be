@@ -7,6 +7,7 @@ import com._team._team.salary.domain.SalaryPolicy;
 import com._team._team.salary.domain.enums.TaxReductionType;
 import com._team._team.salary.dto.reqdto.SalaryCreateReqDto;
 import com._team._team.salary.dto.reqdto.SalaryUpdateReqDto;
+import com._team._team.salary.dto.resdto.MySalaryHistoryResDto;
 import com._team._team.salary.dto.resdto.PayrollPrecheckResDto;
 import com._team._team.salary.dto.resdto.SalaryResDto;
 import com._team._team.salary.feignClients.MemberFeignClient;
@@ -371,5 +372,35 @@ public class SalaryService {
                             + year
             );
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<MySalaryHistoryResDto> findMyHistory(UUID companyId, UUID memberId) {
+        // 1. 본인 급여 행 전부, 적용일 오름차순으로
+        List<Salary> ascending = salaryRepository
+                .findByCompanyIdAndMemberIdOrderByEffectiveFromAsc(companyId, memberId);
+
+        // 2. 직전 행과 비교해서 previousBaseSalary, changeRate 계산
+        List<MySalaryHistoryResDto> result = new ArrayList<>(ascending.size());
+        Long prev = null;
+        for (Salary s : ascending) {
+            Double rate = (prev == null || prev == 0L) ? null
+                    : (s.getBaseSalary() - prev) * 100.0 / prev;
+            result.add(MySalaryHistoryResDto.builder()
+                    .salaryId(s.getSalaryId())
+                    .previousBaseSalary(prev)
+                    .currentBaseSalary(s.getBaseSalary())
+                    .changeRate(rate)
+                    .jobGradeName(s.getJobGradeName())
+                    .jobTitleName(s.getJobTitleName())
+                    .effectiveFrom(s.getEffectiveFrom())
+                    .effectiveTo(s.getEffectiveTo())
+                    .build());
+            prev = s.getBaseSalary();
+        }
+
+        // 3. 화면 노출은 최신순
+        Collections.reverse(result);
+        return result;
     }
 }

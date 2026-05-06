@@ -46,4 +46,7 @@ public interface MemberFeignClient {
      */
     @GetMapping("/member/internal/admins-by-company")
     ApiResponse<List<MemberResDto>> getAdminsByCompany(@RequestParam("companyId") UUID companyId);
+
+    @GetMapping("/member/internal/{memberId}/info")
+    MemberResDto getMemberInfoInternal(@PathVariable("memberId") UUID memberId);
 }
