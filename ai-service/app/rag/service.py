@@ -1,5 +1,6 @@
 from app.core.openai import get_embedding, expand_query, detect_category
 from app.core.pinecone import search_vectors
+from datetime import date
 import asyncio
 import logging
 
@@ -85,6 +86,22 @@ def apply_layer_priority(matches, final_top_k=5):
         )
 
     return result
+
+
+def _build_date_info() -> str:
+    """현재 날짜 정보 헤더 생성 - LLM이 시점 표현 정확히 해석하도록"""
+    today = date.today()
+    weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+    return f"""[현재 날짜 정보]
+- 오늘: {today.isoformat()} ({weekdays[today.weekday()]})
+- 이번달: {today.year}년 {today.month}월
+- 올해: {today.year}년
+
+위 날짜 정보를 활용해 "오늘", "내일", "이번달", "올해" 같은 시점 표현을 정확하게 해석하세요.
+
+---
+
+"""
 
 
 async def rag_search(
@@ -179,7 +196,8 @@ async def rag_search(
         context_parts.append(content)
         sources.add(document_name)
 
-    context = "\n\n---\n\n".join(context_parts)
+    # 현재 날짜 정보 헤더 + 검색 결과 합쳐서 반환
+    context = _build_date_info() + "\n\n---\n\n".join(context_parts)
 
     logger.info(
         f"[rag_search] context {len(context)}자, sources={list(sources)}"

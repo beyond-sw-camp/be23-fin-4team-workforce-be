@@ -57,6 +57,11 @@ def format_work_schedule_to_rag(schedule: dict) -> str:
 - 점심 시간: {break_minutes}분
 - 휴게 시간: {break_minutes}분 ({break_minutes / 60:g}시간)
 
+■ 지각 / 조기 출근 안내
+- 지각 기준: 출근 시간({start_time}) 이후 출근 시 지각 처리
+- 조기 출근: 출근 시간({start_time}) 전 출근 시 정시 처리
+- 지각/결근 발생 시: 근태 정정 신청 결재 양식으로 신청 가능
+
 ■ 근무 유형
 - {work_type_name}
 - 적용 범위: {scope}{flexible_note}
@@ -93,7 +98,7 @@ def format_work_schedule_to_rag(schedule: dict) -> str:
 근무시간, 근무 시간, 일 근무, 근무 유형,
 {work_type_name}, 회사 출근, 회사 퇴근,
 {schedule_name}, 몇시 출근, 몇시 퇴근,
-출근 언제, 퇴근 언제, 점심 몇분
+출근 언제, 퇴근 언제, 점심 몇분, 결근, 지각,
 
 ■ 관련 메뉴
 관련 메뉴: /app/attendance
@@ -199,7 +204,7 @@ def format_company_holidays_to_rag(holidays: list) -> str:
     if legal_by_year:
         sections.append("\n■ 법정 공휴일 (국가 지정)")
         for year, items in sorted(legal_by_year.items()):
-            lines = [f"\n[{year}년] (총 {len(items)}일)"]
+            lines = [f"\n▶ {year}년 (총 {len(items)}일)"]
             for h in items:
                 date = h.get("holidayDate", "")
                 name = h.get("holidayName", "")
@@ -211,7 +216,7 @@ def format_company_holidays_to_rag(holidays: list) -> str:
     if company_by_year:
         sections.append("\n■ 회사 자체 지정 휴일")
         for year, items in sorted(company_by_year.items()):
-            lines = [f"\n[{year}년] (총 {len(items)}일)"]
+            lines = [f"\n▶ {year}년 (총 {len(items)}일)"]
             for h in items:
                 date = h.get("holidayDate", "")
                 name = h.get("holidayName", "")
