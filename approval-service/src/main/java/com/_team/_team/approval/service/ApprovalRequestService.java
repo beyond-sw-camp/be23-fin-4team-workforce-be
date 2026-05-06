@@ -234,6 +234,7 @@ public class ApprovalRequestService {
                             .request(savedRequest)
                             .approverMemberId(line.getApproverMemberId())
                             .approverMemberPositionId(line.getApproverMemberPositionId())
+                            .approverName(line.getApproverName())
                             .stepOrder(line.getStepOrder())
                             .approvalStatus(reqDto.getRequestStatus() == RequestStatus.WAIT && line.getStepOrder() == 1
                                     ? LineStatus.PENDING
@@ -562,6 +563,7 @@ public class ApprovalRequestService {
                             .request(request)
                             .approverMemberId(line.getApproverMemberId())
                             .approverMemberPositionId(line.getApproverMemberPositionId())
+                            .approverName(line.getApproverName())
                             .stepOrder(line.getStepOrder())
                             .approvalStatus(reqDto.getRequestStatus() == RequestStatus.WAIT && line.getStepOrder() == 1
                                     ? LineStatus.PENDING

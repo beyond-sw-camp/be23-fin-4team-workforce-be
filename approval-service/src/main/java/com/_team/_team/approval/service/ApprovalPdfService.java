@@ -112,7 +112,10 @@ public class ApprovalPdfService {
 
         for (Approval line : approvalLines) {
             addCell(table, String.valueOf(line.getStepOrder()), font, false);
-            addCell(table, line.getApproverMemberId().toString().substring(0, 8) + "...", font, false);
+            String name = line.getApproverName() != null
+                    ? line.getApproverName()
+                    : line.getApproverMemberId().toString().substring(0, 8) + "...";
+            addCell(table, name, font, false);
             addCell(table, lineStatusLabel(line.getApprovalStatus()), font, false);
             addCell(table, line.getActedAt() != null
                     ? line.getActedAt().format(DATETIME_FMT)
