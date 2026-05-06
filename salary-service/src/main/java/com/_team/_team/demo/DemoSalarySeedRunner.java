@@ -7,8 +7,11 @@ import com._team._team.attendance.domain.DailyAttendance;
 import com._team._team.attendance.domain.LeavePolicy;
 import com._team._team.attendance.domain.LeaveRequest;
 import com._team._team.attendance.domain.MemberBalance;
+import com._team._team.attendance.domain.MemberScheduleSelection;
 import com._team._team.attendance.domain.MonthlyAttendanceLedger;
 import com._team._team.attendance.domain.OvertimePolicy;
+import com._team._team.attendance.domain.WorkSchedule;
+import com._team._team.attendance.domain.FlexibleTimeSlot;
 import com._team._team.attendance.domain.WorkTripDetail;
 import com._team._team.attendance.domain.enums.AccrualBase;
 import com._team._team.attendance.domain.enums.ApprovalMode;
@@ -18,8 +21,10 @@ import com._team._team.attendance.domain.enums.ClosureStatus;
 import com._team._team.attendance.domain.enums.EventType;
 import com._team._team.attendance.domain.enums.LeaveApprovalStatus;
 import com._team._team.attendance.domain.enums.LeaveInitiator;
+import com._team._team.attendance.domain.enums.ScheduleApprovalStatus;
 import com._team._team.attendance.domain.enums.SourceType;
 import com._team._team.attendance.domain.enums.WorkTripType;
+import com._team._team.attendance.domain.enums.WorkType;
 import com._team._team.attendance.repository.AttendanceLogRepository;
 import com._team._team.attendance.repository.CompanyHolidayRepository;
 import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
@@ -29,8 +34,11 @@ import com._team._team.attendance.repository.LeaveRequestRepository;
 import com._team._team.attendance.service.CompanyHolidayService;
 import com._team._team.attendance.service.CompanyLeaveTypeService;
 import com._team._team.attendance.repository.MemberBalanceRepository;
+import com._team._team.attendance.repository.MemberScheduleSelectionRepository;
 import com._team._team.attendance.repository.MonthlyAttendanceLedgerRepository;
 import com._team._team.attendance.repository.OvertimePolicyRepository;
+import com._team._team.attendance.repository.WorkScheduleRepository;
+import com._team._team.attendance.repository.FlexibleTimeSlotRepository;
 import com._team._team.attendance.repository.WorkTripDetailRepository;
 import com._team._team.dto.ApiResponse;
 import com._team._team.salary.domain.BonusPolicy;
@@ -135,6 +143,9 @@ public class DemoSalarySeedRunner implements ApplicationRunner {
     private final LeaveRequestRepository leaveRequestRepository;
     private final CompanyLeaveTypeRepository companyLeaveTypeRepository;
     private final CompanyLeaveTypeService companyLeaveTypeService;
+    private final WorkScheduleRepository workScheduleRepository;
+    private final FlexibleTimeSlotRepository flexibleTimeSlotRepository;
+    private final MemberScheduleSelectionRepository memberScheduleSelectionRepository;
 
     /** AUTO 부여 (관리자 즉시 부여) 표시용 - 시드 데이터의 시스템 부여 표식 */
     private static final UUID SYSTEM_ACTOR = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -343,6 +354,11 @@ public class DemoSalarySeedRunner implements ApplicationRunner {
         // 8-2-1) LeavePolicy + CompanyLeaveType 기본 - LeaveRequest 시드 선행
         seedLeavePolicy(companyId, effectiveFrom);
         seedCompanyLeaveTypes(companyId);
+
+        // 8-2-2) WorkSchedule - 회사 근무 스케줄
+        // demo-current (usePayGrade=false): FIXED 1개
+        // demo-prev    (usePayGrade=true) : FLEXIBLE 1개 + EARLY/STANDARD/LATE 슬롯 3개
+        seedWorkSchedule(companyId, effectiveFrom, usePayGrade);
 
         // 8-3) 직원별 일별 출퇴근 시드 (입사일 ~ 어제까지, 평일/공휴일 제외)
         seedDailyAttendance(companyId);
@@ -1059,6 +1075,167 @@ public class DemoSalarySeedRunner implements ApplicationRunner {
                 .build();
         leavePolicyRepository.save(policy);
         log.info("[DEMO-SEED] LeavePolicy 시드 완료 effectiveFrom={}", effectiveFrom);
+    }
+
+    /**
+     * 회사 근무 스케줄 시드
+     * - flexible=false : FIXED 9-18 / 12-13 점심 / 일 8h
+     * - flexible=true  : FLEXIBLE + 시차출퇴근 슬롯 3개 (EARLY/STANDARD/LATE)
+     * 멱등 - 회사에 활성 WorkSchedule 있으면 skip
+     */
+    private void seedWorkSchedule(UUID companyId, java.time.LocalDate effectiveFrom, boolean flexible) {
+        boolean exists = workScheduleRepository.findByCompanyIdAndDelYn(companyId, "N")
+                .stream()
+                .anyMatch(ws -> ws.getMemberId() == null);
+        if (exists) {
+            log.info("[DEMO-SEED] WorkSchedule 이미 있음 - skip companyId={}", companyId);
+            return;
+        }
+        if (!flexible) {
+            // FIXED 9-18, 점심 12-13, 일 8h(=480분)
+            WorkSchedule fixed = WorkSchedule.builder()
+                    .companyId(companyId)
+                    .memberId(null)
+                    .scheduleName("기본 근무 (고정)")
+                    .workType(WorkType.FIXED)
+                    .startTime(java.time.LocalTime.of(9, 0))
+                    .endTime(java.time.LocalTime.of(18, 0))
+                    .workMinutes(480)
+                    .breakStart(java.time.LocalTime.of(12, 0))
+                    .breakEnd(java.time.LocalTime.of(13, 0))
+                    .effectiveFrom(effectiveFrom)
+                    .build();
+            workScheduleRepository.save(fixed);
+            log.info("[DEMO-SEED] WorkSchedule FIXED 시드 완료 companyId={}", companyId);
+            return;
+        }
+
+        // FLEXIBLE 1개 + 슬롯 3개
+        WorkSchedule flex = workScheduleRepository.save(WorkSchedule.builder()
+                .companyId(companyId)
+                .memberId(null)
+                .scheduleName("시차출퇴근제")
+                .workType(WorkType.FLEXIBLE)
+                .selectionDeadlineDay(25)
+                .effectiveFrom(effectiveFrom)
+                .build());
+
+        // EARLY 07:00 - 16:00, 점심 11:00-12:00 (8h=480분)
+        flexibleTimeSlotRepository.save(FlexibleTimeSlot.builder()
+                .workScheduleId(flex.getWorkScheduleId())
+                .companyId(companyId)
+                .slotCode("EARLY")
+                .slotLabel("조기 출근 (07:00 - 16:00)")
+                .startTime(java.time.LocalTime.of(7, 0))
+                .endTime(java.time.LocalTime.of(16, 0))
+                .workMinutes(480)
+                .breakStart(java.time.LocalTime.of(11, 0))
+                .breakEnd(java.time.LocalTime.of(12, 0))
+                .isDefault(false)
+                .activeYn("Y")
+                .build());
+
+        // STANDARD 09:00 - 18:00, 점심 12:00-13:00 (8h=480분) - 기본
+        flexibleTimeSlotRepository.save(FlexibleTimeSlot.builder()
+                .workScheduleId(flex.getWorkScheduleId())
+                .companyId(companyId)
+                .slotCode("STANDARD")
+                .slotLabel("표준 (09:00 - 18:00)")
+                .startTime(java.time.LocalTime.of(9, 0))
+                .endTime(java.time.LocalTime.of(18, 0))
+                .workMinutes(480)
+                .breakStart(java.time.LocalTime.of(12, 0))
+                .breakEnd(java.time.LocalTime.of(13, 0))
+                .isDefault(true)
+                .activeYn("Y")
+                .build());
+
+        // LATE 11:00 - 20:00, 점심 13:00-14:00 (8h=480분)
+        FlexibleTimeSlot lateSlot = flexibleTimeSlotRepository.save(FlexibleTimeSlot.builder()
+                .workScheduleId(flex.getWorkScheduleId())
+                .companyId(companyId)
+                .slotCode("LATE")
+                .slotLabel("늦은 출근 (11:00 - 20:00)")
+                .startTime(java.time.LocalTime.of(11, 0))
+                .endTime(java.time.LocalTime.of(20, 0))
+                .workMinutes(480)
+                .breakStart(java.time.LocalTime.of(13, 0))
+                .breakEnd(java.time.LocalTime.of(14, 0))
+                .isDefault(false)
+                .activeYn("Y")
+                .build());
+
+        log.info("[DEMO-SEED] WorkSchedule FLEXIBLE + 슬롯 3개 시드 완료 companyId={}", companyId);
+
+        // 직원별 슬롯 분배 - idx % 3 -> EARLY/STANDARD/LATE 순환
+        // 입사월부터 이번 달까지 매월 MemberScheduleSelection AUTO 상태 시드
+        seedFlexibleSlotSelections(companyId, lateSlot);
+    }
+
+    /**
+     * demo-prev (FLEXIBLE) 직원들에게 시차출퇴근 슬롯 round-robin 분배
+     * 입사일 ~ 이번 달까지 매월 MemberScheduleSelection AUTO 상태로 멱등 생성
+     */
+    private void seedFlexibleSlotSelections(UUID companyId, FlexibleTimeSlot fallbackSlot) {
+        ApiResponse<List<MemberResDto>> apiRes;
+        try {
+            apiRes = memberFeignClient.getMembersByCompany(companyId);
+        } catch (Exception e) {
+            log.warn("[DEMO-SEED] FlexibleSlotSelection - 직원 조회 실패 - {}", e.getMessage());
+            return;
+        }
+        List<MemberResDto> members = apiRes != null ? apiRes.getData() : List.of();
+        if (members.isEmpty()) return;
+
+        // 회사 슬롯 목록 - slotCode 기준 매핑
+        List<FlexibleTimeSlot> slots = flexibleTimeSlotRepository.findAll().stream()
+                .filter(s -> companyId.equals(s.getCompanyId()) && "Y".equals(s.getActiveYn()))
+                .toList();
+        FlexibleTimeSlot early = slots.stream().filter(s -> "EARLY".equals(s.getSlotCode())).findFirst().orElse(fallbackSlot);
+        FlexibleTimeSlot standard = slots.stream().filter(s -> "STANDARD".equals(s.getSlotCode())).findFirst().orElse(fallbackSlot);
+        FlexibleTimeSlot late = slots.stream().filter(s -> "LATE".equals(s.getSlotCode())).findFirst().orElse(fallbackSlot);
+        FlexibleTimeSlot[] cycle = { early, standard, late };
+
+        List<MemberResDto> sorted = members.stream()
+                .filter(m -> m.getJoinDate() != null)
+                .sorted((a, b) -> a.getJoinDate().compareTo(b.getJoinDate()))
+                .toList();
+
+        java.time.YearMonth thisMonth = java.time.YearMonth.now();
+        int totalCreated = 0;
+        int totalSkipped = 0;
+        for (int i = 0; i < sorted.size(); i++) {
+            MemberResDto m = sorted.get(i);
+            FlexibleTimeSlot picked = cycle[i % cycle.length];
+            for (java.time.YearMonth ym = java.time.YearMonth.from(m.getJoinDate());
+                 !ym.isAfter(thisMonth);
+                 ym = ym.plusMonths(1)) {
+                String yearMonth = ym.toString(); // YYYY-MM
+                if (memberScheduleSelectionRepository
+                        .existsByMemberIdAndTargetYearMonthAndApprovalStatus(
+                                m.getMemberId(), yearMonth, ScheduleApprovalStatus.APPROVED)
+                        || memberScheduleSelectionRepository
+                        .existsByMemberIdAndTargetYearMonthAndApprovalStatus(
+                                m.getMemberId(), yearMonth, ScheduleApprovalStatus.AUTO)) {
+                    totalSkipped++;
+                    continue;
+                }
+                memberScheduleSelectionRepository.save(MemberScheduleSelection.builder()
+                        .memberId(m.getMemberId())
+                        .companyId(companyId)
+                        .targetYearMonth(yearMonth)
+                        .slotId(picked.getSlotId())
+                        .breakStart(picked.getBreakStart())
+                        .breakEnd(picked.getBreakEnd())
+                        .approvalStatus(ScheduleApprovalStatus.AUTO)
+                        .requestedBy(SYSTEM_ACTOR)
+                        .requestedAt(ym.atDay(1).atTime(9, 0))
+                        .build());
+                totalCreated++;
+            }
+        }
+        log.info("[DEMO-SEED] FlexibleSlotSelection 시드 완료 companyId={} 생성={} skip={}",
+                companyId, totalCreated, totalSkipped);
     }
 
     /**
