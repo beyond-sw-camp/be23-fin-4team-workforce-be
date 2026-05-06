@@ -2072,6 +2072,7 @@ public class MemberService {
         // 현재 포지션에서 부서/직책 가져오기
         String orgName = null;
         String jobTitleName = null;
+        String jobGradeName = null;
 
         List<MemberPosition> positions = memberPositionRepository
                 .findActivePositionsByMemberIds(List.of(memberId));
@@ -2084,6 +2085,9 @@ public class MemberService {
             if (position.getJobTitle() != null) {
                 jobTitleName = position.getJobTitle().getName();
             }
+            if (position.getJobGrade() != null) {
+                jobGradeName = position.getJobGrade().getName();
+            }
         }
 
         return MemberContractInfoResDto.builder()
@@ -2092,6 +2096,7 @@ public class MemberService {
                 .sabun(member.getSabun())
                 .organizationName(orgName)
                 .jobTitleName(jobTitleName)
+                .jobGradeName(jobGradeName)
                 .build();
     }
 }

@@ -20,6 +20,7 @@ import com._team._team.event.*;
 import com._team._team.notification.NotificationType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -986,4 +987,5 @@ public class ApprovalService {
             return null;
         }
     }
+
 }
