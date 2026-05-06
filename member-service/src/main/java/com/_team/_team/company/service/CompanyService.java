@@ -207,6 +207,13 @@ public class CompanyService {
         } catch (Exception e) {
             log.warn("법정 공휴일 가져오기 실패: {}", e.getMessage());
         }
+
+        // 회사별 자동(스케줄러) 작업 트리거 시드 (salary-service)
+        try {
+            salaryServiceClient.initBatchSchedule(company.getCompanyId());
+        } catch (Exception e) {
+            log.warn("회사별 자동 작업 트리거 시드 실패: {}", e.getMessage());
+        }
     }
 
     private Company createCompany(CompanyOnboardingReqDto reqDto) {
