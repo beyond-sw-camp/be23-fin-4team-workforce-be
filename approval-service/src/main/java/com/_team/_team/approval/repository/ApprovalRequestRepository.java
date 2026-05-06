@@ -49,28 +49,6 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    /** 종결 상태 - 부서 문서함 노출 기준 */
-    Set<RequestStatus> TERMINAL_STATUSES =
-            EnumSet.of(RequestStatus.APPROVED, RequestStatus.REJECTED);
-
-    // 부서 문서함 - requesterOrganizationId 기준, isDeptVisibleYn='Y', 승인완료/반려만
-    @Query("SELECT ar FROM ApprovalRequest ar " +
-            "JOIN FETCH ar.approvalDocument doc " +
-            "WHERE doc.companyId = :companyId " +
-            "AND ar.requesterOrganizationId = :organizationId " +
-            "AND ar.requestStatus IN :statuses " +
-            "AND ar.delYn = 'N' " +
-            "ORDER BY ar.createdAt DESC")
-    List<ApprovalRequest> findDepartmentRequests(
-            @Param("companyId") UUID companyId,
-            @Param("organizationId") UUID organizationId,
-            @Param("statuses") Collection<RequestStatus> statuses);
-
-    /** 호출자 편의 - 종결 상태 고정 */
-    default List<ApprovalRequest> findDepartmentRequests(UUID companyId, UUID organizationId) {
-        return findDepartmentRequests(companyId, organizationId, TERMINAL_STATUSES);
-    }
-
     @Query("SELECT COUNT(r) FROM ApprovalRequest r " +
             "WHERE r.requestType = :requestType " +
             "  AND r.documentNumber IS NOT NULL " +
@@ -79,46 +57,18 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     long countByRequestTypeInYear(@Param("requestType") RequestType requestType,
                                   @Param("year") int year);
 
-    @Query("SELECT r FROM ApprovalRequest r " +
-            "JOIN FETCH r.approvalDocument doc " +
-            "WHERE doc.companyId = :companyId " +
-            "  AND r.requesterOrganizationId = :organizationId " +
-            "  AND r.requestType = :requestType " +
-            "  AND r.requestStatus IN :statuses " +
-            "  AND r.delYn = 'N' " +
-            "ORDER BY r.createdAt DESC")
-    List<ApprovalRequest> findDepartmentRequestsByType(
-            @Param("companyId") UUID companyId,
-            @Param("organizationId") UUID organizationId,
-            @Param("requestType") RequestType requestType,
-            @Param("statuses") Collection<RequestStatus> statuses);
-
-    /** 호출자 편의 - 종결 상태 고정 */
-    default List<ApprovalRequest> findDepartmentRequestsByType(
-            UUID companyId, UUID organizationId, RequestType requestType) {
-        return findDepartmentRequestsByType(companyId, organizationId, requestType, TERMINAL_STATUSES);
-    }
 
     @Query("SELECT r FROM ApprovalRequest r " +
             "WHERE r.requestId IN :requestIds " +
             "  AND r.approvalDocument.companyId = :companyId " +
-            "  AND r.requestType = :requestType " +
-            "  AND r.requestStatus = :status " +
+            "  AND r.requestType = com._team._team.approval.domain.enums.RequestType.OFFICIAL " +
+            "  AND r.requestStatus = com._team._team.approval.domain.enums.RequestStatus.APPROVED " +
             "  AND r.sendYn = 'Y' " +
             "  AND r.delYn = 'N' " +
             "ORDER BY r.createdAt DESC")
     List<ApprovalRequest> findApprovedOfficialsByIdsAndCompany(
             @Param("requestIds") List<UUID> requestIds,
-            @Param("companyId") UUID companyId,
-            @Param("requestType") RequestType requestType,
-            @Param("status") RequestStatus status);
-
-    /** 호출자 편의 - OFFICIAL/APPROVED 고정 */
-    default List<ApprovalRequest> findApprovedOfficialsByIdsAndCompany(
-            List<UUID> requestIds, UUID companyId) {
-        return findApprovedOfficialsByIdsAndCompany(
-                requestIds, companyId, RequestType.OFFICIAL, RequestStatus.APPROVED);
-    }
+            @Param("companyId") UUID companyId);
 
     @Query("SELECT r FROM ApprovalRequest r " +
             "WHERE r.memberId = :memberId " +
@@ -196,5 +146,4 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("companyId") UUID companyId,
             @Param("organizationId") UUID organizationId,
             @Param("requestType") RequestType requestType);
-
 }
