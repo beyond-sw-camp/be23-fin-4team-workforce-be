@@ -101,7 +101,15 @@ async def handle_calendar_action(
         existing_slots=current_state.slots
     )
     if extracted:
-        current_state.slots.update(extracted)
+        # 이미 채워진 슬롯은 보존 (LLM이 generic 값으로 덮어쓰는 것 방지)
+        for key, value in extracted.items():
+            if not value:
+                continue
+            existing = current_state.slots.get(key)
+            # title은 이미 있으면 그대로 유지 (LLM이 "일정" 같은 generic으로 덮어씀 방지)
+            if key == "title" and existing:
+                continue
+            current_state.slots[key] = value
 
     # 4. 부족한 필드 확인
     missing = _find_missing_fields(current_state.slots)
@@ -241,8 +249,22 @@ async def _extract_slots(
 - 출력 형식: YYYY-MM-DDTHH:mm:ss (예: 2026-05-04T14:00:00)
 
 [자동 생성 허용]
-- title: 일정 내용에 어울리는 제목 자동 생성
+- title: 일정 내용에 어울리는 제목 자동 생성 (단, [이미 입력된 정보]에 title이 있으면 그대로 유지하고 절대 변경하지 마세요)
 - endAt: startAt 있고 endAt 없으면 startAt + 1시간
+
+[이전 슬롯 보존 규칙]
+[이미 입력된 정보]에 어떤 필드가 있으면 그 필드는 그대로 두세요.
+사용자가 명시적으로 변경을 요청하지 않았다면 새 값으로 덮어쓰지 마세요.
+
+예시:
+[이미 입력된 정보] {{ "title": "회의" }}
+입력: "내일 오후 2시부터 3시까지"
+올바름: {{ "title": "회의", "startAt": "...", "endAt": "..." }} (title 유지)
+잘못: {{ "title": "일정", "startAt": "...", "endAt": "..." }} (title 변경 X)
+
+[이미 입력된 정보] {{ "title": "주간회의" }}
+입력: "다음주 수요일 12시부터 14시까지"
+올바름: {{ "title": "주간회의", "startAt": "...", "endAt": "..." }} (title 유지)
 
 [잘못된 추출 예시]
 입력: "회의 잡아줘"
@@ -421,6 +443,7 @@ def _format_datetime(iso_str: str) -> str:
 def _get_weekday_korean(target_date: date) -> str:
     weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
     return weekdays[target_date.weekday()]
+
 
 def _is_cancel_intent(question: str) -> bool:
     """사용자 입력이 취소/중단 의도인지 감지"""
