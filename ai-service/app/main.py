@@ -12,6 +12,7 @@ import py_eureka_client.eureka_client as eureka_client
 from app.transcribe.router import router as transcribe_router #
 import logging
 from app.action.router import router as action_router
+from app.calendar_action.router import router as calendar_action_router
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ app.include_router(platform_router, prefix="/ai")
 app.include_router(sync_router, prefix="/ai")
 app.include_router(transcribe_router, prefix="/ai")
 app.include_router(action_router, prefix="/ai")
+app.include_router(calendar_action_router, prefix="/ai")
 
 @app.get("/health")
 def health_check():
