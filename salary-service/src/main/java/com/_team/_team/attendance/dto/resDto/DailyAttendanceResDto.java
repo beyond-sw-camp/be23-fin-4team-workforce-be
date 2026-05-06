@@ -1,9 +1,11 @@
 package com._team._team.attendance.dto.resDto;
 
 import com._team._team.attendance.domain.DailyAttendance;
+import com._team._team.attendance.domain.WorkTripDetail;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
 import com._team._team.attendance.domain.enums.ClosureStatus;
 import com._team._team.attendance.domain.enums.CorrectionState;
+import com._team._team.attendance.domain.enums.WorkTripType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -37,8 +39,19 @@ public class DailyAttendanceResDto {
     /** 정정 진행 상태 — 직원 화면 액션 컬럼 분기에 사용 */
     private CorrectionState correctionState;
 
+    /** 출장/외근 */
+    private WorkTripType workTripType;
+
 
     public static DailyAttendanceResDto fromEntity(DailyAttendance daily) {
+        WorkTripType tripType = null;
+        if (daily.getTrips() != null) {
+            tripType = daily.getTrips().stream()
+                    .filter(t -> "N".equals(t.getDelYn()))
+                    .findFirst()
+                    .map(WorkTripDetail::getWorkTripType)
+                    .orElse(null);
+        }
         return DailyAttendanceResDto.builder()
                 .dailyAttendanceId(daily.getDailyAttendanceId())
                 .memberId(daily.getMemberId())
@@ -51,6 +64,7 @@ public class DailyAttendanceResDto {
                 .workedMinutes(daily.getWorkedMinutes())
                 .overtimeMinutes(daily.getOvertimeMinutes())
                 .correctionState(CorrectionState.NORMAL)   // 기본값. Service 에서 보정
+                .workTripType(tripType)
                 .build();
     }
 

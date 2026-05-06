@@ -11,6 +11,10 @@ import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
 import com._team._team.approval.feignclients.MemberServiceClient;
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
 import com._team._team.approval.feignclients.dto.OrganizationResDto;
+import com._team._team.approval.publisher.AttendanceCorrectionApprovalEventPublisher;
+import com._team._team.approval.publisher.AttendanceCorrectionSubmittedEventPublisher;
+import com._team._team.approval.publisher.EarlyLeaveApprovalEventPublisher;
+import com._team._team.approval.publisher.EarlyLeaveSubmittedEventPublisher;
 import com._team._team.approval.repository.*;
 import com._team._team.dto.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,9 +36,6 @@ import com._team._team.event.EarlyLeaveApprovalEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -727,9 +728,13 @@ public class ApprovalRequestService {
 
         return requests.stream()
                 .map(request -> {
+                    // 받은 공문 = 공문 타입 + 작성자 부서가 내 부서가 아님
+                    boolean isReceivedOfficial =
+                            request.getRequestType() == RequestType.OFFICIAL
+                                    && !organizationId.equals(request.getRequesterOrganizationId());
                     // 비공개 문서 + 작성자 본인이 아닌 경우 → 마스킹
                     if ("N".equals(request.getIsDeptVisibleYn())
-                            && !request.getMemberId().equals(memberId)) {
+                            && !request.getMemberId().equals(memberId) && !isReceivedOfficial) {
                         return ApprovalRequestResDto.maskedFromEntity(request);
                     }
                     return toResDtoWithRecipients(request);

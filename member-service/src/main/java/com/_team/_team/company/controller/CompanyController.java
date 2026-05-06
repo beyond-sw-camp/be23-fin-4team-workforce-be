@@ -92,4 +92,31 @@ public class CompanyController {
         );
     }
 
+    // 회사 직인 업로드
+    @PatchMapping("/seal")
+    public ResponseEntity<?> updateSeal(
+            @RequestHeader("X-User-Id") UUID memberId,
+            @RequestPart MultipartFile seal) {
+        companyService.updateSeal(memberId, seal);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "직인 업로드 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 회사 직인 조회 (internal - 다른 서비스에서 Feign 호출용)
+    @GetMapping("/internal/{companyId}/seal")
+    public String getSealImageUrl(@PathVariable UUID companyId) {
+        return companyService.getSealImageUrl(companyId);
+    }
+
+    /**
+     * 회사 도메인으로 회사 단건 조회 - 시드용 (데모)
+     */
+    @GetMapping("/internal/by-domain/{domain}")
+    public ResponseEntity<?> findByDomain(@PathVariable String domain) {
+        return new ResponseEntity<>(
+                ApiResponse.success(companyService.findByDomain(domain), "회사 조회 성공"),
+                HttpStatus.OK);
+    }
 }

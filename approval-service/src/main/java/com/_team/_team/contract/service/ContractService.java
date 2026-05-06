@@ -7,6 +7,7 @@ import com._team._team.contract.domain.ContractBatch;
 import com._team._team.contract.domain.ContractParty;
 import com._team._team.contract.domain.ContractTemplate;
 import com._team._team.contract.domain.enums.ContractStatus;
+import com._team._team.contract.domain.enums.ContractType;
 import com._team._team.contract.domain.enums.PartyRole;
 import com._team._team.contract.domain.enums.SignStatus;
 import com._team._team.contract.dto.reqdto.*;
@@ -20,6 +21,7 @@ import com._team._team.contract.repository.ContractPartyRepository;
 import com._team._team.contract.repository.ContractRepository;
 import com._team._team.contract.repository.ContractTemplateRepository;
 import com._team._team.dto.BusinessException;
+import com._team._team.event.ContractSignedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,9 +52,10 @@ public class ContractService {
     private final ContractNotificationService contractNotificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ContractNumberService contractNumberService;
+    private final ContractSignedEventPublisher contractSignedEventPublisher;
 
     @Autowired
-    public ContractService(ContractRepository contractRepository, ContractTemplateRepository templateRepository, ContractBatchRepository batchRepository, ContractPartyRepository partyRepository, SalaryServiceClient salaryServiceClient, MemberServiceClient memberServiceClient, ContractNotificationService contractNotificationService, ContractNumberService contractNumberService) {
+    public ContractService(ContractRepository contractRepository, ContractTemplateRepository templateRepository, ContractBatchRepository batchRepository, ContractPartyRepository partyRepository, SalaryServiceClient salaryServiceClient, MemberServiceClient memberServiceClient, ContractNotificationService contractNotificationService, ContractNumberService contractNumberService, ContractSignedEventPublisher contractSignedEventPublisher) {
         this.contractRepository = contractRepository;
         this.templateRepository = templateRepository;
         this.batchRepository = batchRepository;
@@ -59,10 +64,12 @@ public class ContractService {
         this.memberServiceClient = memberServiceClient;
         this.contractNotificationService = contractNotificationService;
         this.contractNumberService = contractNumberService;
+        this.contractSignedEventPublisher = contractSignedEventPublisher;
     }
 
     //    개별 발송
     public ContractResDto sendToEmployee(UUID companyId, UUID senderMemberId, ContractSendReqDto reqDto) {
+        log.info("[Contract-Send] adminInputJson={}", reqDto.getAdminInputJson());
         ContractTemplate template = findActiveTemplate(companyId, reqDto.getTemplateId());
 
         String sealImageUrl = memberServiceClient.getCompanySealImageUrl(companyId);
@@ -249,10 +256,48 @@ public class ContractService {
                         contract.getEmployeeName());
             }
 
+            // 연봉계약서 서명 완료 시 급여 반영 이벤트 발행
+            if (contract.getContractType() == ContractType.SALARY) {
+                publishSalaryContractEvent(contract);
+            }
+
+
             // TODO: PDF 생성 + S3 저장
         }
 
         return ContractResDto.fromEntity(contract, parties);
+    }
+
+    private void publishSalaryContractEvent(Contract contract) {
+        try {
+            Map<String, Object> content = objectMapper.readValue(
+                    contract.getContentJson(),
+                    new TypeReference<Map<String, Object>>() {});
+
+            Object newSalary = content.get("newSalary");
+            Object effectiveDate = content.get("effectiveDate");
+
+            if (newSalary == null || effectiveDate == null) {
+                log.warn("[Contract] 연봉계약서에 newSalary 또는 effectiveDate 누락. contractId={}",
+                        contract.getContractId());
+                return;
+            }
+
+            ContractSignedEvent event = ContractSignedEvent.builder()
+                    .companyId(contract.getCompanyId())
+                    .memberId(contract.getEmployeeMemberId())
+                    .contractId(contract.getContractId())
+                    .contractType("SALARY")
+                    .newSalary(Long.valueOf(newSalary.toString()))
+                    .effectiveDate(java.time.LocalDate.parse(effectiveDate.toString()))
+                    .signedAt(java.time.LocalDateTime.now())
+                    .build();
+
+            contractSignedEventPublisher.publish(event);
+        } catch (Exception e) {
+            log.error("[Contract] 급여 반영 이벤트 생성 실패. contractId={}",
+                    contract.getContractId(), e);
+        }
     }
 
     // 직원 거절
@@ -440,7 +485,7 @@ public class ContractService {
     }
 
     private String buildContentJson(String formSchema, SalaryInfoResDto salaryInfo,
-                                    MemberContractInfoResDto memberInfo, String adminInputJson) {
+                                    MemberContractInfoResDto memberInfo, Map<String, Object> adminInputJson) {
         try {
             Map<String, Object> content = new LinkedHashMap<>();
             content.put("employeeName", memberInfo.getName());
@@ -449,10 +494,8 @@ public class ContractService {
             content.put("jobTitleName", memberInfo.getJobTitleName());
             content.put("baseSalary", salaryInfo.getBaseSalary());
 
-            if (adminInputJson != null && !adminInputJson.isBlank()) {
-                Map<String, Object> adminData = objectMapper.readValue(
-                        adminInputJson, new TypeReference<Map<String, Object>>() {});
-                content.putAll(adminData);
+            if (adminInputJson != null && !adminInputJson.isEmpty()) {
+                content.putAll(adminInputJson);
             }
 
             return objectMapper.writeValueAsString(content);
@@ -502,7 +545,7 @@ public class ContractService {
     }
 
     // 개별 재발송
-    public ContractResDto resend(UUID companyId, UUID senderMemberId, UUID contractId, String adminInputJson) {
+    public ContractResDto resend(UUID companyId, UUID senderMemberId, UUID contractId, Map<String, Object> adminInputJson) {
         Contract original = findContractWithPermission(companyId, contractId);
 
         // 상태 검증: REJECTED 또는 CANCELED만 재발송 가능
@@ -718,7 +761,7 @@ public class ContractService {
 
     // 공통 이력 조회 로직
     private List<ContractResDto> buildHistory(Contract current) {
-        List<ContractResDto> history = new java.util.ArrayList<>();
+        List<ContractResDto> history = new ArrayList<>();
 
         Contract c = current;
         int maxDepth = 10;
@@ -735,7 +778,7 @@ public class ContractService {
             depth++;
         }
 
-        history.sort(java.util.Comparator.comparingInt(ContractResDto::getRevision));
+        history.sort(Comparator.comparingInt(ContractResDto::getRevision));
         return history;
     }
 

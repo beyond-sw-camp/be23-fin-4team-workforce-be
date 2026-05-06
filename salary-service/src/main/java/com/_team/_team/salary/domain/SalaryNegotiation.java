@@ -157,6 +157,17 @@ public class SalaryNegotiation extends BaseTimeEntity {
         this.decisionNote = note;
     }
 
+    /**  직원 거절 (사유 필수) */
+    public void reject(UUID rejecterId, String reason) {
+        if (this.status != NegotiationStatus.SUBMITTED) {
+            throw new IllegalStateException("상신된 건만 거절할 수 있습니다.");
+        }
+        this.status = NegotiationStatus.REJECTED;
+        this.decidedAt = LocalDateTime.now();
+        this.decidedBy = rejecterId;
+        this.decisionNote = reason;
+    }
+
     /** APPROVED -> APPLIED 적용 */
     public void apply(UUID newSalaryId) {
         if (this.status != NegotiationStatus.APPROVED) {

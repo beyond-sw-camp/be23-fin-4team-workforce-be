@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * Spring Batch Job / Step 빈 정의
@@ -88,12 +89,18 @@ public class BatchJobConfig {
                 .build();
     }
 
-    /** 휴가 부여 Step */
+    // 휴가 부여 Step, companyId 있으면 회사별 처리
     @Bean
     public Step leaveGrantStep() {
         return new StepBuilder("leaveGrantStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    leaveGrantWorker.run(LocalDate.now());
+                    String companyIdStr = chunkContext.getStepContext()
+                            .getJobParameters().get("companyId") instanceof String s ? s : null;
+                    if (companyIdStr != null && !companyIdStr.isBlank()) {
+                        leaveGrantWorker.runForCompany(UUID.fromString(companyIdStr), LocalDate.now());
+                    } else {
+                        leaveGrantWorker.run(LocalDate.now());
+                    }
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
@@ -164,12 +171,20 @@ public class BatchJobConfig {
                 .build();
     }
 
-    /** 급여 계산 Step */
+    /**
+     * 급여 계산 Step - 회사별 트리거에서 호출 시 그 회사만 처리
+     */
     @Bean
     public Step payrollCalculateStep() {
         return new StepBuilder("payrollCalculateStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    payrollCalculateWorker.run();
+                    String companyIdStr = chunkContext.getStepContext()
+                            .getJobParameters().get("companyId") instanceof String s ? s : null;
+                    if (companyIdStr != null && !companyIdStr.isBlank()) {
+                        payrollCalculateWorker.runForCompany(UUID.fromString(companyIdStr), null);
+                    } else {
+                        payrollCalculateWorker.run();
+                    }
                     return RepeatStatus.FINISHED;
                 }, new ResourcelessTransactionManager())
                 .build();
@@ -183,12 +198,18 @@ public class BatchJobConfig {
                 .build();
     }
 
-    /** 퇴직금 계산 Step */
+    // 퇴직금 계산 Step, companyId 있으면 회사별
     @Bean
     public Step severancePayStep() {
         return new StepBuilder("severancePayStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    severancePayWorker.run();
+                    String companyIdStr = chunkContext.getStepContext()
+                            .getJobParameters().get("companyId") instanceof String s ? s : null;
+                    if (companyIdStr != null && !companyIdStr.isBlank()) {
+                        severancePayWorker.runForCompany(UUID.fromString(companyIdStr));
+                    } else {
+                        severancePayWorker.run();
+                    }
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
@@ -202,12 +223,18 @@ public class BatchJobConfig {
                 .build();
     }
 
-    /** 급여명세서 발송 Step */
+    // 급여명세서 발송 Step, companyId 있으면 회사별
     @Bean
     public Step payslipSendStep() {
         return new StepBuilder("payslipSendStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    payslipSendWorker.run();
+                    String companyIdStr = chunkContext.getStepContext()
+                            .getJobParameters().get("companyId") instanceof String s ? s : null;
+                    if (companyIdStr != null && !companyIdStr.isBlank()) {
+                        payslipSendWorker.runForCompany(UUID.fromString(companyIdStr));
+                    } else {
+                        payslipSendWorker.run();
+                    }
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
@@ -221,12 +248,18 @@ public class BatchJobConfig {
                 .build();
     }
 
-    /** 연차 초과 부여 Step */
+    // 이월 연차 Step, companyId 있으면 회사별
     @Bean
     public Step carryoverLeaveStep() {
         return new StepBuilder("carryoverLeaveStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    carryoverLeaveWorker.run(LocalDate.now());
+                    String companyIdStr = chunkContext.getStepContext()
+                            .getJobParameters().get("companyId") instanceof String s ? s : null;
+                    if (companyIdStr != null && !companyIdStr.isBlank()) {
+                        carryoverLeaveWorker.runForCompany(UUID.fromString(companyIdStr), LocalDate.now());
+                    } else {
+                        carryoverLeaveWorker.run(LocalDate.now());
+                    }
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
@@ -297,12 +330,18 @@ public class BatchJobConfig {
                 .build();
     }
 
-    /** 월 장부 마감 Step */
+    // 월 장부 마감 Step, companyId 있으면 회사별
     @Bean
     public Step monthlyAttendanceCloseStep() {
         return new StepBuilder("monthlyAttendanceCloseStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    monthlyAttendanceCloseWorker.run();
+                    String companyIdStr = chunkContext.getStepContext()
+                            .getJobParameters().get("companyId") instanceof String s ? s : null;
+                    if (companyIdStr != null && !companyIdStr.isBlank()) {
+                        monthlyAttendanceCloseWorker.runForCompany(UUID.fromString(companyIdStr));
+                    } else {
+                        monthlyAttendanceCloseWorker.run();
+                    }
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
@@ -334,11 +373,18 @@ public class BatchJobConfig {
                 .build();
     }
 
+    // 정기 상여 알림 Step, companyId 있으면 회사별
     @Bean
     public Step regularBonusPaymentStep() {
         return new StepBuilder("regularBonusPaymentStep", jobRepository)
                 .tasklet((contribution, chunkContext) -> {
-                    regularBonusPaymentWorker.run(LocalDate.now());
+                    String companyIdStr = chunkContext.getStepContext()
+                            .getJobParameters().get("companyId") instanceof String s ? s : null;
+                    if (companyIdStr != null && !companyIdStr.isBlank()) {
+                        regularBonusPaymentWorker.runForCompany(UUID.fromString(companyIdStr), LocalDate.now());
+                    } else {
+                        regularBonusPaymentWorker.run(LocalDate.now());
+                    }
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();

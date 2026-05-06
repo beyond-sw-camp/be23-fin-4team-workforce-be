@@ -16,6 +16,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -221,7 +222,7 @@ public class EvaluationReportService {
             }
         }
 
-        sb.append("<div class=\"foot\">생성일시 ").append(java.time.LocalDateTime.now().format(DT)).append("</div>");
+        sb.append("<div class=\"foot\">생성일시 ").append(LocalDateTime.now().format(DT)).append("</div>");
         sb.append("</body></html>");
         return sb.toString();
     }

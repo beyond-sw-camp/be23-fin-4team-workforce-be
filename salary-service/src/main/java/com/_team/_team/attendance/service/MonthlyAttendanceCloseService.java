@@ -98,10 +98,18 @@ public class MonthlyAttendanceCloseService {
         return new CloseResult(companiesProcessed, ledgersCreated, ledgersSkipped, failed);
     }
 
-    /**
-     * 회사 단위 처리
-     * 미해결 건 있으면 보류, FINALIZED 만 집계
-     */
+    // 회사 1곳 외부 노출용 - 회사별 Quartz 트리거에서 호출
+    public CloseResult processForCompany(UUID companyId, YearMonth targetMonth) {
+        try {
+            CompanyResult cr = processCompany(companyId, targetMonth);
+            return new CloseResult(1, cr.created(), cr.skipped(), 0);
+        } catch (Exception e) {
+            log.error("[MonthlyClose] 회사별 처리 실패 companyId={}, msg={}", companyId, e.getMessage(), e);
+            return new CloseResult(0, 0, 0, 1);
+        }
+    }
+
+    // 회사 단위 처리, 미해결 건 있으면 보류, FINALIZED 만 집계
     private CompanyResult processCompany(UUID companyId, YearMonth targetMonth) {
         LocalDate from = targetMonth.atDay(1);
         LocalDate to = targetMonth.atEndOfMonth();

@@ -92,8 +92,6 @@ public class OvertimePolicyService {
                 reqDto.getWeeklyTotalLimitMinutes(),
                 reqDto.getDailyOvertimeLimitMinutes(),
                 reqDto.getMonthlyOvertimeLimitMinutes(),
-                reqDto.getNightStartTime(),
-                reqDto.getNightEndTime(),
                 reqDto.getHolidayWorkRequiresApproval()
         );
 

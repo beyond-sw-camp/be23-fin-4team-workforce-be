@@ -137,6 +137,34 @@ public class SalaryNegotiationController {
                 HttpStatus.OK);
     }
 
+    // 직원 본인 응답 - 수락
+    @PatchMapping("/my/{negotiationId}/accept")
+    public ResponseEntity<?> acceptByEmployee(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID negotiationId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String note = body != null ? body.get("note") : null;
+        SalaryNegotiationResDto data = service.acceptByEmployee(companyId, memberId, negotiationId, note);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "협상 제안을 수락했습니다."),
+                HttpStatus.OK);
+    }
+
+    // 직원 본인 응답 - 거절
+    @PatchMapping("/my/{negotiationId}/reject")
+    public ResponseEntity<?> rejectByEmployee(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @PathVariable UUID negotiationId,
+            @RequestBody Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
+        SalaryNegotiationResDto data = service.rejectByEmployee(companyId, memberId, negotiationId, reason);
+        return new ResponseEntity<>(
+                ApiResponse.success(data, "협상 제안을 거절했습니다."),
+                HttpStatus.OK);
+    }
+
     @DeleteMapping("/{negotiationId}")
     public ResponseEntity<?> delete(
             @RequestHeader("X-User-CompanyId") UUID companyId,

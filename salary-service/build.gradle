@@ -32,7 +32,7 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation 'com.4team:workforce-common:1.0.27'
+    implementation 'com.4team:workforce-common:1.0.31'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
@@ -47,11 +47,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-quartz'
     implementation 'org.springframework.boot:spring-boot-starter-batch'
 
-//    // 2. QueryDSL
-//    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
-//    annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
-//    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
-//    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+    // 2. QueryDSL
+    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+    annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
+    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

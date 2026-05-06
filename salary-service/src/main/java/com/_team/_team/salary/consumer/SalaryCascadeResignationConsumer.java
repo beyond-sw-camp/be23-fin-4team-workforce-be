@@ -7,6 +7,7 @@ import com._team._team.attendance.repository.MemberScheduleSelectionRepository;
 import com._team._team.event.ResignationApprovalEvent;
 import com._team._team.salary.repository.MemberAllowanceRepository;
 import com._team._team.salary.repository.SalaryRepository;
+import com._team._team.salary.service.RetirementSimulationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -19,7 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * 사직서 결재 결과 Kafka 수신 -> 급여/수당/스케줄/잔액 cascade 처리
+ * 사직서 결재 결과 Kafka 수신 -> 급여/수당/스케줄/잔액 처리
  */
 @Slf4j
 @Component
@@ -38,17 +39,20 @@ public class SalaryCascadeResignationConsumer {
     private final MemberAllowanceRepository memberAllowanceRepository;
     private final MemberScheduleSelectionRepository memberScheduleSelectionRepository;
     private final MemberBalanceRepository memberBalanceRepository;
+    private final RetirementSimulationService retirementSimulationService;
 
     @Autowired
     public SalaryCascadeResignationConsumer(
             SalaryRepository salaryRepository,
             MemberAllowanceRepository memberAllowanceRepository,
             MemberScheduleSelectionRepository memberScheduleSelectionRepository,
-            MemberBalanceRepository memberBalanceRepository) {
+            MemberBalanceRepository memberBalanceRepository,
+            RetirementSimulationService retirementSimulationService) {
         this.salaryRepository = salaryRepository;
         this.memberAllowanceRepository = memberAllowanceRepository;
         this.memberScheduleSelectionRepository = memberScheduleSelectionRepository;
         this.memberBalanceRepository = memberBalanceRepository;
+        this.retirementSimulationService = retirementSimulationService;
     }
 
     @KafkaListener(
@@ -102,8 +106,7 @@ public class SalaryCascadeResignationConsumer {
         log.info("[Resignation-Cascade] schedule selections cancelled: {} rows. memberId={}, after={}",
                 cancelledSelections, event.getMemberId(), retireYearMonth);
 
-        // 4) 잔여 연차/이월/월차 - 사용 불가 처리. remaining 값은 보존 (Phase 2 미사용 연차 수당 환산용)
-        // 비활성화 직전 잔액을 로그로 기록 (정산 자료용)
+        // 4) 잔여 연차/이월/월차 - 사용 불가 처리, remaining 값은 보존
         Double annualRemainingBeforeBlock = memberBalanceRepository
                 .sumRemainingByMemberAndType(event.getMemberId(), event.getCompanyId(), BalanceType.ANNUAL);
         Double carryoverRemainingBeforeBlock = memberBalanceRepository
@@ -112,6 +115,20 @@ public class SalaryCascadeResignationConsumer {
                 .markAllUnusableByMember(event.getMemberId(), event.getCompanyId());
         log.info("[Resignation-Cascade] balances blocked: {} rows. annualRemaining={}, carryoverRemaining={}",
                 blockedBalances, annualRemainingBeforeBlock, carryoverRemainingBeforeBlock);
+
+        // 5) 퇴직정산 Payroll 자동 생성 - simulate 결과로 RETIREMENT_SETTLEMENT row 생성 (DRAFT)
+        // 활성 Salary 못 찾으면 (5번 cascade 에서 막 마감해서) 일시 예외 가능 - 별도 try 로 감싸 cascade 자체는 성공
+        double annualRemain = annualRemainingBeforeBlock != null ? annualRemainingBeforeBlock : 0.0;
+        double carryoverRemain = carryoverRemainingBeforeBlock != null ? carryoverRemainingBeforeBlock : 0.0;
+        Double unusedLeaveDays = annualRemain + carryoverRemain;
+        try {
+            retirementSimulationService.createRetirementSettlementPayroll(
+                    event.getCompanyId(), event.getMemberId(), retireDate, unusedLeaveDays);
+        } catch (Exception ex) {
+            log.error("[Resignation-Cascade] retirement settlement payroll 생성 실패 memberId={} retireDate={}",
+                    event.getMemberId(), retireDate, ex);
+            // cascade 자체는 성공 처리. 정산 Payroll 은 관리자가 수동 보강 가능
+        }
 
         log.info("[Resignation-Cascade] done. memberId={} salary={} allowance={} schedule={} balance={}",
                 event.getMemberId(), closedSalaries, syncedAllowances, cancelledSelections, blockedBalances);

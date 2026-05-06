@@ -16,4 +16,8 @@ public interface SalaryServiceClient {
     // 법정 공휴일 복사
     @PostMapping("/company-holidays/import-public")
     void importPublicHolidays(@RequestParam("companyId") UUID companyId);
+
+    // 회사별 자동 작업 트리거 일괄 시드, 회사 신규 가입 시 호출
+    @PostMapping("/salary/internal/batch-schedule/init")
+    void initBatchSchedule(@RequestParam("companyId") UUID companyId);
 }

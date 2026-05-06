@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 출퇴근 정정 신청, 승인, 반려 서비스
@@ -50,6 +51,7 @@ public class AttendanceCorrectionService {
     private final DailyAttendanceRepository dailyAttendanceRepository;
     private final AttendanceLogRepository attendanceLogRepository;
     private final LeaveRequestRepository leaveRequestRepository;
+    private final LeaveRequestService leaveRequestService;
     private final CompanyHolidayRepository companyHolidayRepository;
     private final DailyAttendanceCloseService dailyAttendanceCloseService;
 
@@ -58,11 +60,13 @@ public class AttendanceCorrectionService {
             DailyAttendanceRepository dailyAttendanceRepository,
             AttendanceLogRepository attendanceLogRepository,
             LeaveRequestRepository leaveRequestRepository,
+            LeaveRequestService leaveRequestService,
             CompanyHolidayRepository companyHolidayRepository,
             DailyAttendanceCloseService dailyAttendanceCloseService) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.attendanceLogRepository = attendanceLogRepository;
         this.leaveRequestRepository = leaveRequestRepository;
+        this.leaveRequestService = leaveRequestService;
         this.companyHolidayRepository = companyHolidayRepository;
         this.dailyAttendanceCloseService = dailyAttendanceCloseService;
     }
@@ -146,12 +150,20 @@ public class AttendanceCorrectionService {
     /**
      * [from, to] 와 겹치는 본인의 승인 휴가 일수 합계
      * 휴가 기간이 일부만 겹치면 겹친 부분만 카운트
+     * 비연속 휴가계획이 있는 휴가는 [from, to] 안에 포함된 휴가 계획일(비연속) 개수만 합산
      */
     private long countApprovedLeaveDays(UUID memberId, LocalDate from, LocalDate to) {
         List<LeaveRequest> overlapping = leaveRequestRepository
                 .findApprovedOverlapping(memberId, from, to);
         long total = 0;
         for (LeaveRequest l : overlapping) {
+            Set<LocalDate> planned = leaveRequestService.parsePlannedDates(l);
+            if (!planned.isEmpty()) {
+                total += planned.stream()
+                        .filter(d -> !d.isBefore(from) && !d.isAfter(to))
+                        .count();
+                continue;
+            }
             LocalDate s = l.getStartDate().isBefore(from) ? from : l.getStartDate();
             LocalDate e = l.getEndDate().isAfter(to) ? to : l.getEndDate();
             if (!s.isAfter(e)) {
@@ -470,10 +482,18 @@ public class AttendanceCorrectionService {
         LocalDate windowStart = today.minusDays(CORRECTION_WINDOW_DAYS + leaveDays);
 
         // 2. 본인 승인 휴가 기간 모음 (해당 일자 제외)
+        // 비연속 휴가계획이 있는 휴가는 그 날짜만 leaveDates 에 포함
         List<LeaveRequest> myLeaves = leaveRequestRepository
                 .findApprovedOverlapping(memberId, windowStart, today);
         Set<LocalDate> leaveDates = new HashSet<>();
         for (LeaveRequest l : myLeaves) {
+            Set<LocalDate> planned = leaveRequestService.parsePlannedDates(l);
+            if (!planned.isEmpty()) {
+                planned.stream()
+                        .filter(d -> !d.isBefore(windowStart) && !d.isAfter(today))
+                        .forEach(leaveDates::add);
+                continue;
+            }
             LocalDate s = l.getStartDate().isBefore(windowStart) ? windowStart : l.getStartDate();
             LocalDate e = l.getEndDate().isAfter(today) ? today : l.getEndDate();
             for (LocalDate d = s; !d.isAfter(e); d = d.plusDays(1)) {
@@ -486,7 +506,7 @@ public class AttendanceCorrectionService {
                 .findAllInRange(companyId, windowStart, today)
                 .stream()
                 .map(h -> h.getHolidayDate())
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
 
         // 4. 일자별 매핑
         List<DailyAttendance> myDas = dailyAttendanceRepository

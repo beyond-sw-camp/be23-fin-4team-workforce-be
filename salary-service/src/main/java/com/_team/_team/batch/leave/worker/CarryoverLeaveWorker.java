@@ -51,29 +51,40 @@ public class CarryoverLeaveWorker {
     public void run(LocalDate baseDate) {
         log.info("CarryoverLeaveWorker start baseDate={}", baseDate);
 
-        // 이월 허용 정책만 자동 처리 (동의 흐름 없음)
+        // 이월 허용 정책만 자동 처리
         List<LeavePolicy> targetPolicies = leavePolicyRepository.findAll().stream()
                 .filter(p -> "N".equals(p.getDelYn()))
                 .filter(p -> "Y".equals(p.getIsCarryoverYn()))
                 .filter(p -> p.getCarryoverDays() != null && p.getCarryoverDays() > 0)
                 .toList();
+        runForPolicies(targetPolicies, baseDate, null);
+    }
 
+    // 회사별 호출, 회사 1곳 정책만 필터
+    public void runForCompany(UUID companyId, LocalDate baseDate) {
+        List<LeavePolicy> targetPolicies = leavePolicyRepository.findAll().stream()
+                .filter(p -> "N".equals(p.getDelYn()))
+                .filter(p -> "Y".equals(p.getIsCarryoverYn()))
+                .filter(p -> p.getCarryoverDays() != null && p.getCarryoverDays() > 0)
+                .filter(p -> companyId.equals(p.getCompanyId()))
+                .toList();
+        runForPolicies(targetPolicies, baseDate, companyId);
+    }
+
+    private void runForPolicies(List<LeavePolicy> targetPolicies, LocalDate baseDate, UUID companyIdLog) {
         int totalSuccess = 0, totalSkip = 0, totalError = 0;
-
         for (LeavePolicy policy : targetPolicies) {
             try {
                 int[] result = carryoverForCompany(policy, baseDate);
                 totalSuccess += result[0];
                 totalSkip    += result[1];
             } catch (Exception e) {
-                // 이월 연차 배치 실패 회사
                 log.error("Carryover failed companyId={}", policy.getCompanyId(), e);
                 totalError++;
             }
         }
-        // 이월 연차 배치 실패 직원
-        log.info("CarryoverLeaveWorker end: success={}, skip={}, errors={}",
-                totalSuccess, totalSkip, totalError);
+        log.info("CarryoverLeaveWorker end companyIdScope={} success={} skip={} errors={}",
+                companyIdLog, totalSuccess, totalSkip, totalError);
     }
 
     /**

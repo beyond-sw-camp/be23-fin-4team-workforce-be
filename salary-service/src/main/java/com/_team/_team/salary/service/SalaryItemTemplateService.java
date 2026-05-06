@@ -11,6 +11,8 @@ import com._team._team.salary.dto.reqdto.SalaryItemTemplateUpdateReqDto;
 import com._team._team.salary.dto.resdto.SalaryItemTemplateResDto;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +40,8 @@ public class SalaryItemTemplateService {
         this.ragSyncSalaryEventPublisher = ragSyncSalaryEventPublisher;
     }
 
-    /** 급여 항목 템플릿 생성 */
+    /** 급여 항목 템플릿 생성 - 캐시 무효화 */
+    @CacheEvict(value = "salaryItemTemplates", key = "#companyId")
     public SalaryItemTemplateResDto save(UUID companyId, SalaryItemTemplateCreateReqDto reqDto) {
         validateDuplicateItemName(companyId, reqDto.getItemName());
 
@@ -73,7 +76,7 @@ public class SalaryItemTemplateService {
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
-    /** 회사별 급여 항목 템플릿 목록 조회 */
+    /** 회사별 급여 항목 템플릿 목록 조회 (캐시 일시 비활성) */
     @Transactional(readOnly = true)
     public List<SalaryItemTemplateResDto> findByCompanyId(UUID companyId) {
         return salaryItemTemplateRepository.findByCompanyIdAndDelYn(companyId, "N").stream()
@@ -81,7 +84,8 @@ public class SalaryItemTemplateService {
                 .toList();
     }
 
-    /** 급여 항목 템플릿 수정 (더티체킹) */
+    /** 급여 항목 템플릿 수정 (더티체킹) - 캐시 무효화 */
+    @CacheEvict(value = "salaryItemTemplates", key = "#companyId")
     public SalaryItemTemplateResDto update(UUID companyId, UUID salaryItemTemplateId, SalaryItemTemplateUpdateReqDto reqDto) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
@@ -107,7 +111,8 @@ public class SalaryItemTemplateService {
         return SalaryItemTemplateResDto.fromEntity(template);
     }
 
-    /** 급여 항목 템플릿 삭제 */
+    /** 급여 항목 템플릿 삭제 - 캐시 무효화 */
+    @CacheEvict(value = "salaryItemTemplates", key = "#companyId")
     public void delete(UUID companyId, UUID salaryItemTemplateId) {
         SalaryItemTemplate template = salaryItemTemplateRepository.findById(salaryItemTemplateId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "급여 항목 템플릿을 찾을 수 없습니다."));
@@ -149,14 +154,17 @@ public class SalaryItemTemplateService {
         // 식대/자가운전/보육수당/연구활동비/교통비 = 회사 공통 (정책 일률 지급)
         // 직책수당/자녀수당 = 개인 차등 (직급, 자녀수에 따라 직원마다 다름)
         List<DefaultSpec> specs = List.of(
-                new DefaultSpec("기본급",         ItemType.EARNING, 10, "Y", TaxCategory.TAXABLE,       null,    "N"),
-                new DefaultSpec("직책수당",       ItemType.EARNING, 20, "Y", TaxCategory.TAXABLE,       null,    "N"),
-                new DefaultSpec("식대",           ItemType.EARNING, 30, "N", TaxCategory.MEAL,          200000L, "Y"),
-                new DefaultSpec("자가운전보조금", ItemType.EARNING, 40, "N", TaxCategory.VEHICLE_SELF,  200000L, "Y"),
-                new DefaultSpec("교통비",         ItemType.EARNING, 41, "Y", TaxCategory.TAXABLE,       null,    "N"),
-                new DefaultSpec("보육수당",       ItemType.EARNING, 50, "N", TaxCategory.CHILDCARE,     200000L, "Y"),
-                new DefaultSpec("자녀수당",       ItemType.EARNING, 51, "Y", TaxCategory.TAXABLE,       null,    "N"),
-                new DefaultSpec("연구활동비",     ItemType.EARNING, 60, "N", TaxCategory.RESEARCH,      200000L, "Y")
+                new DefaultSpec("기본급",         ItemType.EARNING, 10, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
+                new DefaultSpec("직책수당",       ItemType.EARNING, 20, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
+                new DefaultSpec("식대",           ItemType.EARNING, 30, "N", TaxCategory.MEAL,            200000L, "Y", "N"),
+                new DefaultSpec("자가운전보조금", ItemType.EARNING, 40, "N", TaxCategory.VEHICLE_SELF,    200000L, "Y", "N"),
+                new DefaultSpec("교통비",         ItemType.EARNING, 41, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("보육수당",       ItemType.EARNING, 50, "N", TaxCategory.CHILDCARE,       200000L, "Y", "N"),
+                new DefaultSpec("자녀수당",       ItemType.EARNING, 51, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("연구활동비",     ItemType.EARNING, 60, "N", TaxCategory.RESEARCH,        200000L, "Y", "N"),
+                new DefaultSpec("퇴직월 일할 급여", ItemType.EARNING, 80, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("퇴직금",          ItemType.EARNING, 81, "N", TaxCategory.ETC_NON_TAXABLE, null,    "N", "N"),
+                new DefaultSpec("미사용 연차 수당", ItemType.EARNING, 82, "Y", TaxCategory.TAXABLE,         null,    "N", "N")
         );
 
         List<SalaryItemTemplate> toSave = new ArrayList<>();
@@ -179,6 +187,8 @@ public class SalaryItemTemplateService {
                     .taxCategory(spec.category())
                     .defaultAmount(spec.defaultAmount())
                     .applyToAllYn(spec.applyToAll())
+                    .isOrdinaryWageYn(spec.ordinaryWage())
+                    .isSystemDefault(true)
                     .delYn("N")
                     .build());
         }
@@ -213,7 +223,8 @@ public class SalaryItemTemplateService {
             String taxable,
             TaxCategory category,
             Long defaultAmount,
-            String applyToAll
+            String applyToAll,
+            String ordinaryWage
     ) {}
 
     public record SeedResult(int created, String message) {}

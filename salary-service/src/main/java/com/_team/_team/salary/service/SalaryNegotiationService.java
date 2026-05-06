@@ -136,6 +136,42 @@ public class SalaryNegotiationService {
     }
 
     /**
+     * 직원 본인이 협상 제안 수락
+     */
+    public SalaryNegotiationResDto acceptByEmployee(UUID companyId, UUID memberId, UUID negotiationId, String note) {
+        SalaryNegotiation neg = findOrThrow(companyId, negotiationId);
+        if (!neg.getMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인 협상안만 응답할 수 있습니다.");
+        }
+        if (neg.getStatus() != NegotiationStatus.SUBMITTED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "검토 대기 상태의 협상만 수락할 수 있습니다.");
+        }
+        neg.approve(memberId, note);
+        log.info("[NEGOTIATION-EMP-ACCEPT] negotiationId={} memberId={}", negotiationId, memberId);
+        return SalaryNegotiationResDto.fromEntity(neg);
+    }
+
+    /**
+     * 직원 본인이 협상 제안 거절
+     */
+    public SalaryNegotiationResDto rejectByEmployee(UUID companyId, UUID memberId, UUID negotiationId, String reason) {
+        SalaryNegotiation neg = findOrThrow(companyId, negotiationId);
+        if (!neg.getMemberId().equals(memberId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "본인 협상안만 응답할 수 있습니다.");
+        }
+        if (neg.getStatus() != NegotiationStatus.SUBMITTED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "검토 대기 상태의 협상만 거절할 수 있습니다.");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "거절 사유를 입력해주세요.");
+        }
+        neg.reject(memberId, reason);
+        log.info("[NEGOTIATION-EMP-REJECT] negotiationId={} memberId={} reason={}",
+                negotiationId, memberId, reason);
+        return SalaryNegotiationResDto.fromEntity(neg);
+    }
+
+    /**
      * 적용 처리
      */
     public SalaryNegotiationResDto apply(UUID companyId, UUID negotiationId) {
@@ -150,12 +186,15 @@ public class SalaryNegotiationService {
                 .stream().findFirst()
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "활성 급여 정책이 없습니다."));
 
-        // 이전 활성 Salary 마감
-        salaryRepository
+        // 이전 활성 Salary 조회 - 마감 + 부가 항목(직급/직책/부양가족) fallback 용도
+        Salary prevActive = salaryRepository
                 .findActiveSalary(neg.getMemberId(), companyId, neg.getProposedEffectiveFrom())
-                .ifPresent(prev -> prev.closeEffectivePeriod(neg.getProposedEffectiveFrom().minusDays(1)));
+                .orElse(null);
+        if (prevActive != null) {
+            prevActive.closeEffectivePeriod(neg.getProposedEffectiveFrom().minusDays(1));
+        }
 
-        // 새 Salary 생성 dependentCount 등 부가 항목은 이전 행 값 보존
+        // 부양가족수 - 이전 행 값 보존 (협상 대상 필드 아님)
         Integer prevDep = salaryRepository
                 .findByMemberIdAndCompanyId(neg.getMemberId(), companyId)
                 .stream()
@@ -164,13 +203,21 @@ public class SalaryNegotiationService {
                 .findFirst()
                 .orElse(1);
 
+        // 직급 / 직책 - 협상에서 명시 제안 안 됐으면 (단순 인상 케이스) 이전 Salary 값 그대로 승계
+        String jobGradeName = neg.getProposedJobGradeName() != null
+                ? neg.getProposedJobGradeName()
+                : (prevActive != null ? prevActive.getJobGradeName() : null);
+        String jobTitleName = neg.getProposedJobTitleName() != null
+                ? neg.getProposedJobTitleName()
+                : (prevActive != null ? prevActive.getJobTitleName() : null);
+
         Salary newSalary = Salary.builder()
                 .memberId(neg.getMemberId())
                 .companyId(companyId)
                 .salaryPolicyId(policy.getSalaryPolicyId())
                 .baseSalary(neg.getProposedBaseSalary())
-                .jobGradeName(neg.getProposedJobGradeName())
-                .jobTitleName(neg.getProposedJobTitleName())
+                .jobGradeName(jobGradeName)
+                .jobTitleName(jobTitleName)
                 .effectiveFrom(neg.getProposedEffectiveFrom())
                 .effectiveTo(null)
                 .dependentCount(prevDep)

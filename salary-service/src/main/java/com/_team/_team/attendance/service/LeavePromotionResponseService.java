@@ -134,12 +134,15 @@ public class LeavePromotionResponseService {
             throw new BusinessException(HttpStatus.FORBIDDEN,
                     "본인의 통보만 회신 가능합니다");
         }
-        if (log.getStatus() != PromotionLogStatus.SENT) {
+        // SENT(미회신) 또는 ACKNOWLEDGED(재회신) 만 허용 - 강제 지정(DESIGNATED) 후엔 불가
+        if (log.getStatus() != PromotionLogStatus.SENT
+                && log.getStatus() != PromotionLogStatus.ACKNOWLEDGED) {
             throw new BusinessException(HttpStatus.CONFLICT,
-                    "이미 회신했거나 회사가 강제 지정한 통보입니다");
+                    "회사가 강제 지정한 통보는 재회신할 수 없습니다");
         }
 
         String json = serializeDates(reqDto.getPlannedDates());
+        // 재회신 시 휴가계획 날짜를 최신으로 덮어씀 (이력 별도 보관 X - 최신 회신만 유효)
         log.acknowledge(json);
     }
 

@@ -5,6 +5,7 @@ import com._team._team.company.domain.Company;
 import com._team._team.company.dto.reqdto.CompanyOnboardingReqDto;
 import com._team._team.company.service.MailService;
 import com._team._team.dto.BusinessException;
+import com._team._team.saas.config.SaasOperatorProperties;
 import com._team._team.dto.NotificationMessage;
 import com._team._team.event.MemberChangedEvent;
 import com._team._team.event.MemberDeletedEvent;
@@ -53,8 +54,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -84,9 +89,10 @@ public class MemberService {
     private final SearchOutboxEventRepository searchOutboxEventRepository;
     private final ObjectMapper objectMapper;
     private final CalendarEventRepository calendarEventRepository;
+    private final SaasOperatorProperties saasOperatorProperties;
 
     @Autowired
-    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper, CalendarEventRepository calendarEventRepository) {
+    public MemberService(MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, RoleRepository roleRepository, RolePermissionRepository rolePermissionRepository, PermissionRepository permissionRepository, OrganizationRepository organizationRepository, JobGradeRepository jobGradeRepository, JobTitleRepository jobTitleRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, MailService mailService, @Qualifier("permissionInventory") RedisTemplate<String, String> permissoinRedisTemplate, PermissionUtils permissionUtils, @Qualifier("emailInventory") RedisTemplate<String, String> emailRedisTemplate, EmploymentJobHistoryRepository employmentJobHistoryRepository, S3Uploader s3Uploader, ApplicationEventPublisher eventPublisher, SearchOutboxEventRepository searchOutboxEventRepository, ObjectMapper objectMapper, CalendarEventRepository calendarEventRepository, SaasOperatorProperties saasOperatorProperties) {
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.roleRepository = roleRepository;
@@ -107,6 +113,7 @@ public class MemberService {
         this.searchOutboxEventRepository = searchOutboxEventRepository;
         this.objectMapper = objectMapper;
         this.calendarEventRepository = calendarEventRepository;
+        this.saasOperatorProperties = saasOperatorProperties;
     }
 
     // 온보딩 시 기본 역할 4개 + 권한 생성
@@ -431,17 +438,38 @@ public class MemberService {
         member.resetLoginFailCount();
         memberRepository.save(member);
 
-        // 6. defaultPosition 조회
+        // 6. SaaS 운영자 분기 - 시스템 회사 소속이면 운영자
+        boolean isSaasOperator = saasOperatorProperties.getSystemCompanyId() != null
+                && member.getCompany() != null
+                && saasOperatorProperties.getSystemCompanyId()
+                        .equals(member.getCompany().getCompanyId().toString());
+        if (isSaasOperator) {
+            String operatorAt = jwtTokenProvider.createAtToken(member, null);
+            String operatorRt = jwtTokenProvider.createRtToken(member);
+            jwtTokenProvider.setRtCookie(response, operatorRt);
+            return LoginResDto.builder()
+                    .accessToken(operatorAt)
+                    .name(member.getName())
+                    .memberId(member.getMemberId())
+                    .memberPositionId(null)
+                    .isFirstLoginYn(member.getIsFirstLoginYn())
+                    .isEmailVerifiedYn(member.getIsEmailVerifiedYn())
+                    .isOnboardingYn(member.getIsOnboardingYn())
+                    .permissions(List.of())
+                    .build();
+        }
+
+        // 7. defaultPosition 조회
         MemberPosition memberPosition = memberPositionRepository
                 .findByIdWithRoleAndPermissions(member.getDefaultPositionId())
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "포지션 정보를 찾을 수 없습니다."
                 ));
 
-        // 7. AT 발급
+        // 8. AT 발급
         String accessToken = jwtTokenProvider.createAtToken(member, memberPosition);
 
-        // 8. RT 발급 + 쿠키 저장
+        // 9. RT 발급 + 쿠키 저장
         String refreshToken = jwtTokenProvider.createRtToken(member);
         jwtTokenProvider.setRtCookie(response, refreshToken);
 
@@ -1749,6 +1777,37 @@ public class MemberService {
     }
 
     /**
+     * 회사별 시스템 관리자 조회
+     * 알림 발송 대상 (예: 주 52시간 위반 알림)
+     */
+    @Transactional(readOnly = true)
+    public List<MemberResDto> findAdminsByCompanyId(UUID companyId) {
+        List<Member> members = memberRepository
+                .findAllActiveByCompanyId(companyId, MemberStatus.ACTIVE);
+        if (members.isEmpty()) return java.util.Collections.emptyList();
+        java.util.Set<UUID> memberIds = members.stream()
+                .map(Member::getMemberId)
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.Map<UUID, MemberPosition> positionByMember = memberPositionRepository
+                .findActivePositionsByMemberIds(memberIds)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        mp -> mp.getMember().getMemberId(),
+                        mp -> mp,
+                        (a, b) -> a));
+        return members.stream()
+                .filter(m -> {
+                    MemberPosition mp = positionByMember.get(m.getMemberId());
+                    return mp != null && "YES".equals(mp.getIsSystemAdminYn());
+                })
+                .map(m -> {
+                    MemberPosition mp = positionByMember.get(m.getMemberId());
+                    return MemberResDto.fromEntity(m, mp);
+                })
+                .toList();
+    }
+
+    /**
      * 회사별 재직 사원 조회
      */
     @Transactional(readOnly = true)
@@ -1864,16 +1923,15 @@ public class MemberService {
      * defaultPositionId 가 있는 경우 해당 포지션의 조직/직책 이름까지 채운다.
      */
     @Transactional(readOnly = true)
-    public java.util.Map<UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto>
-    findMinimalProfilesByIds(java.util.Collection<UUID> memberIds) {
-        if (memberIds == null || memberIds.isEmpty()) return java.util.Collections.emptyMap();
-        java.util.Map<UUID, com._team._team.member.dto.resdto.MemberMinimalProfileResDto> result = new java.util.HashMap<>();
-        java.util.List<Member> members = memberRepository.findAllById(memberIds);
+    public Map<UUID, MemberMinimalProfileResDto> findMinimalProfilesByIds(Collection<UUID> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) return Collections.emptyMap();
+        Map<UUID, MemberMinimalProfileResDto> result = new HashMap<>();
+        List<Member> members = memberRepository.findAllById(memberIds);
         for (Member m : members) {
             String department = null;
             String positionName = null;
             if (m.getDefaultPositionId() != null) {
-                java.util.Optional<MemberPosition> posOpt = memberPositionRepository.findByIdWithDetails(m.getDefaultPositionId());
+                Optional<MemberPosition> posOpt = memberPositionRepository.findByIdWithDetails(m.getDefaultPositionId());
                 if (posOpt.isPresent()) {
                     MemberPosition p = posOpt.get();
                     if (p.getOrganization() != null) {
@@ -1885,7 +1943,7 @@ public class MemberService {
                 }
             }
             result.put(m.getMemberId(),
-                    com._team._team.member.dto.resdto.MemberMinimalProfileResDto.builder()
+                    MemberMinimalProfileResDto.builder()
                             .name(m.getName())
                             .department(department)
                             .positionName(positionName)

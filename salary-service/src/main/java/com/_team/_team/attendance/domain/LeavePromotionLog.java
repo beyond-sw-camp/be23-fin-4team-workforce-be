@@ -81,13 +81,15 @@ public class LeavePromotionLog extends BaseTimeEntity {
     }
 
     /**
-     * 직원 회신 처리.
+     * 휴가계획 -> 직원 회신 처리
      * - acknowledgedAt 기록있ㄷ면 회사 촉진 의무 면책 완료
      * - plannedDates 는 "참고용 계획", 실제 그날 안써도 됨
      */
     public void acknowledge(String plannedDatesJson) {
-        if (this.status != PromotionLogStatus.SENT) {
-            throw new IllegalStateException("이미 응답되었거나 강제 지정된 통보입니다.");
+        // SENT(미회신) 또는 ACKNOWLEDGED(재회신) 만 허용 - 강제 지정(DESIGNATED) 후엔 불가
+        if (this.status != PromotionLogStatus.SENT
+                && this.status != PromotionLogStatus.ACKNOWLEDGED) {
+            throw new IllegalStateException("회사가 강제 지정한 통보는 재회신할 수 없습니다.");
         }
         this.status = PromotionLogStatus.ACKNOWLEDGED;
         this.acknowledgedAt = LocalDateTime.now();

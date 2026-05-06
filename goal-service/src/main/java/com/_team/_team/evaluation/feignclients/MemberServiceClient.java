@@ -3,9 +3,11 @@ package com._team._team.evaluation.feignclients;
 import com._team._team.evaluation.feignclients.dto.MemberMinimalProfileDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -19,7 +21,7 @@ public interface MemberServiceClient {
      * memberId 목록 → 최소 프로필(name/department/positionName/profileUrl) 배치 조회.
      */
     @GetMapping("/member/internal/profiles")
-    java.util.Map<UUID, MemberMinimalProfileDto> getProfilesByIds(@RequestParam("ids") List<UUID> ids);
+    Map<UUID, MemberMinimalProfileDto> getProfilesByIds(@RequestParam("ids") List<UUID> ids);
 
     /**
      * 특정 대상자 기준 평가자 후보 조회 — 조직 + 직급 기반.
@@ -27,7 +29,7 @@ public interface MemberServiceClient {
      */
     @GetMapping("/member/internal/candidates-for-evaluator")
     List<UUID> getCandidatesForEvaluator(
-            @org.springframework.web.bind.annotation.RequestHeader("X-User-CompanyId") String companyId,
+            @RequestHeader("X-User-CompanyId") String companyId,
             @RequestParam("targetMemberId") UUID targetMemberId,
             @RequestParam("evalType") String evalType);
 }

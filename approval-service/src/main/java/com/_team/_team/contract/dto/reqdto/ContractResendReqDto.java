@@ -5,10 +5,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
 @Builder
 public class ContractResendReqDto {
-    private String adminInputJson;
+    private Map<String, Object> adminInputJson;
 }
