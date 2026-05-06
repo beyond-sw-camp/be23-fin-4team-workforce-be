@@ -35,10 +35,14 @@ public class OvertimeUsageController {
     public ResponseEntity<ApiResponse<List<OvertimeUsageResDto>>> getStatus(
             @RequestHeader("X-User-CompanyId") UUID companyId,
             @RequestParam(value = "baseDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate baseDate) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate baseDate,
+            @RequestParam(value = "mode", required = false, defaultValue = "MONTH") String mode) {
 
         LocalDate target = baseDate != null ? baseDate : LocalDate.now();
-        List<OvertimeUsageResDto> result = service.getStatus(companyId, target);
+        OvertimeUsageService.PeriodMode periodMode = "WEEK".equalsIgnoreCase(mode)
+                ? OvertimeUsageService.PeriodMode.WEEK
+                : OvertimeUsageService.PeriodMode.MONTH;
+        List<OvertimeUsageResDto> result = service.getStatus(companyId, target, periodMode);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success(result, "조회 성공"));
     }
