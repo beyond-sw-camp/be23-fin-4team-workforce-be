@@ -365,7 +365,7 @@ public class ApprovalDocumentService {
                     { "name": "effectiveDate",       "label": "효력 시작일", "type": "date",     "required": true },
                     { "name": "orderCategoryLabel",  "label": "발령 종류",   "type": "text"                       },
                     { "name": "reason",              "label": "발령 사유",   "type": "textarea"                   },
-                    { "name": "contentJsonText",     "label": "발령 명세",   "type": "textarea"                   }
+                    { "name": "contentJsonText",     "label": "발령 내역",   "type": "personnel_order_items"      }
                   ]
                 }
                 """)
@@ -478,22 +478,14 @@ public class ApprovalDocumentService {
         return ApprovalDocumentResDto.fromEntity(document);
     }
 
-    // 회사별 활성 양식 목록 조회 - 호환용 (모두 노출)
-    @Transactional(readOnly = true)
-    public List<ApprovalDocumentResDto> findActiveByCompanyId(UUID companyId) {
-        return findActiveByCompanyId(companyId, true);
-    }
-
     /**
      * 회사별 활성 양식 목록 조회
-     * isSystemAdmin = false 인 일반 사용자는 "인사발령품의서" 같은 인사 관리자 전용 양식이 숨겨짐
      */
     @Transactional(readOnly = true)
-    public List<ApprovalDocumentResDto> findActiveByCompanyId(UUID companyId, boolean isSystemAdmin) {
+    public List<ApprovalDocumentResDto> findActiveByCompanyId(UUID companyId) {
         return approvalDocumentRepository
                 .findByCompanyIdAndIsActiveYn(companyId, "Y")
                 .stream()
-                .filter(d -> isSystemAdmin || !"인사발령품의서".equals(d.getDocumentName()))
                 .map(ApprovalDocumentResDto::fromEntity)
                 .toList();
     }
