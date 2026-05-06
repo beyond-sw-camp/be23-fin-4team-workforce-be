@@ -372,7 +372,7 @@ public class ApprovalDocumentService {
                     { "name": "effectiveDate",       "label": "효력 시작일", "type": "date",     "required": true },
                     { "name": "orderCategoryLabel",  "label": "발령 종류",   "type": "text"                       },
                     { "name": "reason",              "label": "발령 사유",   "type": "textarea"                   },
-                    { "name": "contentJsonText",     "label": "발령 명세",   "type": "textarea"                   }
+                    { "name": "contentJsonText",     "label": "발령 내역",   "type": "personnel_order_items"      }
                   ]
                 }
                 """)
