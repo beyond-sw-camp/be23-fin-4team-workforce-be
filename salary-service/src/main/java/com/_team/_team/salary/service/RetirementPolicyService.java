@@ -2,7 +2,6 @@ package com._team._team.salary.service;
 
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.domain.RetirementPolicy;
-import com._team._team.salary.domain.enums.RetirementType;
 import com._team._team.salary.dto.reqdto.RetirementPolicyCreateReqDto;
 import com._team._team.salary.dto.reqdto.RetirementPolicyUpdateReqDto;
 import com._team._team.salary.dto.resdto.RetirementPolicyResDto;
@@ -67,6 +66,10 @@ public class RetirementPolicyService {
                 .effectiveFrom(reqDto.getEffectiveFrom())
                 .effectiveTo(reqDto.getEffectiveTo())
                 .memo(reqDto.getMemo())
+                .dcContributionRate(reqDto.getDcContributionRate())
+                .providerName(reqDto.getProviderName())
+                .contractNumber(reqDto.getContractNumber())
+                .allowEarlySettlementYn(reqDto.getAllowEarlySettlementYn())
                 .build());
 
         log.info("[RETIREMENT-POLICY] 등록 companyId={} policyId={} type={}",
@@ -81,7 +84,15 @@ public class RetirementPolicyService {
         validateCompany(policy, companyId);
         validatePeriod(policy.getEffectiveFrom(), reqDto.getEffectiveTo());
 
-        policy.update(reqDto.getRetirementType(), reqDto.getEffectiveTo(), reqDto.getMemo());
+        policy.update(
+                reqDto.getRetirementType(),
+                reqDto.getEffectiveTo(),
+                reqDto.getMemo(),
+                reqDto.getDcContributionRate(),
+                reqDto.getProviderName(),
+                reqDto.getContractNumber(),
+                reqDto.getAllowEarlySettlementYn()
+        );
         log.info("[RETIREMENT-POLICY] 수정 companyId={} policyId={} type={}",
                 companyId, policyId, policy.getRetirementType());
         return RetirementPolicyResDto.fromEntity(policy);

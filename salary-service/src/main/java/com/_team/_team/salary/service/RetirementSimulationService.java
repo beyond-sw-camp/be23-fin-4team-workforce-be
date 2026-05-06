@@ -28,6 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -117,12 +120,21 @@ public class RetirementSimulationService {
         // 평균임금 정확 산정 breakdown
         AverageWage aw = computeAverageWage(companyId, memberId, req.getResignDate(), baseMonthly);
 
-        // 모드별 계산 1년 미만이면 0 LEGAL DB 는 일액 기준 DC 는 평균월급 근사
+        // 모드별 계산 1년 미만이면 0 LEGAL DB 는 일액 기준 DC 는 월 부담금 × 12 × 근속연수
         long estimated;
         if (!eligible) {
             estimated = 0L;
         } else if (type == RetirementType.DC) {
-            estimated = baseMonthly * years;
+            // 정책 dcContributionRate 미설정 시 법정 기본 8.33% (1/12)
+            BigDecimal rate = policy != null && policy.getDcContributionRate() != null
+                    ? policy.getDcContributionRate()
+                    : new BigDecimal("8.33");
+            // baseMonthly × rate% × 12 × years
+            estimated = rate
+                    .multiply(BigDecimal.valueOf(baseMonthly))
+                    .multiply(BigDecimal.valueOf(12L * years))
+                    .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
+                    .longValue();
         } else {
             // LEGAL DB 적용 일평균 × 30 × 근속일수 / 365
             estimated = aw.appliedDailyWage * 30 * days / 365;

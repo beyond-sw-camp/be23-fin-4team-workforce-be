@@ -6,7 +6,11 @@ import com._team._team.calendar.dto.reqdto.CalendarEventCreateReqDto;
 import com._team._team.calendar.dto.reqdto.CalendarEventUpdateReqDto;
 import com._team._team.calendar.dto.resdto.CalendarEventResDto;
 import com._team._team.calendar.dto.resdto.CalendarMonthlyResDto;
+import com._team._team.calendar.dto.resdto.CompanyHolidayFeignDto;
+import com._team._team.calendar.dto.resdto.LegalHolidayResDto;
 import com._team._team.calendar.repository.CalendarEventRepository;
+import com._team._team.company.feignclients.SalaryServiceClient;
+import com._team._team.dto.ApiResponse;
 import com._team._team.dto.BusinessException;
 import com._team._team.dto.NotificationMessage;
 import com._team._team.member.domain.Member;
@@ -28,7 +32,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -42,14 +48,24 @@ public class CalendarService {
     private final MemberPositionRepository memberPositionRepository;
     private final OrganizationRepository organizationRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final LegalHolidayService legalHolidayService;
+    private final SalaryServiceClient salaryServiceClient;
 
     @Autowired
-    public CalendarService(CalendarEventRepository calendarEventRepository, MemberRepository memberRepository, MemberPositionRepository memberPositionRepository, OrganizationRepository organizationRepository, ApplicationEventPublisher eventPublisher) {
+    public CalendarService(CalendarEventRepository calendarEventRepository,
+                           MemberRepository memberRepository,
+                           MemberPositionRepository memberPositionRepository,
+                           OrganizationRepository organizationRepository,
+                           ApplicationEventPublisher eventPublisher,
+                           LegalHolidayService legalHolidayService,
+                           SalaryServiceClient salaryServiceClient) {
         this.calendarEventRepository = calendarEventRepository;
         this.memberRepository = memberRepository;
         this.memberPositionRepository = memberPositionRepository;
         this.organizationRepository = organizationRepository;
         this.eventPublisher = eventPublisher;
+        this.legalHolidayService = legalHolidayService;
+        this.salaryServiceClient = salaryServiceClient;
     }
 
 
@@ -243,8 +259,54 @@ public class CalendarService {
 
         return CalendarMonthlyResDto.builder()
                 .events(events)
-                .holidays(List.of())
+                .holidays(loadHolidaysForMonth(companyId, year, month))
                 .build();
+    }
+
+    // 법정 공휴일 + 회사 휴일 합쳐서 월 범위로 필터, 같은 날짜는 회사 휴일이 우선
+    private List<CalendarMonthlyResDto.HolidayDto> loadHolidaysForMonth(UUID companyId, int year, int month) {
+        LocalDate from = YearMonth.of(year, month).atDay(1);
+        LocalDate to = YearMonth.of(year, month).atEndOfMonth();
+
+        // 날짜 -> 이름
+        Map<LocalDate, String> merged = new LinkedHashMap<>();
+
+        // 1. 법정 공휴일
+        try {
+            List<LegalHolidayResDto> legal = legalHolidayService.getHolidays(year);
+            for (LegalHolidayResDto h : legal) {
+                LocalDate d = h.getHolidayDate();
+                if (d != null && !d.isBefore(from) && !d.isAfter(to)) {
+                    merged.put(d, h.getHolidayName());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("법정 공휴일 조회 실패 year={} err={}", year, e.getMessage());
+        }
+
+        // 2. 회사 휴일
+        try {
+            ApiResponse<List<CompanyHolidayFeignDto>> resp = salaryServiceClient.findCompanyHolidays(companyId);
+            List<CompanyHolidayFeignDto> companyHolidays = resp != null ? resp.getData() : null;
+            if (companyHolidays != null) {
+                for (CompanyHolidayFeignDto h : companyHolidays) {
+                    LocalDate d = h.getHolidayDate();
+                    if (d != null && !d.isBefore(from) && !d.isAfter(to)) {
+                        merged.put(d, h.getHolidayName());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("회사 휴일 조회 실패 companyId={} err={}", companyId, e.getMessage());
+        }
+
+        return merged.entrySet().stream()
+                .map(e -> CalendarMonthlyResDto.HolidayDto.builder()
+                        .holidayDate(e.getKey())
+                        .holidayName(e.getValue())
+                        .build())
+                .sorted((a, b) -> a.getHolidayDate().compareTo(b.getHolidayDate()))
+                .collect(Collectors.toList());
     }
 
     // 공통 조회 로직

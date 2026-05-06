@@ -4,6 +4,7 @@ import com._team._team.salary.domain.enums.RetirementType;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @AllArgsConstructor
@@ -21,4 +22,16 @@ public class RetirementPolicyCreateReqDto {
     private LocalDate effectiveTo;
 
     private String memo;
+
+    // DC 형 월 부담금 비율(%) - DC 형 정책일 때만 사용, 미입력 시 8.33 적용
+    private BigDecimal dcContributionRate;
+
+    // 운용 금융기관명
+    private String providerName;
+
+    // 운용 계약/계좌번호
+    private String contractNumber;
+
+    // 중간정산 허용 여부 - LEGAL 형에서만 의미, Y/N
+    private String allowEarlySettlementYn;
 }
