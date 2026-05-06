@@ -68,6 +68,11 @@ public class BonusPolicy extends BaseTimeEntity {
     @Column(length = 500)
     private String performanceBonusBasis;
 
+    // 평가 등급 - 성과급 비율 디폴트 JSON
+    // 예 {"S":15,"A":10,"B":5,"C":0,"D":0}
+    @Column(length = 500)
+    private String gradeBonusRatesJson;
+
     /** 명절상여 */
     /** 명절상여 사용 여부 */
     @Column(nullable = false, length = 1)
@@ -129,6 +134,7 @@ public class BonusPolicy extends BaseTimeEntity {
                        String usePerformanceBonusYn,
                        BigDecimal performanceBonusMaxRate,
                        String performanceBonusBasis,
+                       String gradeBonusRatesJson,
                        String useHolidayBonusYn,
                        HolidayBonusType holidayBonusType,
                        BigDecimal holidayBonusValue,
@@ -143,6 +149,7 @@ public class BonusPolicy extends BaseTimeEntity {
         this.usePerformanceBonusYn = usePerformanceBonusYn;
         this.performanceBonusMaxRate = performanceBonusMaxRate;
         this.performanceBonusBasis = performanceBonusBasis;
+        this.gradeBonusRatesJson = gradeBonusRatesJson;
         this.useHolidayBonusYn = useHolidayBonusYn;
         this.holidayBonusType = holidayBonusType;
         this.holidayBonusValue = holidayBonusValue;

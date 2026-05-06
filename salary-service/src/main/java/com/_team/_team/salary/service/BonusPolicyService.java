@@ -70,6 +70,7 @@ public class BonusPolicyService {
                 .usePerformanceBonusYn(normalizeYn(reqDto.getUsePerformanceBonusYn()))
                 .performanceBonusMaxRate(reqDto.getPerformanceBonusMaxRate())
                 .performanceBonusBasis(reqDto.getPerformanceBonusBasis())
+                .gradeBonusRatesJson(reqDto.getGradeBonusRatesJson())
                 .useHolidayBonusYn(normalizeYn(reqDto.getUseHolidayBonusYn()))
                 .holidayBonusType(reqDto.getHolidayBonusType())
                 .holidayBonusValue(reqDto.getHolidayBonusValue())
@@ -102,6 +103,7 @@ public class BonusPolicyService {
                 normalizeYn(reqDto.getUsePerformanceBonusYn()),
                 reqDto.getPerformanceBonusMaxRate(),
                 reqDto.getPerformanceBonusBasis(),
+                reqDto.getGradeBonusRatesJson(),
                 normalizeYn(reqDto.getUseHolidayBonusYn()),
                 reqDto.getHolidayBonusType(),
                 reqDto.getHolidayBonusValue(),

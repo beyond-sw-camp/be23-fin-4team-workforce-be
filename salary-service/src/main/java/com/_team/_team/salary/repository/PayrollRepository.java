@@ -2,6 +2,7 @@ package com._team._team.salary.repository;
 
 import com._team._team.salary.domain.Payroll;
 import com._team._team.salary.domain.enums.PayrollStatus;
+import com._team._team.salary.domain.enums.PayrollType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -41,6 +42,10 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID>, Payroll
      */
     Optional<Payroll> findByCompanyIdAndMemberIdAndPayrollYearMonthDay(
             UUID companyId, UUID memberId, LocalDate payrollYearMonthDay);
+
+    // 직원 + 정산일 + payrollType 조합 조회 - 보너스 종류별 충돌 확인
+    Optional<Payroll> findByCompanyIdAndMemberIdAndPayrollYearMonthDayAndPayrollType(
+            UUID companyId, UUID memberId, LocalDate payrollYearMonthDay, PayrollType payrollType);
 
     /**
      * 직원별 + 상태별 급여대장 조회 (회사 + 삭제되지 않은 것만)

@@ -162,6 +162,9 @@ public class SalaryItemTemplateService {
                 new DefaultSpec("보육수당",       ItemType.EARNING, 50, "N", TaxCategory.CHILDCARE,       200000L, "Y", "N"),
                 new DefaultSpec("자녀수당",       ItemType.EARNING, 51, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
                 new DefaultSpec("연구활동비",     ItemType.EARNING, 60, "N", TaxCategory.RESEARCH,        200000L, "Y", "N"),
+                new DefaultSpec("정기상여",       ItemType.EARNING, 70, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("성과급",         ItemType.EARNING, 71, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("명절상여",       ItemType.EARNING, 72, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
                 new DefaultSpec("퇴직월 일할 급여", ItemType.EARNING, 80, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
                 new DefaultSpec("퇴직금",          ItemType.EARNING, 81, "N", TaxCategory.ETC_NON_TAXABLE, null,    "N", "N"),
                 new DefaultSpec("미사용 연차 수당", ItemType.EARNING, 82, "Y", TaxCategory.TAXABLE,         null,    "N", "N")
