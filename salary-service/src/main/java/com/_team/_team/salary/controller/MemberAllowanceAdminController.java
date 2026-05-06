@@ -114,8 +114,39 @@ public class MemberAllowanceAdminController {
         );
     }
 
+    /** 회사 전체 이력 (활성 + 종료, 효력일 역순) - 상세 모드용 */
+    @GetMapping("/history")
+    public ResponseEntity<?> findAllHistory(
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
+        List<MemberAllowanceResDto> result = memberAllowanceService
+                .findCompanyAllHistory(companyId).stream()
+                .map(MemberAllowanceResDto::fromEntity)
+                .toList();
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "회사 수당 전체 이력 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
     /**
-     * 단건 수당 소프트 삭제 - [수당 관리] 화면의 행별 [삭제].
+     * 단건 수당 종료 - 이력 보존
+     */
+    @PostMapping("/{memberAllowanceId}/close")
+    public ResponseEntity<?> closeOne(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @PathVariable UUID memberAllowanceId,
+            @RequestParam(required = false) String closeAt) {
+        LocalDate at = (closeAt == null || closeAt.isBlank())
+                ? LocalDate.now() : LocalDate.parse(closeAt);
+        memberAllowanceService.adminCloseOne(memberAllowanceId, companyId, at);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "받는 수당이 해체되었습니다."),
+                HttpStatus.OK
+        );
+    }
+
+    /**
+     * 단건 수당 소프트 삭제 (실수 정정용) - [완전 삭제].
      */
     @DeleteMapping("/{memberAllowanceId}")
     public ResponseEntity<?> deleteOne(

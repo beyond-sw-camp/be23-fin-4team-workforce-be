@@ -5,8 +5,6 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
 
-import java.time.LocalTime;
-
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -32,9 +30,6 @@ public class OvertimePolicyUpdateReqDto {
 
     @Positive
     private Integer monthlyOvertimeLimitMinutes;
-
-    private LocalTime nightStartTime;
-    private LocalTime nightEndTime;
 
     private Boolean holidayWorkRequiresApproval;
 

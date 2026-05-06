@@ -11,6 +11,10 @@ import com._team._team.approval.dto.resdto.OfficialRecipientResDto;
 import com._team._team.approval.feignclients.MemberServiceClient;
 import com._team._team.approval.feignclients.dto.MemberPositionResDto;
 import com._team._team.approval.feignclients.dto.OrganizationResDto;
+import com._team._team.approval.publisher.AttendanceCorrectionApprovalEventPublisher;
+import com._team._team.approval.publisher.AttendanceCorrectionSubmittedEventPublisher;
+import com._team._team.approval.publisher.EarlyLeaveApprovalEventPublisher;
+import com._team._team.approval.publisher.EarlyLeaveSubmittedEventPublisher;
 import com._team._team.approval.repository.*;
 import com._team._team.dto.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -429,8 +433,9 @@ public class ApprovalRequestService {
     }
 
 //    임시저장 수정 (DRAFT 상태인 경우)
-    public ApprovalRequestResDto update(UUID companyId, UUID memberId, UUID requestId, ApprovalRequestCreateReqDto reqDto){
-    //        결재요청 조회 및 검증
+
+    public ApprovalRequestResDto update(UUID companyId, UUID memberId, UUID requestId, UUID memberPositionId, ApprovalRequestCreateReqDto reqDto){
+//        결재요청 조회 및 검증
         ApprovalRequest request = approvalRequestRepository.findByIdWithDocument(requestId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "결재 요청을 찾을 수 없습니다."));

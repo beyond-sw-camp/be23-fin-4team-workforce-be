@@ -6,6 +6,7 @@ import com._team._team.attendance.dto.resDto.LeavePromotionHistoryResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionMyResDto;
 import com._team._team.attendance.dto.resDto.LeavePromotionNoResponseResDto;
 import com._team._team.attendance.service.LeavePromotionResponseService;
+import com._team._team.batch.leave.worker.LeavePromotionWorker;
 import com._team._team.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +15,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
@@ -30,6 +33,7 @@ import java.util.UUID;
 public class LeavePromotionController {
 
     private final LeavePromotionResponseService service;
+    private final LeavePromotionWorker leavePromotionWorker;
 
     // 직원 본인이 받은 통보 목록
     @GetMapping("/my")
@@ -76,6 +80,28 @@ public class LeavePromotionController {
         List<LeavePromotionHistoryResDto> data = service.findHistory(companyId);
         return new ResponseEntity<>(
                 ApiResponse.success(data, "촉진 이력 조회 성공"),
+                HttpStatus.OK);
+    }
+
+    /**
+     * 시스템 관리자 - 연차 사용 촉진 배치 수동 트리거 (시연/테스트용)
+     * 1차 통보(만료일 6개월 전) + 2차 통보(만료일 2개월 전) 알림 발송 + 이력 기록
+     */
+    @PostMapping("/batch/run")
+    public ResponseEntity<?> runBatch(
+            @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin,
+            // 시연용 - 임의 날짜 기준으로 배치 실행 (생략 시 오늘)
+            @RequestParam(value = "simDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate simDate) {
+        if (!"YES".equals(isSystemAdmin)) {
+            return new ResponseEntity<>(
+                    ApiResponse.fail("시스템 관리자만 실행할 수 있습니다."),
+                    HttpStatus.FORBIDDEN);
+        }
+        LocalDate baseDate = simDate != null ? simDate : LocalDate.now();
+        LeavePromotionWorker.Result r = leavePromotionWorker.run(baseDate);
+        return new ResponseEntity<>(
+                ApiResponse.success(r, "연차 사용 촉진 배치 실행 완료 (기준일=" + baseDate + ")"),
                 HttpStatus.OK);
     }
 

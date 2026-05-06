@@ -2,6 +2,8 @@ package com._team._team.attendance.repository;
 
 import com._team._team.attendance.domain.WorkTripDetail;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -12,8 +14,17 @@ import java.util.UUID;
 public interface WorkTripDetailRepository extends JpaRepository<WorkTripDetail, UUID> {
 
     /** 직원의 출장/외근 이력 */
+    @Query("""
+        SELECT w FROM WorkTripDetail w
+        LEFT JOIN FETCH w.dailyAttendance
+        WHERE w.memberId = :memberId
+          AND w.companyId = :companyId
+          AND w.delYn = :delYn
+        """)
     List<WorkTripDetail> findByMemberIdAndCompanyIdAndDelYn(
-            UUID memberId, UUID companyId, String delYn);
+            @Param("memberId") UUID memberId,
+            @Param("companyId") UUID companyId,
+            @Param("delYn") String delYn);
 
     /** 특정일 출장/외근 내역 (일별 근태 상세에서 표시) */
     List<WorkTripDetail> findByMemberIdAndCompanyIdAndDelYnAndDailyAttendanceDailyAttendanceId(

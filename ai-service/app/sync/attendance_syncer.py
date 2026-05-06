@@ -114,8 +114,6 @@ def format_overtime_policy_to_rag(policy: dict) -> str:
     weekly_total = policy.get("weeklyTotalLimitMinutes", 3120)
     daily_overtime = policy.get("dailyOvertimeLimitMinutes", 240)
     monthly_overtime = policy.get("monthlyOvertimeLimitMinutes")
-    night_start = policy.get("nightStartTime", "22:00")
-    night_end = policy.get("nightEndTime", "06:00")
     holiday_approval = policy.get("holidayWorkRequiresApproval", True)
 
     weekly_overtime_h = weekly_overtime / 60 if weekly_overtime else 0
@@ -137,7 +135,7 @@ def format_overtime_policy_to_rag(policy: dict) -> str:
         monthly_overtime_h = monthly_overtime / 60
         details.append(f"- 월 연장근로 한도: {monthly_overtime_h:g}시간")
 
-    details.append(f"- 야간근로 시간대: {night_start} ~ {night_end}")
+    details.append("- 야간근로 시간대: 22:00 ~ 06:00 (근로기준법 고정)")
     details.append(
         f"- 휴일 근무 결재: {'필수' if holiday_approval else '불필요'}"
     )

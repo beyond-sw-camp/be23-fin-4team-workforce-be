@@ -34,16 +34,16 @@ public class PayrollCreateReqDto {
     private PayrollType payrollType;
 
     /**
-     * DTO → Payroll 엔티티 변환
-     * - salaryId는 서비스에서 Salary 조회 후 전달
-     * - 금액은 0으로 초기화 (PayrollItem 생성 후 recalculate로 자동 계산)
+     * DTO -> Payroll 엔티티 변환
+     * - 금액은 0으로 초기화 (PayrollItem 생성 후 recalculate 로 자동 계산)
      */
-    public Payroll toEntity(UUID companyId, UUID salaryId) {
+    public Payroll toEntity(UUID companyId, UUID salaryId, String targetYearMonth) {
         return Payroll.builder()
                 .companyId(companyId)
                 .salaryId(salaryId)
                 .memberId(this.memberId)
                 .payrollYearMonthDay(this.payrollYearMonthDay)
+                .targetYearMonth(targetYearMonth)
                 .payrollType(this.payrollType != null ? this.payrollType : PayrollType.REGULAR_MONTHLY)
                 .totalPayment(0L)
                 .totalDeduction(0L)

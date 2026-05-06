@@ -175,5 +175,16 @@ public class RedisConfig {
         return redisTemplate;
     }
 
+    // DB 5 - 캐싱 처리
+    // salary-service CacheConfig 가 RedisCacheManager 에 주입해서 사용
+    @Bean
+    @Qualifier("cacheRedisConnectionFactory")
+    public RedisConnectionFactory cacheRedisConnectionFactory() {
+        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
+        configuration.setHostName(host);
+        configuration.setPort(port);
+        configuration.setDatabase(5);
+        return new LettuceConnectionFactory(configuration);
+    }
 }
 

@@ -4,6 +4,8 @@ import com._team._team.annotation.Action;
 import com._team._team.annotation.CheckPermission;
 import com._team._team.annotation.Resource;
 import com._team._team.dto.ApiResponse;
+import com._team._team.dto.BusinessException;
+import com._team._team.goal.domain.enums.GoalOwnerType;
 import com._team._team.goal.domain.enums.GoalStatus;
 import com._team._team.goal.domain.enums.KpiCycle;
 import com._team._team.goal.dto.reqdto.GoalCreateReqDto;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -128,10 +131,10 @@ public class GoalController {
             @RequestHeader("X-User-CompanyId") String companyId,
             @RequestBody @Valid GoalCreateReqDto dto,
             HttpServletRequest request) {
-        if (dto.getOwnerType() == com._team._team.goal.domain.enums.GoalOwnerType.ORGANIZATION
+        if (dto.getOwnerType() == GoalOwnerType.ORGANIZATION
                 && !positionPermissionReader.canCreateOrganizationScopedGoal(request)) {
-            throw new com._team._team.dto.BusinessException(
-                    org.springframework.http.HttpStatus.FORBIDDEN,
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN,
                     "You do not have permission to create organization objectives."
             );
         }

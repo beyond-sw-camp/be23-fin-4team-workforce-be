@@ -14,11 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUID> {
-
-    // 본인 휴가 이력, 최근 신청 순
-    Page<LeaveRequest> findAllByMemberIdAndCompanyIdAndDelYnOrderByRequestedAtDesc(
-            UUID memberId, UUID companyId, String delYn, Pageable pageable);
+public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, UUID>, LeaveRequestRepositoryQuerydsl {
 
     // 본인 특정일 휴가 신청 목록 (같은 날 여러 건 가능)
     List<LeaveRequest> findAllByMemberIdAndStartDateAndDelYn(
@@ -34,10 +30,6 @@ public interface LeaveRequestRepository  extends JpaRepository<LeaveRequest, UUI
     // 관리자 단건 조회, 회사 소속 검증
     Optional<LeaveRequest> findByLeaveRequestIdAndCompanyIdAndDelYn(
             UUID leaveRequestId, UUID companyId, String delYn);
-
-    // 관리자 상태별 목록, 오래된 순
-    List<LeaveRequest> findAllByCompanyIdAndApprovalStatusAndDelYnOrderByRequestedAtAsc(
-            UUID companyId, LeaveApprovalStatus status, String delYn);
 
     /**
      * 근태 마감 배치용, 특정 날짜에 적용되는 승인된 휴가 조회

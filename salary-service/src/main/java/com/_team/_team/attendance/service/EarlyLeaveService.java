@@ -35,16 +35,19 @@ public class EarlyLeaveService {
     private final DailyAttendanceRepository dailyAttendanceRepository;
     private final AttendanceLogRepository attendanceLogRepository;
     private final LeaveRequestRepository leaveRequestRepository;
+    private final LeaveRequestService leaveRequestService;
     private final DailyAttendanceCloseService dailyAttendanceCloseService;
 
     @Autowired
     public EarlyLeaveService(DailyAttendanceRepository dailyAttendanceRepository,
                              AttendanceLogRepository attendanceLogRepository,
                              LeaveRequestRepository leaveRequestRepository,
+                             LeaveRequestService leaveRequestService,
                              DailyAttendanceCloseService dailyAttendanceCloseService) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.attendanceLogRepository = attendanceLogRepository;
         this.leaveRequestRepository = leaveRequestRepository;
+        this.leaveRequestService = leaveRequestService;
         this.dailyAttendanceCloseService = dailyAttendanceCloseService;
     }
 
@@ -207,12 +210,21 @@ public class EarlyLeaveService {
         attendanceLogRepository.save(log);
     }
 
-    /** [from, to] 와 겹치는 본인의 승인 휴가 일수 합계 */
+    /** [from, to] 와 겹치는 본인의 승인 휴가 일수 합계
+     *  비연속 휴가계획이 있는 휴가신청은 [from, to] 안에 들어간 plannedDates 개수만 합산
+     */
     private long countApprovedLeaveDays(UUID memberId, LocalDate from, LocalDate to) {
         List<LeaveRequest> overlapping = leaveRequestRepository
                 .findApprovedOverlapping(memberId, from, to);
         long total = 0;
         for (LeaveRequest l : overlapping) {
+            java.util.Set<LocalDate> planned = leaveRequestService.parsePlannedDates(l);
+            if (!planned.isEmpty()) {
+                total += planned.stream()
+                        .filter(d -> !d.isBefore(from) && !d.isAfter(to))
+                        .count();
+                continue;
+            }
             LocalDate s = l.getStartDate().isBefore(from) ? from : l.getStartDate();
             LocalDate e = l.getEndDate().isAfter(to) ? to : l.getEndDate();
             if (!s.isAfter(e)) {

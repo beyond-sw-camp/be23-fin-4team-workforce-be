@@ -176,4 +176,62 @@ public interface DailyAttendanceRepository extends JpaRepository<DailyAttendance
     List<DailyAttendance> findAllByCompanyIdAndClosureStatusOrderByDateDesc(
             @Param("companyId") UUID companyId,
             @Param("status") ClosureStatus status);
+
+    /**
+     * 회사 단위 직원별 실측 추가근무 시간 합산
+     * [초과 근무 현황] 화면 - 주/월 한도 위반 모니터링
+     */
+    @Query("""
+       SELECT d.memberId AS memberId, COALESCE(SUM(d.overtimeMinutes), 0) AS sumMinutes
+       FROM DailyAttendance d
+       WHERE d.companyId = :companyId
+         AND d.attendanceDate BETWEEN :from AND :to
+       GROUP BY d.memberId
+       """)
+    List<MemberOvertimeMinutesRow> sumActualOvertimeByCompanyAndRange(
+            @Param("companyId") UUID companyId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /** 회사 단위 직원별 실측 OT 합산 결과 row */
+    interface MemberOvertimeMinutesRow {
+        UUID getMemberId();
+        Long getSumMinutes();
+    }
+
+    // 회사 단위 직원별 총 근무시간 합산 (정규 + 초과 포함, 퇴근-출근 기반)
+    // 초과 근무 현황 화면의 '이번 달 총 근무시간' 컬럼 용도
+    @Query("""
+       SELECT d.memberId AS memberId, COALESCE(SUM(d.workedMinutes), 0) AS sumMinutes
+       FROM DailyAttendance d
+       WHERE d.companyId = :companyId
+         AND d.attendanceDate BETWEEN :from AND :to
+       GROUP BY d.memberId
+       """)
+    List<MemberOvertimeMinutesRow> sumWorkedByCompanyAndRange(
+            @Param("companyId") UUID companyId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    // 회사 단위 직원별 + 일자별 worked/overtime 분 (초과 근무 현황 화면 일자별 셀 용도)
+    @Query("""
+       SELECT d.memberId AS memberId,
+              d.attendanceDate AS attendanceDate,
+              COALESCE(d.workedMinutes, 0) AS workedMinutes,
+              COALESCE(d.overtimeMinutes, 0) AS overtimeMinutes
+       FROM DailyAttendance d
+       WHERE d.companyId = :companyId
+         AND d.attendanceDate BETWEEN :from AND :to
+       """)
+    List<MemberDailyMinutesRow> findDailyMinutesByCompanyAndRange(
+            @Param("companyId") UUID companyId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    interface MemberDailyMinutesRow {
+        UUID getMemberId();
+        LocalDate getAttendanceDate();
+        Integer getWorkedMinutes();
+        Integer getOvertimeMinutes();
+    }
 }

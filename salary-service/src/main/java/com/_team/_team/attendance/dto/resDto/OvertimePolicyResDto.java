@@ -5,7 +5,6 @@ import com._team._team.attendance.domain.enums.ApprovalMode;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -22,8 +21,6 @@ public class OvertimePolicyResDto {
     private Integer weeklyTotalLimitMinutes;
     private Integer dailyOvertimeLimitMinutes;
     private Integer monthlyOvertimeLimitMinutes;
-    private LocalTime nightStartTime;
-    private LocalTime nightEndTime;
     private Boolean holidayWorkRequiresApproval;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
@@ -38,8 +35,6 @@ public class OvertimePolicyResDto {
                 .weeklyTotalLimitMinutes(p.getWeeklyTotalLimitMinutes())
                 .dailyOvertimeLimitMinutes(p.getDailyOvertimeLimitMinutes())
                 .monthlyOvertimeLimitMinutes(p.getMonthlyOvertimeLimitMinutes())
-                .nightStartTime(p.getNightStartTime())
-                .nightEndTime(p.getNightEndTime())
                 .holidayWorkRequiresApproval(p.getHolidayWorkRequiresApproval())
                 .effectiveFrom(p.getEffectiveFrom())
                 .effectiveTo(p.getEffectiveTo())

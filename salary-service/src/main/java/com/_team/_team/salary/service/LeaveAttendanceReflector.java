@@ -5,6 +5,8 @@ import com._team._team.attendance.domain.LeaveRequest;
 import com._team._team.attendance.domain.enums.AttendanceStatus;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
 import com._team._team.attendance.repository.LeaveRequestRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -13,9 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 승인된 휴가신청을 일일근태에 반영
@@ -27,15 +32,37 @@ public class LeaveAttendanceReflector {
 
     private final LeaveRequestRepository leaveRequestRepository;
     private final DailyAttendanceRepository dailyAttendanceRepository;
+    private final ObjectMapper objectMapper;
 
     @Autowired
     public LeaveAttendanceReflector(LeaveRequestRepository leaveRequestRepository,
-                                    DailyAttendanceRepository dailyAttendanceRepository) {
+                                    DailyAttendanceRepository dailyAttendanceRepository,
+                                    ObjectMapper objectMapper) {
         this.leaveRequestRepository = leaveRequestRepository;
         this.dailyAttendanceRepository = dailyAttendanceRepository;
+        this.objectMapper = objectMapper;
+    }
+
+    /**
+     * 비연속 사용 날짜 JSON 파싱, 파싱 실패 또는 비어있으면 빈 Set
+     */
+    private Set<LocalDate> parsePlannedDates(LeaveRequest leave) {
+        String json = leave.getPlannedDatesJson();
+        if (json == null || json.isBlank()) return Collections.emptySet();
+        try {
+            List<String> raw = objectMapper.readValue(json, new TypeReference<>() {});
+            return raw.stream()
+                    .map(LocalDate::parse)
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("[LeaveReflect] plannedDatesJson 파싱 실패 leaveRequestId={}",
+                    leave.getLeaveRequestId(), e);
+            return Collections.emptySet();
+        }
     }
     /**
      * 특정 날짜의 승인 휴가를 모든 직원에 대해 일괄 반영
+     * 비연속 휴가계획이 있는 휴가요청은 그 날짜에 포함된 경우에만 반영
      */
     @Transactional
     public int reflectForDate(LocalDate targetDate) {
@@ -46,6 +73,11 @@ public class LeaveAttendanceReflector {
 
         int count = 0;
         for (LeaveRequest leave : activeLeaves) {
+            // 비연속 plannedDates 있으면 그 날짜만 적용 대상, targetDate 가 없으면 skip
+            Set<LocalDate> planned = parsePlannedDates(leave);
+            if (!planned.isEmpty() && !planned.contains(targetDate)) {
+                continue;
+            }
             try {
                 applyLeaveToAttendance(leave, targetDate);
                 count++;
@@ -59,23 +91,34 @@ public class LeaveAttendanceReflector {
     }
 
     /**
-     * 사후 휴가 승인 시 호출, 휴가 기간 내 모든 날짜의 일일근태에 반영
+     * 사후 휴가 승인 시 호출, 휴가 기간 내 날짜의 일일근태에 반영
      * 마감 후 케이스 재계산용
      */
     @Transactional
     public List<UUID> reflectForLeaveRequest(LeaveRequest leave) {
         List<UUID> affected = new ArrayList<>();
-        LocalDate cur = leave.getStartDate();
-        LocalDate end = leave.getEndDate();
-        while (!cur.isAfter(end)) {
+        Set<LocalDate> planned = parsePlannedDates(leave);
+
+        List<LocalDate> targets = new ArrayList<>();
+        if (!planned.isEmpty()) {
+            targets.addAll(planned);
+        } else {
+            LocalDate cur = leave.getStartDate();
+            LocalDate end = leave.getEndDate();
+            while (!cur.isAfter(end)) {
+                targets.add(cur);
+                cur = cur.plusDays(1);
+            }
+        }
+
+        for (LocalDate target : targets) {
             try {
-                UUID daId = applyLeaveToAttendance(leave, cur);
+                UUID daId = applyLeaveToAttendance(leave, target);
                 if (daId != null) affected.add(daId);
             } catch (Exception e) {
                 log.error("[LeaveReflect] 사후반영 실패 leaveRequestId={}, date={}",
-                        leave.getLeaveRequestId(), cur, e);
+                        leave.getLeaveRequestId(), target, e);
             }
-            cur = cur.plusDays(1);
         }
         log.info("[LeaveReflect] 사후반영 완료 leaveRequestId={}, affected={}",
                 leave.getLeaveRequestId(), affected.size());

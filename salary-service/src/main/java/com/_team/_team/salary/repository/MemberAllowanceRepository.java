@@ -100,6 +100,15 @@ public interface MemberAllowanceRepository extends JpaRepository<MemberAllowance
             @Param("monthStart") LocalDate monthStart,
             @Param("monthEnd") LocalDate monthEnd);
 
+    /** 회사 전체 이력 - 효력일 역순 */
+    @Query("""
+           SELECT a FROM MemberAllowance a
+            WHERE a.companyId = :companyId
+              AND a.delYn = 'N'
+            ORDER BY a.effectiveFrom DESC, a.requestedAt DESC
+           """)
+    List<MemberAllowance> findCompanyAllHistory(@Param("companyId") UUID companyId);
+
     /**
      * 직원 1명의 활성 수당 조회
      * 결재 상태는 APPROVED / AUTO 만 (정산에 실제 반영되는 것)

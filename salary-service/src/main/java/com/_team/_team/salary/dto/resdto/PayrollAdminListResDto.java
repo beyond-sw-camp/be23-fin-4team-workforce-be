@@ -28,6 +28,8 @@ public class PayrollAdminListResDto {
     private String organizationName;
 
     private LocalDate payrollYearMonthDay;
+    /** 정산 대상 월 (YYYY-MM) */
+    private String targetYearMonth;
     private LocalDate paidAt;
 
     private PayrollStatus payrollStatus;
@@ -50,6 +52,7 @@ public class PayrollAdminListResDto {
                 .name(name)
                 .organizationName(organizationName)
                 .payrollYearMonthDay(p.getPayrollYearMonthDay())
+                .targetYearMonth(p.getTargetYearMonth())
                 .paidAt(p.getPaidAt())
                 .payrollStatus(p.getPayrollStatus())
                 .payrollType(p.getPayrollType())

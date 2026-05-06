@@ -22,6 +22,8 @@ public class PayrollResDto {
     private UUID salaryId;
     private UUID memberId;
     private LocalDate payrollYearMonthDay;
+    /** 정산 대상 월 , 어느 월분 급여인지 */
+    private String targetYearMonth;
     private LocalDate paidAt;
     private Long totalPayment;
     private Long totalDeduction;
@@ -37,6 +39,7 @@ public class PayrollResDto {
                 .salaryId(payroll.getSalaryId())
                 .memberId(payroll.getMemberId())
                 .payrollYearMonthDay(payroll.getPayrollYearMonthDay())
+                .targetYearMonth(payroll.getTargetYearMonth())
                 .paidAt(payroll.getPaidAt())
                 .totalPayment(payroll.getTotalPayment())
                 .totalDeduction(payroll.getTotalDeduction())

@@ -132,6 +132,19 @@ public class OrganizationController {
         );
     }
 
+    // 직급 순서 변경
+    @CheckPermission(resource = Resource.ORGANIZATION, action = Action.UPDATE)
+    @PutMapping("/job-grade/reorder")
+    public ResponseEntity<?> reorderJobGrade(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestBody List<UUID> jobGradeIdList) {
+        organizationService.reorderJobGrade(memberId, jobGradeIdList);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "직급 순서 변경 성공"),
+                HttpStatus.OK
+        );
+    }
+
     // 직책 생성
     @CheckPermission(resource = Resource.ORGANIZATION, action = Action.CREATE)
     @PostMapping("/job-title/create")
@@ -182,6 +195,19 @@ public class OrganizationController {
         organizationService.deleteJobTitle(memberId, jobTitleId);
         return new ResponseEntity<>(
                 ApiResponse.success(null, "직책 삭제 성공"),
+                HttpStatus.OK
+        );
+    }
+
+    // 직책 순서 변경
+    @CheckPermission(resource = Resource.ORGANIZATION, action = Action.UPDATE)
+    @PutMapping("/job-title/reorder")
+    public ResponseEntity<?> reorderJobTitle(
+            @RequestHeader("X-User-UUID") UUID memberId,
+            @RequestBody List<UUID> jobTitleIdList) {
+        organizationService.reorderJobTitle(memberId, jobTitleIdList);
+        return new ResponseEntity<>(
+                ApiResponse.success(null, "직책 순서 변경 성공"),
                 HttpStatus.OK
         );
     }

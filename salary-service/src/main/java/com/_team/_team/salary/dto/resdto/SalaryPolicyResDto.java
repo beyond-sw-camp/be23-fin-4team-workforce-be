@@ -1,6 +1,7 @@
 package com._team._team.salary.dto.resdto;
 
 import com._team._team.salary.domain.SalaryPolicy;
+import com._team._team.salary.domain.enums.PayCycleType;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
 import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.domain.enums.WageSystemType;
@@ -30,6 +31,8 @@ public class SalaryPolicyResDto {
     private Integer monthlyOrdinaryHours;
     // 일할계산 방식
     private ProrationMethod prorationMethod;
+    /** 급여 지급 주기 (당월분/전월분) */
+    private PayCycleType payCycleType;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
     private LocalDateTime createdAt;
@@ -47,6 +50,7 @@ public class SalaryPolicyResDto {
                 .fixedOvertimeMinutes(salaryPolicy.getFixedOvertimeMinutes())
                 .monthlyOrdinaryHours(salaryPolicy.getMonthlyOrdinaryHours())
                 .prorationMethod(salaryPolicy.getProrationMethod())
+                .payCycleType(salaryPolicy.getPayCycleType())
                 .effectiveFrom(salaryPolicy.getEffectiveFrom())
                 .effectiveTo(salaryPolicy.getEffectiveTo())
                 .createdAt(salaryPolicy.getCreatedAt())

@@ -23,13 +23,17 @@ import java.util.UUID;
 @Getter
 @Table(
         indexes = {
-                // 일별 승인 OT 집계
+                // 일별 승인 OT 집계 (직원 단건)
                 @Index(name = "idx_overtime_member_date_status",
                         columnList = "memberId, targetDate, approvalStatus"),
 
                 // 결재 대기 목록 (관리자 승인 화면)
                 @Index(name = "idx_overtime_company_status",
                         columnList = "companyId, approvalStatus"),
+
+                // 회사 단위 월별 초과근무시간 누적 집계 (포괄임금제 초과 근무 현황)
+                @Index(name = "idx_overtime_company_date_status",
+                        columnList = "companyId, targetDate, approvalStatus"),
 
                 // 사후 신청 만료 배치용
                 @Index(name = "idx_overtime_type_status_submitted",

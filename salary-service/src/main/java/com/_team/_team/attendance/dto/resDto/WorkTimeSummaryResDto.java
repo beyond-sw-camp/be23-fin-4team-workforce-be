@@ -14,8 +14,8 @@ import java.time.LocalDate;
 @Data
 public class WorkTimeSummaryResDto {
 
-    private LocalDate weekStart;   // 월요일
-    private LocalDate weekEnd;     // 일요일
+    private LocalDate weekStart;   // 일요일
+    private LocalDate weekEnd;     // 토요일
 
     // 주 총 근무시간 (DailyAttendance.workedMinutes 합, 연장근무 포함 실 근무분)
     private Integer totalWorkedMinutes;
@@ -26,6 +26,11 @@ public class WorkTimeSummaryResDto {
     private Integer overtimeApprovedMinutes;
     private Integer overtimeLimitMinutes;   // 법정 주 12시간 = 720
     private Integer overtimeUsagePercent;
+
+    // 월 누적 연장근무 (현재 월의 1일 ~ 기준일까지 DailyAttendance.overtimeMinutes 합)
+    private Integer monthlyOvertimeMinutes;
+    private Integer monthlyOvertimeLimitMinutes;   // 회사 정책 monthlyOvertimeLimitMinutes (없으면 null)
+    private Integer monthlyOvertimeUsagePercent;
 
     // 주휴수당 자격, 근로기준법 55조, 주 15시간 이상 개근 시 자격 O
     private Boolean weeklyHolidayEligible;

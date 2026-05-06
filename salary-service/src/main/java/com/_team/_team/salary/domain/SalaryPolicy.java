@@ -1,6 +1,7 @@
 package com._team._team.salary.domain;
 
 import com._team._team.domain.BaseTimeEntity;
+import com._team._team.salary.domain.enums.PayCycleType;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
 import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.dto.reqdto.SalaryPolicyUpdateReqDto;
@@ -35,6 +36,17 @@ public class SalaryPolicy extends BaseTimeEntity {
     @Column(length = 10, nullable = false)
     @Builder.Default
     private PayDayShiftRule payDayShiftRule = PayDayShiftRule.BEFORE;
+
+    /**
+     * 급여 지급 주기 유형 (당월분 / 전월분)
+     * - CURRENT_MONTH: 해당 월에 그 월분 지급 (예: 5/25 에 5월분)
+     * - PREVIOUS_MONTH: 다음 달에 전월분 지급 (예: 6/10 에 5월분)
+     * 정산 대상 월(targetYearMonth) 산출 + 평균임금 산정 등에 사용
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private PayCycleType payCycleType = PayCycleType.CURRENT_MONTH;
 
     /**
      * 호봉제 사용 여부 (N 이면 연봉협상제)
@@ -119,6 +131,19 @@ public class SalaryPolicy extends BaseTimeEntity {
         if (reqDto.getProrationMethod() != null) {
             this.prorationMethod = reqDto.getProrationMethod();
         }
+        if (reqDto.getPayCycleType() != null) {
+            this.payCycleType = reqDto.getPayCycleType();
+        }
+    }
+
+    /**
+     * 지급일 기반 정산 대상 YearMonth 산출
+     * - CURRENT_MONTH: 그 월 자체
+     * - PREVIOUS_MONTH: 그 월의 직전 달
+     */
+    public java.time.YearMonth resolveTargetYearMonth(LocalDate payrollDate) {
+        java.time.YearMonth ym = java.time.YearMonth.from(payrollDate);
+        return payCycleType == PayCycleType.PREVIOUS_MONTH ? ym.minusMonths(1) : ym;
     }
 
     // 소프트 삭제

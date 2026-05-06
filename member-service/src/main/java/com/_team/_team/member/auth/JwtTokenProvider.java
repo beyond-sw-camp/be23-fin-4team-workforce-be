@@ -58,14 +58,21 @@ public class JwtTokenProvider {
         this.rtKey = Keys.hmacShaKeyFor(rtByte);
     }
 
-    // AT 생성 권한,조직,회사id,이름
+    // AT 생성 - 일반 멤버 (position 필수) / SaaS 운영자 (position null 허용)
     public String createAtToken(Member member, MemberPosition memberPosition) {
         Claims claims = Jwts.claims().setSubject(member.getMemberId().toString());
-        claims.put("memberPositionId", memberPosition.getMemberPositionId().toString());
-        claims.put("organizationId", memberPosition.getOrganization().getOrganizationId().toString());
         claims.put("companyId", member.getCompany().getCompanyId().toString());
         claims.put("name", member.getName());
-        claims.put("isSystemAdmin", memberPosition.getIsSystemAdminYn());
+
+        if (memberPosition == null) {
+            // SaaS 운영자 - position 정보 없음
+            claims.put("actor_type", "OPERATOR");
+        } else {
+            claims.put("actor_type", "MEMBER");
+            claims.put("memberPositionId", memberPosition.getMemberPositionId().toString());
+            claims.put("organizationId", memberPosition.getOrganization().getOrganizationId().toString());
+            claims.put("isSystemAdmin", memberPosition.getIsSystemAdminYn());
+        }
 
         Date now = new Date();
 
