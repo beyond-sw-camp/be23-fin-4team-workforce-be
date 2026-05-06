@@ -4,6 +4,7 @@ import com._team._team.salary.domain.enums.RetirementType;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @AllArgsConstructor
@@ -18,4 +19,14 @@ public class RetirementPolicyUpdateReqDto {
     private LocalDate effectiveTo;
 
     private String memo;
+
+    // DC 형 월 부담금 비율(%)
+    private BigDecimal dcContributionRate;
+
+    private String providerName;
+
+    private String contractNumber;
+
+    // LEGAL 형 중간정산 허용 여부 Y/N
+    private String allowEarlySettlementYn;
 }

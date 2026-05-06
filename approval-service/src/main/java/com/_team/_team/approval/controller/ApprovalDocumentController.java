@@ -77,10 +77,8 @@ public class ApprovalDocumentController {
     // 회사별 활성 양식 목록 조회
     @GetMapping("/active")
     public ResponseEntity<?> findActive(
-            @RequestHeader("X-User-CompanyId") UUID companyId,
-            @RequestHeader(value = "X-User-IsSystemAdmin", required = false) String isSystemAdmin) {
-        boolean adminOnly = "YES".equals(isSystemAdmin);
-        List<ApprovalDocumentResDto> result = approvalDocumentService.findActiveByCompanyId(companyId, adminOnly);
+            @RequestHeader("X-User-CompanyId") UUID companyId) {
+        List<ApprovalDocumentResDto> result = approvalDocumentService.findActiveByCompanyId(companyId);
         return new ResponseEntity<>(
                 ApiResponse.success(result, "활성 결재 양식 목록 조회 성공"),
                 HttpStatus.OK
