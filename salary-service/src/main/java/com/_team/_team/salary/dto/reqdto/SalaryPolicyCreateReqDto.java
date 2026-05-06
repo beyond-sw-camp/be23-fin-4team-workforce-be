@@ -1,6 +1,7 @@
 package com._team._team.salary.dto.reqdto;
 
 import com._team._team.salary.domain.SalaryPolicy;
+import com._team._team.salary.domain.enums.PayCycleType;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
 import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.domain.enums.WageSystemType;
@@ -28,6 +29,12 @@ public class SalaryPolicyCreateReqDto {
 
     @Builder.Default
     private PayDayShiftRule payDayShiftRule = PayDayShiftRule.BEFORE;
+
+    /**
+     * 급여 지급 주기 (당월분/전월분), 기본 CURRENT_MONTH
+     */
+    @Builder.Default
+    private PayCycleType payCycleType = PayCycleType.CURRENT_MONTH;
 
     @NotNull(message = "호봉제 또는 연봉협상제 선택은 필수 입니다.")
     @Builder.Default
@@ -85,6 +92,7 @@ public class SalaryPolicyCreateReqDto {
                                 ? ProrationMethod.DAYS_IN_MONTH
                                 : prorationMethod
                 )
+                .payCycleType(payCycleType == null ? PayCycleType.CURRENT_MONTH : payCycleType)
                 .build();
     }
 }

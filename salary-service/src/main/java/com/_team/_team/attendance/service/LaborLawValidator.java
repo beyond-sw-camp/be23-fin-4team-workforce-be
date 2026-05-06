@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -100,8 +101,9 @@ public class LaborLawValidator {
             return violations;
         }
 
-        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+        // 주 기준 일요일 시작 ~ 토요일 끝 (한국 달력 일반 표기)
+        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        LocalDate weekEnd = weekStart.plusDays(6);
 
         // 주 총 근로시간 체크 (52시간)
         int totalWorked = sumWorkedMinutesInRange(memberId, weekStart, weekEnd);
@@ -193,8 +195,9 @@ public class LaborLawValidator {
                                           int requestedMinutes,
                                           OvertimePolicy policy,
                                           List<LaborLawViolation> violations) {
-        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+        // 주 기준 일요일 시작 ~ 토요일 끝 (한국 달력 일반 표기)
+        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        LocalDate weekEnd = weekStart.plusDays(6);
 
         int existing = overtimeRequestRepository
                 .sumApprovedMinutesInRange(memberId, weekStart, weekEnd);
@@ -247,8 +250,9 @@ public class LaborLawValidator {
         if (policy.getWeeklyTotalLimitMinutes() == null) {
             return;
         }
-        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+        // 주 기준 일요일 시작 ~ 토요일 끝 (한국 달력 일반 표기)
+        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        LocalDate weekEnd = weekStart.plusDays(6);
 
         int existingWorked = sumWorkedMinutesInRange(memberId, weekStart, weekEnd);
         int projected = existingWorked + requestedMinutes;
@@ -283,8 +287,9 @@ public class LaborLawValidator {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "연장근로 정책이 설정되지 않았습니다."));
 
-        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = date.with(DayOfWeek.SUNDAY);
+        // 주 기준 일요일 시작 ~ 토요일 끝 (한국 달력 일반 표기)
+        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        LocalDate weekEnd = weekStart.plusDays(6);
 
         List<DailyAttendance> weekly = dailyAttendanceRepository
                 .findAllByMemberInRange(memberId, weekStart, weekEnd);
@@ -292,11 +297,24 @@ public class LaborLawValidator {
         int totalWorked = weekly.stream()
                 .mapToInt(d -> d.getWorkedMinutes() == null ? 0 : d.getWorkedMinutes())
                 .sum();
-        int overtimeApproved = overtimeRequestRepository
-                .sumApprovedMinutesInRange(memberId, weekStart, weekEnd);
+        // 주 연장근무 - (실제 발생한 연장근무, 월 누적과 동일 기준)
+        int overtimeApproved = weekly.stream()
+                .mapToInt(d -> d.getOvertimeMinutes() == null ? 0 : d.getOvertimeMinutes())
+                .sum();
 
         int totalLimit = policy.getWeeklyTotalLimitMinutes();
         int overtimeLimit = policy.getWeeklyOvertimeLimitMinutes();
+
+        // 월 누적 초과근무
+        LocalDate monthStart = date.withDayOfMonth(1);
+        List<DailyAttendance> monthly = dailyAttendanceRepository
+                .findAllByMemberInRange(memberId, monthStart, date);
+        int monthlyOvertime = monthly.stream()
+                .mapToInt(d -> d.getOvertimeMinutes() == null ? 0 : d.getOvertimeMinutes())
+                .sum();
+        Integer monthlyLimit = policy.getMonthlyOvertimeLimitMinutes();
+        Integer monthlyUsagePercent = monthlyLimit != null && monthlyLimit > 0
+                ? calcPercent(monthlyOvertime, monthlyLimit) : null;
 
         // 주휴수당 자격, 주 소정근로 15시간 이상 + 개근 (ABSENT 0일)
         int absentDays = (int) weekly.stream()
@@ -316,6 +334,9 @@ public class LaborLawValidator {
                 .overtimeApprovedMinutes(overtimeApproved)
                 .overtimeLimitMinutes(overtimeLimit)
                 .overtimeUsagePercent(calcPercent(overtimeApproved, overtimeLimit))
+                .monthlyOvertimeMinutes(monthlyOvertime)
+                .monthlyOvertimeLimitMinutes(monthlyLimit)
+                .monthlyOvertimeUsagePercent(monthlyUsagePercent)
                 .weeklyHolidayEligible(eligible)
                 .weeklyHolidayMinRequiredMinutes(WEEKLY_HOLIDAY_MIN_MINUTES)
                 .weeklyAbsentDays(absentDays)

@@ -50,9 +50,16 @@ public class Payroll extends BaseTimeEntity {
     @Column(nullable = false)
     private UUID memberId;
 
-    /** 급여 연도 (예 : 2026-03-25) */
+    /** 급여 지급일  */
     @Column(nullable = false)
     private LocalDate payrollYearMonthDay;
+
+    /**
+     * 정산 대상 월 (YYYY-MM)
+     * - 어느 월분 급여인지, SalaryPolicy.payCycleType 에 따라 결정
+     */
+    @Column(length = 7)
+    private String targetYearMonth;
 
     /** 실제 지급일 (지급 완료 시 세팅) */
     private LocalDate paidAt;
@@ -80,7 +87,7 @@ public class Payroll extends BaseTimeEntity {
     @Builder.Default
     private PayrollStatus payrollStatus = PayrollStatus.DRAFT;
 
-    /** 급여 구분 (정기급여 / 성과급 / 특별상여 / 소급분) */
+    /** 급여 구분 (정기급여 / 성과급 / 특별상여 / 소급분 / 퇴직 정산) */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     @Builder.Default
@@ -119,6 +126,11 @@ public class Payroll extends BaseTimeEntity {
     public void pay() {
         this.payrollStatus = PayrollStatus.PAID;
         this.paidAt = LocalDate.now();
+    }
+
+    /** 시드 전용 - 실제 지급일로 paidAt 보정 */
+    public void overridePaidAt(LocalDate actualPaidAt) {
+        this.paidAt = actualPaidAt;
     }
 
     /** 소프트 삭제 */

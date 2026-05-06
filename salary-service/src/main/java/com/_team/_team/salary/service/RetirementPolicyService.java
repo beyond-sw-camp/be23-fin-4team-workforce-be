@@ -105,22 +105,12 @@ public class RetirementPolicyService {
                 .toList();
     }
 
-    // 활성 정책 조회 없으면 기본 LEGAL 자동 생성
+    // 활성 정책 조회, 없으면 null 반환 (FE 가 "정책 미등록" 안내 표시)
+    @Transactional(readOnly = true)
     public RetirementPolicyResDto getOrCreateActive(UUID companyId) {
         return retirementPolicyRepository.findActiveAt(companyId, LocalDate.now())
                 .map(RetirementPolicyResDto::fromEntity)
-                .orElseGet(() -> {
-                    log.warn("[RETIREMENT-POLICY] 활성 정책 없음 기본 LEGAL 자동 생성 companyId={}",
-                            companyId);
-                    RetirementPolicy created = retirementPolicyRepository.save(
-                            RetirementPolicy.builder()
-                                    .companyId(companyId)
-                                    .retirementType(RetirementType.LEGAL)
-                                    .effectiveFrom(LocalDate.now())
-                                    .memo("활성 정책 없음 자동 생성 기본 LEGAL")
-                                    .build());
-                    return RetirementPolicyResDto.fromEntity(created);
-                });
+                .orElse(null);
     }
 
     // 활성 정책 엔티티 직접 조회 시뮬레이션 등 다른 서비스에서 사용

@@ -1,5 +1,6 @@
 package com._team._team.salary.dto.reqdto;
 
+import com._team._team.salary.domain.enums.PayCycleType;
 import com._team._team.salary.domain.enums.PayDayShiftRule;
 import com._team._team.salary.domain.enums.ProrationMethod;
 import com._team._team.salary.domain.enums.WageSystemType;
@@ -45,6 +46,9 @@ public class SalaryPolicyUpdateReqDto {
 
     // 일할계산 방식 입사 / 퇴사 / 기간변경 월 적용 null 이면 기존값 유지
     private ProrationMethod prorationMethod;
+
+    /** 급여 지급 주기 (당월분/전월분)*/
+    private PayCycleType payCycleType;
 
     @NotNull(message = "적용 시작일은 필수입니다.")
     private LocalDate effectiveFrom;

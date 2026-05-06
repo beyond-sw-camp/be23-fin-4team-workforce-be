@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 
 /**
@@ -35,7 +36,7 @@ public class WorkTripCreateReqDto {
     private Long expenseAmount; // 경비 금액(원)
     private ExpenseType expenseType; // 경비 유형
 
-    public WorkTripDetail toEntity(DailyAttendance dailyAttendance, java.util.UUID companyId, java.util.UUID memberId) {
+    public WorkTripDetail toEntity(DailyAttendance dailyAttendance, UUID companyId, UUID memberId) {
         return WorkTripDetail.builder()
                 .memberId(memberId)
                 .companyId(companyId)

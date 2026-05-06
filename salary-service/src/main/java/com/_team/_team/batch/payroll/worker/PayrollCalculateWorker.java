@@ -7,6 +7,7 @@ import com._team._team.salary.repository.SalaryRepository;
 import com._team._team.salary.service.PayrollCalculationService;
 import com._team._team.salary.service.PayrollService;
 import com._team._team.salary.domain.SalaryPolicy;
+import com._team._team.salary.domain.enums.PayrollType;
 import com._team._team.salary.dto.reqdto.PayrollCreateReqDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -103,7 +104,7 @@ public class PayrollCalculateWorker {
                         PayrollCreateReqDto.builder()
                                 .memberId(member.getMemberId())
                                 .payrollYearMonthDay(settlement)
-                                .payrollType(com._team._team.salary.domain.enums.PayrollType.REGULAR_MONTHLY)
+                                .payrollType(PayrollType.REGULAR_MONTHLY)
                                 .build());
                 c.ok++;
             } catch (BusinessException e) {

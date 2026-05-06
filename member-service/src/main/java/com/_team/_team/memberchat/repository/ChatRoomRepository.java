@@ -1,6 +1,7 @@
 package com._team._team.memberchat.repository;
 
 import com._team._team.memberchat.domain.ChatRoom;
+import com._team._team.memberchat.domain.enums.ChatParticipantStatus;
 import com._team._team.memberchat.domain.enums.ChatRoomType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -36,9 +37,15 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             select distinct r from ChatRoom r
               join ChatParticipant p on p.chatRoom = r
             where p.memberId = :memberId
-              and p.status = com._team._team.memberchat.domain.enums.ChatParticipantStatus.JOINED
+              and p.status = :status
               and r.deleted = false
             order by r.updatedAt desc
             """)
-    List<ChatRoom> findMyRooms(@Param("memberId") UUID memberId);
+    List<ChatRoom> findMyRooms(@Param("memberId") UUID memberId,
+                               @Param("status") ChatParticipantStatus status);
+
+    /** 호출자 편의 - JOINED 고정 */
+    default List<ChatRoom> findMyRooms(UUID memberId) {
+        return findMyRooms(memberId, ChatParticipantStatus.JOINED);
+    }
 }

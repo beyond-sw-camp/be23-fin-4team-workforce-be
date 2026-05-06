@@ -32,7 +32,7 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation 'com.4team:workforce-common:1.0.29'
+    implementation 'com.4team:workforce-common:1.0.31'
 
     // Lombok (compileOnly + annotationProcessor 필수 세트)
     compileOnly 'org.projectlombok:lombok'
@@ -62,6 +62,9 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // Quartz - 미래 인사발령 자동 적용 배치
+    implementation 'org.springframework.boot:spring-boot-starter-quartz'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

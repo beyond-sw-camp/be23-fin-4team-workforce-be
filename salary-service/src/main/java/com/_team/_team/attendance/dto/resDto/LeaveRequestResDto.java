@@ -5,8 +5,13 @@ import com._team._team.attendance.domain.enums.BalanceType;
 import com._team._team.attendance.domain.enums.LeaveApprovalStatus;
 import lombok.*;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -23,6 +28,9 @@ public class LeaveRequestResDto {
     private LocalDate startDate;
     private LocalDate endDate;
     private Double usageDays;
+
+    /** 비연속 사용 날짜 (예: ["2026-05-21","2026-05-23","2026-05-28"]). null/빈배열이면 startDate~endDate 연속 범위 */
+    private List<String> plannedDates;
 
     private String reason;
     private String evidenceFileUrl;
@@ -45,6 +53,7 @@ public class LeaveRequestResDto {
                 .startDate(leaveRequest.getStartDate())
                 .endDate(leaveRequest.getEndDate())
                 .usageDays(leaveRequest.getUsageDays())
+                .plannedDates(parsePlannedDates(leaveRequest.getPlannedDatesJson()))
                 .reason(leaveRequest.getReason())
                 .evidenceFileUrl(leaveRequest.getEvidenceFileUrl())
                 .approvalRequestId(leaveRequest.getApprovalRequestId())
@@ -55,5 +64,16 @@ public class LeaveRequestResDto {
                 .decidedBy(leaveRequest.getDecidedBy())
                 .decisionNote(leaveRequest.getDecisionNote())
                 .build();
+    }
+
+    private static final ObjectMapper PLANNED_DATES_MAPPER = new ObjectMapper();
+
+    private static List<String> parsePlannedDates(String json) {
+        if (json == null || json.isBlank()) return Collections.emptyList();
+        try {
+            return PLANNED_DATES_MAPPER.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
     }
 }

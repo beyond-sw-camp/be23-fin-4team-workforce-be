@@ -47,7 +47,7 @@ public class JwtAuthFilter implements GlobalFilter {
             "/member/reset-password/send-code",
             "/member/reset-password/verify-code",
             "/member/reset-password",
-            "/mc/**", // 사내 채팅 WS/STOMP — 인증은 STOMP CONNECT 프레임에서 처리
+            "/mc/**", // 사내 채팅 WS/STOMP - 인증은 STOMP CONNECT 프레임에서 처리
             "/attendance/leave-types/internal",
             "/leave-policies/internal",
             "/work-schedules/internal",
@@ -94,22 +94,48 @@ public class JwtAuthFilter implements GlobalFilter {
                     .parseClaimsJws(token)
                     .getBody();
 
-            // AT에 담긴 값 꺼내기
-            String memberId = claims.getSubject();
-            String memberPositionId = claims.get("memberPositionId", String.class);
-            String companyId = claims.get("companyId", String.class);
-            String name = claims.get("name", String.class);
-            String isSystemAdmin = claims.get("isSystemAdmin", String.class);
+            // actor_type 분기 - SaaS 운영자 , SaaS 이용자
+            String actorType = claims.get("actor_type", String.class);
+            boolean isOperator = "OPERATOR".equals(actorType);
+            boolean isSaasPath = urlPath.startsWith("/saas/");
 
-            // 각 서비스로 헤더에 담아 전달
-            ServerWebExchange serverWebExchange = exchange.mutate()
-                    .request(r -> r
-                            .header("X-User-UUID", memberId)
-                            .header("X-User-MemberPositionId", memberPositionId)
-                            .header("X-User-CompanyId", companyId)
-                            .header("X-User-Name", name)
-                            .header("X-User-IsSystemAdmin", isSystemAdmin))
-                    .build();
+            // 경로 권한 검증
+            if (isSaasPath && !isOperator) {
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                return exchange.getResponse().setComplete();
+            }
+            if (!isSaasPath && isOperator) {
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                return exchange.getResponse().setComplete();
+            }
+
+            // 헤더 전달 - 운영자/이용자 분기
+            ServerWebExchange serverWebExchange;
+            if (isOperator) {
+                String operatorEmail = claims.getSubject();
+                String operatorName = claims.get("name", String.class);
+                serverWebExchange = exchange.mutate()
+                        .request(r -> r
+                                .header("X-Actor-Type", "OPERATOR")
+                                .header("X-Operator-Email", operatorEmail != null ? operatorEmail : "")
+                                .header("X-Operator-Name", operatorName != null ? operatorName : ""))
+                        .build();
+            } else {
+                String memberId = claims.getSubject();
+                String memberPositionId = claims.get("memberPositionId", String.class);
+                String companyId = claims.get("companyId", String.class);
+                String name = claims.get("name", String.class);
+                String isSystemAdmin = claims.get("isSystemAdmin", String.class);
+                serverWebExchange = exchange.mutate()
+                        .request(r -> r
+                                .header("X-Actor-Type", "MEMBER")
+                                .header("X-User-UUID", memberId != null ? memberId : "")
+                                .header("X-User-MemberPositionId", memberPositionId != null ? memberPositionId : "")
+                                .header("X-User-CompanyId", companyId != null ? companyId : "")
+                                .header("X-User-Name", name != null ? name : "")
+                                .header("X-User-IsSystemAdmin", isSystemAdmin != null ? isSystemAdmin : ""))
+                        .build();
+            }
 
             return chain.filter(serverWebExchange);
 

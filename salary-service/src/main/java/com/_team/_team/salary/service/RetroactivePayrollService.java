@@ -134,6 +134,8 @@ public class RetroactivePayrollService {
                 .salaryId(salaryId)
                 .memberId(reqDto.getMemberId())
                 .payrollYearMonthDay(today)
+                // 소급분 발행일이 속한 월을 targetYearMonth 로 기록
+                .targetYearMonth(java.time.YearMonth.from(today).toString())
                 .totalPayment(totalDiff)
                 .totalDeduction(0L)   // 소급분은 합계만 표기 4대보험 / 원천세는 다음 정기급여에 합산 시 자동 계산
                 .netPay(totalDiff)

@@ -26,6 +26,19 @@ import java.util.UUID;
 @Entity
 @Getter
 @Builder
+@Table(
+        indexes = {
+                // 본인 월간 조회 (가장 자주 사용)
+                @Index(name = "idx_daily_member_date",
+                        columnList = "memberId, attendanceDate"),
+                // 회사 일자별 전체 조회 (관리자 대시보드 / 배치 / 휴일 반영)
+                @Index(name = "idx_daily_company_date",
+                        columnList = "companyId, attendanceDate"),
+                // 회사 + 마감 상태 (월 마감 배치)
+                @Index(name = "idx_daily_company_closure",
+                        columnList = "companyId, closureStatus")
+        }
+)
 public class DailyAttendance extends BaseTimeEntity {
 
     @Id

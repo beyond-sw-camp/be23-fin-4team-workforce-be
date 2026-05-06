@@ -37,9 +37,10 @@ public class MyAnnualSalaryResDto {
     @Builder
     @Data
     public static class MonthlyRow {
-        private int month;                 // 1 ~ 12
+        private int month;                 // 1 ~ 12 (정산 대상 월 기준)
         private String payrollId;          // 없으면 null
-        private String payrollYearMonthDay; // 없으면 null
+        private String payrollYearMonthDay; // 지급일
+        private String targetYearMonth;    // 정산 대상 월
         private PayrollStatus payrollStatus;
         private long totalPayment;
         private long totalDeduction;

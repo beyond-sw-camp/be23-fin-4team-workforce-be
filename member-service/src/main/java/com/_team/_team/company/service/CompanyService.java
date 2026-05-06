@@ -207,6 +207,13 @@ public class CompanyService {
         } catch (Exception e) {
             log.warn("법정 공휴일 가져오기 실패: {}", e.getMessage());
         }
+
+        // 회사별 자동(스케줄러) 작업 트리거 시드 (salary-service)
+        try {
+            salaryServiceClient.initBatchSchedule(company.getCompanyId());
+        } catch (Exception e) {
+            log.warn("회사별 자동 작업 트리거 시드 실패: {}", e.getMessage());
+        }
     }
 
     private Company createCompany(CompanyOnboardingReqDto reqDto) {
@@ -277,5 +284,15 @@ public class CompanyService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "회사를 찾을 수 없습니다."));
         return company.getSealImageUrl();
+    }
+
+    /**
+     * 회사 도메인으로 회사 단건 조회 - 시드용
+     */
+    public CompanyInfoResDto findByDomain(String domain) {
+        Company company = companyRepository.findByCompanyDomain(domain)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "도메인으로 회사를 찾을 수 없습니다: " + domain));
+        return CompanyInfoResDto.fromEntity(company);
     }
 }

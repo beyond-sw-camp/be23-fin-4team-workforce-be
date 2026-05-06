@@ -3,7 +3,6 @@ package com._team._team.attendance.service;
 import com._team._team.attendance.repository.CompanyHolidayRepository;
 import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
-import com._team._team.attendance.repository.LeaveRequestRepository;
 import com._team._team.attendance.repository.WorkScheduleRepository;
 import com._team._team.attendance.domain.CompanyLeaveType;
 import com._team._team.attendance.domain.DailyAttendance;
@@ -39,7 +38,7 @@ public class AttendanceAnomalyDetector {
     private final DailyAttendanceRepository dailyAttendanceRepository;
     private final WorkScheduleRepository workScheduleRepository;
     private final CompanyHolidayRepository companyHolidayRepository;
-    private final LeaveRequestRepository leaveRequestRepository;
+    private final LeaveRequestService leaveRequestService;
     private final CompanyLeaveTypeRepository companyLeaveTypeRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -47,13 +46,13 @@ public class AttendanceAnomalyDetector {
     public AttendanceAnomalyDetector(DailyAttendanceRepository dailyAttendanceRepository,
                                      WorkScheduleRepository workScheduleRepository,
                                      CompanyHolidayRepository companyHolidayRepository,
-                                     LeaveRequestRepository leaveRequestRepository,
+                                     LeaveRequestService leaveRequestService,
                                      CompanyLeaveTypeRepository companyLeaveTypeRepository,
                                      ApplicationEventPublisher eventPublisher) {
         this.dailyAttendanceRepository = dailyAttendanceRepository;
         this.workScheduleRepository = workScheduleRepository;
         this.companyHolidayRepository = companyHolidayRepository;
-        this.leaveRequestRepository = leaveRequestRepository;
+        this.leaveRequestService = leaveRequestService;
         this.companyLeaveTypeRepository = companyLeaveTypeRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -181,7 +180,7 @@ public class AttendanceAnomalyDetector {
 
     // 본인 해당 날짜 반차 유형 조회, LeaveRequest -> CompanyLeaveType.code 연결
     private HalfDayShift resolveHalfDayShift(UUID companyId, UUID memberId, LocalDate date) {
-        Optional<LeaveRequest> leave = leaveRequestRepository
+        Optional<LeaveRequest> leave = leaveRequestService
                 .findActiveOnDate(companyId, memberId, date);
         if (leave.isEmpty()) {
             return HalfDayShift.UNKNOWN;
