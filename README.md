@@ -164,6 +164,19 @@ Nori 형태소 분석기를 적용하여 한국어 검색 정확도를 높였습
 </details>
 
 <details>
+<summary><strong>SSE 실시간 알림</strong></summary>
+
+결재 승인, 근태 이상, 계약 발송 등 주요 이벤트 발생 시 사용자에게 실시간으로 알림을 전달합니다.
+
+**알림 파이프라인**: Kafka → Redis Pub/Sub → SSE
+
+- **Kafka**: 각 서비스에서 발생한 이벤트를 알림 토픽으로 발행
+- **Redis Pub/Sub**: 다중 인스턴스 환경에서 알림 메시지를 모든 서버로 브로드캐스트
+- **SSE (Server-Sent Events)**: 서버 → 클라이언트 단방향 연결로 새로고침 없이 실시간 수신
+
+</details>
+
+<details>
 <summary><strong>동기/비동기 통신 설계 및 이벤트 기반 후속 처리</strong></summary>
 
 MSA 환경에서 전자결재 서비스가 member·salary 서버와 통신하는 상황이 많은 만큼, 통신 방식 설계를 중점적으로 고려했습니다. 결재 트랜잭션 내에서 즉시 필요한 데이터인지, 승인 이후 후속 처리인지에 따라 동기·비동기 방식을 구분하여 설계했습니다.
