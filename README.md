@@ -5,6 +5,9 @@
   
 </div>
 
+> 결재, 계약, 근태, 급여, 목표/평가, ESG, 채팅까지 하나의 시스템에서 통합 관리할 수 있는 중소기업 맞춤형 인사관리 플랫폼입니다.
+> 회사별 정책에 맞게 자유롭게 설정할 수 있도록 설계되어, 복잡한 인사 업무를 자동화하고 AI 챗봇을 통해 쉽고 빠르게 운영할 수 있도록 지원합니다.
+
 <hr>
 
 ## 팀원 소개
@@ -111,6 +114,54 @@
 ---
 
 ## 주요 기술
+
+<details>
+<summary><strong>Common 공통 라이브러리</strong></summary>
+
+MSA 환경에서 5개 마이크로서비스가 공통으로 사용하는 코드를 별도 라이브러리(`workforce-common`)로 분리하고, GitHub Packages에 Maven으로 배포하여 각 서비스에서 의존성으로 주입받아 사용합니다.
+
+**공통 라이브러리 구성**
+
+| 구분 | 내용 |
+|------|------|
+| Base Entity | `BaseTimeEntity` — 전 엔티티 공통 생성일/수정일 자동 관리 |
+| API 응답 | `ApiResponse<T>`, `CommonErrorDto` — 통일된 응답/에러 형식 |
+| 예외 처리 | `BusinessException`, `CommonExceptionHandler` — 서비스 공통 예외 처리 |
+| 권한 검증 | `@CheckPermission` AOP 어노테이션 — 13개 리소스 × 4개 액션 × 4단계 범위(본인/팀/부서/전사) 선언적 권한 체크 |
+| 인프라 설정 | Redis(Pub/Sub, 캐싱), Kafka(Producer), S3(파일 업로드/다운로드), ShedLock(분산 스케줄러) |
+| 알림 | `NotificationType` 40종 이상 정의, Kafka 기반 비동기 알림 발행 |
+| 도메인 이벤트 | 28개 이상의 이벤트 클래스 — 근태, 결재, 계약, 인사, 급여 등 서비스 간 이벤트 정의 |
+
+</details>
+
+<details>
+<summary><strong>Elasticsearch 통합 검색</strong></summary>
+
+결재, 인사, 조직 등 여러 서비스에 흩어진 데이터를 한 번에 검색할 수 있도록 Elasticsearch 기반 통합 검색을 구현했습니다.
+
+**인덱스 구성**
+
+| 인덱스 | 검색 대상 | 주요 필드 |
+|------|------|------|
+| member | 직원 정보 | 이름, 직책, 이메일, 전화번호, 소속 조직 |
+| organization | 조직 구조 | 조직명, 상위 조직, 소속 직원 |
+| approval | 결재 문서 | 문서명, 기안자명, 소속 부서, 결재 상태, 요청 타입, 본문 내용 |
+
+**데이터 동기화 — Outbox 패턴 + Kafka**
+
+각 서비스에서 데이터가 변경되면 Outbox 테이블에 이벤트를 저장하고, 5초 간격 스케줄러가 Kafka로 발행합니다. Search Service의 Consumer가 이를 수신하여 Elasticsearch에 반영합니다.
+- 처리 완료된 이벤트는 일정 기간 후 자동 정리 (member: 24시간, approval: 7일)
+- ShedLock으로 다중 인스턴스 환경에서 스케줄러 중복 실행 방지
+
+**한국어 검색 최적화**
+
+Nori 형태소 분석기를 적용하여 한국어 검색 정확도를 높였습니다. 인덱싱 시에는 N-gram 필터(1~5글자)로 부분 매칭을 지원하고, 검색 시에는 형태소 단위로 분석하여 정확한 결과를 반환합니다.
+
+**멀티테넌시**
+
+모든 검색 쿼리에 companyId 필터를 적용하여 회사 간 데이터가 완전히 격리됩니다.
+
+</details>
 
 <details>
 <summary><strong>동기/비동기 통신 설계 및 이벤트 기반 후속 처리</strong></summary>
