@@ -142,6 +142,36 @@
 
 <!-- TODO: 동적 폼 스키마, Pessimistic Locking, RAG, AOP 권한 검증, 이벤트 기반 후속 처리 등 -->
 
+<details>
+<summary><strong>동기/비동기 통신 설계 및 이벤트 기반 후속 처리</strong></summary>
+
+MSA 환경에서 전자결재 서비스가 member·salary 서버와 통신하는 상황이 다수 발생했습니다. 결재 트랜잭션 내에서 즉시 필요한 데이터인지, 승인 이후 후속 처리인지에 따라 동기·비동기 방식을 구분하여 설계했습니다.
+
+**동기 통신 (FeignClient)** — 결재 트랜잭션 내 즉시 결과가 필요한 경우에만 최소한으로 적용
+- 결재라인 편집 화면에서 즉시 후보자 리스트를 확인하는 경우
+- 기안 생성 트랜잭션 안에서 기안자 직책·조직 정보를 함께 검증·저장하는 경우
+- 승인 트랜잭션 안에서 결재자 서명 이미지를 즉시 문서에 저장하는 경우
+
+**비동기 통신 (Kafka)** — 결재 트랜잭션과 분리 가능한 후속 처리는 전부 비동기로 분리. 서비스 간 느슨한 결합으로 특정 서비스 장애가 결재 승인 자체에 영향을 주지 않도록 설계
+
+| 요청 타입 | 발행 이벤트 | 후속 처리 |
+|------|------|------|
+| VACATION | LeaveApprovalEvent | 연차 잔고 차감 |
+| ATTENDANCE | OvertimeApprovalEvent | 연장근무 정산 반영 |
+| ATTENDANCE | AttendanceCorrectionEvent | 출퇴근 정정 반영 |
+| ATTENDANCE | EarlyLeaveEvent | 조기퇴근 근태 반영 |
+| HR_MOVEMENT | LeaveOfAbsenceEvent | 휴직·복직 상태 변경 |
+| HR_MOVEMENT | ResignationEvent | 퇴직 프로세스 시작 |
+| SALARY | AllowanceApprovalEvent | 수당 급여 정산 반영 |
+| 공통 | ScheduleApprovalEvent | 근무일정 반영 |
+| 공통 | CalendarApprovalEvent | 캘린더 일정 등록 |
+
+검색 동기화는 Outbox 패턴으로 별도 관리 — 5초 간격 폴링 발행, 7일 이후 자동 정리
+
+> 결재 트랜잭션 내에서 즉시 필요한 데이터인지 여부를 기준으로, 동기 호출은 최소화하고 나머지는 전부 비동기로 분리하는 방향으로 설계했습니다.
+
+</details>
+
 <br>
 <div align="right"><a href="#목차">맨 위로</a></div>
 
