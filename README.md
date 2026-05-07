@@ -228,6 +228,33 @@ MSA 환경에서 전자결재 서비스가 member·salary 서버와 통신하는
 </details>
 
 <details>
+<summary><strong>상여 · 성과급 관리</strong></summary>
+
+| 기능 | 상세 |
+|---|---|
+| 보너스 정책 | BonusPolicy — useRegularBonusYn(정기상여 사용 여부), regularBonusAnnualRate / regularBonusPaymentCount(연 누계 한도 / 분할 횟수), performanceBonusMaxRate(성과급 1회당 max), gradeBonusRatesJson(평가 등급별 차등율), holidayBonusType+Value(명절상여 정액/정률), minTenureMonths(최소 근속), excludeOnLeaveYn(휴직자 제외) |
+| 한도 검증 | 발행 화면에서 정책 한도 초과 입력을 자동 차단. InputNumber max 동적 + 폼 validator 이중 검증 |
+| 정기상여 | 분기/반기 등 정해진 회차 발행. 회차당 권장 비율 안내(연 누계 / 회수) |
+| 성과급 | 평가 시즌 결과를 [평가 결과 불러오기]로 prefill — 등급별 차등율(S/A/B/C 등)을 자동 매핑하여 직원별 row 생성. 관리자 수정 가능 |
+| 명절상여 | 정책에 정액 또는 정률 사전 설정. 발행 시 비율 자동 적용 (수정 불가) |
+| 발행 흐름 | 시뮬 미리보기로 직원별 산출액 확인 → [지급 ON/OFF 토글]로 개별 제외 가능 → [발행]으로 PERFORMANCE_BONUS / SPECIAL_BONUS Payroll 일괄 생성 |
+
+</details>
+
+<details>
+<summary><strong>급여 관리</strong></summary>
+
+| 제도 | 산식 | 운용 |
+|---|---|---|
+| 법정 퇴직금 (LEGAL) | 평균임금 일액 × 30 × 근속일수 / 365 | 회사 사내 적립 |
+| DB형 퇴직연금 (DB) | 평균임금 일액 × 30 × 근속일수 / 365 | 외부 운용기관에 사용자 명의 적립, 운용 손익 회사 부담 |
+| DC형 퇴직연금 (DC) | baseMonthly × dcContributionRate% × 12 × years | 직원별 가입자 계좌에 매월 적립, 운용 손익 직원 부담. 법정 최저 8.33% (= 1/12) |
+
+</details>
+
+
+
+<details>
 <summary><strong>전자결재 · 계약</strong></summary>
 
 | 기능 | 설명 |
@@ -255,11 +282,14 @@ MSA 환경에서 전자결재 서비스가 member·salary 서버와 통신하는
 <details>
 <summary><strong>목표 · 성과 관리</strong></summary>
 
-| 기능 | 설명 |
-|------|------|
-| 목표 관리 | 목표 설정 → 활동 기록 → 진척률 관리 |
-| 평가 관리 | 평가 시즌 관리, 평가 설계(Design), 다면 피드백, 부서 간 보정(Calibration) |
-| 리포트 | 평가 결과 리포트 자동 생성 |
+| 기능 | 상세 |
+|---|---|
+| 목표 관리 | 시즌 단위 OKR/KPI 설정 → 활동 기록 → 진척률 자동 계산 |
+| 평가 설계 | 평가 시즌별 평가 항목/배점/가중치를 자유 구성 |
+| 다면 피드백 | 자기/상사/동료/하급자 평가 응답을 EvaluationResponse로 수집. 익명/실명 정책 |
+| 부서 간 보정 | Calibration 단계로 부서 편향 제거. 등급 분포 가이드 표시 |
+| 결과 발행 | 평가 시즌 CONFIRMED 시 EvaluationPublishedEvent 발행 → 알림 생성 + 성과급 prefill 데이터로 노출 |
+| 리포트 | 평가 결과 리포트 자동 생성, 부서/직급/등급별 분포 시각화 |
 
 </details>
 
