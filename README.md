@@ -97,6 +97,19 @@
 | 결재 후속 처리 | 승인 완료 시 요청 타입별 자동 처리 — 휴가 잔고 차감, 근태 정산 반영, 인사 발령 이력 생성, 캘린더 연동 등 |
 | 전자계약 | 계약서 생성 → 발송 → 서명 → PDF 저장. 일괄 발송, 법인인감 자동 서명, 계약 재발행 이력 관리 |
 
+<summary><strong>전자계약 서명 프로세스</strong></summary>
+
+계약서 생성부터 서명 완료까지의 전체 생명주기를 관리합니다.
+
+**계약 상태 흐름**: CREATED → SENT → SIGNED / REJECTED / CANCELED
+
+- **자동 정보 채움**: 발송 시 FeignClient로 member-service(인사 정보), salary-service(급여 정보) 조회하여 계약서 필드 자동 채움
+- **법인인감 자동 서명**: 회사 측(COMPANY) 서명은 sealImageUrl로 자동 처리, 직원 서명만 대기
+- **일괄 발송**: ContractBatch로 다수 직원에게 동일 계약서 일괄 생성·발송
+- **재발행 이력 추적**: previousContractId, revision으로 재발행 이력 연결
+- **서명 완료 PDF**: 양측 서명 완료 시 signedPdfUrl에 계약서 PDF 저장
+- **계약 번호 자동 채번**: ContractNumberService로 순차 번호 생성
+
 </details>
 
 <details>
@@ -169,6 +182,28 @@ MSA 환경에서 전자결재 서비스가 member·salary 서버와 통신하는
 검색 동기화는 Outbox 패턴으로 별도 관리 — 5초 간격 폴링 발행, 7일 이후 자동 정리
 
 > 결재 트랜잭션 내에서 즉시 필요한 데이터인지 여부를 기준으로, 동기 호출은 최소화하고 나머지는 전부 비동기로 분리하는 방향으로 설계했습니다.
+
+</details>
+
+
+<details>
+<summary><strong>회의 녹음 AI 요약</strong></summary>
+
+인사관리 플랫폼에서 회의는 일상적으로 발생하는 업무입니다. 회의 내용을 기록하고, 이후 일정 및 후속 사항을 체계적으로 정리할 수 있도록 AI 기반 회의록 자동 생성 기능을 추가했습니다.
+
+**처리 파이프라인**: 녹음 파일 업로드 → STT 텍스트 변환 → LLM 회의록 생성
+
+- **음성 인식 (STT)**: OpenAI Whisper API(`whisper-1`)로 음성을 텍스트로 변환. webm, m4a, mp3, wav 등 지원, 최대 25MB
+- **회의록 생성 (LLM)**: GPT-4o-mini(temperature 0.3)로 구조화된 회의록 자동 생성
+  - 회의 요약 (한 줄)
+  - 주요 결정사항
+  - 액션 아이템 (담당자·기한 포함)
+  - 주요 논의 내용
+  - 이후 일정 및 후속 사항
+- **재요약 기능**: 기존 텍스트를 다시 요약하는 별도 엔드포인트(`/ai/transcribe/summary`) 제공
+- **성과 관리 연동**: 회의에서 도출된 액션 아이템을 목표·평가 시스템과 연결하여 추적 가능
+
+**기술 구성**: FastAPI + OpenAI SDK, Eureka 서비스 등록으로 Spring 마이크로서비스와 통합
 
 </details>
 
