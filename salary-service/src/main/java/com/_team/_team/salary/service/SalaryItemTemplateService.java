@@ -149,9 +149,9 @@ public class SalaryItemTemplateService {
      * - 식대/자가운전/보육수당/연구활동비 (비과세 각 월 20만원)
      */
     public SeedResult initializeDefaults(UUID companyId) {
-        // applyToAll=Y 인 항목은 회사 공통
-        // 식대/자가운전/보육수당/연구활동비/교통비 = 회사 공통 (정책 일률 지급)
-        // 직책수당/자녀수당 = 개인 차등 (직급, 자녀수에 따라 직원마다 다름)
+        // fixedAmount=Y 인 항목은 기본 금액 고정 (직원별 차등 불가)
+        // 식대/자가운전/보육수당/연구활동비 = 200,000원 고정
+        // 직책수당/자녀수당/교통비 = 자유 금액 (직급/자녀수/거리 등에 따라 차등)
         List<DefaultSpec> specs = List.of(
                 new DefaultSpec("기본급",         ItemType.EARNING, 1, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
                 new DefaultSpec("직책수당",       ItemType.EARNING, 2, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
@@ -188,7 +188,7 @@ public class SalaryItemTemplateService {
                     .isTaxableYn(spec.taxable())
                     .taxCategory(spec.category())
                     .defaultAmount(spec.defaultAmount())
-                    .applyToAllYn(spec.applyToAll())
+                    .fixedAmountYn(spec.fixedAmount())
                     .isOrdinaryWageYn(spec.ordinaryWage())
                     .isSystemDefault(true)
                     .delYn("N")
@@ -225,7 +225,7 @@ public class SalaryItemTemplateService {
             String taxable,
             TaxCategory category,
             Long defaultAmount,
-            String applyToAll,
+            String fixedAmount,
             String ordinaryWage
     ) {}
 
