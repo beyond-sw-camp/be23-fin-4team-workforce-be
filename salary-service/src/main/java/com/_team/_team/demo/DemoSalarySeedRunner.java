@@ -26,6 +26,7 @@ import com._team._team.attendance.domain.enums.SourceType;
 import com._team._team.attendance.domain.enums.WorkTripType;
 import com._team._team.attendance.domain.enums.WorkType;
 import com._team._team.attendance.repository.AttendanceLogRepository;
+import com._team._team.batch.leave.worker.LeaveGrantWorker;
 import com._team._team.attendance.repository.CompanyHolidayRepository;
 import com._team._team.attendance.repository.CompanyLeaveTypeRepository;
 import com._team._team.attendance.repository.DailyAttendanceRepository;
@@ -146,6 +147,8 @@ public class DemoSalarySeedRunner implements ApplicationRunner {
     private final WorkScheduleRepository workScheduleRepository;
     private final FlexibleTimeSlotRepository flexibleTimeSlotRepository;
     private final MemberScheduleSelectionRepository memberScheduleSelectionRepository;
+    // 시드용 ANNUAL 부여 - 정책 기반으로 LeaveGrantWorker 가 직접 부여 (seedMemberBalances 대체)
+    private final LeaveGrantWorker leaveGrantWorker;
 
     /** AUTO 부여 (관리자 즉시 부여) 표시용 - 시드 데이터의 시스템 부여 표식 */
     private static final UUID SYSTEM_ACTOR = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -345,8 +348,14 @@ public class DemoSalarySeedRunner implements ApplicationRunner {
         // 8) 직원별 Salary + MemberAllowance 시드 (자체 멱등)
         seedEmployees(companyId, salaryPolicy.getSalaryPolicyId(), usePayGrade);
 
-        // 8-1) 직원별 ANNUAL 연차 잔여 시드 (자체 멱등)
-        seedMemberBalances(companyId);
+        // 8-1) 직원별 ANNUAL 연차 부여 - LeavePolicy 기반 LeaveGrantWorker 호출 (자체 멱등)
+        // seedMemberBalances 자체 시드는 제거 - LeaveGrantWorker 와 중복 부여 이슈 해결
+        try {
+            leaveGrantWorker.runForCompany(companyId, LocalDate.now());
+            log.info("[DEMO-SEED] LeaveGrantWorker 회사별 부여 완료 companyId={}", companyId);
+        } catch (Exception e) {
+            log.warn("[DEMO-SEED] LeaveGrantWorker 호출 실패 companyId={} - {}", companyId, e.getMessage());
+        }
 
         // 8-2) 회사 공휴일 - 법정 공휴일 자동 import (daily 시드에서 휴일 skip 위해 선행)
         seedCompanyHolidays(companyId);
