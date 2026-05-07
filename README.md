@@ -242,7 +242,7 @@ MSA 환경에서 전자결재 서비스가 member·salary 서버와 통신하는
 </details>
 
 <details>
-<summary><strong>급여 관리</strong></summary>
+<summary><strong>퇴직금 관리</strong></summary>
 
 | 제도 | 산식 | 운용 |
 |---|---|---|
@@ -251,8 +251,6 @@ MSA 환경에서 전자결재 서비스가 member·salary 서버와 통신하는
 | DC형 퇴직연금 (DC) | baseMonthly × dcContributionRate% × 12 × years | 직원별 가입자 계좌에 매월 적립, 운용 손익 직원 부담. 법정 최저 8.33% (= 1/12) |
 
 </details>
-
-
 
 <details>
 <summary><strong>전자결재 · 계약</strong></summary>
