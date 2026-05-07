@@ -135,6 +135,20 @@ MSA 환경에서 5개 마이크로서비스가 공통으로 사용하는 코드�
 </details>
 
 <details>
+<summary><strong>AI 챗봇 (RAG)</strong></summary>
+
+회사별 정책과 결재 양식을 기반으로 자연어 질의응답이 가능한 AI 챗봇을 구현했습니다.
+
+**RAG 파이프라인**: 사용자 질문 → 벡터 유사도 검색 → 관련 문서 조회 → LLM 답변 생성
+
+- **벡터 DB (Redis Stack)**: 회사별 정책·결재 양식 문서를 임베딩하여 Redis Stack의 벡터 검색 인덱스에 저장. 캐싱과 벡터 검색을 하나의 Redis로 통합 운용
+- **LLM**: OpenAI GPT-4o-mini로 조회된 문서를 컨텍스트로 전달하여 해당 회사 상황에 맞는 답변 생성
+- **자동 동기화**: 결재 양식 변경 시 Kafka Consumer가 벡터 인덱스를 자동 갱신하여 항상 최신 데이터 기반으로 답변
+- **기술 구성**: Python FastAPI + LangChain + OpenAI SDK, Eureka 서비스 등록으로 Spring 마이크로서비스와 통합
+
+</details>
+
+<details>
 <summary><strong>Elasticsearch 통합 검색</strong></summary>
 
 결재, 인사, 조직 등 여러 서비스에 흩어진 데이터를 한 번에 검색할 수 있도록 Elasticsearch 기반 통합 검색을 구현했습니다.
