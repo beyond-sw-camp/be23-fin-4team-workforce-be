@@ -63,6 +63,10 @@ public interface PayrollRepository extends JpaRepository<Payroll, UUID>, Payroll
      */
     List<Payroll> findByPayrollStatusAndDelYn(PayrollStatus payrollStatus, String delYn);
 
+    // 회사 단위 처리 필요(지급전, 확정 상태인 급여) 급여대장 시간 무관 조회
+    List<Payroll> findByCompanyIdAndPayrollStatusInAndDelYnOrderByPayrollYearMonthDayAsc(
+            UUID companyId, Collection<PayrollStatus> statuses, String delYn);
+
     /**
      * [미사용수당 API 용]
      * 특정 연/월에 해당하는 DRAFT 급여대장 조회

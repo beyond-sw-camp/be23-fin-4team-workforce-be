@@ -114,7 +114,7 @@ public class BonusPolicy extends BaseTimeEntity {
 
     private LocalDate effectiveTo;
 
-    // 정책 등록 시 비고 메모 변경 사유 등
+    // 정책 등록 시 메모
     @Column(length = 500)
     private String memo;
 

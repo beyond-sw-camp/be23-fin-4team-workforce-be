@@ -88,14 +88,6 @@ public class PayrollService {
 
     /**
      * 급여대장 생성
-     * 1) 직원의 정산일 기준 적용 중인 Salary 자동 조회
-     * 2) 동일 직원 + 동일 정산일 중복 체크
-     * 3) 정산기간 산출 -> 월 장부(MonthlyAttendanceLedger) 조회
-     * 4) Payroll 엔티티 생성 (금액 0으로 초기화)
-     * 5) 회사 SalaryItemTemplate 목록 -> PayrollItem 일괄 생성
-     * 6) 장부 기반으로 초과근무, 공휴일, 야간 수당 자동 계산
-     * 7) 과세소득 기반 4대보험, 세금 자동 공제
-     * 8) EARNING/DEDUCTION 합계 계산 -> Payroll.recalculate()
      */
     public PayrollResDto createPayroll(UUID companyId, PayrollCreateReqDto reqDto){
 
@@ -116,18 +108,21 @@ public class PayrollService {
 
         /**
          * 2. 직원 + 정산일 기존 이력 체크
+         * delYn=N: 이미 활성 행, 중복 차단, delYn=Y: 이전 소프트 삭제된 행, hard delete 후 재생성 허용
          */
-        payrollRepository.findByCompanyIdAndMemberIdAndPayrollYearMonthDay(
-                        companyId, reqDto.getMemberId(), reqDto.getPayrollYearMonthDay())
-                .ifPresent(existing -> {
-                    if ("N".equals(existing.getDelYn())) {
-                        throw new BusinessException(HttpStatus.CONFLICT,
-                                "해당 직원의 동일 정산일에 이미 급여대장이 존재합니다.");
-                    } else {
-                        throw new BusinessException(HttpStatus.CONFLICT,
-                                "해당 직원의 동일 정산일에 이전 급여대장 이력이 존재합니다. 다른 정산일로 생성하거나 기존 대장을 수정해주세요.");
-                    }
-                });
+        Optional<Payroll> existing = payrollRepository
+                .findByCompanyIdAndMemberIdAndPayrollYearMonthDay(
+                        companyId, reqDto.getMemberId(), reqDto.getPayrollYearMonthDay());
+        if (existing.isPresent()) {
+            Payroll prev = existing.get();
+            if ("N".equals(prev.getDelYn())) {
+                throw new BusinessException(HttpStatus.CONFLICT,
+                        "해당 직원의 동일 정산일에 이미 급여대장이 존재합니다.");
+            }
+            // 소프트 삭제된 행 정리 - 같은 unique key 재사용 가능하게 hard delete + flush
+            payrollRepository.delete(prev);
+            payrollRepository.flush();
+        }
 
         /** 3. 정산기간 (1단계에서 이미 계산된 것 재사용) */
         SettlementPeriod period = settlementPeriod;
@@ -441,6 +436,29 @@ public class PayrollService {
                 .build());
 
         return PayrollResDto.fromEntity(payroll);
+    }
+
+    // 회사 단위 처리 필요(지급전, 확정 상태인 급여) 급여대장 시간 무관 조회
+    // 정산 처리 화면 데이터 (중요) - 이 화면에서 급여(정기급여, 퇴직, 상여, 성과) 모두 처리
+    @Transactional(readOnly = true)
+    public List<PayrollAdminListResDto> listPendingByCompany(UUID companyId) {
+        List<Payroll> payrolls = payrollRepository
+                .findByCompanyIdAndPayrollStatusInAndDelYnOrderByPayrollYearMonthDayAsc(
+                        companyId,
+                        List.of(PayrollStatus.DRAFT, PayrollStatus.CONFIRMED),
+                        "N");
+        if (payrolls.isEmpty()) return Collections.emptyList();
+
+        Map<UUID, MemberResDto> memberMap = fetchMemberMap(companyId);
+        return payrolls.stream()
+                .map(p -> {
+                    MemberResDto m = memberMap.get(p.getMemberId());
+                    String sabun = m != null ? m.getSabun() : null;
+                    String name = m != null ? m.getName() : null;
+                    String orgName = m != null ? m.getOrganizationName() : null;
+                    return PayrollAdminListResDto.fromEntity(p, sabun, name, orgName);
+                })
+                .toList();
     }
 
     // 회사 월 단위 급여대장 전체 조회 직원 정보 결합

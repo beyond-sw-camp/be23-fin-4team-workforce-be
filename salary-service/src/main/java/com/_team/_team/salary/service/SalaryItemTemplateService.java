@@ -12,7 +12,6 @@ import com._team._team.salary.dto.resdto.SalaryItemTemplateResDto;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -154,20 +153,20 @@ public class SalaryItemTemplateService {
         // 식대/자가운전/보육수당/연구활동비/교통비 = 회사 공통 (정책 일률 지급)
         // 직책수당/자녀수당 = 개인 차등 (직급, 자녀수에 따라 직원마다 다름)
         List<DefaultSpec> specs = List.of(
-                new DefaultSpec("기본급",         ItemType.EARNING, 10, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
-                new DefaultSpec("직책수당",       ItemType.EARNING, 20, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
-                new DefaultSpec("식대",           ItemType.EARNING, 30, "N", TaxCategory.MEAL,            200000L, "Y", "N"),
-                new DefaultSpec("자가운전보조금", ItemType.EARNING, 40, "N", TaxCategory.VEHICLE_SELF,    200000L, "Y", "N"),
-                new DefaultSpec("교통비",         ItemType.EARNING, 41, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
-                new DefaultSpec("보육수당",       ItemType.EARNING, 50, "N", TaxCategory.CHILDCARE,       200000L, "Y", "N"),
-                new DefaultSpec("자녀수당",       ItemType.EARNING, 51, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
-                new DefaultSpec("연구활동비",     ItemType.EARNING, 60, "N", TaxCategory.RESEARCH,        200000L, "Y", "N"),
-                new DefaultSpec("정기상여",       ItemType.EARNING, 70, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
-                new DefaultSpec("성과급",         ItemType.EARNING, 71, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
-                new DefaultSpec("명절상여",       ItemType.EARNING, 72, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
-                new DefaultSpec("퇴직월 일할 급여", ItemType.EARNING, 80, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
-                new DefaultSpec("퇴직금",          ItemType.EARNING, 81, "N", TaxCategory.ETC_NON_TAXABLE, null,    "N", "N"),
-                new DefaultSpec("미사용 연차 수당", ItemType.EARNING, 82, "Y", TaxCategory.TAXABLE,         null,    "N", "N")
+                new DefaultSpec("기본급",         ItemType.EARNING, 1, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
+                new DefaultSpec("직책수당",       ItemType.EARNING, 2, "Y", TaxCategory.TAXABLE,         null,    "N", "Y"),
+                new DefaultSpec("식대",           ItemType.EARNING, 3, "N", TaxCategory.MEAL,            200000L, "Y", "N"),
+                new DefaultSpec("자가운전보조금", ItemType.EARNING, 4, "N", TaxCategory.VEHICLE_SELF,    200000L, "Y", "N"),
+                new DefaultSpec("교통비",         ItemType.EARNING, 5, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("보육수당",       ItemType.EARNING, 6, "N", TaxCategory.CHILDCARE,       200000L, "Y", "N"),
+                new DefaultSpec("자녀수당",       ItemType.EARNING, 7, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("연구활동비",     ItemType.EARNING, 8, "N", TaxCategory.RESEARCH,        200000L, "Y", "N"),
+                new DefaultSpec("정기상여",       ItemType.EARNING, 9, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("성과급",         ItemType.EARNING, 10, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("명절상여",       ItemType.EARNING, 11, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("퇴직월 일할 급여", ItemType.EARNING, 12, "Y", TaxCategory.TAXABLE,         null,    "N", "N"),
+                new DefaultSpec("퇴직금",          ItemType.EARNING, 13, "N", TaxCategory.ETC_NON_TAXABLE, null,    "N", "N"),
+                new DefaultSpec("미사용 연차 수당", ItemType.EARNING, 14, "Y", TaxCategory.TAXABLE,         null,    "N", "N")
         );
 
         List<SalaryItemTemplate> toSave = new ArrayList<>();

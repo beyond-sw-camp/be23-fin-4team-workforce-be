@@ -1,5 +1,7 @@
 package com._team._team.salary.service;
 
+import com._team._team.attendance.domain.MemberLeaveOfAbsence;
+import com._team._team.attendance.repository.MemberLeaveOfAbsenceRepository;
 import com._team._team.dto.ApiResponse;
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.domain.BonusPolicy;
@@ -39,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 보너스 일괄 발행 - 회사 단위 시뮬 미리보기 + 명세서 발행
@@ -54,6 +57,8 @@ public class BonusBatchService {
     private final PayrollItemRepository payrollItemRepository;
     private final SalaryItemTemplateRepository salaryItemTemplateRepository;
     private final MemberFeignClient memberFeignClient;
+    // 휴직자 제외 정책 검증용
+    private final MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository;
 
     @Autowired
     public BonusBatchService(
@@ -62,7 +67,8 @@ public class BonusBatchService {
             PayrollRepository payrollRepository,
             PayrollItemRepository payrollItemRepository,
             SalaryItemTemplateRepository salaryItemTemplateRepository,
-            MemberFeignClient memberFeignClient
+            MemberFeignClient memberFeignClient,
+            MemberLeaveOfAbsenceRepository memberLeaveOfAbsenceRepository
     ) {
         this.bonusPolicyRepository = bonusPolicyRepository;
         this.salaryRepository = salaryRepository;
@@ -70,6 +76,7 @@ public class BonusBatchService {
         this.payrollItemRepository = payrollItemRepository;
         this.salaryItemTemplateRepository = salaryItemTemplateRepository;
         this.memberFeignClient = memberFeignClient;
+        this.memberLeaveOfAbsenceRepository = memberLeaveOfAbsenceRepository;
     }
 
     public BonusBatchPreviewResDto preview(UUID companyId, BonusBatchReqDto req) {
@@ -79,13 +86,17 @@ public class BonusBatchService {
         // 동일 종류 충돌만 차단
         PayrollType payrollType = resolvePayrollType(req.getBonusKind());
         List<MemberResDto> members = fetchMembers(companyId);
+        // 휴직자 검증용 - excludeOnLeaveYn=Y 정책에서만 사용, 빈 Map 이면 검증 skip
+        Map<UUID, MemberLeaveOfAbsence> loaMap = "Y".equals(policy.getExcludeOnLeaveYn())
+                ? loadActiveLoaMap(companyId, req.getPayDate())
+                : Map.of();
         List<BonusBatchPreviewResDto.TargetEntry> targets = new ArrayList<>();
         long total = 0L;
         int skipped = 0;
 
         for (MemberResDto m : members) {
             // 자격 미달 사유 체크
-            String skipReason = checkEligibility(policy, req, m);
+            String skipReason = checkEligibility(policy, req, m, loaMap);
             // baseSalary 조회
             Optional<Salary> activeSalary = salaryRepository.findActiveSalary(
                     m.getMemberId(), companyId, req.getPayDate());
@@ -175,6 +186,11 @@ public class BonusBatchService {
             for (MemberResDto m : allMembers) targetMemberIds.add(m.getMemberId());
         }
 
+        // 휴직자 검증용 Map - 정책에 휴직자 제외 옵션이 켜진 경우만 조회
+        Map<UUID, MemberLeaveOfAbsence> loaMap = "Y".equals(policy.getExcludeOnLeaveYn())
+                ? loadActiveLoaMap(companyId, req.getPayDate())
+                : Map.of();
+
         List<UUID> created = new ArrayList<>();
         List<String> failures = new ArrayList<>();
 
@@ -185,8 +201,8 @@ public class BonusBatchService {
                 continue;
             }
             try {
-                // 자격 검증
-                String skip = checkEligibility(policy, req, m);
+                // 자격 검증 (휴직자 포함)
+                String skip = checkEligibility(policy, req, m, loaMap);
                 if (skip != null) {
                     failures.add(String.format("%s: %s", m.getName(), skip));
                     continue;
@@ -299,7 +315,8 @@ public class BonusBatchService {
         }
     }
 
-    private String checkEligibility(BonusPolicy policy, BonusBatchReqDto req, MemberResDto m) {
+    private String checkEligibility(BonusPolicy policy, BonusBatchReqDto req, MemberResDto m,
+                                    Map<UUID, MemberLeaveOfAbsence> loaMap) {
         if (m.getJoinDate() == null) return "입사일 미등록";
         long monthsServed = ChronoUnit.MONTHS.between(m.getJoinDate(), req.getPayDate());
         Integer minMonths = policy.getMinTenureMonths();
@@ -313,7 +330,23 @@ public class BonusBatchService {
                 return "정규직 아님";
             }
         }
+        // 휴직자 제외 정책 - 지급날 시점 활성 휴직 중인 직원 차단
+        if ("Y".equals(policy.getExcludeOnLeaveYn())
+                && loaMap != null && loaMap.containsKey(m.getMemberId())) {
+            return "휴직 중";
+        }
         return null;
+    }
+
+    // 회사 + 지급날 활성 휴직자 Map - 매 호출 시 1회 조회 (preview/apply 각자)
+    private Map<UUID, MemberLeaveOfAbsence> loadActiveLoaMap(UUID companyId, LocalDate payDate) {
+        return memberLeaveOfAbsenceRepository
+                .findAllActiveInCompanyOnDate(companyId, payDate)
+                .stream()
+                .collect(Collectors.toMap(
+                        MemberLeaveOfAbsence::getMemberId,
+                        loa -> loa,
+                        (a, b) -> a));
     }
 
     private long computeBonusAmount(BonusBatchReqDto req, BonusPolicy policy, long baseSalary) {
