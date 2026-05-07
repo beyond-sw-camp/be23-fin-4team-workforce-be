@@ -422,6 +422,18 @@ public class MemberController {
         );
     }
 
+    // 회사별 시스템관리자 알림 발송에 사용
+    @GetMapping("/internal/admin-ids-by-company")
+    public ResponseEntity<?> getAdminMemberIdsByCompany(@RequestParam UUID companyId) {
+        List<UUID> result = memberService.findAdminsByCompanyId(companyId).stream()
+                .map(MemberResDto::getMemberId)
+                .toList();
+        return new ResponseEntity<>(
+                ApiResponse.success(result, "회사 관리자 ID 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
     // 대시보드용 내 프로필
     @GetMapping("/dashboard-profile")
     public ResponseEntity<?> getDashboardProfile(
