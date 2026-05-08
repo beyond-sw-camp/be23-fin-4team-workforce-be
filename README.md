@@ -30,6 +30,7 @@
 4. [시스템 아키텍처](#시스템-아키텍처)
 5. [주요 기능](#주요-기능)
 6. [트러블슈팅](#트러블슈팅)
+7. [프로젝트 시연](#프로젝트 시연)
 
 ---
 
@@ -719,6 +720,25 @@
 <div align="right"><a href="#목차">맨 위로</a></div>
 
 ---
+
+## 프로젝트 시연
+
+## 5. 프로젝트 시연
+
+<details>
+<summary>프로젝트 시연 보기</summary>
+
+<br/>
+
+<details>
+<summary>[관리자]  </summary>
+<div markdown="1">
+
+<img width="1330" height="1547" alt="" src="./asset/demo/회원가입_일반.gif" />
+  - OAuth 2.0 인증 플로우
+
+</div>
+</details>
 
 ## 부록
 
