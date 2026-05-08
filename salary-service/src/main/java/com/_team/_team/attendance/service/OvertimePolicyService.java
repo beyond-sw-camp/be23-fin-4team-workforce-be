@@ -131,6 +131,18 @@ public class OvertimePolicyService {
     }
 
     /**
+     * 정책 소프트 삭제, 활성 정책은 차단 (신규 등록 시 자동 종료 흐름 사용)
+     */
+    public void delete(UUID companyId, UUID policyId) {
+        OvertimePolicy policy = findPolicy(policyId, companyId);
+        if (policy.getEffectiveTo() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "현재 활성 정책은 삭제할 수 없습니다. 신규 정책을 등록하면 자동 종료됩니다.");
+        }
+        policy.softDelete();
+    }
+
+    /**
      * 회사 정책 이력 전체
      */
     @Transactional(readOnly = true)

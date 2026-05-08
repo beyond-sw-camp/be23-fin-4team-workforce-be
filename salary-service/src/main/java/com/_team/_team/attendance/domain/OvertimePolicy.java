@@ -99,9 +99,19 @@ public class OvertimePolicy extends BaseTimeEntity {
     /** 정책 효력 종료일 (null이면 현재 적용 중) */
     private LocalDate effectiveTo;
 
+    /** 삭제 여부  */
+    @Column(nullable = false, length = 1)
+    @Builder.Default
+    private String delYn = "N";
+
     // 정책 효력 종료
     public void close(LocalDate endDate) {
         this.effectiveTo = endDate;
+    }
+
+    // 정책 소프트 삭제, 이력 흔적은 보존하되 조회에서 제외
+    public void softDelete() {
+        this.delYn = "Y";
     }
 
     // 정책 내용 수정
