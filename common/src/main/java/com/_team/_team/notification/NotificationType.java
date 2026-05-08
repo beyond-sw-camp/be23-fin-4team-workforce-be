@@ -55,6 +55,13 @@ public enum NotificationType {
     EVALUATION_REOPENED,     // 제출된 평가 재작성 허용
     EVALUATION_RESULTS_PUBLISHED, // 평가 결과 공개 - 인사관리자 성과급 발행 안내
 
+    // 면담
+    MEETING_SCHEDULED,       // 면담 예약
+    MEETING_REMINDER,        // 면담 알림
+    MEETING_CANCELED,        // 면담 취소
+    MEETING_COMPLETED,       // 면담 완료
+    MEETING_REQUESTED,       // 면담 요청
+
     // 인사
     MEMBER_DORMANT,          // 휴직 처리
     MEMBER_RETURN,            // 복직 처리
