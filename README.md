@@ -36,21 +36,33 @@
 ## 배경 및 문제 인식
 
 자체 인사관리 시스템을 구축하기 어려운 중소·중견기업은 시중 프로그램을 도입하더라도 각 회사 정책과 맞지 않거나, 기능이 복잡해 제대로 활용하지 못하는 문제가 있습니다.
-
-**WORKFORCE**는 회사별 정책에 맞게 설정하여 사용할 수 있고, 사용 중 어려운 부분은 AI 챗봇에게 물어보며 쉽게 해결할 수 있는 인사관리 플랫폼입니다.
+**WORKFORCE**는 회사별 정책에 시스템이 맞춰지고, AI가 사람의 반복 업무를 대신 처리하는 중소기업 전용 인사관리 플랫폼입니다.
 
 ### 1. 시장 분석
 
-국내 중소기업은 평균 5개 가량 기업용 솔루션을 사용하는 것으로 나타났고, 이 가운데 4분의 1은 직원 혼자 기업용 솔루션을 관리하고 있습니다. 전문 담당자와 예산이 부족해 실정에 맞는 정책 설정에 어려움을 호소하고 있습니다.
+국내 HR 시장 규모는 **2025년 약 2조 8,500억 원**에 달할 것으로 추산되며, 채용 시장만 연평균 **6.6% 성장**이 전망됩니다.<sup>[[MTN, 2023]](https://news.mtn.co.kr/news-detail/2023022310563781713)</sup> 글로벌 HR SaaS 시장 또한 2024년 기준 **약 234억 달러** 규모로, HR 테크는 전 세계적으로 가장 빠르게 성장하는 B2B SaaS 영역 중 하나입니다.<sup>[[Wiseguy Reports, 2024]](https://www.wiseguyreports.com/ko/reports/hr-saas-system-market)</sup>
 
-한편 중소기업기술정보진흥원에 따르면, 매출 500억원 이상 중소기업의 HR 시스템 구축률은 2021년 41%에서 2024년 79%까지 빠르게 증가하고 있습니다. 통상임금과 근로제도 변화가 중소기업 인사관리의 주요 이슈로 자리잡으면서, 노동규제와 인력 운영 환경에 맞춰 HR 테크 기업들이 자동화·지능화를 앞세운 솔루션을 통해 시장 선점에 본격 나서고 있습니다.
+그러나 성장의 열매는 대기업에 집중되는 경향이 있습니다. 국내 중소기업의 **디지털 성숙도는 평균 41.4점**에 불과하며, 전략적으로 디지털화에 대비하고 있는 중소기업은 **16.7%** 수준입니다.<sup>[[KDI, 중소기업의 디지털 성숙도 조사]](https://eiec.kdi.re.kr/policy/domesticView.do?ac=0000156198)</sup> 또한 중소기업 인사담당자의 **10명 중 8명은 인사 업무 외 다른 업무를 겸직**하고 있어, 전문 인력과 예산이 부족한 상황에서 자사 실정에 맞는 HR 정책 설정과 운영에 구조적 어려움을 겪고 있습니다.<sup>[[다우오피스HR, 2024]](https://hr.daouoffice.com/blog/sme-hr-manager-recruitment-burnout)</sup>
 
-### 2. 해결방안
+통상임금·근로시간 단축 등 노동제도 변화가 중소기업 인사관리의 주요 이슈로 부상하면서, HR 테크 기업들이 자동화·AI를 앞세운 SaaS 솔루션으로 시장 선점에 본격 나서고 있습니다.<sup>[[디지털데일리, 2024]](https://www.ddaily.co.kr/page/view/2024050511345817576)</sup>
 
-* **회사 맞춤형 설정**: JSON 동적 폼 스키마로 결재 양식을 자유롭게 구성하고, 회사별 휴가 종류·공휴일·조직 구조를 독립 관리
-* **급여·근태 자동화**: 급여 계산·상여금·퇴직금·세금·소급 정산을 자동 처리하고, 연차 촉진 알림·52시간 초과근로 위반 감지
-* **AI 챗봇 안내**: 사용법과 회사 정책을 자연어로 질문하면 해당 회사 상황에 맞는 답변 제공, 특정 담당자에게 질문이 몰리는 문제 해소
-* **성과관리 체계 구축**: 목표 설정 → 활동 기록 → 평가 → 피드백 → 보정(Calibration)까지 하나의 흐름으로 관리
+### 2. 기존 HR 시스템의 3가지 핵심 문제
+
+기존 HR 시스템의 문제는 세 가지 축으로 요약됩니다.
+
+**① 획일성** — 결재 양식·휴가 종류·급여 항목이 고정되어 있어 회사 정책에 맞게 커스터마이징할 수 없습니다. 중소기업은 평균 5개의 솔루션을 각각 도입해도 정작 자사 정책을 반영하지 못하는 경우가 많습니다.
+
+**② 단절** — 결재·근태·급여·성과 시스템이 따로 운영되어, 승인 후 후속 처리(연차 차감, 근태 반영, 성과-보상 연계)를 사람이 수동으로 연결해야 합니다.
+
+**③ 관리 부담** — 주 52시간 위반 감지, 연차 사용 촉진 의무(근로기준법 제61조), 급여 계산, 신규 입사자 온보딩 질문 응대 등 반복 업무가 전부 사람 손에 달려 있어 담당자 1인이 과부하를 떠안습니다.
+
+### 3. 해결방안
+
+| 문제 | WORKFORCE 해결 방식                                                                          |
+|------|------------------------------------------------------------------------------------------|
+| 획일성 | JSON 동적 폼 스키마로 결재 양식 자유 구성, 회사별 휴가·공휴일·급여 항목·조직 구조 독립 관리. 가입 즉시 기본 템플릿 자동 시드             |
+| 단절 | Kafka 이벤트 기반으로 결재 승인 → 근태·급여·인사 발령·캘린더 자동 후속 처리. 목표 설정 → 평가 → 연계 구조를 설계     |
+| 관리 부담 | 주 52시간 자동 감지·알림, 연차 촉진 1·2차 배치 자동화, Quartz 기반 급여 전 과정 자동 정산, RAG AI 챗봇으로 온보딩·정책 질문 자동 응대 |
 
 > 📎 [Figma 기획서 보기](https://www.figma.com/proto/6suak3PIQpHGzS3UBatOF1/%ED%95%9C%ED%99%94-BEYOND-SW-CAMP-23%EA%B8%B0?node-id=618-102&viewport=696%2C533%2C0.2&t=o5woH0kckAYE5DgS-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=618%3A102&page-id=612%3A67) · [기획서 PDF 다운로드](docs/WORKFORCE_프로젝트_기획서.pdf)
 
@@ -63,8 +75,10 @@
 
 <table>
   <tr>
-    <td valign="middle" width="150"><div align="center"><small><b>Backend · Spring</b></small></div></td>
-    <td>
+      <td valign="middle" width="150">
+        <div align="center"><sup><b>Backend · Spring</b></sup></div>
+      </td>
+      <td>
       <img src="https://img.shields.io/badge/Java-007396?style=flat-square&logo=openjdk&logoColor=white"/>
       <img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=flat-square&logo=springboot&logoColor=white"/>
       <img src="https://img.shields.io/badge/Spring_Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white"/>
@@ -81,7 +95,9 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><small><b>Backend · Python</b></small></div></td>
+    <td valign="middle" width="150">
+      <div align="center"><sup><b>Backend · Python</b></sup></div>
+    </td>
     <td>
       <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white"/>
       <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white"/>
@@ -90,7 +106,9 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><small><b>Frontend</b></small></div></td>
+    <td valign="middle" width="150">
+      <div align="center"><sup><b>Frontend</b></sup></div>
+    </td>
     <td>
       <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB"/>
       <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white"/>
@@ -106,7 +124,9 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><small><b>Database</b></small></div></td>
+    <td valign="middle" width="150">
+      <div align="center"><sup><b>Database</b></sup></div>
+    </td>
     <td>
       <img src="https://img.shields.io/badge/MariaDB-003545?style=flat-square&logo=mariadb&logoColor=white"/>
       <img src="https://img.shields.io/badge/Redis-FF4438?style=flat-square&logo=redis&logoColor=white"/>
@@ -114,7 +134,9 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><small><b>Cloud / Infra</b></small></div></td>
+    <td valign="middle" width="150">
+      <div align="center"><sup><b>Cloud / Infra</b></sup></div>
+    </td>
     <td>
       <img src="https://img.shields.io/badge/AWS_EKS-FF9900?style=flat-square&logo=amazoneks&logoColor=white"/>
       <img src="https://img.shields.io/badge/AWS_ECR-FF9900?style=flat-square&logo=amazonaws&logoColor=white"/>
@@ -128,14 +150,18 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><small><b>CI / CD</b></small></div></td>
+    <td valign="middle" width="150">
+      <div align="center"><sup><b>CI / CD</b></sup></div>
+    </td>
     <td>
       <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white"/>
       <img src="https://img.shields.io/badge/GitHub_Packages-181717?style=flat-square&logo=github&logoColor=white"/>
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><small><b>Tools</b></small></div></td>
+    <td valign="middle" width="150">
+      <div align="center"><sup><b>Tools</b></sup></div>
+    </td>
     <td>
       <img src="https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white"/>
       <img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white"/>
