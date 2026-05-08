@@ -683,7 +683,8 @@ public class MemberService {
         log.info("Email: {}, TempPassword: {}", companyEmail, tempPassword);
 
         // 13. 임시 비밀번호 개인 이메일로 발송
-        mailService.sendTempPassword(reqDto.getPersonalEmail(), companyEmail, tempPassword);
+        // 데모 시드 부팅 가속 위해 임시 주석 - 운영 배포 시 풀기
+        // mailService.sendTempPassword(reqDto.getPersonalEmail(), companyEmail, tempPassword);
 
         // 14. 아웃박스 저장
         eventPublisher.publishEvent(new MemberChangedEvent(savedMember.getMemberId()));
