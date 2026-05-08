@@ -63,7 +63,7 @@
 
 <table>
   <tr>
-    <td valign="middle" width="150"><div align="center"><b>Backend · Spring</b></div></td>
+    <td valign="middle" width="150"><div align="center"><small><b>Backend · Spring</b></small></div></td>
     <td>
       <img src="https://img.shields.io/badge/Java-007396?style=flat-square&logo=openjdk&logoColor=white"/>
       <img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=flat-square&logo=springboot&logoColor=white"/>
@@ -81,7 +81,7 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><b>Backend · Python</b></div></td>
+    <td valign="middle" width="130"><div align="center"><small><b>Backend · Python</b></small></div></td>
     <td>
       <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white"/>
       <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white"/>
@@ -90,7 +90,7 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><b>Frontend</b></div></td>
+    <td valign="middle" width="130"><div align="center"><small><b>Frontend</b></small></div></td>
     <td>
       <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB"/>
       <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white"/>
@@ -106,7 +106,7 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><b>Database</b></div></td>
+    <td valign="middle" width="130"><div align="center"><small><b>Database</b></small></div></td>
     <td>
       <img src="https://img.shields.io/badge/MariaDB-003545?style=flat-square&logo=mariadb&logoColor=white"/>
       <img src="https://img.shields.io/badge/Redis-FF4438?style=flat-square&logo=redis&logoColor=white"/>
@@ -114,7 +114,7 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><b>Cloud / Infra</b></div></td>
+    <td valign="middle" width="130"><div align="center"><small><b>Cloud / Infra</b></small></div></td>
     <td>
       <img src="https://img.shields.io/badge/AWS_EKS-FF9900?style=flat-square&logo=amazoneks&logoColor=white"/>
       <img src="https://img.shields.io/badge/AWS_ECR-FF9900?style=flat-square&logo=amazonaws&logoColor=white"/>
@@ -128,14 +128,14 @@
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><b>CI / CD</b></div></td>
+    <td valign="middle" width="130"><div align="center"><small><b>CI / CD</b></small></div></td>
     <td>
       <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white"/>
       <img src="https://img.shields.io/badge/GitHub_Packages-181717?style=flat-square&logo=github&logoColor=white"/>
     </td>
   </tr>
   <tr>
-    <td valign="middle" width="130"><div align="center"><b>Tools</b></div></td>
+    <td valign="middle" width="130"><div align="center"><small><b>Tools</b></small></div></td>
     <td>
       <img src="https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white"/>
       <img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white"/>

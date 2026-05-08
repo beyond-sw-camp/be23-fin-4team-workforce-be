@@ -27,7 +27,7 @@ public class MailService {
             log.info("임시 비밀번호 메일 발송 완료: {}", toEmail);
         } catch (Exception e) {
             log.error("메일 발송 실패: {}", e.getMessage());
-            // throw new RuntimeException(e); // 테스트용 주석 처리
+            throw new RuntimeException(e); // 테스트용 주석 처리
         }
     }
 
