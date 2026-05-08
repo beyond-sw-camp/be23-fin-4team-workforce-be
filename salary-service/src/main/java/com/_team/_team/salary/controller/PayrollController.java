@@ -287,6 +287,19 @@ public class PayrollController {
         );
     }
 
+    // 회사 그 월 직원별 수당 집계 - 회사 공통 + 개인 차등 모두 포함
+    @GetMapping("/admin/allowance-monthly")
+    public ResponseEntity<?> findMonthlyAllowance(
+            @RequestHeader("X-User-CompanyId") UUID companyId,
+            @RequestParam("yearMonth") String yearMonth) {
+        YearMonth ym = YearMonth.parse(yearMonth);
+        return new ResponseEntity<>(
+                ApiResponse.success(payrollService.findMonthlyAllowanceByCompany(companyId, ym),
+                        "월별 직원 수당 집계 조회 성공"),
+                HttpStatus.OK
+        );
+    }
+
     // 회사 단위 급여대장 재계산
     // 자동 배치 누락 / 마스터 데이터 늦게 등록한 경우 관리자가 직접 호출
     @PostMapping("/recalculate")
