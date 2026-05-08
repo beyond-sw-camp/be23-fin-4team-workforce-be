@@ -173,7 +173,7 @@ MSA 환경에서 5개 마이크로서비스가 공통으로 사용하는 코드�
 </details>
 
 <details>
-<summary><strong>AI 챗봇 (RAG)</strong></summary>
+<summary><strong>AI 챗봇 (3-Layer RAG + 멀티턴)</strong></summary>
 
 회사별 정책·결재 양식·실시간 데이터 기반의 멀티턴 AI 챗봇을 구현했습니다.
 
