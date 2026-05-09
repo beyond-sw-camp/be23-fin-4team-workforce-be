@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1920" height="800" alt="workforce 쇼릴" src="https://github.com/user-attachments/assets/5027fc7c-45b0-427e-bca8-fb1eac7bc5eb" />
+<img width="1920" height="800" alt="WORKFORCE hero" src="./docs/asset/profile/workforce-hero.gif" />
 </div>
 
 > **WORKFORCE**는 회사마다 다른 인사 정책과 낮은 디지털 성숙도로 인해 발생하는 업무 공백을 줄이기 위한 AI 기반 HRMS입니다.  
