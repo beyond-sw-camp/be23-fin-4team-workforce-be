@@ -10,7 +10,9 @@ import com._team._team.evaluation.dto.reqdto.SeasonUpdateReqDto;
 import com._team._team.evaluation.dto.resdto.SeasonOperationalAlertsResDto;
 import com._team._team.evaluation.dto.resdto.PublishBlockersResDto;
 import com._team._team.evaluation.dto.resdto.EvaluationResponseResDto;
+import com._team._team.evaluation.dto.resdto.MemberFinalGradeResDto;
 import com._team._team.evaluation.service.EvaluationAccessScopeService;
+import com._team._team.evaluation.service.EvaluationGradeQueryService;
 import com._team._team.evaluation.service.EvaluationGroupTranslator;
 import com._team._team.evaluation.service.EvaluationResponseService;
 import com._team._team.evaluation.service.EvaluationSeasonService;
@@ -41,17 +43,20 @@ public class EvaluationSeasonController {
     private final MeetingRecordService meetingRecordService;
     private final EvaluationResponseService responseService;
     private final EvaluationAccessScopeService accessScopeService;
+    private final EvaluationGradeQueryService gradeQueryService;
 
     public EvaluationSeasonController(EvaluationSeasonService seasonService,
                                       EvaluationGroupTranslator groupTranslator,
                                       MeetingRecordService meetingRecordService,
                                       EvaluationResponseService responseService,
-                                      EvaluationAccessScopeService accessScopeService) {
+                                      EvaluationAccessScopeService accessScopeService,
+                                      EvaluationGradeQueryService gradeQueryService) {
         this.seasonService = seasonService;
         this.groupTranslator = groupTranslator;
         this.meetingRecordService = meetingRecordService;
         this.responseService = responseService;
         this.accessScopeService = accessScopeService;
+        this.gradeQueryService = gradeQueryService;
     }
 
     @CheckPermission(resource = Resource.EVALUATION, action = Action.CREATE)
@@ -83,6 +88,18 @@ public class EvaluationSeasonController {
         return ApiResponse.success(
                 seasonService.get(seasonId, UUID.fromString(companyId)),
                 "Evaluation season loaded successfully."
+        );
+    }
+
+    // 회사 + 시즌 단위 직원별 최종 등급 - 성과급 발행용
+    @CheckPermission(resource = Resource.EVALUATION, action = Action.READ)
+    @GetMapping("/{seasonId}/grades")
+    public ApiResponse<List<MemberFinalGradeResDto>> findFinalGrades(
+            @PathVariable UUID seasonId,
+            @RequestHeader("X-User-CompanyId") String companyId) {
+        return ApiResponse.success(
+                gradeQueryService.findFinalGrades(UUID.fromString(companyId), seasonId),
+                "Member final grades loaded successfully."
         );
     }
 

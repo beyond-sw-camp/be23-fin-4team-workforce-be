@@ -3,11 +3,14 @@ package com._team._team.salary.service;
 import com._team._team.dto.BusinessException;
 import com._team._team.salary.domain.MemberAllowance;
 import com._team._team.salary.domain.Salary;
+import com._team._team.salary.domain.SalaryItemTemplate;
 import com._team._team.salary.domain.enums.AllowanceApprovalStatus;
 import com._team._team.salary.repository.MemberAllowanceRepository;
+import com._team._team.salary.repository.SalaryItemTemplateRepository;
 import com._team._team.salary.repository.SalaryRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,12 +31,18 @@ public class MemberAllowanceService {
 
     private final MemberAllowanceRepository repository;
     private final SalaryRepository salaryRepository;
+    private final SalaryItemTemplateRepository salaryItemTemplateRepository;
+    private final PayrollService payrollService;
 
     @Autowired
     public MemberAllowanceService(MemberAllowanceRepository repository,
-                                  SalaryRepository salaryRepository) {
+                                  SalaryRepository salaryRepository,
+                                  SalaryItemTemplateRepository salaryItemTemplateRepository,
+                                  @Lazy PayrollService payrollService) {
         this.repository = repository;
         this.salaryRepository = salaryRepository;
+        this.salaryItemTemplateRepository = salaryItemTemplateRepository;
+        this.payrollService = payrollService;
     }
 
     // 직원 입사 시 수당 선택하면 기본 수당 AUTO 등록, 결재 생략
@@ -173,6 +182,15 @@ public class MemberAllowanceService {
                     "종료일은 시작일 이후여야 합니다.");
         }
         entity.closeEffectivePeriod(at);
+
+        // 영구 종료 후속 처리
+        SalaryItemTemplate template = salaryItemTemplateRepository
+                .findById(entity.getSalaryItemTemplateId())
+                .orElse(null);
+        if (template != null) {
+            payrollService.deleteAllowanceItemsForMember(
+                    companyId, entity.getMemberId(), template.getItemName());
+        }
     }
 
     /**
