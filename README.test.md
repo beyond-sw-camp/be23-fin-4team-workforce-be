@@ -11,7 +11,7 @@
 
 <div align="center">
 
-| ![김정훈](url1) | ![박세민](url2) | ![이다은](url3) | ![이지연](url4) |
+| <img src="./docs/asset/profile/kjh-profile.png" width="120" alt="김정훈 프로필" /> | <img src="./docs/asset/profile/psm-profile.png" width="120" alt="박세민 프로필" /> | <img src="./docs/asset/profile/lde-profile.png" width="120" alt="이다은 프로필" /> | <img src="./docs/asset/profile/ljy-profile.png" width="120" alt="이지연 프로필" /> |
 |----------------|-----------------|-----------------|-----------------|
 | [김정훈](https://github.com/jeonghuny) | [박세민](https://github.com/semin980520) | [이다은](https://github.com/leeda973) | [이지연](https://github.com/jiyean99) |
 
@@ -223,15 +223,14 @@ WORKFORCE는 이 한계를 **디지털 성숙도 격차**와 **정책 커스터�
 
 ## 시연 영상
 
-프론트엔드 화면 기준으로 가능한 모든 시나리오의 증적물을 아래 구조에 맞춰 정리합니다.  
-각 항목의 `증적` 칸에는 최종 GIF, MP4, 스크린샷, Notion/GitHub 첨부 링크를 연결합니다.
+화면 기준으로 가능한 모든 시나리오의 증적물을 아래 구조에 맞춰 정리하였습니다.
 
 <details>
 <summary><strong>Public · 인증/회사 가입</strong></summary>
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 랜딩 | `/` | 서비스 진입, 로그인/회사 온보딩 이동 | <img width="845" alt="WORKFORCE" src="https://github.com/user-attachments/assets/a8d3b7b8-4880-491f-9073-0dad92340ea5" /> |
+| 랜딩 | `/` | 서비스 진입, 로그인/회사 온보딩 이동 | 준비 중 |
 | 로그인 | `/login` | 일반 사용자 로그인, SaaS 운영자 로그인 분기 | 준비 중 |
 | 비밀번호 찾기 | `/find-password` | 이메일 입력 후 재설정 요청 | 준비 중 |
 | 비밀번호 재설정 | `/reset-password` | 재설정 토큰 기반 새 비밀번호 등록 | 준비 중 |
