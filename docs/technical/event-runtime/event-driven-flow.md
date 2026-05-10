@@ -24,6 +24,8 @@ flowchart LR
 | 휴가 결재 승인 | approval-service | salary-service 근태/연차 반영, member-service 캘린더 등록 |
 | 급여 명세서 발행 | salary-service | member-service 알림 발송 |
 | 정책 변경 | member/salary/approval-service | ai-service RAG 인덱스 갱신 |
+| 결재 양식 변경 | approval-service | ai-service 결재 양식 RAG 문서 갱신 |
+| 계약 서명 완료 | approval-service | salary/member 후속 처리와 알림 연동 |
 | 평가 결과 발행 | goal-service | salary-service 성과급 prefill 데이터 연결 |
 
 ## 알림 파이프라인

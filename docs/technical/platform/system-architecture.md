@@ -7,7 +7,7 @@ WORKFORCE는 MSA 기반으로 도메인별 서비스를 분리했습니다.
 | 서비스 | 역할 |
 |--------|------|
 | gateway | 인증, 라우팅, 공통 필터 |
-| eureka | 서비스 디스커버리 |
+| eureka | 로컬 개발 환경의 서비스 디스커버리 |
 | common | 공통 응답, 예외, 이벤트, 인프라 설정 |
 | member-service | 회원, 회사, 조직, 권한, 캘린더, 채팅, 알림 |
 | approval-service | 전자결재, 동적 양식, 계약 |
@@ -20,7 +20,8 @@ WORKFORCE는 MSA 기반으로 도메인별 서비스를 분리했습니다.
 
 ```mermaid
 flowchart TB
-    FE["Frontend"] --> GW["Gateway"]
+    FE["Frontend"] --> Ingress["Ingress"]
+    Ingress --> GW["Gateway"]
     GW --> M["member-service"]
     GW --> A["approval-service"]
     GW --> S["salary-service"]
@@ -36,13 +37,14 @@ flowchart TB
     K --> S
     K --> AI
 
-    M --> DB["MariaDB"]
+    M --> DB["RDS MariaDB"]
     A --> DB
     S --> DB
     G --> DB
     Search --> ES["Elasticsearch"]
-    AI --> V["Vector DB"]
+    AI --> V["Pinecone"]
     M --> Redis["Redis"]
+    GW --> DNS["K8S Service DNS"]
 ```
 
 ## 인프라 구성
@@ -50,10 +52,26 @@ flowchart TB
 | 영역 | 기술 |
 |------|------|
 | API 서버 | Spring Boot, FastAPI |
-| Service Discovery | Eureka |
+| Service Discovery | 로컬: Eureka, 운영: Kubernetes Service DNS |
 | Gateway | Spring Cloud Gateway |
-| DB | MariaDB, Redis, Elasticsearch, Vector DB |
-| Event | Kafka |
+| DB | Amazon RDS for MariaDB, Redis, Redis Stack, Elasticsearch, Pinecone |
+| Event | Kafka KRaft |
 | Batch | Quartz, Spring Batch |
 | File | AWS S3 |
-| Deploy | AWS EKS, ECR, RDS, CloudFront, GitHub Actions |
+| Deploy | Docker, GitHub Actions, AWS ECR, AWS EKS, ingress-nginx, cert-manager |
+| Availability | HPA, PDB, RollingUpdate, readiness/liveness probe |
+
+## 운영 배포 구조
+
+운영 환경은 `be-devops` 저장소의 Kubernetes 매니페스트를 기준으로 배포됩니다.
+
+| 항목 | 운영 기준 |
+|------|-----------|
+| Namespace | `4team` |
+| Backend ingress | `server.workforcehr.shop` -> `gateway-service` |
+| Workflow | GitHub Actions `main` push 기반 빌드/배포 |
+| Image registry | AWS ECR `4team/<service>` |
+| Runtime config | Kubernetes Secret `workforce-secrets` |
+| Health check | Spring `/actuator/health`, FastAPI `/health` |
+
+운영에서는 Eureka를 비활성화하고 Gateway가 `http://member-service:8080` 같은 Kubernetes Service DNS로 라우팅합니다.

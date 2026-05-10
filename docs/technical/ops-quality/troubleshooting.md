@@ -71,3 +71,42 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 ### 결과
 
 다중 서버 환경에서도 결재, 급여, 근태 이벤트 알림을 실시간으로 전달할 수 있습니다.
+
+---
+
+## 5. 로컬 Eureka 구조와 운영 Kubernetes 구조가 달라지는 문제
+
+### 문제
+
+로컬 개발 환경은 Eureka 기반으로 서비스 디스커버리를 수행하지만, 운영 EKS 환경에서는 Pod가 Kubernetes Service 뒤에 배치됩니다.  
+로컬 설정을 그대로 운영에 가져가면 Gateway가 `lb://service-name`을 찾으려 하거나 AI/n8n 연동 URL이 localhost를 바라보는 문제가 생길 수 있습니다.
+
+### 해결
+
+- 운영 `prod` profile에서는 Eureka Client를 비활성화했습니다.
+- Gateway route를 Kubernetes Service DNS 기준으로 분리했습니다.
+- AI 서비스의 `GATEWAY_URL`, Kafka, Redis, DB 연결 정보는 Kubernetes Secret과 환경변수로 주입했습니다.
+- n8n webhook URL도 `n8n-service:5678` 기준으로 운영 환경을 분리했습니다.
+
+### 결과
+
+운영 Pod가 재생성되어 IP가 바뀌어도 Service DNS를 통해 안정적으로 내부 통신할 수 있습니다.
+
+---
+
+## 6. 배포 중 가용성과 실제 매니페스트 기준값 불일치 문제
+
+### 문제
+
+운영 문서와 실제 Kubernetes 매니페스트가 함께 발전하면서 HPA, RollingUpdate 값이 서로 다르게 적힌 부분이 생겼습니다.  
+예를 들어 실제 `k8s/hpa.yml`은 CPU 80%, `minReplicas: 1`, `maxReplicas: 2`이며, 서비스별 Deployment는 기본 replica 2개와 readiness/liveness probe를 사용합니다.
+
+### 해결
+
+- README 기술 문서는 실제 `be-devops` 매니페스트 기준으로 다시 정리했습니다.
+- HPA, PDB, RollingUpdate, probe 설정을 별도 DevOps 문서로 분리했습니다.
+- 무중단 배포 설명은 이상적인 목표값이 아니라 현재 적용된 값과 운영상 주의점 중심으로 정리했습니다.
+
+### 결과
+
+발표나 질의응답에서 운영 구성을 설명할 때 실제 배포 파일과 충돌하지 않는 기준 문서를 사용할 수 있습니다.

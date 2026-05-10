@@ -10,7 +10,7 @@ WORKFORCE는 회사 단위 멀티테넌시를 기준으로 구성원, 조직, �
 |--------|-------------|
 | 회사/회원 | Company, Member, MemberPosition |
 | 조직/권한 | Organization, JobGrade, JobTitle, Role, Permission, RolePermission |
-| 전자결재 | ApprovalDocument, ApprovalRequest, ApprovalLine |
+| 전자결재 | ApprovalDocument, ApprovalRequest, Approval |
 | 전자계약 | ContractTemplate, Contract, ContractParty |
 | 근태/휴가 | AttendanceLog, DailyAttendance, MonthlyAttendance, MemberBalance, LeaveRequest |
 | 급여 | SalaryPolicy, Salary, Payroll, PayrollItem, MemberAllowance |

@@ -73,6 +73,7 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 - 신입사원과 일반 사용자가 인사 시스템 사용법을 자연어로 질문할 수 있습니다.
 - 회사 정책, 결재 양식, 휴가/급여/근태 규정을 RAG 기반으로 조회합니다.
 - “내 잔여 연차 얼마야?”처럼 실시간 데이터가 필요한 질문은 백엔드 API를 호출해 답변합니다.
+- “내일 연차 신청해줘”, “금요일 2시에 회의 일정 잡아줘”처럼 대화에서 필요한 값을 추출해 결재 작성 화면 prefill 또는 캘린더 일정 등록까지 연결합니다.
 - 전자결재 양식 등록/수정 시 벡터 DB가 갱신되어 챗봇이 최신 양식을 안내할 수 있습니다.
 
 ### 2. 회사별 정책 커스터마이징
@@ -91,7 +92,8 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 
 - 휴가, 외근, 출장, 출퇴근 정정, 인사 발령, 계약 등 업무를 결재 흐름으로 처리합니다.
 - 승인 완료 시 Kafka 이벤트를 통해 근태 차감, 캘린더 등록, 급여 반영, 인사 이력 생성이 자동 수행됩니다.
-- 대리결재, 참조, 공람, 임시저장, 회수 등 실무 결재 흐름을 지원합니다.
+- 부재 위임 기반 대리결재, 참조, 공람, 임시저장, 회수, 공문 발송/수신, 결재 PDF 다운로드 등 실무 결재 흐름을 지원합니다.
+- 전자계약은 템플릿 기반 개별/일괄 발송, 서명, 거절, 회수, 재발송, 이력 조회, 리마인드, PDF 다운로드까지 처리합니다.
 
 ### 5. 목표·평가 파이프라인
 
@@ -165,11 +167,16 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
   <tr>
     <td><b>Cloud / Infra</b></td>
     <td>
+      <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white"/>
+      <img src="https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square&logo=kubernetes&logoColor=white"/>
       <img src="https://img.shields.io/badge/AWS_EKS-FF9900?style=flat-square&logo=amazoneks&logoColor=white"/>
       <img src="https://img.shields.io/badge/AWS_ECR-FF9900?style=flat-square&logo=amazonaws&logoColor=white"/>
       <img src="https://img.shields.io/badge/Amazon_RDS-527FFF?style=flat-square&logo=amazonrds&logoColor=white"/>
       <img src="https://img.shields.io/badge/Amazon_S3-569A31?style=flat-square&logo=amazons3&logoColor=white"/>
+      <img src="https://img.shields.io/badge/CloudFront-FF9900?style=flat-square&logo=amazonaws&logoColor=white"/>
       <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white"/>
+      <img src="https://img.shields.io/badge/ingress--nginx-009639?style=flat-square&logo=nginx&logoColor=white"/>
+      <img src="https://img.shields.io/badge/cert--manager-326CE5?style=flat-square"/>
     </td>
   </tr>
 </table>
@@ -181,20 +188,34 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 
 ## 기술 문서
 
-백엔드 중심으로 사용한 기술과 설계 포인트를 전수형 문서로 분리했습니다.  
-인증/권한처럼 모든 API의 기반이 되는 기술부터 각 도메인별 구현까지 확인할 수 있습니다.
+백엔드와 DevOps 기준으로 사용한 기술과 설계 포인트를 전수형 문서로 분리했습니다.  
+인증/권한처럼 모든 API의 기반이 되는 기술부터 배포, 확장, 운영 의존성까지 확인할 수 있습니다.
+
+전체 기술 문서는 [기술 문서 인덱스](docs/technical/README.md)에서도 폴더별로 확인할 수 있습니다.
 
 <details>
 <summary><strong>플랫폼 기반 · 공통 인프라</strong></summary>
 
 | 문서 | 내용 |
 |------|------|
-| [시스템 아키텍처](docs/technical/system-architecture.md) | MSA 구성, 서비스 역할, 데이터 흐름, 운영 인프라 |
-| [인증·인가·멀티테넌시](docs/technical/auth-authorization-multitenancy.md) | JWT, Gateway 인증 필터, Refresh Token, SaaS 운영자/멤버 분리, `X-User-*` 헤더 전파 |
-| [공통 라이브러리와 표준 API 처리](docs/technical/common-library-api-standard.md) | `workforce-common`, 공통 응답, 예외 처리, BaseTimeEntity, QueryDSL, S3, Redis 설정 |
-| [권한 모델과 역할 설계](docs/technical/permission-role-model.md) | 역할/권한 데이터 모델, Redis 권한 캐시, `@CheckPermission` AOP, 권한 범위 |
-| [서비스 디스커버리와 Gateway 라우팅](docs/technical/gateway-eureka-routing.md) | Eureka, Spring Cloud Gateway, 공개 경로, 내부 API, CORS |
-| [서비스 간 통신과 Feign Client](docs/technical/inter-service-communication.md) | OpenFeign, 내부 조회 API, 헤더 전파, 장애 격리 포인트 |
+| [시스템 아키텍처](docs/technical/platform/system-architecture.md) | MSA 구성, 서비스 역할, 데이터 흐름, 운영 인프라 |
+| [인증·인가·멀티테넌시](docs/technical/platform/auth-authorization-multitenancy.md) | JWT, Gateway 인증 필터, Refresh Token, SaaS 운영자/멤버 분리, `X-User-*` 헤더 전파 |
+| [공통 라이브러리와 표준 API 처리](docs/technical/platform/common-library-api-standard.md) | `workforce-common`, 공통 응답, 예외 처리, BaseTimeEntity, QueryDSL, S3, Redis 설정 |
+| [권한 모델과 역할 설계](docs/technical/platform/permission-role-model.md) | 역할/권한 데이터 모델, Redis 권한 캐시, `@CheckPermission` AOP, 권한 범위 |
+| [서비스 디스커버리와 Gateway 라우팅](docs/technical/platform/gateway-eureka-routing.md) | 로컬 Eureka, 운영 K8S Service DNS, Spring Cloud Gateway, 공개 경로, CORS |
+| [서비스 간 통신과 Feign Client](docs/technical/platform/inter-service-communication.md) | OpenFeign, 내부 조회 API, 헤더 전파, 장애 격리 포인트 |
+
+</details>
+
+<details>
+<summary><strong>DevOps · 배포/운영 인프라</strong></summary>
+
+| 문서 | 내용 |
+|------|------|
+| [Kubernetes와 AWS 운영 인프라](docs/technical/devops/devops-kubernetes-aws.md) | EKS, ECR, RDS, S3, CloudFront, Ingress, cert-manager, K8S Service DNS |
+| [CI/CD와 컨테이너 배포](docs/technical/devops/devops-cicd-container.md) | GitHub Actions, Docker 멀티스테이지 빌드, ECR Push, kubectl apply/rollout restart |
+| [확장성과 무중단 배포 전략](docs/technical/devops/devops-scaling-zero-downtime.md) | HPA, PDB, RollingUpdate, readiness/liveness probe, 실제 매니페스트 기준 운영값 |
+| [운영 의존성과 런타임 설정](docs/technical/devops/devops-runtime-dependencies.md) | Kafka KRaft, Redis/Redis Stack, Elasticsearch Nori, n8n, Secret, prod profile |
 
 </details>
 
@@ -203,11 +224,11 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 
 | 문서 | 내용 |
 |------|------|
-| [이벤트 기반 시스템 연동](docs/technical/event-driven-flow.md) | Kafka, 도메인 이벤트, 검색/AI/후속 처리 연동 |
-| [알림·SSE·Redis Pub/Sub](docs/technical/notification-realtime-pipeline.md) | Kafka 알림 발행, Redis 브로드캐스트, SSE 연결, 알림 저장 |
-| [업무 자동화와 배치 처리](docs/technical/hr-automation-batch.md) | Quartz, Spring Batch, 회사별 Job, 연차/근태/급여/상여/퇴직금 자동화 |
-| [스케줄러와 운영자 콘솔](docs/technical/scheduler-saas-operations.md) | SaaS 운영자 스케줄 조회/수정, Quartz 트리거, 세율/요율 운영 |
-| [실시간 채팅과 파일 처리](docs/technical/member-chat-websocket.md) | WebSocket/STOMP, STOMP JWT 검증, Redis fan-out, 채팅방 권한, S3 파일 |
+| [이벤트 기반 시스템 연동](docs/technical/event-runtime/event-driven-flow.md) | Kafka, 도메인 이벤트, 검색/AI/후속 처리 연동 |
+| [알림·SSE·Redis Pub/Sub](docs/technical/event-runtime/notification-realtime-pipeline.md) | Kafka 알림 발행, Redis 브로드캐스트, SSE 연결, 알림 저장 |
+| [업무 자동화와 배치 처리](docs/technical/event-runtime/hr-automation-batch.md) | Quartz, Spring Batch, 회사별 Job, 연차/근태/급여/상여/퇴직금 자동화 |
+| [스케줄러와 운영자 콘솔](docs/technical/event-runtime/scheduler-saas-operations.md) | SaaS 운영자 스케줄 조회/수정, Quartz 트리거, 세율/요율 운영 |
+| [실시간 채팅과 파일 처리](docs/technical/event-runtime/member-chat-websocket.md) | WebSocket/STOMP, STOMP JWT 검증, Redis fan-out, 채팅방 권한, S3 파일 |
 
 </details>
 
@@ -216,13 +237,13 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 
 | 문서 | 내용 |
 |------|------|
-| [회원·회사·조직 온보딩](docs/technical/member-company-organization.md) | 회사 가입, 기본 조직/직급/직책/역할 시드, 구성원 관리, 인사 발령 |
-| [정책 커스터마이징과 동적 결재 양식](docs/technical/policy-customization.md) | 회사별 정책 관리, JSON 동적 폼, 결재 후속 처리, 역할/권한 설계 |
-| [전자결재와 전자계약](docs/technical/approval-contract.md) | 결재 요청 상태, 결재선, 문서함, 공문, 계약 생성/서명/PDF |
-| [근태·휴가 도메인](docs/technical/attendance-leave-domain.md) | 출퇴근, 일/월 근태, 휴가 잔고, 연차 촉진, 외근/출장, 법령 검증 |
-| [급여·상여·퇴직금 도메인](docs/technical/payroll-salary-domain.md) | 급여 정책, 명세서, 수당, 세금/4대보험, 상여, 퇴직금, 연차수당 |
-| [목표·평가·면담 도메인](docs/technical/goal-evaluation-meeting.md) | 목표, 활동, 평가 시즌/설계/다면평가/보정, 면담 기록 |
-| [ESG 활동 관리](docs/technical/esg-management.md) | ESG 활동, 포인트, 캠페인, 상품 교환, 참여 현황 |
+| [회원·회사·조직 온보딩](docs/technical/domain/member-company-organization.md) | 회사 가입, 기본 조직/직급/직책/역할 시드, 구성원 관리, 인사 발령 |
+| [정책 커스터마이징과 동적 결재 양식](docs/technical/domain/policy-customization.md) | 회사별 정책 관리, JSON 동적 폼, 결재 후속 처리, 역할/권한 설계 |
+| [전자결재와 전자계약](docs/technical/domain/approval-contract.md) | 결재 요청 상태, 결재선, 문서함, 공문, 계약 생성/서명/PDF |
+| [근태·휴가 도메인](docs/technical/domain/attendance-leave-domain.md) | 출퇴근, 일/월 근태, 휴가 잔고, 연차 촉진, 외근/출장, 법령 검증 |
+| [급여·상여·퇴직금 도메인](docs/technical/domain/payroll-salary-domain.md) | 급여 정책, 명세서, 수당, 세금/4대보험, 상여, 퇴직금, 연차수당 |
+| [목표·평가·면담 도메인](docs/technical/domain/goal-evaluation-meeting.md) | 목표, 활동, 평가 시즌/설계/다면평가/보정, 면담 기록 |
+| [ESG 활동 관리](docs/technical/domain/esg-management.md) | ESG 활동, 포인트, 캠페인, 상품 교환, 참여 현황 |
 
 </details>
 
@@ -231,10 +252,11 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 
 | 문서 | 내용 |
 |------|------|
-| [AI 챗봇 및 RAG 아키텍처](docs/technical/ai-rag-chatbot.md) | 3-Layer RAG, 회사별 벡터 격리, 의도 분류, n8n 오케스트레이션, 정책 자동 동기화 |
-| [AI 회의록과 음성 처리](docs/technical/ai-recording-transcribe.md) | 녹음 업로드, FastAPI STT 연동, 회의록 생성, S3 저장 |
-| [통합 검색과 인덱싱](docs/technical/search-indexing.md) | Elasticsearch, 멤버/조직/결재 인덱스, Kafka 기반 색인 동기화 |
-| [문서·파일·PDF 처리](docs/technical/document-file-pdf.md) | S3 업로드, presigned URL, 결재/계약/PDF, 급여명세서/평가 리포트 |
+| [AI 챗봇 및 RAG 아키텍처](docs/technical/ai-search-docs/ai-rag-chatbot.md) | 3-Layer RAG, 회사별 벡터 격리, 의도 분류, n8n 오케스트레이션, 정책 자동 동기화 |
+| [AI 액션 오케스트레이션](docs/technical/ai-search-docs/ai-action-orchestration.md) | 대화 기반 결재 양식 prefill, 캘린더 일정 생성, 슬롯 추출, 세션 상태 검증 |
+| [AI 회의록과 음성 처리](docs/technical/ai-search-docs/ai-recording-transcribe.md) | 녹음 업로드, FastAPI STT 연동, 회의록 생성, S3 저장 |
+| [통합 검색과 인덱싱](docs/technical/ai-search-docs/search-indexing.md) | Elasticsearch, 멤버/조직/결재 인덱스, Kafka 기반 색인 동기화 |
+| [문서·파일·PDF 처리](docs/technical/ai-search-docs/document-file-pdf.md) | S3 업로드, presigned URL, 결재/계약/PDF, 급여명세서/평가 리포트 |
 
 </details>
 
@@ -243,8 +265,8 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 
 | 문서 | 내용 |
 |------|------|
-| [데이터 모델과 ERD](docs/technical/data-model-erd.md) | 주요 도메인 엔티티, 회사 단위 데이터 격리, ERD 링크 |
-| [트러블슈팅](docs/technical/troubleshooting.md) | 핵심 기능 구현 중 발생한 문제와 해결 과정 정리 |
+| [데이터 모델과 ERD](docs/technical/ops-quality/data-model-erd.md) | 주요 도메인 엔티티, 회사 단위 데이터 격리, ERD 링크 |
+| [트러블슈팅](docs/technical/ops-quality/troubleshooting.md) | 핵심 기능 구현 중 발생한 문제와 해결 과정 정리 |
 
 </details>
 
