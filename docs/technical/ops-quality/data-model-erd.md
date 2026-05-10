@@ -30,4 +30,6 @@ WORKFORCE는 회사 단위 멀티테넌시를 기준으로 구성원, 조직, �
 ## ERD
 
 - [ERD 전체 보기](https://www.erdcloud.com/d/Er4amBY2KpweBcKTk)
-- [ERD 이미지](../WORKFORCE_ERD.png)
+- [ERD 이미지](../../asset/WORKFORCE_ERD.png)
+
+![WORKFORCE ERD](../../asset/WORKFORCE_ERD.png)

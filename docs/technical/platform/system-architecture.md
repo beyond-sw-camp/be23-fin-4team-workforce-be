@@ -1,5 +1,7 @@
 # 시스템 아키텍처
 
+![WORKFORCE 시스템 아키텍처](../../asset/workforce-architecture.png)
+
 ## 서비스 구성
 
 WORKFORCE는 MSA 기반으로 도메인별 서비스를 분리했습니다.

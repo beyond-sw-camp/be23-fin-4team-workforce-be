@@ -24,9 +24,10 @@
 1. [서비스 개요](#서비스-개요)
 2. [주요 기능](#주요-기능)
 3. [기술 스택](#기술-스택)
-4. [기술 문서](#기술-문서)
-5. [시연 영상](#시연-영상)
-6. [부록](#부록)
+4. [시스템 아키텍처 & n8n AI Agent 오케스트레이션](#시스템-아키텍처--n8n-ai-agent-오케스트레이션)
+5. [기술 문서](#기술-문서)
+6. [시연 영상](#시연-영상)
+7. [부록](#부록)
 
 ---
 
@@ -180,6 +181,37 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
     </td>
   </tr>
 </table>
+
+<br>
+<div align="right"><a href="#목차">맨 위로</a></div>
+
+---
+
+## 시스템 아키텍처 & n8n AI Agent 오케스트레이션
+
+WORKFORCE는 AWS EKS 기반 MSA 구조로 배포되며, Gateway를 단일 API 진입점으로 두고 각 도메인 서비스와 AI 서비스를 Kubernetes Service DNS로 연결합니다.  
+운영 환경에서는 HPA, PDB, RollingUpdate, readiness/liveness probe를 조합해 확장성과 배포 안정성을 확보하고, AI 서비스는 Kafka RAG 동기화와 내부 API 호출을 통해 정책·결재 양식·캘린더 액션을 연결합니다.
+
+![WORKFORCE 시스템 아키텍처](docs/asset/workforce-architecture.png)
+
+WORKFORCE의 챗봇 요청은 `member-service`에서 n8n webhook으로 전달되고, n8n은 사용자 질문을 정규화한 뒤 LLM 기반 의도 분류와 Switch 라우팅을 수행합니다.  
+정책/RAG 답변, 실시간 HR 데이터 조회, 결재 양식 작성 액션, 캘린더 일정 등록 액션을 분기하여 각 서비스 API 또는 `ai-service` 액션 API로 연결합니다.
+
+![n8n AI Agent 오케스트레이션 Overview](docs/asset/architecture/n8n-workflow-overview.svg)
+
+<details>
+<summary><strong>n8n 상세 증적</strong></summary>
+
+| 증적 항목 | 확인 내용 | 권장 파일 위치 |
+|-----------|-----------|----------------|
+| 전체 워크플로 | `Webhook -> Code -> LLM Intent Classification -> Switch -> HTTP Request -> Respond to Webhook` 흐름 | `docs/asset/architecture/n8n-workflow-overview.svg` |
+| 의도 분류 | `MEMBER`, `CALENDAR`, `ESG`, `SALARY`, `ATTENDANCE`, `POLICY`, `APPROVAL`, `GOAL`, `ACTION`, `CALENDAR_ACTION` 분기 | `docs/asset/architecture/n8n-intent-classification.png` |
+| AI 액션 라우팅 | 결재 양식 작성 요청은 `AI Action Request`, 캘린더 일정 등록 요청은 캘린더 액션 API로 위임 | `docs/asset/architecture/n8n-action-routing.png` |
+| 실행 결과 | 실제 질문 입력, 분류 결과, 응답 JSON, 세션 ID/redirect/action response 확인 | `docs/asset/architecture/n8n-execution-success.png` |
+| 백업 원본 | 민감정보를 제거한 n8n workflow export JSON | `docs/architecture/n8n-chatbot-workflow.json` |
+
+
+</details>
 
 <br>
 <div align="right"><a href="#목차">맨 위로</a></div>
@@ -466,6 +498,7 @@ WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정
 ## 부록
 
 - [ERD 전체 보기](https://www.erdcloud.com/d/Er4amBY2KpweBcKTk)
+- [ERD 이미지](docs/asset/WORKFORCE_ERD.png)
 - [프로그램 사양서 및 단위테스트결과서](https://documenter.getpostman.com/view/51059789/2sBXqDrNZT)
 - [요구사항 명세서](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=63147339#gid=63147339)
 - [WBS](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=395838842#gid=395838842)

@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="920" viewBox="0 0 1600 920" role="img" aria-labelledby="title desc">
+  <title id="title">n8n AI Agent Workflow Overview</title>
+  <desc id="desc">WORKFORCE chatbot-agent n8n workflow overview generated from exported workflow JSON.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2563eb"/>
+    </marker>
+    <style>
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 15px Arial, sans-serif; fill: #475569; }
+      .section { font: 700 16px Arial, sans-serif; fill: #1e293b; }
+      .label { font: 700 15px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 500 12px Arial, sans-serif; fill: #475569; }
+      .tiny { font: 500 11px Arial, sans-serif; fill: #64748b; }
+      .box { stroke-width: 1.5; rx: 14; ry: 14; }
+      .edge { fill: none; stroke: #334155; stroke-width: 2; marker-end: url(#arrow); }
+      .edgeBlue { fill: none; stroke: #2563eb; stroke-width: 2.2; marker-end: url(#arrowBlue); }
+      .edgeDash { fill: none; stroke: #64748b; stroke-width: 1.8; stroke-dasharray: 7 5; marker-end: url(#arrow); }
+      .chip { font: 700 12px Arial, sans-serif; fill: #1e293b; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="920" fill="#f8fafc"/>
+  <text x="50" y="58" class="title">n8n AI Agent 오케스트레이션 Overview</text>
+  <text x="50" y="84" class="subtitle">Export source: My workflow.json · 165 nodes · Webhook 1 · Switch 8 · LLM Chain 32 · OpenAI Chat Model 32 · HTTP Request 27 · Respond 27</text>
+
+  <rect x="40" y="115" width="1520" height="755" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" rx="22"/>
+  <text x="68" y="150" class="section">Request Intake</text>
+  <text x="428" y="150" class="section">Intent Classification</text>
+  <text x="760" y="150" class="section">Switch Routing</text>
+  <text x="1120" y="150" class="section">Service Actions / Response</text>
+
+  <!-- Intake -->
+  <rect x="70" y="190" width="210" height="82" class="box" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="175" y="222" text-anchor="middle" class="label">사용자 질문</text>
+  <text x="175" y="246" text-anchor="middle" class="small">챗봇 UI / session</text>
+
+  <rect x="70" y="330" width="210" height="92" class="box" fill="#e0f2fe" stroke="#0284c7"/>
+  <text x="175" y="361" text-anchor="middle" class="label">member-service</text>
+  <text x="175" y="385" text-anchor="middle" class="small">question, companyId</text>
+  <text x="175" y="405" text-anchor="middle" class="small">memberId, accessToken</text>
+
+  <rect x="70" y="490" width="210" height="96" class="box" fill="#fef3c7" stroke="#d97706"/>
+  <text x="175" y="521" text-anchor="middle" class="label">n8n Webhook</text>
+  <text x="175" y="545" text-anchor="middle" class="small">POST /webhook</text>
+  <text x="175" y="565" text-anchor="middle" class="small">chatbot-agent</text>
+
+  <rect x="330" y="490" width="230" height="96" class="box" fill="#fef9c3" stroke="#ca8a04"/>
+  <text x="445" y="520" text-anchor="middle" class="label">Code Node</text>
+  <text x="445" y="544" text-anchor="middle" class="small">질문 정규화</text>
+  <text x="445" y="564" text-anchor="middle" class="small">today / tomorrow / month range</text>
+
+  <path d="M175 272 L175 330" class="edgeBlue"/>
+  <path d="M175 422 L175 490" class="edgeBlue"/>
+  <path d="M280 538 L330 538" class="edgeBlue"/>
+
+  <!-- Classification -->
+  <rect x="390" y="310" width="240" height="100" class="box" fill="#f3e8ff" stroke="#9333ea"/>
+  <text x="510" y="342" text-anchor="middle" class="label">LLM Intent Classifier</text>
+  <text x="510" y="366" text-anchor="middle" class="small">OpenAI Chat Model</text>
+  <text x="510" y="386" text-anchor="middle" class="small">카테고리명만 반환</text>
+
+  <rect x="390" y="185" width="240" height="82" class="box" fill="#fae8ff" stroke="#a21caf"/>
+  <text x="510" y="216" text-anchor="middle" class="label">우선순위 규칙</text>
+  <text x="510" y="240" text-anchor="middle" class="small">ACTION / CALENDAR_ACTION</text>
+
+  <path d="M445 490 L445 410" class="edgeBlue"/>
+  <path d="M510 267 L510 310" class="edgeDash"/>
+
+  <!-- Switch -->
+  <rect x="720" y="285" width="245" height="150" class="box" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="842" y="318" text-anchor="middle" class="label">Switch Routing</text>
+  <text x="842" y="343" text-anchor="middle" class="small">MEMBER · CALENDAR · ESG</text>
+  <text x="842" y="363" text-anchor="middle" class="small">SALARY · ATTENDANCE</text>
+  <text x="842" y="383" text-anchor="middle" class="small">POLICY · APPROVAL · GOAL</text>
+  <text x="842" y="403" text-anchor="middle" class="small">ACTION · CALENDAR_ACTION</text>
+
+  <path d="M630 360 L720 360" class="edgeBlue"/>
+
+  <!-- Branch chips -->
+  <rect x="720" y="495" width="112" height="36" fill="#eff6ff" stroke="#93c5fd" rx="18"/>
+  <text x="776" y="518" text-anchor="middle" class="chip">MEMBER</text>
+  <rect x="846" y="495" width="112" height="36" fill="#eff6ff" stroke="#93c5fd" rx="18"/>
+  <text x="902" y="518" text-anchor="middle" class="chip">CALENDAR</text>
+  <rect x="972" y="495" width="90" height="36" fill="#eff6ff" stroke="#93c5fd" rx="18"/>
+  <text x="1017" y="518" text-anchor="middle" class="chip">ESG</text>
+  <rect x="720" y="545" width="112" height="36" fill="#eff6ff" stroke="#93c5fd" rx="18"/>
+  <text x="776" y="568" text-anchor="middle" class="chip">SALARY</text>
+  <rect x="846" y="545" width="130" height="36" fill="#eff6ff" stroke="#93c5fd" rx="18"/>
+  <text x="911" y="568" text-anchor="middle" class="chip">ATTENDANCE</text>
+  <rect x="990" y="545" width="86" height="36" fill="#eff6ff" stroke="#93c5fd" rx="18"/>
+  <text x="1033" y="568" text-anchor="middle" class="chip">GOAL</text>
+  <rect x="720" y="595" width="112" height="36" fill="#fef9c3" stroke="#fde047" rx="18"/>
+  <text x="776" y="618" text-anchor="middle" class="chip">POLICY</text>
+  <rect x="846" y="595" width="112" height="36" fill="#fef9c3" stroke="#fde047" rx="18"/>
+  <text x="902" y="618" text-anchor="middle" class="chip">APPROVAL</text>
+  <rect x="720" y="645" width="112" height="36" fill="#fce7f3" stroke="#f9a8d4" rx="18"/>
+  <text x="776" y="668" text-anchor="middle" class="chip">ACTION</text>
+  <rect x="846" y="645" width="160" height="36" fill="#fce7f3" stroke="#f9a8d4" rx="18"/>
+  <text x="926" y="668" text-anchor="middle" class="chip">CALENDAR_ACTION</text>
+
+  <path d="M842 435 L842 480" class="edgeDash"/>
+
+  <!-- Outputs -->
+  <rect x="1135" y="185" width="300" height="90" class="box" fill="#e0f2fe" stroke="#0284c7"/>
+  <text x="1285" y="218" text-anchor="middle" class="label">실시간 HR 데이터 조회</text>
+  <text x="1285" y="242" text-anchor="middle" class="small">Gateway → member/salary/approval/goal</text>
+  <text x="1285" y="262" text-anchor="middle" class="small">프로필 · 일정 · 급여 · 근태 · 결재 · 목표</text>
+
+  <rect x="1135" y="315" width="300" height="92" class="box" fill="#fef9c3" stroke="#ca8a04"/>
+  <text x="1285" y="347" text-anchor="middle" class="label">정책/RAG 답변</text>
+  <text x="1285" y="371" text-anchor="middle" class="small">ai-service /ai/rag/search</text>
+  <text x="1285" y="391" text-anchor="middle" class="small">Pinecone context + OpenAI answer</text>
+
+  <rect x="1135" y="450" width="300" height="98" class="box" fill="#fce7f3" stroke="#db2777"/>
+  <text x="1285" y="481" text-anchor="middle" class="label">결재 양식 작성 액션</text>
+  <text x="1285" y="505" text-anchor="middle" class="small">ai-service /ai/action</text>
+  <text x="1285" y="525" text-anchor="middle" class="small">formSchema slot extraction → prefill redirect</text>
+
+  <rect x="1135" y="590" width="300" height="98" class="box" fill="#fce7f3" stroke="#db2777"/>
+  <text x="1285" y="621" text-anchor="middle" class="label">캘린더 일정 등록 액션</text>
+  <text x="1285" y="645" text-anchor="middle" class="small">ai-service /ai/calendar-action</text>
+  <text x="1285" y="665" text-anchor="middle" class="small">date/time slots → member calendar API</text>
+
+  <rect x="1135" y="735" width="300" height="80" class="box" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="1285" y="766" text-anchor="middle" class="label">Respond to Webhook</text>
+  <text x="1285" y="790" text-anchor="middle" class="small">answer / sources / sessionId / action response</text>
+
+  <path d="M965 330 C1030 260, 1060 230, 1135 230" class="edge"/>
+  <path d="M965 365 C1030 360, 1060 360, 1135 360" class="edge"/>
+  <path d="M965 400 C1030 470, 1060 500, 1135 500" class="edge"/>
+  <path d="M965 420 C1030 590, 1060 640, 1135 640" class="edge"/>
+  <path d="M1285 275 L1285 315" class="edgeDash"/>
+  <path d="M1285 407 L1285 450" class="edgeDash"/>
+  <path d="M1285 548 L1285 590" class="edgeDash"/>
+  <path d="M1285 688 L1285 735" class="edgeDash"/>
+
+  <!-- Evidence footer -->
+  <rect x="70" y="730" width="980" height="100" fill="#f1f5f9" stroke="#cbd5e1" rx="16"/>
+  <text x="95" y="762" class="label">증적 포인트</text>
+  <text x="95" y="788" class="small">1. Webhook path: chatbot-agent · responseMode: responseNode · Content-Type: application/json</text>
+  <text x="95" y="812" class="small">2. LLM classifier prompt explicitly prioritizes ACTION and CALENDAR_ACTION before general policy/data lookup.</text>
+  <text x="95" y="836" class="small">3. Switch routes intent categories to HTTP Request / LLM Chain / ai-service action APIs and returns normalized JSON.</text>
+
+  <rect x="70" y="875" width="1465" height="24" fill="none"/>
+  <text x="70" y="894" class="tiny">Generated from C:\Users\wldus\Downloads\My workflow.json. Sensitive workflow IDs/credentials are not embedded in this diagram.</text>
+</svg>
