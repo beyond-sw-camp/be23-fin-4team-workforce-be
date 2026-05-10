@@ -197,21 +197,7 @@ WORKFORCE는 AWS EKS 기반 MSA 구조로 배포되며, Gateway를 단일 API �
 WORKFORCE의 챗봇 요청은 `member-service`에서 n8n webhook으로 전달되고, n8n은 사용자 질문을 정규화한 뒤 LLM 기반 의도 분류와 Switch 라우팅을 수행합니다.  
 정책/RAG 답변, 실시간 HR 데이터 조회, 결재 양식 작성 액션, 캘린더 일정 등록 액션을 분기하여 각 서비스 API 또는 `ai-service` 액션 API로 연결합니다.
 
-![n8n AI Agent 오케스트레이션 Overview](docs/asset/architecture/n8n-workflow-overview.svg)
-
-<details>
-<summary><strong>n8n 상세 증적</strong></summary>
-
-| 증적 항목 | 확인 내용 | 권장 파일 위치 |
-|-----------|-----------|----------------|
-| 전체 워크플로 | `Webhook -> Code -> LLM Intent Classification -> Switch -> HTTP Request -> Respond to Webhook` 흐름 | `docs/asset/architecture/n8n-workflow-overview.svg` |
-| 의도 분류 | `MEMBER`, `CALENDAR`, `ESG`, `SALARY`, `ATTENDANCE`, `POLICY`, `APPROVAL`, `GOAL`, `ACTION`, `CALENDAR_ACTION` 분기 | `docs/asset/architecture/n8n-intent-classification.png` |
-| AI 액션 라우팅 | 결재 양식 작성 요청은 `AI Action Request`, 캘린더 일정 등록 요청은 캘린더 액션 API로 위임 | `docs/asset/architecture/n8n-action-routing.png` |
-| 실행 결과 | 실제 질문 입력, 분류 결과, 응답 JSON, 세션 ID/redirect/action response 확인 | `docs/asset/architecture/n8n-execution-success.png` |
-| 백업 원본 | 민감정보를 제거한 n8n workflow export JSON | `docs/architecture/n8n-chatbot-workflow.json` |
-
-
-</details>
+![n8n AI Agent 오케스트레이션 Overview](docs/asset/n8n-workflow-overview.png)
 
 <br>
 <div align="right"><a href="#목차">맨 위로</a></div>
