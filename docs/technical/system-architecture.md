@@ -57,9 +57,3 @@ flowchart TB
 | Batch | Quartz, Spring Batch |
 | File | AWS S3 |
 | Deploy | AWS EKS, ECR, RDS, CloudFront, GitHub Actions |
-
-## 발표 포인트
-
-- 기능별 서비스를 분리한 이유는 HR 업무 도메인이 크고 후속 처리가 많기 때문입니다.
-- Kafka는 서비스 간 후속 처리를 연결하고, AI 동기화와 알림에도 사용됩니다.
-- 아키텍처 장표는 발표 본문보다 백업 장표로 두고, 질문이 들어오면 상세히 설명하는 구성이 좋습니다.

@@ -17,72 +17,49 @@
 
 </div>
 
-<br>
-<div align="right"><a href="#목차">맨 위로</a></div>
-
 ---
 
 ## 목차
 
 1. [서비스 개요](#서비스-개요)
-2. [기획 배경](#기획-배경)
-3. [주요 기능](#주요-기능)
-4. [기술 스택](#기술-스택)
-5. [기술 문서](#기술-문서)
-6. [시연 영상](#시연-영상)
-7. [부록](#부록)
+2. [주요 기능](#주요-기능)
+3. [기술 스택](#기술-스택)
+4. [기술 문서](#기술-문서)
+5. [시연 영상](#시연-영상)
+6. [부록](#부록)
 
 ---
 
 ## 서비스 개요
 
-WORKFORCE는 **업무 인수인계가 부족해도 누구나 바로 사용할 수 있는 HRMS**를 지향합니다.  
-단순히 인사 기능을 모아둔 시스템이 아니라, 회사 정책 변경이 결재 양식, 급여/근태 자동화, AI 챗봇 답변까지 이어지도록 설계했습니다.
-
-### 우리가 해결하려는 문제
-
-| 문제 | 현장에서 발생하는 영향 | WORKFORCE의 접근 |
-|------|----------------------|------------------|
-| 낮은 디지털 성숙도 | 시스템을 도입해도 사용법 학습과 운영 인수인계에 시간이 소요됨 | AI 챗봇이 시스템 사용법과 회사 정책을 자연어로 안내 |
-| 회사별 정책 다양성 | 휴가, 급여, 결재, 조직 구조가 회사마다 달라 표준 솔루션이 맞지 않음 | 회사별 정책, 양식, 조직, 권한을 독립적으로 커스텀 |
-| 법령 준수 부담 | 연차 촉진, 주 52시간, 급여/퇴직금 산정 등을 담당자가 수동 검증 | 배치/이벤트 기반 자동 산정과 알림으로 누락 방지 |
-| 업무 공백 | 인사 담당자 부재 또는 겸직 상황에서 신규 입사자·직원의 문의가 집중됨 | 온보딩, 조회, 결재 초안, 반복 업무를 AI와 자동화로 보조 |
-| 시스템 단절 | 결재 승인 후 근태, 급여, 캘린더 반영을 사람이 다시 처리 | Kafka 이벤트 기반 후속 처리로 업무 흐름 연결 |
-
-### 서비스 한 줄 정의
-
 > **회사별 HR 정책을 AI와 자동화 흐름에 동기화하여, 인사 담당자의 반복 업무와 직원의 시스템 적응 시간을 줄이는 맞춤형 HR 관리 서비스**
 
-<br>
-<div align="right"><a href="#목차">맨 위로</a></div>
+WORKFORCE는 단순히 인사 기능을 모아둔 HRMS가 아닙니다.  
+회사마다 다른 정책을 시스템 설정으로 흡수하고, 그 설정이 **결재 양식 · 근태/급여 자동화 · AI 챗봇 답변**까지 이어지도록 설계한 인사 운영 플랫폼입니다.
 
----
+| 문제 정의 | 해결 방향 | 핵심 기능 |
+|-----------|-----------|-----------|
+| 시스템 사용법과 정책 인수인계가 사람에게 의존함 | AI 챗봇이 사용법, 정책, 실시간 데이터를 대화형으로 안내 | AI 챗봇, HR 정책 문서, 실시간 조회 |
+| 회사별 휴가, 급여, 결재, 조직 정책이 표준 기능과 맞지 않음 | 조직/권한/정책/결재 양식을 회사별로 커스터마이징 | 동적 결재 양식, 회사별 정책 설정 |
+| 연차 촉진, 근태 마감, 급여 산정 등 반복 업무가 누락되기 쉬움 | 배치와 이벤트 기반으로 정기 업무를 자동 처리 | Quartz, Spring Batch, 자동 작업 관리 |
+| 결재 승인 후 다른 시스템에 다시 반영해야 함 | 승인 이벤트로 근태, 급여, 캘린더, 알림을 자동 연결 | Kafka 이벤트, 후속 처리 자동화 |
+| ESG 활동이 별도 관리되어 참여 데이터가 흩어짐 | HR 데이터와 연결해 활동, 포인트, 캠페인을 통합 관리 | ESG 활동 관리, ESG 샵 |
 
-## 기획 배경
+### 핵심 메시지
 
-국내 HR SaaS 시장은 성장하고 있지만, 실제 HR 운영 현장에서는 여전히 인사 담당자가 여러 업무를 겸직하고, 회사마다 다른 정책을 시스템에 맞추기 어려운 문제가 남아 있습니다.  
-WORKFORCE는 이 한계를 **디지털 성숙도 격차**와 **정책 커스터마이징의 어려움**으로 정의했습니다.
+- **누구나 바로 쓰는 HRMS**: 메뉴얼과 담당자 설명에 의존하지 않고 AI 챗봇으로 시스템 적응을 돕습니다.
+- **회사 정책에 맞춰지는 HRMS**: 고정된 기능에 회사를 맞추는 대신, 회사별 정책을 설정하고 자동화/챗봇에 동기화합니다.
+- **승인 이후까지 이어지는 HRMS**: 결재 승인으로 끝나지 않고 근태, 급여, 캘린더, 알림까지 후속 처리가 연결됩니다.
 
-### 시장 분석에서 도출한 방향
+<details>
+<summary><strong>시장 분석 근거</strong></summary>
 
-- HR SaaS와 AI 기반 업무 자동화 수요는 증가하고 있습니다.
-- 기존 시장 분석에서는 국내 HR 시장 성장, 조직별 디지털 성숙도 격차, 인사 담당자의 겸직 부담이 함께 확인되었습니다.
-- 그러나 표준화된 HR 솔루션은 회사별 휴가, 급여, 결재, 조직 정책을 충분히 반영하기 어렵습니다.
-- 인사 담당자 부재, 겸직, 인수인계 공백은 시스템 도입 이후에도 업무 병목으로 남습니다.
-- 따라서 핵심은 “기능이 많은 HRMS”가 아니라 **가이드 없이도 쉽게 접근하고, 회사 정책에 맞게 자동으로 움직이는 HRMS**입니다.
+HR SaaS와 AI 기반 업무 자동화 수요는 증가하고 있지만, HR 운영 현장에서는 디지털 성숙도 격차, 담당자 겸직, 정책 커스터마이징 어려움이 함께 나타납니다.  
+WORKFORCE는 이 지점을 **가이드 없이도 쉽게 접근하고, 회사 정책에 맞게 자동으로 움직이는 HRMS**라는 방향으로 풀었습니다.
 
-관련 근거는 기존 README의 시장 분석 출처를 기준으로 정리했습니다.  
 [MTN HR 시장 기사](https://news.mtn.co.kr/news-detail/2023022310563781713) · [KDI 디지털 성숙도 조사](https://eiec.kdi.re.kr/policy/domesticView.do?ac=0000156198) · [다우오피스HR 인사담당자 현황](https://hr.daouoffice.com/blog/sme-hr-manager-recruitment-burnout) · [디지털데일리 HR테크 기사](https://www.ddaily.co.kr/page/view/2024050511345817576)
 
-### 핵심 차별점
-
-| 구분 | 기존 HRMS | WORKFORCE |
-|------|-----------|-----------|
-| 온보딩 | 메뉴얼과 담당자 설명에 의존 | AI 챗봇이 시스템 사용법과 회사 정책을 즉시 안내 |
-| 정책 적용 | 고정된 기능에 회사가 맞춤 | 회사별 정책을 설정하고 자동화/챗봇에 동기화 |
-| 반복 업무 | 담당자가 조건을 확인하고 수동 처리 | 배치, 이벤트, 알림으로 정기 업무 자동 처리 |
-| 결재 이후 처리 | 승인 후 별도 시스템에 재입력 | 승인 이벤트로 근태, 급여, 캘린더 자동 반영 |
-| ESG | 별도 캠페인 또는 수기 관리 | HR 데이터와 연결된 ESG 활동, 포인트, 캠페인 관리 |
+</details>
 
 <br>
 <div align="right"><a href="#목차">맨 위로</a></div>
@@ -204,17 +181,72 @@ WORKFORCE는 이 한계를 **디지털 성숙도 격차**와 **정책 커스터�
 
 ## 기술 문서
 
-상세 기술은 아래 문서로 분리했습니다.
+백엔드 중심으로 사용한 기술과 설계 포인트를 전수형 문서로 분리했습니다.  
+인증/권한처럼 모든 API의 기반이 되는 기술부터 각 도메인별 구현까지 확인할 수 있습니다.
+
+<details>
+<summary><strong>플랫폼 기반 · 공통 인프라</strong></summary>
+
+| 문서 | 내용 |
+|------|------|
+| [시스템 아키텍처](docs/technical/system-architecture.md) | MSA 구성, 서비스 역할, 데이터 흐름, 운영 인프라 |
+| [인증·인가·멀티테넌시](docs/technical/auth-authorization-multitenancy.md) | JWT, Gateway 인증 필터, Refresh Token, SaaS 운영자/멤버 분리, `X-User-*` 헤더 전파 |
+| [공통 라이브러리와 표준 API 처리](docs/technical/common-library-api-standard.md) | `workforce-common`, 공통 응답, 예외 처리, BaseTimeEntity, QueryDSL, S3, Redis 설정 |
+| [권한 모델과 역할 설계](docs/technical/permission-role-model.md) | 역할/권한 데이터 모델, Redis 권한 캐시, `@CheckPermission` AOP, 권한 범위 |
+| [서비스 디스커버리와 Gateway 라우팅](docs/technical/gateway-eureka-routing.md) | Eureka, Spring Cloud Gateway, 공개 경로, 내부 API, CORS |
+| [서비스 간 통신과 Feign Client](docs/technical/inter-service-communication.md) | OpenFeign, 내부 조회 API, 헤더 전파, 장애 격리 포인트 |
+
+</details>
+
+<details>
+<summary><strong>이벤트 · 배치 · 실시간 처리</strong></summary>
+
+| 문서 | 내용 |
+|------|------|
+| [이벤트 기반 시스템 연동](docs/technical/event-driven-flow.md) | Kafka, 도메인 이벤트, 검색/AI/후속 처리 연동 |
+| [알림·SSE·Redis Pub/Sub](docs/technical/notification-realtime-pipeline.md) | Kafka 알림 발행, Redis 브로드캐스트, SSE 연결, 알림 저장 |
+| [업무 자동화와 배치 처리](docs/technical/hr-automation-batch.md) | Quartz, Spring Batch, 회사별 Job, 연차/근태/급여/상여/퇴직금 자동화 |
+| [스케줄러와 운영자 콘솔](docs/technical/scheduler-saas-operations.md) | SaaS 운영자 스케줄 조회/수정, Quartz 트리거, 세율/요율 운영 |
+| [실시간 채팅과 파일 처리](docs/technical/member-chat-websocket.md) | WebSocket/STOMP, STOMP JWT 검증, Redis fan-out, 채팅방 권한, S3 파일 |
+
+</details>
+
+<details>
+<summary><strong>도메인 기술</strong></summary>
+
+| 문서 | 내용 |
+|------|------|
+| [회원·회사·조직 온보딩](docs/technical/member-company-organization.md) | 회사 가입, 기본 조직/직급/직책/역할 시드, 구성원 관리, 인사 발령 |
+| [정책 커스터마이징과 동적 결재 양식](docs/technical/policy-customization.md) | 회사별 정책 관리, JSON 동적 폼, 결재 후속 처리, 역할/권한 설계 |
+| [전자결재와 전자계약](docs/technical/approval-contract.md) | 결재 요청 상태, 결재선, 문서함, 공문, 계약 생성/서명/PDF |
+| [근태·휴가 도메인](docs/technical/attendance-leave-domain.md) | 출퇴근, 일/월 근태, 휴가 잔고, 연차 촉진, 외근/출장, 법령 검증 |
+| [급여·상여·퇴직금 도메인](docs/technical/payroll-salary-domain.md) | 급여 정책, 명세서, 수당, 세금/4대보험, 상여, 퇴직금, 연차수당 |
+| [목표·평가·면담 도메인](docs/technical/goal-evaluation-meeting.md) | 목표, 활동, 평가 시즌/설계/다면평가/보정, 면담 기록 |
+| [ESG 활동 관리](docs/technical/esg-management.md) | ESG 활동, 포인트, 캠페인, 상품 교환, 참여 현황 |
+
+</details>
+
+<details>
+<summary><strong>AI · 검색 · 문서</strong></summary>
 
 | 문서 | 내용 |
 |------|------|
 | [AI 챗봇 및 RAG 아키텍처](docs/technical/ai-rag-chatbot.md) | 3-Layer RAG, 회사별 벡터 격리, 의도 분류, n8n 오케스트레이션, 정책 자동 동기화 |
-| [정책 커스터마이징과 동적 결재 양식](docs/technical/policy-customization.md) | 회사별 정책 관리, JSON 동적 폼, 결재 후속 처리, 역할/권한 설계 |
-| [업무 자동화와 배치 처리](docs/technical/hr-automation-batch.md) | Quartz, Spring Batch, 연차 부여, 연차 촉진, 근태 마감, 급여/상여/퇴직금 자동화 |
-| [이벤트 기반 시스템 연동](docs/technical/event-driven-flow.md) | Kafka, Outbox, Redis Pub/Sub, SSE, 서비스 간 후속 처리 |
-| [ESG 활동 관리](docs/technical/esg-management.md) | ESG 활동, 포인트, 캠페인, 인사 데이터 기반 참여 현황 |
-| [시스템 아키텍처](docs/technical/system-architecture.md) | MSA 구성, 서비스 역할, 데이터 흐름, 운영 인프라 |
+| [AI 회의록과 음성 처리](docs/technical/ai-recording-transcribe.md) | 녹음 업로드, FastAPI STT 연동, 회의록 생성, S3 저장 |
+| [통합 검색과 인덱싱](docs/technical/search-indexing.md) | Elasticsearch, 멤버/조직/결재 인덱스, Kafka 기반 색인 동기화 |
+| [문서·파일·PDF 처리](docs/technical/document-file-pdf.md) | S3 업로드, presigned URL, 결재/계약/PDF, 급여명세서/평가 리포트 |
+
+</details>
+
+<details>
+<summary><strong>운영 · 품질</strong></summary>
+
+| 문서 | 내용 |
+|------|------|
+| [데이터 모델과 ERD](docs/technical/data-model-erd.md) | 주요 도메인 엔티티, 회사 단위 데이터 격리, ERD 링크 |
 | [트러블슈팅](docs/technical/troubleshooting.md) | 핵심 기능 구현 중 발생한 문제와 해결 과정 정리 |
+
+</details>
 
 <br>
 <div align="right"><a href="#목차">맨 위로</a></div>
