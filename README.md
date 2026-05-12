@@ -369,12 +369,12 @@ WORKFORCE의 챗봇 요청은 `member-service`에서 n8n webhook으로 전달되
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 결재 작성 허브 | `/app/approvals?tab=compose` | 결재 양식 선택, 문서 작성, 임시저장, 상신 | 준비 중 |
-| 결재 양식 설정 | `/app/approvals?tab=admin` | JSON 동적 양식 생성/수정, 필드 구성 | 준비 중 |
-| 결재 대기함 | `/app/approvals?box=do-pending` | 결재 대기 문서 승인/반려 | 준비 중 |
+| 결재 작성 허브 | `/app/approvals?tab=compose` | 결재 양식 선택, 문서 작성, 임시저장, 상신 | <video src="https://github.com/user-attachments/assets/e14c097f-a4d4-4dd8-962f-d6166ea1cb2c"></video> |
+| 결재 양식 설정 | `/app/approvals?tab=admin` | 회사별 맞춤 양식 생성/수정, 필드 구성 | <video src="https://github.com/user-attachments/assets/77431889-ade1-4578-90c0-0b5954a5f6e4"></video> <video src="https://github.com/user-attachments/assets/13f39d96-734e-484a-8589-379af8f45523"></video> |
+| 결재 대기함 | `/app/approvals?box=do-pending` | 결재 대기 문서 승인/반려 | <video src="https://github.com/user-attachments/assets/4d1e3472-ea33-4074-8cb2-9c10909ae598"></video> <video src="https://github.com/user-attachments/assets/5a61f2cd-b5d2-4405-83a4-924804666071"></video> |
 | 결재 처리함 | `/app/approvals?box=do-acted` | 내가 처리한 문서 조회 | 준비 중 |
 | 결재 예정함 | `/app/approvals?box=do-upcoming` | 다음 결재 예정 문서 확인 | 준비 중 |
-| 내 기안 전체 | `/app/approvals?box=per-all` | 내가 올린 문서 상태별 조회 | 준비 중 |
+| 내 기안 전체 | `/app/approvals?box=per-all` | 내가 올린 문서 상태별 조회 | <video src="https://github.com/user-attachments/assets/28a6cccf-7685-4bb3-9779-f63b16964857"></video> |
 | 임시저장함 | `/app/approvals?box=per-draft` | 임시저장 문서 이어쓰기/삭제 | 준비 중 |
 | 참조/공람함 | `/app/approvals?box=per-viewers` | 참조/공람 문서 확인 | 준비 중 |
 | 부재 위임 | `/app/approvals/absence-proxy` | 결재 위임 등록/해제 | 준비 중 |
@@ -383,8 +383,8 @@ WORKFORCE의 챗봇 요청은 `member-service`에서 n8n webhook으로 전달되
 | 부서 문서 고급검색 | `/app/approvals/department-search` | 조직/상태/유형별 검색 | 준비 중 |
 | 내 기안 검색 | `/app/approvals/my-requests` | 내 기안 문서 목록, 상세 검색 | 준비 중 |
 | 출퇴근 정정 신청 | `/app/approvals/correction-request` | 근태 화면에서 정정 결재 prefill 이동 | 준비 중 |
-| 전자계약 발송 | `/app/contracts/send` | 계약 템플릿 선택, 대상자 선택, 일괄 발송 | 준비 중 |
-| 계약 상세 딥링크 | `/app/approvals?tab=compose` | 계약 알림 클릭 후 상세/서명 흐름 확인 | 준비 중 |
+| 전자계약 발송 | `/app/contracts/send` | 계약 템플릿 선택, 대상자 선택, 일괄 발송 | <video src="https://github.com/user-attachments/assets/6d136d61-0b5b-4149-8383-87713809588b"></video> |
+| 계약 상세 딥링크 | `/app/approvals?tab=compose` | 계약 알림 클릭 후 상세/서명 흐름 확인 | <video src="https://github.com/user-attachments/assets/7a06fe5c-80a0-4445-a15b-56b793aac0d9"></video> |
 
 </details>
 
