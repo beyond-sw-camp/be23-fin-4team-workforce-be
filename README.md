@@ -469,9 +469,9 @@ WORKFORCE의 챗봇 요청은 `member-service`에서 n8n webhook으로 전달되
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| My ESG | `/app/esg` | ESG 활동 신청, 포인트 현황, 참여 현황 확인 | ![esg활동인증](https://github.com/user-attachments/assets/e7c7a705-995d-4abd-91e1-7bf07afe707e) |
-| ESG 샵 | `/app/esg/shop` | 포인트 상품 조회, 교환 신청 | ![esg샵물품구매](https://github.com/user-attachments/assets/c3f5ff67-ffb8-4364-8111-b9ff64e90e7e) |
-| ESG 설정 | `/app/esg/admin` | ESG 활동 승인/반려, 캠페인/상품 관리 | ![esg활동승인처리](https://github.com/user-attachments/assets/7d3e196c-81a9-442f-bb3c-5bd40f0f5539) <br> ![esg반려](https://github.com/user-attachments/assets/ba4cb137-14a1-4a36-9fe9-b86cde0ab01a) |
+| My ESG | `/app/esg` | ESG 활동 신청, 포인트 현황, 참여 현황 확인 | https://github.com/user-attachments/assets/e7c7a705-995d-4abd-91e1-7bf07afe707e |
+| ESG 샵 | `/app/esg/shop` | 포인트 상품 조회, 교환 신청 | https://github.com/user-attachments/assets/c3f5ff67-ffb8-4364-8111-b9ff64e90e7e |
+| ESG 설정 | `/app/esg/admin` | ESG 활동 승인/반려, 캠페인/상품 관리 | https://github.com/user-attachments/assets/7d3e196c-81a9-442f-bb3c-5bd40f0f5539 <br> https://github.com/user-attachments/assets/ba4cb137-14a1-4a36-9fe9-b86cde0ab01a |
 
 </details>
 
