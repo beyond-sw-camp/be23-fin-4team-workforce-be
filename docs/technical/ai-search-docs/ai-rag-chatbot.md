@@ -117,9 +117,9 @@ AI 서비스의 Kafka consumer는 `ai-service-rag-sync` group으로 다음 topic
 
 - FastAPI: AI API 서버
 - OpenAI: 임베딩 및 답변 생성
-- LangChain: RAG 파이프라인 구성
 - Pinecone: 벡터 저장소
 - n8n: 의도 분류, 분기, 검색, LLM 호출 워크플로우 오케스트레이션
+- redis stack: 의미 기반 캐시
 - Kafka: 정책 변경 이벤트 동기화
 - SQLAlchemy: HR 문서 메타데이터 관리
 - PyPDF, python-docx: 업로드 문서 텍스트 추출
