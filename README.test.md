@@ -490,7 +490,7 @@ WORKFORCE의 챗봇 요청은 `member-service`에서 n8n webhook으로 전달되
 - [요구사항 명세서](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=63147339#gid=63147339)
 - [WBS](https://docs.google.com/spreadsheets/d/107CuIWefCSjBbwO0mnKdQJzK5WCFDKYtw5Rs18liJw8/edit?gid=395838842#gid=395838842)
 - [Figma 기획서](https://www.figma.com/proto/6suak3PIQpHGzS3UBatOF1/%ED%95%9C%ED%99%94-BEYOND-SW-CAMP-23%EA%B8%B0?node-id=618-102&viewport=696%2C533%2C0.2&t=o5woH0kckAYE5DgS-1&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=618%3A102&page-id=612%3A67)
-- [기획서 PDF](docs/WORKFORCE_프로젝트_기획서.pdf)
+- [기획서 PDF](WORKFORCE_프로젝트_기획서.pdf)
 
 <br>
 <div align="right"><a href="#목차">맨 위로</a></div>
