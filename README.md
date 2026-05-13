@@ -506,5 +506,7 @@ WORKFORCE의 챗봇 요청은 `member-service`에서 n8n webhook으로 전달되
 
 ## 트러블슈팅
 
+[트러블슈팅](ops-quality/troubleshooting.md)
+
 <br>
 <div align="right"><a href="#목차">맨 위로</a></div>
