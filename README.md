@@ -483,7 +483,7 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 운영자 대시보드 | `/saas/dashboard` | SaaS 운영자 로그인 후 콘솔 진입 | 준비 중 |
+| 운영자 대시보드 | `/saas/dashboard` | SaaS 운영자 로그인 후 콘솔 진입 | <video src="https://github.com/user-attachments/assets/311f1fa5-523e-4b0c-9687-3bf19c37c397"></video>|
 | 자동 작업 스케줄 | `/saas/schedules` | 테넌트/작업별 스케줄 조회 및 관리 | 준비 중 |
 | 세율표 관리 | `/saas/tax-table` | 기준연도별 세율표 조회/관리 | 준비 중 |
 | 4대보험 요율 관리 | `/saas/tax-rate` | 보험 요율 조회/관리 | 준비 중 |
@@ -533,6 +533,10 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 </details>
 
 <details>
+
+Uploading saas 접속.mov…
+
+
 <summary><strong>근태 · 휴가 · 출장</strong></summary>
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
