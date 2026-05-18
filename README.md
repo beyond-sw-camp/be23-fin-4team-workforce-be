@@ -486,7 +486,7 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 운영자 대시보드 | `/saas/dashboard` | SaaS 운영자 로그인 후 콘솔 진입 | <video src="https://github.com/user-attachments/assets/311f1fa5-523e-4b0c-9687-3bf19c37c397"></video>|
 | 자동 작업 스케줄 | `/saas/schedules` | 테넌트/작업별 스케줄 조회 및 관리 | 준비 중 |
 | 세율표 관리 | `/saas/tax-table` | 기준연도별 세율표 조회/관리 | 준비 중 |
-| 4대보험 요율 관리 | `/saas/tax-rate` | 보험 요율 조회/관리 | <video src="https://github.com/user-attachments/assets/e5fe9004-d671-4bf8-87e4-18dc3804346b></video>|
+| 4대보험 요율 관리 | `/saas/tax-rate` | 보험 요율 조회/관리 | <video src="https://github.com/user-attachments/assets/e5fe9004-d671-4bf8-87e4-18dc3804346b"></video>|
 
 </details>
 
