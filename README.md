@@ -1,3 +1,7 @@
+
+https://github.com/user-attachments/assets/7b35f61c-0f0d-4c85-98d3-a8cd8d9d5280
+
+https://github.com/user-attachments/assets/08b98d77-a99b-4281-be72-54ae7c03d5d1
 <div align="center">
 <img width="1920" height="800" alt="WORKFORCE hero" src="./docs/asset/profile/workforce-hero.gif" />
 </div>
@@ -532,10 +536,6 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 </details>
 
 <details>
-
-Uploading saas 접속.mov…
-
-
 <summary><strong>근태 · 휴가 · 출장</strong></summary>
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
@@ -565,7 +565,7 @@ Uploading saas 접속.mov…
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 급여 조회 | `/app/payroll` | 내 급여 명세 목록 조회 | 준비 중 |
+| 급여 조회 | `/app/payroll` | 내 급여 명세 목록 조회 | <video src="https://github.com/user-attachments/assets/55dd42c3-fb36-4a55-9494-e41257a80219"></video> |
 | 급여 명세 상세 | `/app/payroll/$payrollId` | 지급/공제/세금 상세 확인 | 준비 중 |
 | 수당 변경 신청 | `/app/payroll/allowances` | 개인 수당 변경 신청/이력 조회 | 준비 중 |
 | 연봉 조회 | `/app/payroll/annual` | 내 연봉 정보 조회 | 준비 중 |
