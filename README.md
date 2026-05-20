@@ -537,17 +537,16 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 내 근태 | `/app/attendance` | 출근/퇴근, 일간/주간 근태 현황, 정정 신청 진입 | 준비 중 |
-| 내 월근태 | `/app/attendance/monthly` | 월별 근태 내역 조회 | 준비 중 |
-| 개인 근무 스케줄 | `/app/attendance/schedules/my` | 시차출퇴근 스케줄 선택/변경 신청 | 준비 중 |
-| 초과근무 신청/조회 | `/app/attendance/overtime` | 연장근무 신청, 신청 이력 조회 | 준비 중 |
-| 내 주간 근무시간 | `/app/attendance/work-time` | 주간 누적 근무시간, 52시간 관련 상태 확인 | 준비 중 |
-| 휴가 계획 관리 | `/app/leave` | 잔여 연차 조회, 휴가 신청, 연차 촉진 회신 | 준비 중 |
-| 출장 신청/이력 | `/app/work-trips` | 출장/외근 신청, 이력 조회 | 준비 중 |
-| 전사 근태 현황 | `/app/attendance/company` | 일근태/월근태 현황, 이상 근태 확인 | 준비 중 |
-| 근무스케줄 관리 | `/app/attendance/schedules` | 회사 근무 스케줄 정책 관리 | 준비 중 |
-| 연장근로 정책 | `/app/attendance/overtime-policies` | 초과근무 정책 등록/수정 | 준비 중 |
-| 시차 출퇴근 시간대 | `/app/attendance/flexible-slots` | 출근 슬롯 등록/수정 | 준비 중 |
+| 내 근태 | `/app/attendance` | 출근/퇴근, 일간/주간 근태 현황, 정정 신청 진입 | <video src="https://github.com/user-attachments/assets/d9b806ff-3efb-444b-98b5-01b1dae01673"></video> |
+| 개인 근무 스케줄 | `/app/attendance/schedules/my` | 시차출퇴근 스케줄 선택/변경 신청 | <video src="https://github.com/user-attachments/assets/b046d057-b15e-44ca-bbc3-7b915f081009"></video> |
+| 초과근무 신청/조회 | `/app/attendance/overtime` | 연장근무 신청, 신청 이력 조회 | <video src=""></video> |
+| 내 주간 근무시간 | `/app/attendance/work-time` | 주간 누적 근무시간, 52시간 관련 상태 확인 | <video src="https://github.com/user-attachments/assets/3084ef51-1dc3-4dd9-9060-4caf80a58d40"></video> |
+| 휴가 계획 관리 | `/app/leave` | 잔여 연차 조회, 휴가 신청, 연차 촉진 회신 | <video src="https://github.com/user-attachments/assets/d8d7f9ae-347f-4f08-b242-374063fc5348"></video> |
+| 출장 신청 | `/app/work-trips` | 출장/외근 신청 | <video src="https://github.com/user-attachments/assets/27cf5214-6c0c-4bd9-a2ba-12f8f7a63d9c"></video> |
+| 전사 근태 현황 | `/app/attendance/company` | 일근태/월근태 현황, 이상 근태 확인 | <video src="https://github.com/user-attachments/assets/6a7ccc51-09ba-43f8-9929-732a420dc8ab"></video> |
+| 근무스케줄 관리 | `/app/attendance/schedules` | 회사 근무 스케줄 정책 관리 | <video src="https://github.com/user-attachments/assets/15bc271b-0cbd-424b-9cb5-04fb603e757c"></video> |
+| 연장근로 정책 | `/app/attendance/overtime-policies` | 초과근무 정책 등록/수정 | <video src="https://github.com/user-attachments/assets/8c00b853-b5c7-494b-a28f-d2a004d84ae7"></video> |
+| 시차 출퇴근 시간대 | `/app/attendance/flexible-slots` | 출퇴근시간 스케줄 등록/수정 | 준비 중 |
 | 연장근로 현황 | `/app/attendance/overtime-status` | 연장근로 사용 현황 집계 | 준비 중 |
 | 휴무일/공휴일 관리 | `/app/attendance/holidays` | 공휴일 등록, 일괄 반영 | 준비 중 |
 | 휴가 유형 관리 | `/app/leave/types` | 회사별 휴가 유형 등록/수정 | 준비 중 |
@@ -575,7 +574,6 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 호봉표 관리 | `/app/salary/pay-grade-table` | 호봉 테이블 등록/수정 | <video src="https://github.com/user-attachments/assets/ff3f71d5-dcf1-4112-99d9-8b8e983d1534"></video> |
 | 연차수당 정산 | `/app/salary/unused-leave` | 연말 미사용 연차수당 정산 내역 | <video src="https://github.com/user-attachments/assets/aafc8b76-e5c5-4edd-92e2-74704e96454b"></video> |
 | 퇴직급여 정책 | `/app/salary/retirement-policy` | 법정/DB/DC 퇴직급여 정책 설정 | <video src="https://github.com/user-attachments/assets/53d01132-89f1-4e52-8762-08d6ebeed316"></video> |
-| 연봉 협상 관리 | `/app/salary/negotiations` | 협상 대상자, 요청/승인 흐름 관리 | 준비 중 |
 | 상여 정책 | `/app/salary/bonus-policy` | 정기상여/성과급/명절상여 정책 설정 | <video src="https://github.com/user-attachments/assets/9a91a345-f08e-4dad-b085-a6d9109533a1"></video>|
 
 </details>
