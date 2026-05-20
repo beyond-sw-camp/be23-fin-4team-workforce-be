@@ -562,21 +562,21 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 급여 조회 | `/app/payroll` | 내 급여 명세 목록 조회 | <video src="https://github.com/user-attachments/assets/55dd42c3-fb36-4a55-9494-e41257a80219"></video> |
-| 급여 명세 상세 | `/app/payroll/$payrollId` | 지급/공제/세금 상세 확인 | 준비 중 |
-| 수당 변경 신청 | `/app/payroll/allowances` | 개인 수당 변경 신청/이력 조회 | 준비 중 |
-| 연봉 조회 | `/app/payroll/annual` | 내 연봉 정보 조회 | 준비 중 |
-| 퇴직금 조회 | `/app/payroll/retirement` | 예상 퇴직금 시뮬레이션 | 준비 중 |
-| 연봉 협상 이력 | `/app/payroll/negotiations` | 개인 연봉 협상 이력 조회 | 준비 중 |
+| 급여 조회 | `/app/payroll` | 내 급여 명세 목록 조회 | <video src="https://github.com/user-attachments/assets/737dcd68-2b20-42e9-9289-7cd16c1d7d00"></video> |
+| 급여 명세 상세 | `/app/payroll/$payrollId` | 지급/공제/세금 상세 확인 | <video src="https://github.com/user-attachments/assets/576072af-4839-430a-a465-605b3fccc812"></video> |
+| 수당 변경 신청 | `/app/payroll/allowances` | 개인 수당 변경 신청 | <video src="https://github.com/user-attachments/assets/f2a9ec03-1c2c-4f58-a210-6089c3e90b2d"></video> |
+| 연봉 조회 | `/app/payroll/annual` | 내 연봉 정보 조회 | <video src="https://github.com/user-attachments/assets/7450f01f-524f-4351-8af2-a06b7459ffc2"></video> |
+| 퇴직금 조회 | `/app/payroll/retirement` | 예상 퇴직금 시뮬레이션 | <video src="https://github.com/user-attachments/assets/f6dfe43a-21a9-47df-9732-fac3b11f4c0d"></video> |
+| 연봉 협상 이력 | `/app/payroll/negotiations` | 개인 연봉 협상 이력 조회 | <video src="https://github.com/user-attachments/assets/9104323b-23ac-4e38-8543-6f14fa868443"></video> |
 | 급여 정산 관리 | `/app/payroll/admin` | 월별 정산, 직원별 명세 생성/확정/지급 | 준비 중 |
 | 급여대장 상세 편집 | `/app/payroll/admin/$payrollId` | 명세 라인 수정, 확정/지급 처리 | 준비 중 |
-| 세금·4대보험 집계 | `/app/payroll/tax-summary` | 월별 보험/원천세 집계 조회 | 준비 중 |
-| 급여 정책 | `/app/salary/settings` | 지급/공제 항목, 급여 정책 설정 | 준비 중 |
-| 호봉표 관리 | `/app/salary/pay-grade-table` | 호봉 테이블 등록/수정 | 준비 중 |
-| 연차수당 정산 | `/app/salary/unused-leave` | 미사용 연차수당 대상 조회/정산 | 준비 중 |
-| 퇴직급여 정책 | `/app/salary/retirement-policy` | 법정/DB/DC 퇴직급여 정책 설정 | 준비 중 |
+| 세금·4대보험 집계 | `/app/payroll/tax-summary` | 월별 보험/원천세 집계 조회 | <video src="https://github.com/user-attachments/assets/069c90a6-6c4e-479f-bc14-f59cd849062e"></video> |
+| 급여 정책 | `/app/salary/settings` | 급여 정책 설정 | <video src="https://github.com/user-attachments/assets/bdb510e9-5c11-4d72-bb7c-dc4bdf8f9ce6"></video>|
+| 호봉표 관리 | `/app/salary/pay-grade-table` | 호봉 테이블 등록/수정 | <video src="https://github.com/user-attachments/assets/ff3f71d5-dcf1-4112-99d9-8b8e983d1534"></video> |
+| 연차수당 정산 | `/app/salary/unused-leave` | 연말 미사용 연차수당 정산 내역 | <video src="https://github.com/user-attachments/assets/aafc8b76-e5c5-4edd-92e2-74704e96454b"></video> |
+| 퇴직급여 정책 | `/app/salary/retirement-policy` | 법정/DB/DC 퇴직급여 정책 설정 | <video src="https://github.com/user-attachments/assets/53d01132-89f1-4e52-8762-08d6ebeed316"></video> |
 | 연봉 협상 관리 | `/app/salary/negotiations` | 협상 대상자, 요청/승인 흐름 관리 | 준비 중 |
-| 상여 정책 | `/app/salary/bonus-policy` | 정기상여/성과급/명절상여 정책 설정 | 준비 중 |
+| 상여 정책 | `/app/salary/bonus-policy` | 정기상여/성과급/명절상여 정책 설정 | <video src="https://github.com/user-attachments/assets/9a91a345-f08e-4dad-b085-a6d9109533a1"></video>|
 
 </details>
 
