@@ -1,4 +1,6 @@
 
+https://github.com/user-attachments/assets/7e196cbe-9529-45bb-b5c2-61e01b0336c0
+
 <div align="center">
 <img width="1920" height="800" alt="WORKFORCE hero" src="./docs/asset/profile/workforce-hero.gif" />
 </div>
@@ -540,20 +542,21 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 내 근태 | `/app/attendance` | 출근/퇴근, 주간/월간 근태 현황, 근태 정정 신청 진입 | <video src="https://github.com/user-attachments/assets/d9b806ff-3efb-444b-98b5-01b1dae01673"></video> |
 | 개인 근무 스케줄 | `/app/attendance/schedules/my` | 시차출퇴근 스케줄 선택/변경 신청 | <video src="https://github.com/user-attachments/assets/6c06c440-df49-477f-a7c7-6fc7c15100db"></video> |
 | 초과근무 신청/조회 | `/app/attendance/overtime` | 연장근무 신청, 신청 이력 조회 | <video src="https://github.com/user-attachments/assets/4ada85e6-01b7-450c-ad9d-b2d4e8df0c1c"></video> |
-| 휴가 계획 관리 | `/app/leave` | 잔여 연차 조회, 휴가 신청, 연차 촉진 회신 | <video src="https://github.com/user-attachments/assets/d8d7f9ae-347f-4f08-b242-374063fc5348"></video> |
+| 휴가 계획 관리 | `/app/leave` | 잔여 연차 조회, 휴가 신청, 연차 촉진 회신 | <video src="https://github.com/user-attachments/assets/a0c4be3c-cc73-454a-9ee7-7c03ceee1e65"></video> |
 | 출장 신청 | `/app/work-trips` | 출장/외근 신청 | <video src="https://github.com/user-attachments/assets/27cf5214-6c0c-4bd9-a2ba-12f8f7a63d9c"></video> |
 | 전사 근태 현황 | `/app/attendance/company` | 일근태/월근태 현황, 이상 근태 확인 | <video src="https://github.com/user-attachments/assets/6a7ccc51-09ba-43f8-9929-732a420dc8ab"></video> |
-| 근무스케줄 관리 | `/app/attendance/schedules` | 회사 근무 스케줄 정책 관리 | <video src=""></video> |
+| 근무스케줄 관리 | `/app/attendance/schedules` | 회사 근무 스케줄 정책 관리 | <video src="https://github.com/user-attachments/assets/e1b9b222-abae-423d-b85f-0b4be08a0194"></video> |
 | 연장근로 정책 | `/app/attendance/overtime-policies` | 초과근무 정책 등록/수정 | <video src="https://github.com/user-attachments/assets/8c00b853-b5c7-494b-a28f-d2a004d84ae7"></video> |
-| 시차 출퇴근 시간대 | `/app/attendance/flexible-slots` | 출퇴근시간 스케줄 등록/수정 | 준비 중 |
-| 연장근로 현황 | `/app/attendance/overtime-status` | 연장근로 사용 현황 집계 | 준비 중 |
-| 휴무일/공휴일 관리 | `/app/attendance/holidays` | 공휴일 등록, 일괄 반영 | 준비 중 |
-| 휴가 유형 관리 | `/app/leave/types` | 회사별 휴가 유형 등록/수정 | 준비 중 |
-| 연차 정책 관리 | `/app/leave/policies` | 연차 부여/이월/촉진 정책 설정 | 준비 중 |
-| 휴직 관리 | `/app/leave/absence` | 휴직 등록/승인 반영 내역 확인 | 준비 중 |
-| 연차 통보 미응답자 관리 | `/app/leave/promotion-no-response` | 1차/2차 미응답 대상자 필터링 및 조치 | 준비 중 |
+| 시차 출퇴근 시간대 | `/app/attendance/flexible-slots` | 출퇴근시간 스케줄 등록/수정 | <video src="https://github.com/user-attachments/assets/67762f46-545e-4a62-83df-9ee8e6630110"></video>|
+| 연장근로 현황 | `/app/attendance/overtime-status` | 연장근로 사용 현황 집계 | <video src="https://github.com/user-attachments/assets/54002007-6c17-404c-88a3-5a38f951c779"></video> |
+| 휴무일/공휴일 관리 | `/app/attendance/holidays` | 공휴일 등록, 일괄 반영 | <video src="https://github.com/user-attachments/assets/4949074a-cb38-4469-bffd-51dc6e99dbb8"></video> |
+| 휴가 유형 관리 | `/app/leave/types` | 회사별 휴가 유형 등록/수정 | <video src="https://github.com/user-attachments/assets/147d717a-15f7-41c3-bcaf-bc4aa2a6d469"></video> |
+| 연차 정책 관리 | `/app/leave/policies` | 연차 부여/이월/촉진 정책 설정 | <video src="https://github.com/user-attachments/assets/23903995-e3ec-4e45-9043-32cddeedd7d8"></video> |
+| 휴직 관리 | `/app/leave/absence` | 휴직 등록/승인 반영 내역 확인 | <video src=""></video> |
+| 연차 통보 미응답자 관리 | `/app/leave/promotion-no-response` | 1차/2차 미응답 대상자 필터링 및 조치 | <video src="https://github.com/user-attachments/assets/954f31d8-5796-43eb-9aca-d2e0ccde2b35"></video> |
 
 </details>
+
 
 <details>
 <summary><strong>급여 · 상여 · 퇴직금</strong></summary>
