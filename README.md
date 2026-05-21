@@ -450,35 +450,39 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
 | 랜딩 | `/` | 서비스 진입, 로그인/회사 온보딩 이동 | 준비 중 |
-| 로그인 | `/login` | 일반 사용자 로그인, SaaS 운영자 로그인 분기 | 준비 중 |
-| 비밀번호 찾기 | `/find-password` | 이메일 입력 후 재설정 요청 | 준비 중 |
-| 비밀번호 재설정 | `/reset-password` | 재설정 토큰 기반 새 비밀번호 등록 | 준비 중 |
-| 비밀번호 변경 | `/change-password` | 최초 로그인/강제 변경 플로우 | 준비 중 |
-| 이메일 인증 | `/verify-email` | 이메일 인증 완료/실패 화면 | 준비 중 |
-| 회사 온보딩 | `/company/onboarding` | 회사 생성, 기본 정보 입력, 초기 가입 완료 | 준비 중 |
+| 로그인 | `/login` | 일반 사용자 로그인, SaaS 운영자 로그인 분기 | <video src="https://github.com/user-attachments/assets/b255560f-0305-4697-9d3b-95ba7c2f5e63"></video> |
+| 비밀번호 찾기 | `/find-password` | 이메일 입력 후 재설정 요청 | <video src="https://github.com/user-attachments/assets/37032ce2-d279-4a4b-8325-a83a181d3302"></video> |
+| 비밀번호 재설정 | `/reset-password` | 재설정 토큰 기반 새 비밀번호 등록 | <video src="https://github.com/user-attachments/assets/cbc55465-c675-4818-9f4e-b744443fb5b9"></video>  |
+| 비밀번호 변경 | `/change-password` | 최초 로그인/강제 변경 플로우 |   |
+| 이메일 인증 | `/verify-email` | 이메일 인증 완료/실패 화면 | 비밀번호 찾기시 인증 |
+| 회사 온보딩 | `/company/onboarding` | 회사 생성, 기본 정보 입력, 초기 가입 완료 | <video src="https://github.com/user-attachments/assets/3774dbac-220b-4f74-9307-cdd5735a9d2a"></video> |
 | 접근 금지 | `/403` | 권한 없는 사용자 접근 차단 | 준비 중 |
 | Not Found | `/404` | 존재하지 않는 URL 진입 | 준비 중 |
 
 </details>
+
+
+
 
 <details>
 <summary><strong>공통 앱 셸 · 대시보드/검색/알림/AI</strong></summary>
 
 | 화면/기능 | 경로 | 증적 시나리오 | 증적 |
 |-----------|------|---------------|------|
-| 대시보드 | `/app/dashboard` | 로그인 후 메인 위젯, 요약 지표 확인 | 준비 중 |
-| HR 인사이트 | `/app/insights` | 인사 지표/분석 화면 조회 | 준비 중 |
-| 캘린더 | `/app/calendar` | 회사 일정, 개인 일정, 결재 승인 일정 확인 | 준비 중 |
-| 알림 목록 | `/app/notifications` | 알림 목록 조회, 읽음 처리, 관련 화면 이동 | 준비 중 |
+| 대시보드 | `/app/dashboard` | 로그인 후 메인 위젯, 요약 지표 확인 |  <video src="https://github.com/user-attachments/assets/862567e2-c7cc-4ebc-b2b0-5e21d4b598af"></video> |
+| HR 인사이트 | `/app/insights` | 인사 지표/분석 화면 조회(UI 시연용 더미) | <video src="https://github.com/user-attachments/assets/e7442a7d-02de-4d7f-b9b0-df6822447849"></video> |
+| 캘린더 | `/app/calendar` | 회사 일정, 개인 일정, 결재 승인 일정 확인 | <video src="https://github.com/user-attachments/assets/a06332bc-49a3-4c32-b1d3-7426459c78c9"></video> |
+| 알림 목록 | `/app/notifications` | 알림 목록 조회, 읽음 처리, 관련 화면 이동 | <video src="https://github.com/user-attachments/assets/6b0f44cf-a862-4575-9eda-3af304b0f00c"></video> |
 | 헤더 알림 팝오버 | 공통 헤더 | 실시간 알림 수신, 알림 클릭 라우팅 | 준비 중 |
-| 통합 검색 | 공통 헤더 | 메뉴/구성원/문서 검색 후 상세 이동 | 준비 중 |
-| 조직도 모달 | 공통 앱 셸 | 조직 트리 조회, 구성원 상세 패널 확인 | 준비 중 |
-| 멤버 채팅 | 공통 헤더/모달 | 1:1/그룹 채팅, 파일/이미지 메시지, 읽음 처리 | 준비 중 |
-| AI 챗봇 | 우측 하단 FAB | 정책 질문, 실시간 조회 질문, 답변 출처 확인 | 준비 중 |
-| AI 회의록 | 공통 헤더 모달 | 녹음 파일 업로드, 회의록 생성, 결과 확인 | 준비 중 |
-| 마이페이지 | `/app/me` | 내 정보 조회 | 준비 중 |
+| 통합 검색 | 공통 헤더 | 메뉴/구성원/문서 검색 후 상세 이동 | <video src="https://github.com/user-attachments/assets/e5e43e84-8083-4fc3-892e-976c5b61ee27"></video> |
+| 조직도 모달 | 공통 앱 셸 | 조직 트리 조회, 구성원 상세 패널 확인 | <video src="https://github.com/user-attachments/assets/7ab593ce-5943-444a-af6f-76f45705e02b"></video> |
+| 멤버 채팅 | 공통 헤더/모달 | 1:1/그룹 채팅, 파일/이미지 메시지, 읽음 처리 | <video src="https://github.com/user-attachments/assets/471e4cf1-bad2-43c3-92a4-37fb7809f9cd"></video> |
+| AI 챗봇 | 우측 하단 FAB | 정책 질문, 실시간 조회 질문, 답변 출처 확인 | <video src=""></video> |
+| AI 회의록 | 공통 헤더 모달 | 녹음 파일 업로드, 회의록 생성, 결과 확인 | <video src=""></video> |
+| 마이페이지 | `/app/me` | 내 정보 조회 | <video src="https://github.com/user-attachments/assets/f48e937f-bde0-46f2-8a21-2525ea8fd51c"></video> |
 
 </details>
+
 
 <details>
 <summary><strong>SaaS 운영자 콘솔</strong></summary>
@@ -496,14 +500,12 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 관리자 온보딩 | `/app/onboarding` | 회사 초기 조직/정책/결재 기본 설정 | 준비 중 |
-| 구성원 목록 | `/app/members` | 구성원 검색, 필터, 직원 등록 | <video src="https://github.com/user-attachments/assets/8823b793-de0f-4466-acd8-ebc6fac76de9
-"></video> |
+| 관리자 온보딩 | `/app/onboarding` | 회사 초기 조직/정책/결재 기본 설정 | <video src="https://github.com/user-attachments/assets/3774dbac-220b-4f74-9307-cdd5735a9d2a"></video> |
+| 구성원 목록 | `/app/members` | 구성원 검색, 필터, 직원 등록 | <video src="https://github.com/user-attachments/assets/8823b793-de0f-4466-acd8-ebc6fac76de9"></video> |
 | 구성원 상세 | `/app/members/$memberId` | 인사 정보, 소속, 이력 상세 확인 | <video src="https://github.com/user-attachments/assets/a2601280-94f9-4a19-b436-aecc0e3ac018"></video> |
 | 조직 구조 | `/app/organization?tab=structure` | 조직 트리 생성/수정/이동 | <video src="https://github.com/user-attachments/assets/ae4816f0-d55e-4249-b24b-f7687ab22cdc"></video> |
 | 직급 관리 | `/app/organization?tab=grades` | 직급 등록/수정/삭제 | <video src="https://github.com/user-attachments/assets/522de4ba-27ba-4385-a4c2-6ce9b5c92e56"></video> |
-| 직책 관리 | `/app/organization?tab=titles` | 직책 등록/수정/삭제 | <video src="https://github.com/user-attachments/assets/b7f60867-7d57-43f1-9fd6-537f05909941
-"></video> |
+| 직책 관리 | `/app/organization?tab=titles` | 직책 등록/수정/삭제 | <video src="https://github.com/user-attachments/assets/b7f60867-7d57-43f1-9fd6-537f05909941"></video> |
 | 역할·권한 | `/app/organization?tab=roles` | 기본 역할, 커스텀 권한 설정 | <video src="https://github.com/user-attachments/assets/432c1d42-ec4e-4a5f-8dcb-2ab6ca134b41"></video> |
 | 조직 개편 | `/app/organization?tab=restructure` | 조직 개편 시뮬레이션/적용 | <video src="https://github.com/user-attachments/assets/0628dcc8-4d19-47ad-8be2-3bc084530f86"></video> |
 | HR 정책 문서 | `/app/ai-documents` | 정책 문서 업로드, 목록 조회, 삭제, 챗봇 연동 증적 | <video src=""></video> |
