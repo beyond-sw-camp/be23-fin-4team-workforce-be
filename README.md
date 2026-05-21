@@ -1,4 +1,6 @@
 
+https://github.com/user-attachments/assets/f2282ca5-a998-4212-ac38-527841971a2e
+
 
 <div align="center">
 <img width="1920" height="800" alt="WORKFORCE hero" src="./docs/asset/profile/workforce-hero.gif" />
@@ -497,17 +499,20 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
 | 관리자 온보딩 | `/app/onboarding` | 회사 초기 조직/정책/결재 기본 설정 | 준비 중 |
-| 구성원 목록 | `/app/members` | 구성원 검색, 필터, 직원 등록 | 준비 중 |
-| 구성원 상세 | `/app/members/$memberId` | 인사 정보, 소속, 이력 상세 확인 | 준비 중 |
-| 조직 구조 | `/app/organization?tab=structure` | 조직 트리 생성/수정/이동 | 준비 중 |
-| 직급 관리 | `/app/organization?tab=grades` | 직급 등록/수정/삭제 | 준비 중 |
-| 직책 관리 | `/app/organization?tab=titles` | 직책 등록/수정/삭제 | 준비 중 |
-| 역할·권한 | `/app/organization?tab=roles` | 기본 역할, 커스텀 권한 설정 | 준비 중 |
-| 조직 개편 | `/app/organization?tab=restructure` | 조직 개편 시뮬레이션/적용 | 준비 중 |
-| HR 정책 문서 | `/app/ai-documents` | 정책 문서 업로드, 목록 조회, 삭제, 챗봇 연동 증적 | 준비 중 |
-| 자동 작업 관리 | `/app/admin/batch-schedule` | 배치 스케줄 조회/수정 | 준비 중 |
+| 구성원 목록 | `/app/members` | 구성원 검색, 필터, 직원 등록 | <video src="https://github.com/user-attachments/assets/8823b793-de0f-4466-acd8-ebc6fac76de9
+"></video> |
+| 구성원 상세 | `/app/members/$memberId` | 인사 정보, 소속, 이력 상세 확인 | <video src="https://github.com/user-attachments/assets/a2601280-94f9-4a19-b436-aecc0e3ac018"></video> |
+| 조직 구조 | `/app/organization?tab=structure` | 조직 트리 생성/수정/이동 | <video src="https://github.com/user-attachments/assets/ae4816f0-d55e-4249-b24b-f7687ab22cdc"></video> |
+| 직급 관리 | `/app/organization?tab=grades` | 직급 등록/수정/삭제 | <video src="https://github.com/user-attachments/assets/522de4ba-27ba-4385-a4c2-6ce9b5c92e56"></video> |
+| 직책 관리 | `/app/organization?tab=titles` | 직책 등록/수정/삭제 | <video src="https://github.com/user-attachments/assets/b7f60867-7d57-43f1-9fd6-537f05909941
+"></video> |
+| 역할·권한 | `/app/organization?tab=roles` | 기본 역할, 커스텀 권한 설정 | <video src="https://github.com/user-attachments/assets/432c1d42-ec4e-4a5f-8dcb-2ab6ca134b41"></video> |
+| 조직 개편 | `/app/organization?tab=restructure` | 조직 개편 시뮬레이션/적용 | <video src="https://github.com/user-attachments/assets/0628dcc8-4d19-47ad-8be2-3bc084530f86"></video> |
+| HR 정책 문서 | `/app/ai-documents` | 정책 문서 업로드, 목록 조회, 삭제, 챗봇 연동 증적 | <video src=""></video> |
+| 자동 작업 관리 | `/app/admin/batch-schedule` | 배치 스케줄 조회/수정 | <video src="https://github.com/user-attachments/assets/325aca94-ad08-4eb2-998a-baa94e73d7ba"></video> |
 
 </details>
+
 
 <details>
 <summary><strong>전자결재 · 문서함/양식/계약</strong></summary>
@@ -551,11 +556,10 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 휴무일/공휴일 관리 | `/app/attendance/holidays` | 공휴일 등록, 일괄 반영 | <video src="https://github.com/user-attachments/assets/4949074a-cb38-4469-bffd-51dc6e99dbb8"></video> |
 | 휴가 유형 관리 | `/app/leave/types` | 회사별 휴가 유형 등록/수정 | <video src="https://github.com/user-attachments/assets/147d717a-15f7-41c3-bcaf-bc4aa2a6d469"></video> |
 | 연차 정책 관리 | `/app/leave/policies` | 연차 부여/이월/촉진 정책 설정 | <video src="https://github.com/user-attachments/assets/23903995-e3ec-4e45-9043-32cddeedd7d8"></video> |
-| 휴직 관리 | `/app/leave/absence` | 휴직 등록/승인 반영 내역 확인 | <video src=""></video> |
+| 휴직 관리 | `/app/leave/absence` | 휴직 등록/승인 반영 내역 확인 | <video src="https://github.com/user-attachments/assets/2b0be1a2-a513-4b81-bd0e-0378e4d57f30"></video> |
 | 연차 통보 미응답자 관리 | `/app/leave/promotion-no-response` | 1차/2차 미응답 대상자 필터링 및 조치 | <video src="https://github.com/user-attachments/assets/954f31d8-5796-43eb-9aca-d2e0ccde2b35"></video> |
 
 </details>
-
 
 <details>
 <summary><strong>급여 · 상여 · 퇴직금</strong></summary>
@@ -568,8 +572,8 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 연봉 조회 | `/app/payroll/annual` | 내 연봉 정보 조회 | <video src="https://github.com/user-attachments/assets/7450f01f-524f-4351-8af2-a06b7459ffc2"></video> |
 | 퇴직금 조회 | `/app/payroll/retirement` | 예상 퇴직금 시뮬레이션 | <video src="https://github.com/user-attachments/assets/f6dfe43a-21a9-47df-9732-fac3b11f4c0d"></video> |
 | 연봉 협상 이력 | `/app/payroll/negotiations` | 개인 연봉 협상 이력 조회 | <video src="https://github.com/user-attachments/assets/9104323b-23ac-4e38-8543-6f14fa868443"></video> |
-| 급여 정산 관리 | `/app/payroll/admin` | 월별 정산, 직원별 명세 생성/확정/지급 | 준비 중 |
-| 급여대장 상세 편집 | `/app/payroll/admin/$payrollId` | 명세 라인 수정, 확정/지급 처리 | 준비 중 |
+| 급여 정산 관리 | `/app/payroll/admin` | 월별 정산, 직원별 명세 생성/확정/지급 | <video src="https://github.com/user-attachments/assets/7f763de2-4606-4527-a947-4b7b38934938"></video> |
+| 급여대장 상세 조회 및 수정 | `/app/payroll/admin/$payrollId` | 직원별 급여 명세서 수정 | <video src="https://github.com/user-attachments/assets/f1cda2ea-6ec0-4ae8-a6f5-b1e841be249c"></video> |
 | 세금·4대보험 집계 | `/app/payroll/tax-summary` | 월별 보험/원천세 집계 조회 | <video src="https://github.com/user-attachments/assets/069c90a6-6c4e-479f-bc14-f59cd849062e"></video> |
 | 급여 정책 | `/app/salary/settings` | 급여 정책 설정 | <video src="https://github.com/user-attachments/assets/bdb510e9-5c11-4d72-bb7c-dc4bdf8f9ce6"></video>|
 | 호봉표 관리 | `/app/salary/pay-grade-table` | 호봉 테이블 등록/수정 | <video src="https://github.com/user-attachments/assets/ff3f71d5-dcf1-4112-99d9-8b8e983d1534"></video> |
@@ -615,8 +619,6 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 메일 | `/app/mail` | 준비 중 화면 확인 | 준비 중 |
 | AI 비서 페이지 | `/app/ai-assistant` | 준비 중 화면 확인, FAB 챗봇과 구분 | 준비 중 |
 | 역할·권한 레거시 | `/app/roles` | `/app/organization?tab=roles` 리다이렉트 확인 | 준비 중 |
-| 월근태 레거시 | `/app/attendance/company/monthly` | `/app/attendance/company` 리다이렉트 확인 | 준비 중 |
-| 포괄임금 OT 레거시 | `/app/attendance/comprehensive-ot` | `/app/attendance/overtime-status` 리다이렉트 확인 | 준비 중 |
 
 </details>
 
