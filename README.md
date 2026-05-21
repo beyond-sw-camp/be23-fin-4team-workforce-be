@@ -1,6 +1,4 @@
 
-https://github.com/user-attachments/assets/f2282ca5-a998-4212-ac38-527841971a2e
-
 
 <div align="center">
 <img width="1920" height="800" alt="WORKFORCE hero" src="./docs/asset/profile/workforce-hero.gif" />
