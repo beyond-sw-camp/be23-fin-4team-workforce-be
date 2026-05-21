@@ -537,14 +537,13 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 
 | 화면 | 경로 | 증적 시나리오 | 증적 |
 |------|------|---------------|------|
-| 내 근태 | `/app/attendance` | 출근/퇴근, 일간/주간 근태 현황, 정정 신청 진입 | <video src="https://github.com/user-attachments/assets/d9b806ff-3efb-444b-98b5-01b1dae01673"></video> |
-| 개인 근무 스케줄 | `/app/attendance/schedules/my` | 시차출퇴근 스케줄 선택/변경 신청 | <video src="https://github.com/user-attachments/assets/b046d057-b15e-44ca-bbc3-7b915f081009"></video> |
-| 초과근무 신청/조회 | `/app/attendance/overtime` | 연장근무 신청, 신청 이력 조회 | <video src=""></video> |
-| 내 주간 근무시간 | `/app/attendance/work-time` | 주간 누적 근무시간, 52시간 관련 상태 확인 | <video src="https://github.com/user-attachments/assets/3084ef51-1dc3-4dd9-9060-4caf80a58d40"></video> |
+| 내 근태 | `/app/attendance` | 출근/퇴근, 주간/월간 근태 현황, 근태 정정 신청 진입 | <video src="https://github.com/user-attachments/assets/d9b806ff-3efb-444b-98b5-01b1dae01673"></video> |
+| 개인 근무 스케줄 | `/app/attendance/schedules/my` | 시차출퇴근 스케줄 선택/변경 신청 | <video src="https://github.com/user-attachments/assets/6c06c440-df49-477f-a7c7-6fc7c15100db"></video> |
+| 초과근무 신청/조회 | `/app/attendance/overtime` | 연장근무 신청, 신청 이력 조회 | <video src="https://github.com/user-attachments/assets/4ada85e6-01b7-450c-ad9d-b2d4e8df0c1c"></video> |
 | 휴가 계획 관리 | `/app/leave` | 잔여 연차 조회, 휴가 신청, 연차 촉진 회신 | <video src="https://github.com/user-attachments/assets/d8d7f9ae-347f-4f08-b242-374063fc5348"></video> |
 | 출장 신청 | `/app/work-trips` | 출장/외근 신청 | <video src="https://github.com/user-attachments/assets/27cf5214-6c0c-4bd9-a2ba-12f8f7a63d9c"></video> |
 | 전사 근태 현황 | `/app/attendance/company` | 일근태/월근태 현황, 이상 근태 확인 | <video src="https://github.com/user-attachments/assets/6a7ccc51-09ba-43f8-9929-732a420dc8ab"></video> |
-| 근무스케줄 관리 | `/app/attendance/schedules` | 회사 근무 스케줄 정책 관리 | <video src="https://github.com/user-attachments/assets/15bc271b-0cbd-424b-9cb5-04fb603e757c"></video> |
+| 근무스케줄 관리 | `/app/attendance/schedules` | 회사 근무 스케줄 정책 관리 | <video src=""></video> |
 | 연장근로 정책 | `/app/attendance/overtime-policies` | 초과근무 정책 등록/수정 | <video src="https://github.com/user-attachments/assets/8c00b853-b5c7-494b-a28f-d2a004d84ae7"></video> |
 | 시차 출퇴근 시간대 | `/app/attendance/flexible-slots` | 출퇴근시간 스케줄 등록/수정 | 준비 중 |
 | 연장근로 현황 | `/app/attendance/overtime-status` | 연장근로 사용 현황 집계 | 준비 중 |
