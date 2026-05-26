@@ -454,7 +454,7 @@ AI 챗봇이 회사 정책 문서를 기반으로 답변하려면, HR 담당자�
 | 비밀번호 찾기 | `/find-password` | 이메일 입력 후 재설정 요청 | <video src="https://github.com/user-attachments/assets/37032ce2-d279-4a4b-8325-a83a181d3302"></video> |
 | 비밀번호 재설정 | `/reset-password` | 재설정 토큰 기반 새 비밀번호 등록 | <video src="https://github.com/user-attachments/assets/cbc55465-c675-4818-9f4e-b744443fb5b9"></video> |
 | 비밀번호 변경 | `/change-password` | 최초 로그인/강제 변경 플로우 | <video src="https://github.com/user-attachments/assets/7d4eec44-5a7b-46a4-81a8-634992262f86"></video> |
-| 이메일 인증 | `/verify-email` | 이메일 인증 완료/실패 화면 | 비밀번호 찾기시 인증 |
+| 이메일 인증 | `/verify-email` | 이메일 인증 완료/실패 화면 | <video src="https://github.com/user-attachments/assets/92aa20f3-804e-402d-acbb-b27360c0e8be"></video> <video src="https://github.com/user-attachments/assets/a1f92048-52ed-4e22-89da-81105f84837f"></video> |
 | 회사 온보딩 | `/company/onboarding` | 회사 생성, 기본 정보 입력, 초기 가입 완료 | <video src="https://github.com/user-attachments/assets/3774dbac-220b-4f74-9307-cdd5735a9d2a"></video> |
 | 접근 금지 | `/403` | 권한 없는 사용자 접근 차단 | 준비 중 |
 | Not Found | `/404` | 존재하지 않는 URL 진입 | 준비 중 |
